@@ -79,20 +79,37 @@ export default function Bill() {
       {/* ── Print CSS ── */}
       <style>{`
         @media print {
-          html, body { margin: 0; padding: 0; background: white; }
-          .no-print { display: none !important; }
-          .receipt-shell {
+          /* 1. Hide EVERYTHING on the page — including sidebar, bottom nav, app shell */
+          body * { visibility: hidden !important; }
+
+          /* 2. Make ONLY the receipt card and its children visible */
+          .receipt-print-only,
+          .receipt-print-only * { visibility: visible !important; }
+
+          /* 3. Pin the receipt to the top-left so it fills the print page cleanly */
+          .receipt-print-only {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
             padding: 0 !important;
             background: white !important;
-            display: block !important;
-          }
-          .receipt-card {
             box-shadow: none !important;
             border: none !important;
-            max-width: 100% !important;
             border-radius: 0 !important;
-            page-break-inside: avoid;
+            max-width: 100% !important;
+            z-index: 99999 !important;
           }
+
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+
+          /* 4. Strip zigzag SVG decorations — they add blank space when printed */
+          .receipt-print-only svg { display: none !important; }
         }
       `}</style>
 
@@ -114,7 +131,7 @@ export default function Bill() {
         </div>
 
         {/* ── Receipt wrapper ── */}
-        <div className="receipt-card mx-auto my-6 w-full max-w-sm bg-white shadow-2xl rounded-sm overflow-hidden"
+        <div className="receipt-print-only receipt-card mx-auto my-6 w-full max-w-sm bg-white shadow-2xl rounded-sm overflow-hidden"
              style={{ fontFamily: "'Courier New', Courier, monospace" }}>
 
           {/* Zigzag top edge */}
