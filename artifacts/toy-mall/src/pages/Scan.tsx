@@ -5,7 +5,7 @@ import {
   ScanLine, ArrowRight, Trash2, Plus, Minus,
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
   Phone, Wallet, Banknote, Smartphone,
-  PackagePlus, ShoppingBag, ArrowUpCircle, RotateCcw,
+  PackagePlus, ShoppingBag, ArrowUpCircle, RotateCcw, Camera, CameraOff,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -69,8 +69,8 @@ function AnimatedTotal({ value }: { value: number }) {
   }, [value]);
   return (
     <span
-      className={`font-black text-white tabular-nums transition-all duration-300 ${
-        pulse ? "text-4xl text-green-400 scale-110" : "text-3xl scale-100"
+      className={`font-black tabular-nums transition-all duration-300 ${
+        pulse ? "text-4xl text-green-600 dark:text-green-400 scale-110" : "text-3xl text-foreground scale-100"
       }`}
       style={{ display: "inline-block", transformOrigin: "left center" }}
     >
@@ -87,16 +87,16 @@ function SuccessOverlay({ billId }: { billId: string }) {
     return () => clearTimeout(t);
   }, [billId, setLocation]);
   return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/95 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative flex items-center justify-center">
         <div className="absolute w-40 h-40 rounded-full bg-green-500/10 animate-ping" style={{ animationDuration: "1s" }} />
         <div className="absolute w-28 h-28 rounded-full bg-green-500/20 animate-ping" style={{ animationDuration: "0.8s", animationDelay: "0.1s" }} />
-        <div className="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center shadow-2xl shadow-green-500/40 animate-in zoom-in duration-300">
+        <div className="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center shadow-2xl shadow-green-500/30 animate-in zoom-in duration-300">
           <CheckCircle2 className="w-12 h-12 text-white" strokeWidth={2.5} />
         </div>
       </div>
-      <p className="mt-8 text-2xl font-black text-white tracking-wide animate-in slide-in-from-bottom-4 duration-400 delay-200">Sale Complete!</p>
-      <p className="mt-2 text-sm text-white/50 animate-in slide-in-from-bottom-4 duration-400 delay-300">Printing receipt…</p>
+      <p className="mt-8 text-2xl font-black text-foreground tracking-wide animate-in slide-in-from-bottom-4 duration-400 delay-200">Sale Complete!</p>
+      <p className="mt-2 text-sm text-muted-foreground animate-in slide-in-from-bottom-4 duration-400 delay-300">Opening receipt…</p>
     </div>
   );
 }
@@ -124,78 +124,92 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading }: CheckoutM
   };
 
   return (
-    <div className="absolute inset-0 z-40 flex items-end md:items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+    <div className="absolute inset-0 z-40 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
          onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="w-full md:max-w-sm bg-zinc-900 rounded-t-3xl md:rounded-3xl border border-white/10 shadow-2xl animate-in slide-in-from-bottom-4 md:zoom-in-95 duration-250 overflow-hidden">
+      <div className="w-full md:max-w-sm bg-card rounded-t-3xl md:rounded-3xl border shadow-2xl animate-in slide-in-from-bottom-4 md:zoom-in-95 duration-250 overflow-hidden">
+        {/* Drag handle (mobile) */}
         <div className="md:hidden flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-white/20" />
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
-        <div className="px-5 pt-4 pb-3 border-b border-white/10 flex items-center justify-between">
+
+        {/* Header */}
+        <div className="px-5 pt-4 pb-3 border-b flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-black text-white">Confirm Checkout</h2>
-            <p className="text-xs text-white/40 mt-0.5">{count} item{count !== 1 ? "s" : ""} in cart</p>
+            <h2 className="text-lg font-black text-foreground">Confirm Checkout</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{count} item{count !== 1 ? "s" : ""} in cart</p>
           </div>
-          <button onClick={onCancel} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
-            <X className="w-4 h-4 text-white/60" />
+          <button onClick={onCancel} className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center transition-all">
+            <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
+
         <div className="px-5 py-4 space-y-5">
-          <div className="bg-green-500/10 border border-green-500/20 rounded-2xl px-4 py-3 flex items-center justify-between">
+          {/* Grand total */}
+          <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-2xl px-4 py-3 flex items-center justify-between">
             <div>
-              <p className="text-xs text-white/50 font-medium">Grand Total</p>
-              <p className="text-3xl font-black text-green-400 tabular-nums">
+              <p className="text-xs text-muted-foreground font-medium">Grand Total</p>
+              <p className="text-3xl font-black text-green-700 dark:text-green-400 tabular-nums">
                 ₹{total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-green-500/20 flex items-center justify-center">
-              <Receipt className="w-6 h-6 text-green-400" />
+            <div className="w-12 h-12 rounded-2xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+              <Receipt className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
           </div>
+
+          {/* Payment mode */}
           <div>
-            <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
               <Wallet className="w-3.5 h-3.5" /> Payment Mode
             </p>
             <div className="grid grid-cols-2 gap-3">
               {([
-                { value: "cash", label: "Cash",  Icon: Banknote,   color: "text-yellow-400", bg: "bg-yellow-500/15 border-yellow-500/40" },
-                { value: "upi",  label: "UPI",   Icon: Smartphone, color: "text-blue-400",   bg: "bg-blue-500/15 border-blue-500/40"   },
-              ] as const).map(({ value, label, Icon, color, bg }) => (
-                <button key={value} onClick={() => setPaymentMode(value)}
-                  className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 ${paymentMode === value ? `${bg} shadow-lg` : "border-white/10 bg-white/5 hover:bg-white/10"}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${paymentMode === value ? bg : "bg-white/10"}`}>
-                    <Icon className={`w-4 h-4 ${paymentMode === value ? color : "text-white/50"}`} />
-                  </div>
-                  <div className="text-left">
-                    <p className={`font-black text-sm ${paymentMode === value ? "text-white" : "text-white/60"}`}>{label}</p>
-                    {paymentMode === value && <p className={`text-[10px] font-bold ${color}`}>Selected ✓</p>}
-                  </div>
-                </button>
-              ))}
+                { value: "cash", label: "Cash",  Icon: Banknote,   activeClass: "bg-amber-50 dark:bg-amber-950/30 border-amber-400 dark:border-amber-600", iconClass: "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400", textClass: "text-amber-700 dark:text-amber-300" },
+                { value: "upi",  label: "UPI",   Icon: Smartphone, activeClass: "bg-blue-50 dark:bg-blue-950/30 border-blue-400 dark:border-blue-600",   iconClass: "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400",   textClass: "text-blue-700 dark:text-blue-300" },
+              ] as const).map(({ value, label, Icon, activeClass, iconClass, textClass }) => {
+                const active = paymentMode === value;
+                return (
+                  <button key={value} onClick={() => setPaymentMode(value)}
+                    className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 ${active ? activeClass : "border-border bg-muted/40 hover:bg-muted"}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${active ? iconClass : "bg-muted text-muted-foreground"}`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <p className={`font-black text-sm ${active ? textClass : "text-muted-foreground"}`}>{label}</p>
+                      {active && <p className={`text-[10px] font-bold ${textClass}`}>Selected ✓</p>}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
+
+          {/* Customer phone */}
           <div>
-            <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
               <Phone className="w-3.5 h-3.5" /> Customer Mobile
-              <span className="normal-case text-white/30 font-medium">(optional)</span>
+              <span className="normal-case text-muted-foreground/60 font-medium">(optional)</span>
             </p>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-white/40 select-none">+91</span>
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground select-none">+91</span>
               <input ref={phoneRef} type="tel" maxLength={10} inputMode="numeric" value={phone}
                 onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 10); setPhone(v); setPhoneError(v ? validatePhone(v) : ""); }}
                 placeholder="98765 43210"
-                className={`w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border text-white font-mono text-sm placeholder:text-white/20 focus:outline-none focus:ring-2 transition-all ${phoneError ? "border-red-500/60 focus:ring-red-500/30" : "border-white/10 focus:ring-primary/40 focus:border-primary/50"}`}
+                className={`w-full h-12 pl-12 pr-4 rounded-xl bg-muted border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-all ${phoneError ? "border-red-500 focus:ring-red-500/30" : "border-border focus:ring-primary/40 focus:border-primary"}`}
               />
             </div>
-            {phoneError && <p className="text-xs text-red-400 mt-1.5 font-medium">{phoneError}</p>}
+            {phoneError && <p className="text-xs text-red-500 mt-1.5 font-medium">{phoneError}</p>}
           </div>
         </div>
+
+        {/* Actions */}
         <div className="px-5 pb-6 grid grid-cols-2 gap-3">
           <button onClick={onCancel} disabled={loading}
-            className="py-3.5 rounded-2xl border border-white/15 text-white/70 font-bold text-sm hover:bg-white/5 active:scale-95 transition-all disabled:opacity-40">
+            className="py-3.5 rounded-2xl border border-border text-muted-foreground font-bold text-sm hover:bg-muted active:scale-95 transition-all disabled:opacity-40">
             Cancel
           </button>
           <button onClick={handleSubmit} disabled={loading || !!validatePhone(phone)}
-            className="py-3.5 rounded-2xl bg-green-600 hover:bg-green-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-green-900/40 active:scale-95 transition-all disabled:opacity-50">
+            className="py-3.5 rounded-2xl bg-green-600 hover:bg-green-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 active:scale-95 transition-all disabled:opacity-50">
             {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : <><Receipt className="w-4 h-4" /> Confirm & Print</>}
           </button>
         </div>
@@ -204,7 +218,7 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading }: CheckoutM
   );
 }
 
-/* ── Stock IN confirmation panel ─────────────────────────────────── */
+/* ── Stock IN panel ──────────────────────────────────────────────── */
 interface StockInPanelProps {
   product: ScannedProduct;
   onConfirm: (qty: number) => void;
@@ -214,76 +228,64 @@ interface StockInPanelProps {
 function StockInPanel({ product, onConfirm, onDismiss, loading }: StockInPanelProps) {
   const [qty, setQty] = useState(1);
   return (
-    <div className="mx-4 rounded-2xl border-2 border-blue-500/40 bg-blue-500/10 overflow-hidden animate-in slide-in-from-bottom-2 duration-250">
-      {/* Product info */}
+    <div className="mx-4 rounded-2xl border-2 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 overflow-hidden animate-in slide-in-from-bottom-2 duration-250">
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-              <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Product Scanned</span>
+              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Product Scanned</span>
             </div>
-            <p className="font-black text-base text-white leading-tight">{product.name}</p>
-            <p className="text-xs font-mono text-white/40 mt-0.5">{product.sku}</p>
+            <p className="font-black text-base text-foreground leading-tight">{product.name}</p>
+            <p className="text-xs font-mono text-muted-foreground mt-0.5">{product.sku}</p>
           </div>
-          <button onClick={onDismiss} className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center shrink-0 mt-0.5">
-            <X className="w-3.5 h-3.5 text-white/50" />
+          <button onClick={onDismiss} className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-200 dark:hover:bg-blue-800/50 flex items-center justify-center shrink-0 mt-0.5">
+            <X className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           </button>
         </div>
 
-        {/* Current stock badge */}
         <div className="flex items-center gap-2 mt-2">
-          <span className="text-xs text-white/50">Current stock:</span>
+          <span className="text-xs text-muted-foreground">Current stock:</span>
           <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-            product.stock <= 5 ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white/70"
+            product.stock <= 5 ? "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400" : "bg-muted text-muted-foreground"
           }`}>
             {product.stock} units
           </span>
-          <span className="text-white/30">→</span>
-          <span className="text-xs font-black text-blue-400 px-2 py-0.5 rounded-full bg-blue-500/15">
+          <span className="text-muted-foreground">→</span>
+          <span className="text-xs font-black text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30">
             {product.stock + qty} units
           </span>
         </div>
       </div>
 
-      {/* Qty selector */}
       <div className="px-4 pb-4">
-        <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Quantity to Add</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Quantity to Add</p>
         <div className="flex items-center gap-3">
           <button onClick={() => setQty((q) => Math.max(1, q - 1))}
-            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center transition-all">
+            className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-200 dark:hover:bg-blue-800/50 active:scale-90 flex items-center justify-center transition-all text-blue-700 dark:text-blue-300">
             <Minus className="w-4 h-4" />
           </button>
-          <input
-            type="number"
-            min={1}
-            max={9999}
-            value={qty}
-            onChange={(e) => {
-              const v = parseInt(e.target.value, 10);
-              if (!isNaN(v) && v >= 1) setQty(v);
-            }}
-            className="flex-1 h-10 text-center font-black text-2xl bg-white/5 border border-white/15 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 tabular-nums"
+          <input type="number" min={1} max={9999} value={qty}
+            onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 1) setQty(v); }}
+            className="flex-1 h-10 text-center font-black text-2xl bg-card border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 tabular-nums"
           />
           <button onClick={() => setQty((q) => Math.min(9999, q + 1))}
-            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center transition-all">
+            className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-200 dark:hover:bg-blue-800/50 active:scale-90 flex items-center justify-center transition-all text-blue-700 dark:text-blue-300">
             <Plus className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Quick qty chips */}
-        <div className="flex gap-2 mt-2">
+        <div className="flex gap-2 mt-2 flex-wrap">
           {[5, 10, 25, 50, 100].map((n) => (
             <button key={n} onClick={() => setQty(n)}
-              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${qty === n ? "bg-blue-500 text-white" : "bg-white/10 text-white/50 hover:text-white"}`}>
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${qty === n ? "bg-blue-600 text-white" : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50"}`}>
               +{n}
             </button>
           ))}
         </div>
 
-        {/* Confirm button */}
         <button onClick={() => onConfirm(qty)} disabled={loading}
-          className="mt-3 w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-blue-900/40 active:scale-[0.98] transition-all disabled:opacity-50">
+          className="mt-3 w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all disabled:opacity-50">
           {loading
             ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding…</>
             : <><ArrowUpCircle className="w-4 h-4" /> Add {qty} to Stock</>
@@ -294,11 +296,8 @@ function StockInPanel({ product, onConfirm, onDismiss, loading }: StockInPanelPr
   );
 }
 
-/* ── Scanner hook (shared between modes) ─────────────────────────── */
-function useScanner(
-  active: boolean,
-  onScan: (sku: string) => void,
-) {
+/* ── Scanner hook ────────────────────────────────────────────────── */
+function useScanner(active: boolean, onScan: (sku: string) => void) {
   const processingRef = useRef(false);
   useEffect(() => {
     if (!active) return;
@@ -348,7 +347,6 @@ export default function Scan() {
   const [successBillId, setSuccessBillId] = useState<string | null>(null);
   const [showModal, setShowModal]     = useState(false);
 
-  // Stock IN state
   const [stockProduct, setStockProduct]   = useState<ScannedProduct | null>(null);
   const [stockAdding, setStockAdding]     = useState(false);
   const [stockSuccess, setStockSuccess]   = useState<{ name: string; added: number; newStock: number } | null>(null);
@@ -356,18 +354,12 @@ export default function Scan() {
   const isBilling = mode === "billing";
   const isStockIn = mode === "stockin";
 
-  /* ── Scanner callback ── */
-  const handleScan = useCallback((sku: string) => {
-    setLookupSku(sku);
-  }, []);
-
+  const handleScan = useCallback((sku: string) => { setLookupSku(sku); }, []);
   useScanner(showScanner, handleScan);
 
-  /* ── Resolve SKU (both modes) ── */
   useEffect(() => {
     if (!lookupSku) return;
     playScanBeep();
-
     lookupBySku(lookupSku)
       .then((product) => {
         if (isBilling) {
@@ -376,58 +368,28 @@ export default function Scan() {
           setTimeout(() => setLastAddedId(null), 700);
           toast.success(`Added: ${product.name}`, { duration: 1500 });
         } else {
-          // Stock IN — show the confirmation panel
           setStockProduct(product);
           setStockSuccess(null);
         }
       })
-      .catch(() => {
-        playError();
-        toast.error(`SKU "${lookupSku}" not found`);
-      })
+      .catch(() => { playError(); toast.error(`SKU "${lookupSku}" not found`); })
       .finally(() => setLookupSku(null));
   }, [lookupSku, isBilling, addItem]);
 
-  /* ── Keyboard shortcuts ── */
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      // Ignore when typing in an input/textarea
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-
-      // Enter → open checkout modal (billing mode, items in cart, modal not open)
-      if (e.key === "Enter" && isBilling && items.length > 0 && !showModal) {
-        e.preventDefault();
-        setShowModal(true);
-        return;
-      }
-      // Escape → close modal
-      if (e.key === "Escape" && showModal) {
-        setShowModal(false);
-        return;
-      }
-      // Ctrl/Cmd + K or M → toggle mode
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-        e.preventDefault();
-        setMode((m) => m === "billing" ? "stockin" : "billing");
-        return;
-      }
-      // B → billing mode
-      if (e.key === "b" || e.key === "B") {
-        setMode("billing");
-        return;
-      }
-      // S → stock-in mode
-      if (e.key === "s" || e.key === "S") {
-        setMode("stockin");
-        return;
-      }
+      if (e.key === "Enter" && isBilling && items.length > 0 && !showModal) { e.preventDefault(); setShowModal(true); return; }
+      if (e.key === "Escape" && showModal) { setShowModal(false); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setMode((m) => m === "billing" ? "stockin" : "billing"); return; }
+      if (e.key === "b" || e.key === "B") { setMode("billing"); return; }
+      if (e.key === "s" || e.key === "S") { setMode("stockin"); return; }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [isBilling, items.length, showModal]);
 
-  /* ── Manual SKU submit ── */
   const handleManual = (e: React.FormEvent) => {
     e.preventDefault();
     const sku = manualSku.trim().toUpperCase();
@@ -436,25 +398,19 @@ export default function Scan() {
     setLookupSku(sku);
   };
 
-  /* ── Billing: qty change ── */
   const handleQtyChange = useCallback((productId: string, newQty: number) => {
-    playTick();
-    updateQty(productId, newQty);
+    playTick(); updateQty(productId, newQty);
   }, [updateQty]);
 
-  /* ── Billing: checkout ── */
   const handleConfirmCheckout = async (paymentMode: PaymentMode, customerPhone: string) => {
     if (!items.length) return;
     setChecking(true);
     try {
       const result = await postCheckout({
         items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
-        paymentMode,
-        customerPhone: customerPhone || undefined,
+        paymentMode, customerPhone: customerPhone || undefined,
       });
-      playCheckoutSuccess();
-      clearCart();
-      setShowModal(false);
+      playCheckoutSuccess(); clearCart(); setShowModal(false);
       setSuccessBillId(result.bill.id);
     } catch (err: any) {
       toast.error(err.message || "Checkout failed");
@@ -463,7 +419,6 @@ export default function Scan() {
     }
   };
 
-  /* ── Stock IN: confirm add ── */
   const handleStockInConfirm = async (qty: number) => {
     if (!stockProduct) return;
     setStockAdding(true);
@@ -475,26 +430,20 @@ export default function Scan() {
       setStockProduct(null);
       toast.success(`Stock updated: +${qty} added`, { duration: 2000 });
     } catch (err: any) {
-      playError();
-      toast.error(err.message || "Stock update failed");
+      playError(); toast.error(err.message || "Stock update failed");
     } finally {
       setStockAdding(false);
     }
   };
 
-  /* ── Mode switch: clear state ── */
   const switchMode = (newMode: PageMode) => {
-    setMode(newMode);
-    setStockProduct(null);
-    setStockSuccess(null);
-    setLookupSku(null);
-    setManualSku("");
+    setMode(newMode); setStockProduct(null); setStockSuccess(null); setLookupSku(null); setManualSku("");
   };
 
   const hasItems = items.length > 0;
 
   return (
-    <div className="relative flex flex-col h-full bg-zinc-950 text-white overflow-hidden">
+    <div className="relative flex flex-col h-full bg-background text-foreground overflow-hidden">
 
       {/* ── Overlays ── */}
       {successBillId && <SuccessOverlay billId={successBillId} />}
@@ -507,124 +456,123 @@ export default function Scan() {
       )}
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/80 backdrop-blur-sm border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-2">
-          <ScanLine className="w-5 h-5 text-primary" />
-          <h1 className="text-lg font-black">{isBilling ? "Scan & Cart" : "Stock IN"}</h1>
+      <div className="flex items-center justify-between px-4 py-3 bg-card border-b shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isBilling ? "bg-green-100 dark:bg-green-900/40" : "bg-blue-100 dark:bg-blue-900/40"}`}>
+            <ScanLine className={`w-4 h-4 ${isBilling ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`} />
+          </div>
+          <div>
+            <h1 className="text-base font-black leading-none">{isBilling ? "Scan & Bill" : "Stock IN"}</h1>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {isBilling ? "Scan → add to cart → checkout" : "Scan → confirm quantity → update stock"}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowScanner((v) => !v)}
-            className="text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors font-semibold">
-            {showScanner ? "Hide Camera" : "Show Camera"}
-          </button>
           {isBilling && hasItems && (
-            <div className="flex items-center gap-1.5 bg-green-500/20 text-green-400 px-3 py-1.5 rounded-full text-sm font-bold border border-green-500/30">
-              <ShoppingCart className="w-4 h-4" />
+            <div className="flex items-center gap-1.5 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-3 py-1.5 rounded-full text-sm font-bold border border-green-200 dark:border-green-800">
+              <ShoppingCart className="w-3.5 h-3.5" />
               {count}
             </div>
           )}
+          <button onClick={() => setShowScanner((v) => !v)}
+            className="w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors border">
+            {showScanner ? <CameraOff className="w-4 h-4 text-muted-foreground" /> : <Camera className="w-4 h-4 text-muted-foreground" />}
+          </button>
         </div>
       </div>
 
       {/* ── Mode Toggle ── */}
-      <div className="shrink-0 px-4 pt-3 pb-1">
-        <div className="flex rounded-2xl bg-white/5 border border-white/10 p-1 gap-1">
-          <button
-            onClick={() => switchMode("billing")}
-            className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-xl font-black text-sm transition-all ${
+      <div className="shrink-0 px-4 pt-3 pb-2">
+        <div className="flex rounded-xl bg-muted border p-1 gap-1">
+          <button onClick={() => switchMode("billing")}
+            className={`flex-1 flex items-center justify-center gap-2 h-9 rounded-lg font-bold text-sm transition-all ${
               isBilling
-                ? "bg-green-600 text-white shadow-lg shadow-green-900/40"
-                : "text-white/40 hover:text-white/70"
-            }`}
-          >
+                ? "bg-green-600 text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}>
             <ShoppingBag className="w-4 h-4" />
-            Billing Mode
+            Billing
           </button>
-          <button
-            onClick={() => switchMode("stockin")}
-            className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-xl font-black text-sm transition-all ${
+          <button onClick={() => switchMode("stockin")}
+            className={`flex-1 flex items-center justify-center gap-2 h-9 rounded-lg font-bold text-sm transition-all ${
               isStockIn
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-900/40"
-                : "text-white/40 hover:text-white/70"
-            }`}
-          >
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}>
             <PackagePlus className="w-4 h-4" />
             Stock IN
           </button>
         </div>
-
-        {/* Mode hint */}
-        <p className={`text-[10px] font-semibold mt-1.5 px-1 ${isBilling ? "text-green-500/60" : "text-blue-500/60"}`}>
-          {isBilling
-            ? "Scan products to add to cart → checkout deducts stock"
-            : "Scan a product → enter quantity → add to stock"}
-        </p>
       </div>
 
       {/* ── Scanner ── */}
       {showScanner && (
-        <div className="shrink-0 flex flex-col items-center px-4 pt-2 pb-2">
-          <div className={`w-full max-w-xs aspect-square bg-black rounded-2xl overflow-hidden shadow-xl relative border ${
-            isBilling ? "border-white/10" : "border-blue-500/30"
+        <div className="shrink-0 flex flex-col items-center px-4 pb-2">
+          <div className={`w-full max-w-xs aspect-square bg-zinc-900 rounded-2xl overflow-hidden shadow-lg relative border-2 ${
+            isBilling ? "border-green-500/40" : "border-blue-500/40"
           }`}>
             <div id="reader"
               className="w-full h-full [&>div]:border-none [&>div>video]:object-cover [&>div>video]:w-full [&>div>video]:h-full" />
+            {/* Corner brackets overlay */}
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
               <div className="w-36 h-36 relative">
-                {(["top-0 left-0 border-t-4 border-l-4 rounded-tl-lg",
-                   "top-0 right-0 border-t-4 border-r-4 rounded-tr-lg",
-                   "bottom-0 left-0 border-b-4 border-l-4 rounded-bl-lg",
-                   "bottom-0 right-0 border-b-4 border-r-4 rounded-br-lg",
+                {(["top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-lg",
+                   "top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-lg",
+                   "bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-lg",
+                   "bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-lg",
                 ] as const).map((cls, i) => (
-                  <div key={i} className={`absolute w-5 h-5 ${cls} ${isBilling ? "border-primary" : "border-blue-400"}`} />
+                  <div key={i} className={`absolute w-6 h-6 ${cls} ${isBilling ? "border-green-400" : "border-blue-400"}`} />
                 ))}
-                <div className={`absolute top-1/2 left-0 right-0 h-0.5 animate-[scan_2s_ease-in-out_infinite] ${isBilling ? "bg-primary/80" : "bg-blue-400/80"}`} />
+                <div className={`absolute top-1/2 left-0 right-0 h-0.5 animate-[scan_2s_ease-in-out_infinite] ${isBilling ? "bg-green-400/80" : "bg-blue-400/80"}`} />
               </div>
             </div>
           </div>
-          <div className="h-6 mt-2 flex items-center justify-center">
+          <div className="h-6 mt-1.5 flex items-center justify-center">
             {lookupSku ? (
-              <span className={`flex items-center gap-1.5 text-xs font-mono font-semibold ${isBilling ? "text-primary" : "text-blue-400"}`}>
+              <span className={`flex items-center gap-1.5 text-xs font-semibold ${isBilling ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Looking up {lookupSku}…
               </span>
             ) : (
-              <span className="text-xs text-white/30 font-medium">Point camera at QR code or barcode</span>
+              <span className="text-xs text-muted-foreground">Point camera at QR code or barcode</span>
             )}
           </div>
         </div>
       )}
 
-      {/* ── Manual Entry ── */}
+      {/* ── Manual SKU Entry ── */}
       <div className="px-4 pb-3 shrink-0">
         <form onSubmit={handleManual} className="flex gap-2">
           <Input value={manualSku} onChange={(e) => setManualSku(e.target.value)}
             placeholder="Type SKU manually…"
-            className={`h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl font-mono uppercase text-sm ${isStockIn ? "focus:border-blue-500/50" : ""}`}
+            className={`h-11 font-mono uppercase text-sm rounded-xl ${isStockIn ? "focus:border-blue-500" : "focus:border-green-500"}`}
             data-testid="input-sku-manual"
           />
           <Button type="submit" size="sm"
-            className={`h-11 px-4 rounded-xl font-bold ${isStockIn ? "bg-blue-600 hover:bg-blue-500" : ""}`}
+            className={`h-11 px-4 rounded-xl font-bold shrink-0 ${isStockIn ? "bg-blue-600 hover:bg-blue-500" : "bg-green-600 hover:bg-green-500"}`}
             disabled={!manualSku.trim()}>
             <ArrowRight className="w-4 h-4" />
           </Button>
         </form>
       </div>
 
-      {/* ════════════════════════════════════════════════
+      {/* ══════════════════════════════════
           BILLING MODE content
-      ════════════════════════════════════════════════ */}
+      ══════════════════════════════════ */}
       {isBilling && (
         <div className="flex-1 overflow-y-auto px-4 space-y-2 pb-2">
           {!hasItems ? (
-            <div className="flex flex-col items-center justify-center h-full text-white/30 py-8">
-              <ShoppingCart className="w-14 h-14 mb-3 opacity-40" />
-              <p className="font-bold text-lg">Cart is empty</p>
-              <p className="text-xs mt-1">Scan a product to get started</p>
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
+              <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-3">
+                <ShoppingCart className="w-8 h-8 opacity-40" />
+              </div>
+              <p className="font-bold text-base text-foreground">Cart is empty</p>
+              <p className="text-sm mt-1 text-muted-foreground">Scan a product to get started</p>
             </div>
           ) : (
             <>
-              <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
                 Cart · {count} item{count !== 1 ? "s" : ""}
               </p>
               {items.map((item) => {
@@ -632,33 +580,35 @@ export default function Scan() {
                 return (
                   <div key={item.productId}
                     className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-all duration-300 ${
-                      isNew ? "bg-green-500/20 border-green-500/60 shadow-lg shadow-green-500/10 scale-[1.01]" : "bg-white/5 border-white/10 scale-100"
+                      isNew
+                        ? "bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-700 shadow-sm scale-[1.01]"
+                        : "bg-card border-border scale-100"
                     }`}>
-                    <div className={`shrink-0 w-2 h-2 rounded-full transition-all duration-300 ${isNew ? "bg-green-400" : "bg-white/10"}`} />
+                    <div className={`shrink-0 w-2 h-2 rounded-full transition-all duration-300 ${isNew ? "bg-green-500" : "bg-muted-foreground/20"}`} />
                     <div className="flex-1 min-w-0">
-                      <p className={`font-bold text-sm truncate ${isNew ? "text-green-300" : "text-white"}`}>{item.name}</p>
-                      <p className="text-xs font-mono text-white/40">{item.sku}</p>
-                      <p className="text-xs text-white/50 mt-0.5">
+                      <p className={`font-bold text-sm truncate ${isNew ? "text-green-700 dark:text-green-300" : "text-foreground"}`}>{item.name}</p>
+                      <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         ₹{item.price.toLocaleString("en-IN")} × {item.quantity} ={" "}
-                        <span className={`font-bold ${isNew ? "text-green-400" : "text-white"}`}>
+                        <span className={`font-bold ${isNew ? "text-green-600 dark:text-green-400" : "text-foreground"}`}>
                           ₹{(item.price * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </span>
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <button onClick={() => handleQtyChange(item.productId, item.quantity - 1)}
-                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all">
-                        <Minus className="w-3.5 h-3.5" />
+                        className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border">
+                        <Minus className="w-3.5 h-3.5 text-muted-foreground" />
                       </button>
                       <span className="w-7 text-center font-black text-sm tabular-nums">{item.quantity}</span>
                       <button onClick={() => handleQtyChange(item.productId, item.quantity + 1)}
-                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all">
-                        <Plus className="w-3.5 h-3.5" />
+                        className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border">
+                        <Plus className="w-3.5 h-3.5 text-muted-foreground" />
                       </button>
                     </div>
                     <button onClick={() => removeItem(item.productId)}
-                      className="w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500/30 active:scale-90 flex items-center justify-center transition-all shrink-0">
-                      <X className="w-3.5 h-3.5 text-red-400" />
+                      className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 active:scale-90 flex items-center justify-center transition-all shrink-0 border border-red-200 dark:border-red-800">
+                      <X className="w-3.5 h-3.5 text-red-500" />
                     </button>
                   </div>
                 );
@@ -668,49 +618,42 @@ export default function Scan() {
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════
+      {/* ══════════════════════════════════
           STOCK IN MODE content
-      ════════════════════════════════════════════════ */}
+      ══════════════════════════════════ */}
       {isStockIn && (
         <div className="flex-1 overflow-y-auto pb-4 space-y-3">
-
-          {/* Last stock-add success banner */}
           {stockSuccess && (
-            <div className="mx-4 flex items-center gap-3 bg-green-500/15 border border-green-500/30 rounded-2xl px-4 py-3 animate-in slide-in-from-top-2 duration-300">
-              <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
+            <div className="mx-4 flex items-center gap-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-2xl px-4 py-3 animate-in slide-in-from-top-2 duration-300">
+              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-green-300 truncate">+{stockSuccess.added} added · {stockSuccess.name}</p>
-                <p className="text-xs text-white/40">New stock: <span className="font-bold text-white/70">{stockSuccess.newStock} units</span></p>
+                <p className="text-sm font-bold text-green-700 dark:text-green-300 truncate">+{stockSuccess.added} added · {stockSuccess.name}</p>
+                <p className="text-xs text-muted-foreground">New stock: <span className="font-bold text-foreground">{stockSuccess.newStock} units</span></p>
               </div>
-              <button onClick={() => setStockSuccess(null)} className="text-white/30 hover:text-white/60">
+              <button onClick={() => setStockSuccess(null)} className="text-muted-foreground hover:text-foreground">
                 <X className="w-4 h-4" />
               </button>
             </div>
           )}
 
-          {/* Scanned product panel */}
           {stockProduct ? (
-            <StockInPanel
-              product={stockProduct}
-              onConfirm={handleStockInConfirm}
-              onDismiss={() => setStockProduct(null)}
-              loading={stockAdding}
-            />
+            <StockInPanel product={stockProduct} onConfirm={handleStockInConfirm} onDismiss={() => setStockProduct(null)} loading={stockAdding} />
           ) : (
             !stockSuccess && (
-              <div className="flex flex-col items-center justify-center py-12 text-white/30 px-6 text-center">
-                <PackagePlus className="w-14 h-14 mb-3 opacity-40 text-blue-400" />
-                <p className="font-bold text-lg text-blue-300/60">Stock IN Mode</p>
-                <p className="text-xs mt-1">Scan a product barcode or enter SKU to add stock</p>
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground px-6 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-3">
+                  <PackagePlus className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                </div>
+                <p className="font-bold text-base text-foreground">Stock IN Mode</p>
+                <p className="text-sm mt-1">Scan a product barcode or enter SKU to add stock</p>
               </div>
             )
           )}
 
-          {/* Scan another button after success */}
           {stockSuccess && !stockProduct && (
             <div className="mx-4 flex">
               <button onClick={() => { setStockSuccess(null); }}
-                className="flex-1 h-11 flex items-center justify-center gap-2 border border-blue-500/30 text-blue-400 font-bold text-sm rounded-2xl hover:bg-blue-500/10 active:scale-95 transition-all">
+                className="flex-1 h-11 flex items-center justify-center gap-2 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-bold text-sm rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-95 transition-all">
                 <RotateCcw className="w-4 h-4" />
                 Scan Another Product
               </button>
@@ -721,57 +664,35 @@ export default function Scan() {
 
       {/* ── Billing bottom bar ── */}
       {isBilling && (
-        <div className={`shrink-0 border-t border-white/10 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3 transition-all duration-300 ${hasItems ? "bg-zinc-900" : "bg-zinc-950"}`}>
+        <div className={`shrink-0 border-t px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3 transition-all duration-300 bg-card`}>
           {hasItems ? (
             <>
-              <div className="flex items-end justify-between mb-3">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-                  <p className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-0.5">
-                    {count} item{count !== 1 ? "s" : ""} · Grand Total
-                  </p>
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Grand Total</p>
                   <AnimatedTotal value={total} />
                 </div>
-                <button onClick={clearCart}
-                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 active:scale-95 transition-all font-semibold mb-1 px-2 py-1 rounded-lg hover:bg-red-500/10">
-                  <Trash2 className="w-3.5 h-3.5" /> Clear
-                </button>
+                <div className="text-right">
+                  <button onClick={clearCart}
+                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-semibold transition-colors">
+                    <Trash2 className="w-3 h-3" /> Clear cart
+                  </button>
+                </div>
               </div>
               <button onClick={() => setShowModal(true)}
-                className="w-full h-14 text-base font-black rounded-2xl bg-green-600 hover:bg-green-500 text-white shadow-xl shadow-green-900/40 active:scale-[0.98] transition-all flex items-center justify-center gap-2.5">
+                className="w-full h-13 py-3.5 rounded-2xl bg-green-600 hover:bg-green-500 text-white font-black text-base flex items-center justify-center gap-2.5 shadow-lg shadow-green-500/20 active:scale-[0.98] transition-all"
+                data-testid="btn-checkout">
                 <Receipt className="w-5 h-5" />
-                Checkout & Print Bill
+                Checkout · {count} item{count !== 1 ? "s" : ""}
               </button>
             </>
           ) : (
-            <div className="h-14 flex items-center justify-center text-xs text-white/20 font-medium">
+            <div className="flex items-center justify-center h-12 text-sm text-muted-foreground font-medium">
               Add items to start billing
             </div>
           )}
         </div>
       )}
-
-      {/* ── Stock IN bottom status ── */}
-      {isStockIn && (
-        <div className="shrink-0 border-t border-blue-500/20 bg-zinc-900 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3">
-          <div className="flex items-center justify-center gap-2 text-xs text-blue-400/60 font-semibold">
-            <ArrowUpCircle className="w-4 h-4" />
-            Stock IN Mode — Changes are saved immediately
-          </div>
-        </div>
-      )}
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes scan {
-          0%   { transform: translateY(-90px); opacity: 0; }
-          10%  { opacity: 1; }
-          90%  { opacity: 1; }
-          100% { transform: translateY(90px); opacity: 0; }
-        }
-        #reader button { background: white; color: black; border: none; padding: 6px 12px; border-radius: 8px; font-weight: bold; margin-top: 8px; }
-        #reader a { color: white; display: none; }
-        #reader__dashboard_section_csr { padding: 12px 0; }
-        #reader video { object-fit: cover; width: 100%; height: 100%; }
-      ` }} />
     </div>
   );
 }
