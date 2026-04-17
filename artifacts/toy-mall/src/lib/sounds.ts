@@ -55,3 +55,11 @@ export function playStockOut() {
 export function playError() {
   playTone(200, 0.25, "sawtooth", 0.2);
 }
+
+/** Ascending 4-note fanfare — checkout success */
+export function playCheckoutSuccess() {
+  playTone(523, 0.1, "sine", 0.35);
+  setTimeout(() => playTone(659, 0.1, "sine", 0.35), 110);
+  setTimeout(() => playTone(784, 0.1, "sine", 0.35), 220);
+  setTimeout(() => playTone(1047, 0.25, "sine", 0.4), 330);
+}
