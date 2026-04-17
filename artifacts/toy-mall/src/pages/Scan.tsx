@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import {
-  ScanLine, Keyboard, ArrowRight, Trash2, Plus, Minus,
-  ShoppingCart, Receipt, CheckCircle2, Loader2, X, AlertTriangle,
+  ScanLine, ArrowRight, Trash2, Plus, Minus,
+  ShoppingCart, Receipt, Loader2, X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -174,7 +174,7 @@ export default function Scan() {
               </div>
             )}
 
-            {/* Corner brackets */}
+            {/* Corner brackets only — no overlay */}
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
               <div className="w-36 h-36 relative">
                 <div className="absolute top-0 left-0 w-5 h-5 border-t-4 border-l-4 border-primary rounded-tl-lg" />
@@ -184,13 +184,17 @@ export default function Scan() {
                 <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-primary/80 animate-[scan_2s_ease-in-out_infinite]" />
               </div>
             </div>
+          </div>
 
-            {/* Lookup indicator */}
-            {lookupSku && (
-              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
-                <p className="text-xs font-mono text-white/70">{lookupSku}</p>
-              </div>
+          {/* Status bar below camera */}
+          <div className="h-6 mt-2 flex items-center justify-center">
+            {lookupSku ? (
+              <span className="flex items-center gap-1.5 text-xs text-primary font-mono font-semibold">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Looking up {lookupSku}…
+              </span>
+            ) : (
+              <span className="text-xs text-white/30 font-medium">Point camera at QR code or barcode</span>
             )}
           </div>
         </div>
@@ -307,7 +311,7 @@ export default function Scan() {
         #reader button { background: white; color: black; border: none; padding: 6px 12px; border-radius: 8px; font-weight: bold; margin-top: 8px; }
         #reader a { color: white; display: none; }
         #reader__dashboard_section_csr { padding: 12px 0; }
-        #reader > div { height: 100% !important; }
+        #reader video { object-fit: cover; width: 100%; height: 100%; }
       ` }} />
     </div>
   );
