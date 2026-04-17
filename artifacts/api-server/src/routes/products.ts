@@ -86,6 +86,32 @@ router.post("/products", async (req, res): Promise<void> => {
   res.status(201).json({ ...product, price: Number(product.price) });
 });
 
+router.get("/products/next-sku", async (req, res): Promise<void> => {
+  const { categoryCode } = req.query;
+  if (!categoryCode || typeof categoryCode !== "string") {
+    res.status(400).json({ error: "categoryCode query param is required" });
+    return;
+  }
+
+  const prefix = categoryCode.toUpperCase();
+  const likePattern = `${prefix}-%`;
+
+  const products = await db
+    .select({ sku: productsTable.sku })
+    .from(productsTable)
+    .where(ilike(productsTable.sku, likePattern));
+
+  let maxNum = 0;
+  for (const p of products) {
+    const numPart = p.sku.slice(prefix.length + 1); // strip "RC-"
+    const num = parseInt(numPart, 10);
+    if (!isNaN(num) && num > maxNum) maxNum = num;
+  }
+
+  const nextSku = `${prefix}-${String(maxNum + 1).padStart(3, "0")}`;
+  res.json({ sku: nextSku });
+});
+
 router.get("/products/sku/:sku", async (req, res): Promise<void> => {
   const params = GetProductBySkuParams.safeParse(req.params);
   if (!params.success) {
