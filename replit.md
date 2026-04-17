@@ -10,7 +10,7 @@ Mobile-first inventory management web app for a toy mall. Ultra-fast QR-based st
 - **Node.js version**: 24
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
-- **Frontend**: React + Vite (artifacts/toy-mall), Tailwind CSS, shadcn/ui, wouter routing
+- **Frontend**: React + Vite (artifacts/toy-mall), Tailwind CSS, shadcn/ui, wouter routing, Recharts
 - **Backend**: Express 5 (artifacts/api-server)
 - **Database**: PostgreSQL + Drizzle ORM (lib/db)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
@@ -18,34 +18,54 @@ Mobile-first inventory management web app for a toy mall. Ultra-fast QR-based st
 - **QR Scanner**: html5-qrcode
 - **State**: Zustand (role/auth state)
 - **Build**: esbuild (CJS bundle)
+- **Real-time**: SSE (Server-Sent Events) for live dashboard updates
 
 ## Application Structure
 
 ### Frontend Pages (artifacts/toy-mall/src/pages/)
-- **Dashboard** (/) — Stats: total products, stock value, low stock count, today IN/OUT. Low stock alerts, category breakdown.
-- **Products** (/products) — Searchable/filterable product list
-- **Create Product** (/products/new) — Form to add new products
-- **Product Detail** (/product?sku=SKU) — Stock IN/OUT with optimistic UI, QR code
-- **Scan** (/scan) — Full-screen camera QR scanner + USB/manual fallback
+- **Dashboard** (/) — Stats, 7-day revenue chart, quick-nav tiles, low stock alerts, category breakdown. LIVE SSE badge.
+- **Products** (/products) — Searchable product list with bulk CSV import modal (Admin)
+- **Create Product** (/products/new) — Form with category auto-SKU generation
+- **Product Detail** (/product?sku=SKU) — Stock IN/OUT with optimistic UI, QR code, imageUrl field
+- **Scan** (/scan) — Full-screen camera QR scanner + USB/manual fallback. Keyboard shortcuts: B=billing, S=stock-in, Enter=checkout, Esc=close modal, Ctrl+K=toggle mode
 - **Logs** (/logs) — Paginated stock activity logs with type filter
 - **Profile** (/profile) — Role switcher (Admin/Staff)
+- **Billing** (/billing) — Recent bills list
+- **Bill Detail** (/bill/:id) — Receipt view with print + Return/Refund flow
+- **Suppliers** (/suppliers) — Full CRUD for vendor management (Admin-gated)
+- **Customers** (/customers) — Customer CRM: purchase history by phone number
+- **Reports** (/report) — Revenue trend chart (7/14/30d), EOD daily report with cash/UPI split, top products
+- **Labels** (/labels) — QR shelf label printer: select products, generate + print 3-column label sheet
 
 ### Database Schema (lib/db/src/schema/)
-- **products** — id (uuid), name, sku (unique, indexed), category, price, stock, low_stock_threshold, created_at
+- **products** — id, name, sku, category, price, stock, low_stock_threshold, image_url, supplier_id, created_at
 - **stock_logs** — id, product_id (fk), type (IN/OUT/ADJUSTMENT), quantity, user_id, created_at
 - **sales** — id, product_id (fk), quantity, total_price, created_at
+- **bills** — id, total_amount, items_count, payment_mode, customer_phone, created_at
+- **bill_items** — id, bill_id (fk), product_id (fk), product_name, product_sku, quantity, price, subtotal
+- **suppliers** — id, name, contact, email, phone, address, notes, created_at
+- **returns** — id, bill_id (fk), reason, total_refund, created_at + return_items sub-records
 
 ### API Routes (artifacts/api-server/src/routes/)
-- `products.ts` — CRUD + stock update + QR code generation
+- `products.ts` — CRUD + stock update + QR code + bulk-import + imageUrl/supplierId PATCH
 - `stock-logs.ts` — Stock log history
 - `sales.ts` — Sales records
 - `dashboard.ts` — Summary stats, low stock, today activity, category breakdown
+- `bills.ts` — Checkout, bill list, bill detail
+- `suppliers.ts` — CRUD supplier management
+- `returns.ts` — Process return (auto-restocks, SSE broadcast)
+- `customers.ts` — Customer list + bill history by phone
+- `reports.ts` — Revenue trend + end-of-day summary
+- `events.ts` — SSE real-time event broadcast
 
 ## Key Business Rules
 - OUT does NOT allow stock < 0 → returns 400 "Insufficient stock"
 - Every OUT creates a sale record automatically
 - No delete on logs — use ADJUSTMENT type instead
 - QR codes encode `/product?sku=SKU_HERE`
+- Returns auto-restock the selected item quantities
+- Bulk CSV import matches by SKU only — unknown SKUs are skipped
+- SSE broadcasts: `stock_updated`, `bill_created`, `product_updated` events
 
 ## Key Commands
 
@@ -58,5 +78,4 @@ Mobile-first inventory management web app for a toy mall. Ultra-fast QR-based st
 
 ## Preview
 
-- Frontend: http://localhost:80/ (preview path: /)
-- API: http://localhost:80/api/ (preview path: /api)
+The app is available at the root preview path `/`. The API server runs on port 8080 internally.

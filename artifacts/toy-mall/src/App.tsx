@@ -16,6 +16,10 @@ import Logs          from "@/pages/Logs";
 import Profile       from "@/pages/Profile";
 import Bill          from "@/pages/Bill";
 import Billing       from "@/pages/Billing";
+import Suppliers     from "@/pages/Suppliers";
+import Customers     from "@/pages/Customers";
+import Report        from "@/pages/Report";
+import Labels        from "@/pages/Labels";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +49,10 @@ function Router() {
         <Route path="/profile"      component={Profile} />
         <Route path="/billing"      component={Billing} />
         <Route path="/bill/:id"     component={Bill} />
+        <Route path="/suppliers"    component={Suppliers} />
+        <Route path="/customers"    component={Customers} />
+        <Route path="/report"       component={Report} />
+        <Route path="/labels"       component={Labels} />
         <Route                      component={NotFound} />
       </Switch>
     </AppLayout>

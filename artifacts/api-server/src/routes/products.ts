@@ -176,6 +176,8 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   if (parsed.data.stock != null) updates.stock = parsed.data.stock;
   if (parsed.data.lowStockThreshold != null)
     updates.lowStockThreshold = parsed.data.lowStockThreshold;
+  if (req.body.imageUrl !== undefined) updates.imageUrl = req.body.imageUrl || null;
+  if (req.body.supplierId !== undefined) updates.supplierId = req.body.supplierId || null;
 
   const [product] = await db
     .update(productsTable)
@@ -342,6 +344,49 @@ router.get("/products/:id/qr", async (req, res): Promise<void> => {
     url,
     qrDataUrl,
   });
+});
+
+/**
+ * POST /api/products/bulk-import
+ * Body: { items: Array<{ sku, stock?, price?, name?, category?, lowStockThreshold? }> }
+ * Matches by SKU — updates existing products. Skips unknown SKUs.
+ */
+router.post("/products/bulk-import", async (req, res): Promise<void> => {
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    res.status(400).json({ error: "items array is required" });
+    return;
+  }
+
+  const results = { updated: 0, skipped: 0, errors: [] as string[] };
+
+  for (const item of items) {
+    if (!item.sku) { results.skipped++; continue; }
+    const sku = String(item.sku).trim().toUpperCase();
+
+    const [existing] = await db
+      .select()
+      .from(productsTable)
+      .where(eq(productsTable.sku, sku));
+
+    if (!existing) { results.skipped++; continue; }
+
+    const updates: Record<string, unknown> = {};
+    if (item.stock != null && !isNaN(Number(item.stock))) updates.stock = Number(item.stock);
+    if (item.price != null && !isNaN(Number(item.price))) updates.price = String(Number(item.price));
+    if (item.name != null) updates.name = String(item.name).trim();
+    if (item.category != null) updates.category = String(item.category).trim();
+    if (item.lowStockThreshold != null && !isNaN(Number(item.lowStockThreshold)))
+      updates.lowStockThreshold = Number(item.lowStockThreshold);
+
+    if (Object.keys(updates).length === 0) { results.skipped++; continue; }
+
+    await db.update(productsTable).set(updates).where(eq(productsTable.sku, sku));
+    results.updated++;
+  }
+
+  broadcast("product_updated", { bulk: true, updated: results.updated });
+  res.json(results);
 });
 
 export default router;

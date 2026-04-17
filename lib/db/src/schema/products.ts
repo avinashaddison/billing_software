@@ -5,14 +5,16 @@ import { z } from "zod/v4";
 export const productsTable = pgTable(
   "products",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    name: text("name").notNull(),
-    sku: text("sku").notNull().unique(),
-    category: text("category").notNull(),
-    price: numeric("price", { precision: 10, scale: 2 }).notNull(),
-    stock: integer("stock").notNull().default(0),
+    id:                uuid("id").primaryKey().defaultRandom(),
+    name:              text("name").notNull(),
+    sku:               text("sku").notNull().unique(),
+    category:          text("category").notNull(),
+    price:             numeric("price", { precision: 10, scale: 2 }).notNull(),
+    stock:             integer("stock").notNull().default(0),
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    imageUrl:          text("image_url"),
+    supplierId:        uuid("supplier_id"),
+    createdAt:         timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("products_sku_idx").on(table.sku)]
 );

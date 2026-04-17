@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
-import { ArrowLeft, ScanLine, Printer } from "lucide-react";
+import { ArrowLeft, ScanLine, Printer, RotateCcw, X, Minus, Plus, Check, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface BillItem {
   id: string;
@@ -36,21 +37,117 @@ function pad(s: string, len: number, right = false) {
 const LINE = "─".repeat(36);
 const DASH = "- ".repeat(18).trimEnd();
 
+/* ─── Return modal ───────────────────────────────────────────────── */
+function ReturnModal({ billId, items, onClose }: { billId: string; items: BillItem[]; onClose: (restocked: boolean) => void }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [qtys, setQtys]         = useState<Record<string, number>>(() =>
+    Object.fromEntries(items.map((i) => [i.id, i.quantity]))
+  );
+  const [processing, setProcessing] = useState(false);
+  const [reason, setReason]         = useState("Customer return");
+
+  const toggle = (id: string) =>
+    setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const handleReturn = async () => {
+    if (selected.size === 0) { toast.error("Select at least one item to return"); return; }
+    setProcessing(true);
+    try {
+      const returnItems = Array.from(selected).map((id) => ({ billItemId: id, quantity: qtys[id] }));
+      const r = await fetch(`${BASE_URL}/api/returns`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ billId, items: returnItems, reason }),
+      });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
+      const data = await r.json();
+      toast.success(`Return processed — ₹${data.totalRefund?.toLocaleString("en-IN", { maximumFractionDigits: 0 })} refunded, stock restocked`);
+      onClose(true);
+    } catch (e: any) { toast.error(e.message || "Return failed"); }
+    finally { setProcessing(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => onClose(false)} />
+      <div className="relative w-full md:max-w-md bg-background rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="font-black text-lg flex items-center gap-2">
+            <RotateCcw className="w-5 h-5 text-orange-500" /> Process Return
+          </h2>
+          <button onClick={() => onClose(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+          <p className="text-xs text-muted-foreground">Select items to return. Stock will be automatically restocked.</p>
+          {items.map((item) => {
+            const isSel = selected.has(item.id);
+            return (
+              <div key={item.id} className={`p-3 rounded-xl border transition-all ${isSel ? "border-orange-400 bg-orange-50 dark:bg-orange-950/20" : "border-border"}`}>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => toggle(item.id)}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSel ? "bg-orange-500 border-orange-500" : "border-muted-foreground/40"}`}>
+                    {isSel && <Check className="w-3 h-3 text-white" />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm truncate">{item.productName}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{item.productSku} · ₹{item.price.toLocaleString("en-IN")} each</p>
+                  </div>
+                  {isSel && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => setQtys((q) => ({ ...q, [item.id]: Math.max(1, (q[item.id] ?? 1) - 1) }))}
+                        className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="w-5 text-center text-sm font-black">{qtys[item.id]}</span>
+                      <button onClick={() => setQtys((q) => ({ ...q, [item.id]: Math.min(item.quantity, (q[item.id] ?? 1) + 1) }))}
+                        className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+                        <Plus className="w-3 h-3" />
+                      </button>
+                      <span className="text-xs text-muted-foreground">/ {item.quantity}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          <div>
+            <p className="text-xs font-bold text-muted-foreground mb-1">Reason</p>
+            <input value={reason} onChange={(e) => setReason(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border bg-muted/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          </div>
+        </div>
+        <div className="p-4 border-t">
+          <button onClick={handleReturn} disabled={processing || selected.size === 0}
+            className="w-full h-12 bg-orange-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-orange-600 active:scale-[0.98] transition-all disabled:opacity-50">
+            {processing ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : <><RotateCcw className="w-4 h-4" /> Process Return ({selected.size} item{selected.size !== 1 ? "s" : ""})</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Component ──────────────────────────────────────────────────── */
 export default function Bill() {
   const { id: billId } = useParams<{ id: string }>();
   const [data, setData]       = useState<BillData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
+  const [showReturn, setShowReturn] = useState(false);
 
-  useEffect(() => {
+  const loadBill = () => {
     if (!billId) return;
+    setLoading(true);
     fetch(`${BASE_URL}/api/bills/${billId}`)
       .then((r) => r.json())
       .then(setData)
       .catch(() => setError("Could not load bill"))
       .finally(() => setLoading(false));
-  }, [billId]);
+  };
+
+  useEffect(() => { loadBill(); }, [billId]);
 
   /* ── loading / error ── */
   if (loading) {
@@ -69,6 +166,20 @@ export default function Bill() {
   }
 
   const { bill, items } = data;
+
+  if (showReturn) {
+    return (
+      <ReturnModal
+        billId={bill.id}
+        items={items}
+        onClose={(restocked) => {
+          setShowReturn(false);
+          if (restocked) loadBill();
+        }}
+      />
+    );
+  }
+
   const dt = new Date(bill.createdAt);
   const dateStr = dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   const timeStr = dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
@@ -279,20 +390,29 @@ export default function Bill() {
         </div>
 
         {/* ── Action buttons (screen only) ── */}
-        <div className="no-print flex gap-3 px-4 pb-8 max-w-sm mx-auto w-full">
-          <button
-            onClick={() => window.print()}
-            className="flex-1 h-12 flex items-center justify-center gap-2 bg-black text-white font-bold rounded-2xl hover:bg-neutral-800 active:scale-95 transition-all text-sm"
-          >
-            <Printer className="w-4 h-4" />
-            Print Receipt
-          </button>
-          <Link href="/scan" className="flex-1">
-            <button className="w-full h-12 flex items-center justify-center gap-2 border-2 border-black text-black font-bold rounded-2xl hover:bg-gray-50 active:scale-95 transition-all text-sm dark:border-white dark:text-white dark:hover:bg-neutral-800">
-              <ScanLine className="w-4 h-4" />
-              New Sale
+        <div className="no-print flex flex-col gap-3 px-4 pb-8 max-w-sm mx-auto w-full">
+          <div className="flex gap-3">
+            <button
+              onClick={() => window.print()}
+              className="flex-1 h-12 flex items-center justify-center gap-2 bg-black text-white font-bold rounded-2xl hover:bg-neutral-800 active:scale-95 transition-all text-sm"
+            >
+              <Printer className="w-4 h-4" />
+              Print Receipt
             </button>
-          </Link>
+            <Link href="/scan" className="flex-1">
+              <button className="w-full h-12 flex items-center justify-center gap-2 border-2 border-black text-black font-bold rounded-2xl hover:bg-gray-50 active:scale-95 transition-all text-sm dark:border-white dark:text-white dark:hover:bg-neutral-800">
+                <ScanLine className="w-4 h-4" />
+                New Sale
+              </button>
+            </Link>
+          </div>
+          <button
+            onClick={() => setShowReturn(true)}
+            className="w-full h-10 flex items-center justify-center gap-2 border border-orange-400 text-orange-600 font-bold rounded-2xl hover:bg-orange-50 dark:hover:bg-orange-950/20 active:scale-95 transition-all text-sm"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Process Return / Refund
+          </button>
         </div>
 
       </div>

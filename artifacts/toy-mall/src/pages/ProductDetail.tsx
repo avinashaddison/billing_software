@@ -9,13 +9,15 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, Edit3, ChevronRight } from "lucide-react";
+import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, Edit3, ChevronRight, ImageIcon, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { playTick, playStockIn, playStockOut, playError } from "@/lib/sounds";
+
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 export default function ProductDetail() {
   const searchParams = new URLSearchParams(useSearch());
@@ -24,7 +26,10 @@ export default function ProductDetail() {
   const queryClient = useQueryClient();
   const { userId } = useAuth();
 
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity]         = useState<number>(1);
+  const [editingImg, setEditingImg]     = useState(false);
+  const [imageUrlInput, setImageUrlInput] = useState("");
+  const [savingImg, setSavingImg]       = useState(false);
 
   const { data: product, isLoading, isError } = useGetProductBySku(sku, {
     query: {
@@ -83,6 +88,22 @@ export default function ProductDetail() {
       queryClient.setQueryData(getGetProductBySkuQueryKey(sku), { ...product, stock: previousStock });
       toast.error(error?.data?.error || error?.message || "Failed to update stock");
     }
+  };
+
+  const saveImageUrl = async () => {
+    if (!product) return;
+    setSavingImg(true);
+    try {
+      await fetch(`${BASE_URL}/api/products/${product.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: imageUrlInput.trim() || null }),
+      });
+      queryClient.invalidateQueries({ queryKey: getGetProductBySkuQueryKey(sku) });
+      toast.success("Image updated");
+      setEditingImg(false);
+    } catch { toast.error("Failed to save image URL"); }
+    finally { setSavingImg(false); }
   };
 
   if (!sku) {
@@ -179,6 +200,43 @@ export default function ProductDetail() {
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Low Stock Threshold</p>
                 <p className="text-sm font-semibold">{product.lowStockThreshold} units</p>
               </div>
+            </div>
+
+            {/* Image URL section */}
+            <div className="mt-4 pt-4 border-t space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Product Image</p>
+                {!editingImg && (
+                  <button onClick={() => { setImageUrlInput((product as any).imageUrl ?? ""); setEditingImg(true); }}
+                    className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+                    <Edit3 className="w-3 h-3" /> Edit
+                  </button>
+                )}
+              </div>
+
+              {editingImg ? (
+                <div className="space-y-2">
+                  <Input placeholder="https://example.com/image.jpg" value={imageUrlInput}
+                    onChange={(e) => setImageUrlInput(e.target.value)} className="h-10 rounded-xl text-sm" />
+                  <div className="flex gap-2">
+                    <button onClick={saveImageUrl} disabled={savingImg}
+                      className="flex-1 h-9 bg-primary text-primary-foreground rounded-xl text-xs font-bold flex items-center justify-center gap-1">
+                      {savingImg ? "Saving…" : <><Check className="w-3.5 h-3.5" /> Save</>}
+                    </button>
+                    <button onClick={() => setEditingImg(false)}
+                      className="h-9 px-3 bg-muted rounded-xl text-xs font-bold">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (product as any).imageUrl ? (
+                <img src={(product as any).imageUrl} alt={product.name}
+                  className="w-full h-32 object-cover rounded-xl border" />
+              ) : (
+                <div className="h-20 rounded-xl border-2 border-dashed border-muted flex items-center justify-center text-muted-foreground/50">
+                  <ImageIcon className="w-6 h-6" />
+                </div>
+              )}
             </div>
 
             <div className="mt-4 pt-4 border-t">

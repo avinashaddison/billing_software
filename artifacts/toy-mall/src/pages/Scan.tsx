@@ -388,6 +388,45 @@ export default function Scan() {
       .finally(() => setLookupSku(null));
   }, [lookupSku, isBilling, addItem]);
 
+  /* ── Keyboard shortcuts ── */
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      // Ignore when typing in an input/textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+
+      // Enter → open checkout modal (billing mode, items in cart, modal not open)
+      if (e.key === "Enter" && isBilling && items.length > 0 && !showModal) {
+        e.preventDefault();
+        setShowModal(true);
+        return;
+      }
+      // Escape → close modal
+      if (e.key === "Escape" && showModal) {
+        setShowModal(false);
+        return;
+      }
+      // Ctrl/Cmd + K or M → toggle mode
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setMode((m) => m === "billing" ? "stockin" : "billing");
+        return;
+      }
+      // B → billing mode
+      if (e.key === "b" || e.key === "B") {
+        setMode("billing");
+        return;
+      }
+      // S → stock-in mode
+      if (e.key === "s" || e.key === "S") {
+        setMode("stockin");
+        return;
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isBilling, items.length, showModal]);
+
   /* ── Manual SKU submit ── */
   const handleManual = (e: React.FormEvent) => {
     e.preventDefault();

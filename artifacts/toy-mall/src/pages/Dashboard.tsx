@@ -1,12 +1,55 @@
 import { useGetDashboardSummary, useGetTodayActivity, useGetLowStockProducts, useGetCategoryBreakdown, getGetDashboardSummaryQueryKey, getGetTodayActivityQueryKey, getGetLowStockProductsQueryKey, getGetCategoryBreakdownQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Package, IndianRupee, AlertTriangle, ArrowDownToLine, ArrowUpToLine, Layers } from "lucide-react";
+import { Package, IndianRupee, AlertTriangle, ArrowDownToLine, ArrowUpToLine, Layers, TrendingUp, FileText, Users, Tag, Truck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+interface DayRevenue { day: string; totalAmount: number; billCount: number; }
+
+function RevenueChart() {
+  const [data, setData]     = useState<DayRevenue[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/reports/revenue?days=7`)
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const fmt = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+
+  return (
+    <div className="bg-card border rounded-2xl p-4 mt-2">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-base font-black flex items-center gap-2"><TrendingUp className="w-4 h-4 text-primary" /> 7-Day Revenue</h2>
+        <Link href="/report" className="text-xs font-bold text-primary hover:underline">Full Report →</Link>
+      </div>
+      {loading ? (
+        <div className="h-28 flex items-center justify-center"><Skeleton className="w-full h-24 rounded-xl" /></div>
+      ) : data.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-6">No sales data yet</p>
+      ) : (
+        <ResponsiveContainer width="100%" height={110}>
+          <BarChart data={data} margin={{ top: 0, right: 0, left: -30, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+            <XAxis dataKey="day" tickFormatter={fmt} tick={{ fontSize: 9 }} />
+            <YAxis tick={{ fontSize: 9 }} />
+            <Tooltip formatter={(v: number) => `₹${v.toLocaleString("en-IN")}`} labelFormatter={fmt}
+              contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+            <Bar dataKey="totalAmount" name="Revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
 
 function LiveBadge() {
   const [connected, setConnected] = useState(false);
@@ -65,6 +108,26 @@ export default function Dashboard() {
         <StatCard title="Stock Value" value={summary ? `₹${summary.totalStockValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}` : undefined} icon={IndianRupee} loading={loadingSummary} testid="stat-stock-value" />
         <StatCard title="Today IN" value={activity?.inQuantity} subtitle={`${activity?.inCount ?? 0} transactions`} icon={ArrowDownToLine} loading={loadingActivity} className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900" valueClassName="text-green-700 dark:text-green-400" testid="stat-today-in" />
         <StatCard title="Today OUT" value={activity?.outQuantity} subtitle={`${activity?.outCount ?? 0} transactions`} icon={ArrowUpToLine} loading={loadingActivity} className="bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900" valueClassName="text-red-700 dark:text-red-400" testid="stat-today-out" />
+      </div>
+
+      {/* Revenue chart */}
+      <RevenueChart />
+
+      {/* Quick-access tiles for new sections */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-1">
+        {[
+          { href: "/report",    icon: FileText, label: "Reports",   desc: "EOD summary & trends",  color: "text-blue-600 dark:text-blue-400",   bg: "bg-blue-50 dark:bg-blue-950/30"   },
+          { href: "/customers", icon: Users,    label: "Customers", desc: "Purchase history",       color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-950/30" },
+          { href: "/labels",    icon: Tag,      label: "Labels",    desc: "Print QR shelf tags",    color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-50 dark:bg-orange-950/30" },
+          { href: "/suppliers", icon: Truck,    label: "Suppliers", desc: "Manage vendors",         color: "text-green-600 dark:text-green-400",  bg: "bg-green-50 dark:bg-green-950/30"  },
+        ].map(({ href, icon: Icon, label, desc, color, bg }) => (
+          <Link key={href} href={href}
+            className={`flex flex-col p-3 rounded-2xl border ${bg} hover:opacity-90 active:scale-[0.97] transition-all`}>
+            <Icon className={`w-5 h-5 mb-1.5 ${color}`} />
+            <p className={`font-black text-sm ${color}`}>{label}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
+          </Link>
+        ))}
       </div>
 
       {/* Two column on desktop for alerts + categories */}
