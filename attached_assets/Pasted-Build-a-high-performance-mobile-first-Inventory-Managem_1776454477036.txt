@@ -1,0 +1,189 @@
+Build a high-performance, mobile-first Inventory Management Web App for a Toy Mall.
+
+## 🎯 Core Goal
+
+Ultra-fast QR-based stock system (scan → IN/OUT in <5 seconds).
+
+---
+
+## ⚙️ Tech Stack
+
+* Frontend: React (Vite)
+* Backend: Supabase (PostgreSQL)
+* Styling: Tailwind CSS
+* QR Scanner: html5-qrcode
+* Routing: React Router
+
+---
+
+## 🧱 DATABASE SCHEMA (STRICT)
+
+### products
+
+* id (uuid, primary key)
+* name (text)
+* sku (text, unique, indexed)
+* category (text)
+* price (numeric)
+* stock (integer, default 0)
+* low_stock_threshold (integer, default 5)
+* created_at (timestamp default now())
+
+### stock_logs
+
+* id (uuid)
+* product_id (uuid, foreign key)
+* type (IN, OUT, ADJUSTMENT)
+* quantity (integer)
+* user_id (text)
+* created_at (timestamp)
+
+### sales
+
+* id (uuid)
+* product_id (uuid)
+* quantity (integer)
+* total_price (numeric)
+* created_at (timestamp)
+
+---
+
+## 🔳 QR SYSTEM
+
+* QR must encode: sku (NOT id)
+* Format: /product?sku=RC-RED-001
+
+---
+
+## ⚡ CRITICAL LOGIC RULES
+
+### Stock Update
+
+* OUT should NOT allow stock < 0
+* If attempted → show error: "Insufficient stock"
+
+### Adjustment System
+
+* No delete allowed
+* Use ADJUSTMENT log instead
+
+### Sale Logic
+
+* Every OUT = create sale record
+
+---
+
+## 🔥 PERFORMANCE RULES (MANDATORY)
+
+* Use optimistic UI updates
+* No page reloads
+* Max 1 API call per action
+* Index on sku column
+* Lazy load product list
+
+---
+
+## 📱 UI STRUCTURE
+
+Bottom Navigation:
+Dashboard | Products | Scan | Logs | Profile
+
+---
+
+## 🔳 SCAN PAGE (CRITICAL UX)
+
+* Full screen camera
+* Auto scan detection
+* Instant redirect
+* No popup
+
+Fallback:
+
+* Input field for USB scanner
+
+---
+
+## 📄 PRODUCT DETAIL
+
+* Show:
+  name, stock, low stock warning
+
+* Actions:
+  [IN] [OUT]
+
+* Default quantity = 1
+
+* After action:
+
+  * Update UI instantly
+  * Save log in background
+
+---
+
+## 📊 DASHBOARD
+
+* Total products
+* Total stock value
+* Low stock list
+* Today IN / OUT counts
+
+---
+
+## 🔍 SEARCH
+
+* Search by:
+
+  * name
+  * sku
+
+---
+
+## 🔐 USER ROLES
+
+* Admin:
+  full control
+* Staff:
+  only scan + IN/OUT
+
+---
+
+## 📶 ERROR HANDLING
+
+* Show simple errors
+* Retry failed requests
+* Never crash UI
+
+---
+
+## 🧾 BILLING (LITE)
+
+* On OUT:
+  store sale record
+
+* Optional:
+  show simple receipt:
+  Product | Qty | Total
+
+---
+
+## 🎨 UI RULES
+
+* Big buttons
+* Green = IN
+* Red = OUT
+* Minimal text
+* Mobile-first
+* No complex forms
+
+---
+
+## 🚀 FINAL REQUIREMENTS
+
+* Must feel instant
+* Must work on mobile smoothly
+* Must handle 1000+ products
+* Clean code structure
+
+---
+
+Focus on SPEED, SIMPLICITY, and REAL-WORLD USABILITY.

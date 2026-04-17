@@ -3,13 +3,22 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Toy Mall Inventory Management API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: products
+    description: Product operations
+  - name: stock-logs
+    description: Stock log operations
+  - name: sales
+    description: Sales operations
+  - name: dashboard
+    description: Dashboard summary operations
+
 paths:
   /healthz:
     get:
@@ -24,6 +33,347 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List all products
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by name or SKU
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Filter by category
+        - name: lowStock
+          in: query
+          schema:
+            type: boolean
+          description: Filter to low stock products only
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      operationId: createProduct
+      tags: [products]
+      summary: Create a new product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductInput"
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /products/sku/{sku}:
+    get:
+      operationId: getProductBySku
+      tags: [products]
+      summary: Get product by SKU
+      parameters:
+        - name: sku
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get a product by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateProduct
+      tags: [products]
+      summary: Update a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductInput"
+      responses:
+        "200":
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteProduct
+      tags: [products]
+      summary: Delete a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Product deleted
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /products/{id}/stock:
+    post:
+      operationId: updateStock
+      tags: [products]
+      summary: Update product stock (IN, OUT, ADJUSTMENT)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockUpdateBody"
+      responses:
+        "200":
+          description: Stock updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockUpdateResponse"
+        "400":
+          description: Validation error (e.g. insufficient stock)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /products/{id}/qr:
+    get:
+      operationId: getProductQr
+      tags: [products]
+      summary: Get QR code data URL for a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: QR code data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrCodeResponse"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stock-logs:
+    get:
+      operationId: listStockLogs
+      tags: [stock-logs]
+      summary: List stock logs
+      parameters:
+        - name: productId
+          in: query
+          schema:
+            type: string
+          description: Filter by product ID
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [IN, OUT, ADJUSTMENT]
+          description: Filter by log type
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Number of logs to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Offset for pagination
+      responses:
+        "200":
+          description: List of stock logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockLog"
+
+  /sales:
+    get:
+      operationId: listSales
+      tags: [sales]
+      summary: List sales records
+      parameters:
+        - name: productId
+          in: query
+          schema:
+            type: string
+          description: Filter by product ID
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of sales
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sale"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary statistics
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/low-stock:
+    get:
+      operationId: getLowStockProducts
+      tags: [dashboard]
+      summary: Get products with low stock
+      responses:
+        "200":
+          description: Low stock products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /dashboard/today-activity:
+    get:
+      operationId: getTodayActivity
+      tags: [dashboard]
+      summary: Get today's IN/OUT activity counts
+      responses:
+        "200":
+          description: Today's activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodayActivity"
+
+  /dashboard/categories:
+    get:
+      operationId: getCategoryBreakdown
+      tags: [dashboard]
+      summary: Get product count and stock value by category
+      responses:
+        "200":
+          description: Category breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryStat"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +384,229 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sku:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+        stock:
+          type: integer
+        lowStockThreshold:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - sku
+        - category
+        - price
+        - stock
+        - lowStockThreshold
+        - createdAt
+
+    CreateProductInput:
+      type: object
+      properties:
+        name:
+          type: string
+        sku:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+        stock:
+          type: integer
+        lowStockThreshold:
+          type: integer
+      required:
+        - name
+        - sku
+        - category
+        - price
+
+    UpdateProductInput:
+      type: object
+      properties:
+        name:
+          type: string
+        sku:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+        stock:
+          type: integer
+        lowStockThreshold:
+          type: integer
+
+    StockUpdateBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [IN, OUT, ADJUSTMENT]
+        quantity:
+          type: integer
+        userId:
+          type: string
+      required:
+        - type
+        - quantity
+
+    StockUpdateResponse:
+      type: object
+      properties:
+        product:
+          $ref: "#/components/schemas/Product"
+        log:
+          $ref: "#/components/schemas/StockLog"
+        sale:
+          $ref: "#/components/schemas/Sale"
+      required:
+        - product
+        - log
+
+    QrCodeResponse:
+      type: object
+      properties:
+        sku:
+          type: string
+        url:
+          type: string
+        qrDataUrl:
+          type: string
+      required:
+        - sku
+        - url
+        - qrDataUrl
+
+    StockLog:
+      type: object
+      properties:
+        id:
+          type: string
+        productId:
+          type: string
+        productName:
+          type: string
+        productSku:
+          type: string
+        type:
+          type: string
+          enum: [IN, OUT, ADJUSTMENT]
+        quantity:
+          type: integer
+        userId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - productId
+        - productName
+        - productSku
+        - type
+        - quantity
+        - createdAt
+
+    Sale:
+      type: object
+      properties:
+        id:
+          type: string
+        productId:
+          type: string
+        productName:
+          type: string
+        productSku:
+          type: string
+        quantity:
+          type: integer
+        totalPrice:
+          type: number
+        createdAt:
+          type: string
+      required:
+        - id
+        - productId
+        - productName
+        - productSku
+        - quantity
+        - totalPrice
+        - createdAt
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalProducts:
+          type: integer
+        totalStock:
+          type: integer
+        totalStockValue:
+          type: number
+        lowStockCount:
+          type: integer
+        todayInCount:
+          type: integer
+        todayOutCount:
+          type: integer
+      required:
+        - totalProducts
+        - totalStock
+        - totalStockValue
+        - lowStockCount
+        - todayInCount
+        - todayOutCount
+
+    TodayActivity:
+      type: object
+      properties:
+        inCount:
+          type: integer
+        outCount:
+          type: integer
+        inQuantity:
+          type: integer
+        outQuantity:
+          type: integer
+      required:
+        - inCount
+        - outCount
+        - inQuantity
+        - outQuantity
+
+    CategoryStat:
+      type: object
+      properties:
+        category:
+          type: string
+        productCount:
+          type: integer
+        totalStock:
+          type: integer
+        stockValue:
+          type: number
+      required:
+        - category
+        - productCount
+        - totalStock
+        - stockValue
