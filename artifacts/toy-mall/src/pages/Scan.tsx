@@ -4,6 +4,7 @@ import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { ScanLine, Keyboard, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { playScanBeep } from "@/lib/sounds";
 
 export default function Scan() {
   const [, setLocation] = useLocation();
@@ -33,22 +34,24 @@ export default function Scan() {
             scanner.clear();
             setScannerActive(false);
           }
-          
+
+          playScanBeep();
+
           // Handle decoded text. If it's a URL containing sku, extract it. Otherwise assume it IS the sku.
           try {
             if (decodedText.includes("product?sku=")) {
               const url = new URL(decodedText.startsWith("http") ? decodedText : `http://localhost${decodedText}`);
               const sku = url.searchParams.get("sku");
               if (sku) {
-                setLocation(`/product?sku=${sku}`);
+                setTimeout(() => setLocation(`/product?sku=${sku}`), 200);
                 return;
               }
             }
           } catch (e) {
             // Not a URL, use raw text
           }
-          
-          setLocation(`/product?sku=${decodedText}`);
+
+          setTimeout(() => setLocation(`/product?sku=${decodedText}`), 200);
         },
         (error) => {
           // Ignored - runs constantly when no QR is found

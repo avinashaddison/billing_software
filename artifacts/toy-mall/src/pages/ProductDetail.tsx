@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { playTick, playStockIn, playStockOut, playError } from "@/lib/sounds";
 
 export default function ProductDetail() {
   const searchParams = new URLSearchParams(useSearch());
@@ -52,10 +53,12 @@ export default function ProductDetail() {
   const handleStockAction = async (type: "IN" | "OUT") => {
     if (!product) return;
     if (quantity <= 0) {
+      playError();
       toast.error("Quantity must be at least 1");
       return;
     }
     if (type === "OUT" && product.stock < quantity) {
+      playError();
       toast.error("Insufficient stock");
       return;
     }
@@ -67,6 +70,7 @@ export default function ProductDetail() {
 
     try {
       await updateStock.mutateAsync({ id: product.id, data: { type, quantity, userId } });
+      if (type === "IN") playStockIn(); else playStockOut();
       toast.success(`Stock ${type === "IN" ? "added" : "removed"} successfully`);
       queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetTodayActivityQueryKey() });
@@ -75,6 +79,7 @@ export default function ProductDetail() {
       queryClient.invalidateQueries({ queryKey: getListStockLogsQueryKey() });
       setQuantity(1);
     } catch (error: any) {
+      playError();
       queryClient.setQueryData(getGetProductBySkuQueryKey(sku), { ...product, stock: previousStock });
       toast.error(error?.data?.error || error?.message || "Failed to update stock");
     }
@@ -193,7 +198,7 @@ export default function ProductDetail() {
                 variant="outline"
                 size="icon"
                 className="w-14 h-14 rounded-full text-2xl font-black shadow-sm"
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                onClick={() => { playTick(); setQuantity(Math.max(1, quantity - 1)); }}
               >
                 −
               </Button>
@@ -214,7 +219,7 @@ export default function ProductDetail() {
                 variant="outline"
                 size="icon"
                 className="w-14 h-14 rounded-full text-2xl font-black shadow-sm"
-                onClick={() => setQuantity(quantity + 1)}
+                onClick={() => { playTick(); setQuantity(quantity + 1); }}
               >
                 +
               </Button>
