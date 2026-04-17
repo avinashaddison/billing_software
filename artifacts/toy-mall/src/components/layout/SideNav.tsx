@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, Receipt, FileText, Users, Tag, Truck } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, Receipt, FileText, Users, Tag, Truck, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -22,9 +22,10 @@ export function SideNav() {
   ];
 
   const extraItems = [
-    { name: "Reports",   href: "/report",    icon: FileText },
-    { name: "Customers", href: "/customers", icon: Users    },
-    { name: "Labels",    href: "/labels",    icon: Tag      },
+    { name: "Reports",    href: "/report",      icon: FileText },
+    { name: "Customers",  href: "/customers",   icon: Users    },
+    { name: "Categories", href: "/categories",  icon: Layers   },
+    { name: "Labels",     href: "/labels",      icon: Tag      },
     ...(isAdmin ? [{ name: "Suppliers", href: "/suppliers", icon: Truck }] : []),
   ];
 

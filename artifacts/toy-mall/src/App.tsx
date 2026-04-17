@@ -20,6 +20,7 @@ import Suppliers     from "@/pages/Suppliers";
 import Customers     from "@/pages/Customers";
 import Report        from "@/pages/Report";
 import Labels        from "@/pages/Labels";
+import Categories    from "@/pages/Categories";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +54,7 @@ function Router() {
         <Route path="/customers"    component={Customers} />
         <Route path="/report"       component={Report} />
         <Route path="/labels"       component={Labels} />
+        <Route path="/categories"   component={Categories} />
         <Route                      component={NotFound} />
       </Switch>
     </AppLayout>

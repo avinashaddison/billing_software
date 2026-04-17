@@ -5,3 +5,4 @@ export * from "./bills";
 export * from "./sale_items";
 export * from "./suppliers";
 export * from "./returns";
+export * from "./categories";

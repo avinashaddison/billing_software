@@ -25,7 +25,8 @@ Mobile-first inventory management web app for a toy mall. Ultra-fast QR-based st
 ### Frontend Pages (artifacts/toy-mall/src/pages/)
 - **Dashboard** (/) — Stats, 7-day revenue chart, quick-nav tiles, low stock alerts, category breakdown. LIVE SSE badge.
 - **Products** (/products) — Searchable product list with bulk CSV import modal (Admin)
-- **Create Product** (/products/new) — Form with category auto-SKU generation
+- **Create Product** (/products/new) — Form with category auto-SKU generation, image URL input, loads categories from API
+- **Categories** (/categories) — Full CRUD for toy categories: emoji, SKU prefix, product count per category
 - **Product Detail** (/product?sku=SKU) — Stock IN/OUT with optimistic UI, QR code, imageUrl field
 - **Scan** (/scan) — Full-screen camera QR scanner + USB/manual fallback. Keyboard shortcuts: B=billing, S=stock-in, Enter=checkout, Esc=close modal, Ctrl+K=toggle mode
 - **Logs** (/logs) — Paginated stock activity logs with type filter

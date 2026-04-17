@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useCreateProduct, getListProductsQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Lightbulb, Tag, PenLine } from "lucide-react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Lightbulb, Tag, PenLine, ImageIcon } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -124,6 +124,7 @@ const createProductSchema = z.object({
   price:             z.coerce.number().min(0.01, "Price must be greater than 0"),
   stock:             z.coerce.number().int().min(0, "Stock cannot be negative").optional().default(0),
   lowStockThreshold: z.coerce.number().int().min(0).optional().default(5),
+  imageUrl:          z.string().url("Enter a valid image URL").optional().or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof createProductSchema>;
@@ -138,10 +139,27 @@ async function fetchNextSku(categoryCode: string): Promise<string> {
 }
 
 /* ── Component ───────────────────────────────────────────────────── */
+interface ApiCategory { id: string; name: string; emoji: string; skuCode: string }
+
 export default function CreateProduct() {
   const [, setLocation] = useLocation();
   const queryClient   = useQueryClient();
   const createProduct = useCreateProduct();
+
+  /* Load categories from the API to pick up custom ones created on /categories */
+  const { data: apiCats = [] } = useQuery<ApiCategory[]>({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE_URL}/api/categories`);
+      if (!r.ok) return [];
+      return r.json();
+    },
+    staleTime: 1000 * 60,
+  });
+
+  /* Merge: hardcoded cats keep rich metadata; API-only cats get generic entry */
+  const hardcodedNames = new Set(CATEGORIES.filter((c) => c.value !== "__custom__").map((c) => c.value));
+  const extraApiCats = apiCats.filter((a) => !hardcodedNames.has(a.name));
 
   const [autoSku, setAutoSku]             = useState<string>("");
   const [skuLoading, setSkuLoading]       = useState(false);
@@ -150,7 +168,7 @@ export default function CreateProduct() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(createProductSchema),
-    defaultValues: { name: "", category: "", customCategory: "", price: undefined as unknown as number, stock: 0, lowStockThreshold: 5 },
+    defaultValues: { name: "", category: "", customCategory: "", price: undefined as unknown as number, stock: 0, lowStockThreshold: 5, imageUrl: "" },
   });
 
   const selectedCategory  = form.watch("category") as CategoryValue | "";
@@ -171,7 +189,9 @@ export default function CreateProduct() {
       if (!customCategoryVal.trim()) { setAutoSku(""); return; }
       code = codeFromName(customCategoryVal);
     } else {
-      code = CATEGORIES.find((c) => c.value === selectedCategory)?.code ?? "OTH";
+      const hardcodedCode = CATEGORIES.find((c) => c.value === selectedCategory)?.code;
+      const apiCode = apiCats.find((c) => c.name === selectedCategory)?.skuCode;
+      code = hardcodedCode ?? apiCode ?? "OTH";
     }
     setSkuLoading(true);
     setAutoSku("");
@@ -179,7 +199,8 @@ export default function CreateProduct() {
       .then(setAutoSku)
       .catch(() => toast.error("Could not generate SKU"))
       .finally(() => setSkuLoading(false));
-  }, [selectedCategory, isCustom, customCategoryVal]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, isCustom, customCategoryVal, apiCats]);
 
   const handleNameFocus = () => { if (activeCat && !isCustom) setShowSuggestions(true); };
   const handleNameBlur  = () => {
@@ -198,7 +219,7 @@ export default function CreateProduct() {
     const finalCategory = isCustom ? (data.customCategory?.trim() || "") : data.category;
     if (!finalCategory) { toast.error("Please enter a custom category name"); return; }
     createProduct.mutate(
-      { data: { name: data.name, category: finalCategory, price: data.price, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku } },
+      { data: { name: data.name, category: finalCategory, price: data.price, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || undefined } },
       {
         onSuccess: (product) => {
           toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
@@ -245,15 +266,25 @@ export default function CreateProduct() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="max-h-72">
-                      {CATEGORIES.map((cat) => (
+                      {CATEGORIES.filter((c) => c.value !== "__custom__").map((cat) => (
                         <SelectItem key={cat.value} value={cat.value}>
                           <span className="mr-2">{cat.emoji}</span>
                           <span className="font-semibold">{cat.label}</span>
-                          {cat.value !== "__custom__" && (
-                            <span className="ml-2 font-mono text-xs text-muted-foreground">({cat.code})</span>
-                          )}
+                          <span className="ml-2 font-mono text-xs text-muted-foreground">({cat.code})</span>
                         </SelectItem>
                       ))}
+                      {extraApiCats.map((cat) => (
+                        <SelectItem key={cat.name} value={cat.name}>
+                          <span className="mr-2">{cat.emoji}</span>
+                          <span className="font-semibold">{cat.name}</span>
+                          <span className="ml-2 font-mono text-xs text-muted-foreground">({cat.skuCode})</span>
+                        </SelectItem>
+                      ))}
+                      {/* Always-available custom option */}
+                      <SelectItem value="__custom__">
+                        <span className="mr-2">🎁</span>
+                        <span className="font-semibold">Other / Custom</span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -381,6 +412,36 @@ export default function CreateProduct() {
                   </FormItem>
                 )} />
               </div>
+
+              {/* Image URL */}
+              <FormField control={form.control} name="imageUrl" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold text-muted-foreground">
+                    <ImageIcon className="w-3.5 h-3.5 inline mr-1.5" />Product Image URL
+                    <span className="ml-1.5 text-xs font-normal normal-case">(optional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="url"
+                      placeholder="https://example.com/image.jpg"
+                      className="h-12 rounded-xl"
+                      {...field}
+                    />
+                  </FormControl>
+                  {field.value && (
+                    <div className="flex items-center gap-3 mt-2">
+                      <img
+                        src={field.value}
+                        alt="Preview"
+                        className="w-14 h-14 rounded-xl object-cover border"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                      <p className="text-xs text-muted-foreground">Image preview</p>
+                    </div>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )} />
             </div>
 
             <Button
