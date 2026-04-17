@@ -1,33 +1,42 @@
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, Receipt, FileText, Users, Tag, Truck, Layers } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, Receipt, FileText, Users, Tag, Truck, Layers, Users2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
+import { type Permissions } from "@/lib/permissions";
+
+function getLevel(role: string | null, permissions: Permissions, resource: string): "none" | "read" | "write" {
+  if (role === "owner") return "write";
+  return (permissions as Record<string, "none" | "read" | "write">)[resource] ?? "none";
+}
 
 export function SideNav() {
   const [location] = useLocation();
   const { isDark, toggleTheme } = useTheme();
   const { count } = useCart();
-  const { role } = useAuth();
-  const isAdmin = role === "Admin";
+  const { role, permissions } = useAuth();
+
+  const perm    = (resource: string) => getLevel(role, permissions, resource);
+  const visible = (resource: string) => perm(resource) !== "none";
 
   const navItems = [
-    { name: "Dashboard", href: "/",          icon: Home,     highlight: false },
-    { name: "Products",  href: "/products",  icon: Package,  highlight: false },
-    { name: "Scan",      href: "/scan",      icon: ScanLine, highlight: true  },
-    { name: "Billing",   href: "/billing",   icon: Receipt,  highlight: false },
-    { name: "Logs",      href: "/logs",      icon: Clock,    highlight: false },
-    { name: "Profile",   href: "/profile",   icon: User,     highlight: false },
-  ];
+    { name: "Dashboard", href: "/",          icon: Home,     highlight: false, resource: "dashboard" },
+    { name: "Products",  href: "/products",  icon: Package,  highlight: false, resource: "products"  },
+    { name: "Scan",      href: "/scan",      icon: ScanLine, highlight: true,  resource: "scan"      },
+    { name: "Billing",   href: "/billing",   icon: Receipt,  highlight: false, resource: "billing"   },
+    { name: "Logs",      href: "/logs",      icon: Clock,    highlight: false, resource: "logs"      },
+    { name: "Profile",   href: "/profile",   icon: User,     highlight: false, resource: null        },
+  ].filter((item) => !item.resource || visible(item.resource));
 
   const extraItems = [
-    { name: "Reports",    href: "/report",      icon: FileText },
-    { name: "Customers",  href: "/customers",   icon: Users    },
-    { name: "Categories", href: "/categories",  icon: Layers   },
-    { name: "Labels",     href: "/labels",      icon: Tag      },
-    ...(isAdmin ? [{ name: "Suppliers", href: "/suppliers", icon: Truck }] : []),
-  ];
+    { name: "Reports",    href: "/report",     icon: FileText, resource: "reports"   },
+    { name: "Customers",  href: "/customers",  icon: Users,    resource: "customers"  },
+    { name: "Categories", href: "/categories", icon: Layers,   resource: "categories" },
+    { name: "Labels",     href: "/labels",     icon: Tag,      resource: "labels"    },
+    { name: "Suppliers",  href: "/suppliers",  icon: Truck,    resource: "suppliers"  },
+    { name: "Staff",      href: "/staff",      icon: Users2,   resource: "staff"     },
+  ].filter((item) => visible(item.resource));
 
   return (
     <aside className="hidden md:flex flex-col w-56 min-h-screen bg-background border-r border-border shrink-0 sticky top-0 h-screen">
@@ -99,12 +108,14 @@ export function SideNav() {
           {isDark ? <Sun size={16} /> : <Moon size={16} />}
           {isDark ? "Light Mode" : "Dark Mode"}
         </button>
-        <Link href="/products/new"
-          className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted text-foreground font-semibold text-sm hover:bg-muted/70 transition-colors"
-          data-testid="nav-add-product">
-          <Plus size={16} />
-          Add Product
-        </Link>
+        {visible("products") && perm("products") === "write" && (
+          <Link href="/products/new"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted text-foreground font-semibold text-sm hover:bg-muted/70 transition-colors"
+            data-testid="nav-add-product">
+            <Plus size={16} />
+            Add Product
+          </Link>
+        )}
       </div>
     </aside>
   );

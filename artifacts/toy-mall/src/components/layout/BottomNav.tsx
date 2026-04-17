@@ -2,19 +2,32 @@ import { Link, useLocation } from "wouter";
 import { Home, Package, ScanLine, Clock, User, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/contexts/cart-context";
+import { useAuth } from "@/hooks/use-auth";
+import { type Permissions } from "@/lib/permissions";
+
+function getLevel(role: string | null, permissions: Permissions, resource: string): "none" | "read" | "write" {
+  if (role === "owner") return "write";
+  return (permissions as Record<string, "none" | "read" | "write">)[resource] ?? "none";
+}
 
 export function BottomNav() {
   const [location] = useLocation();
   const { count } = useCart();
+  const { role, permissions } = useAuth();
 
-  const navItems = [
-    { name: "Home",    href: "/",        icon: Home    },
-    { name: "Products",href: "/products", icon: Package },
-    { name: "Scan",    href: "/scan",     icon: ScanLine, highlight: true },
-    { name: "Billing", href: "/billing",  icon: Receipt },
-    { name: "Logs",    href: "/logs",     icon: Clock   },
-    { name: "Profile", href: "/profile",  icon: User    },
+  const visible = (resource: string) => getLevel(role, permissions, resource) !== "none";
+
+  const allItems = [
+    { name: "Home",    href: "/",        icon: Home,    resource: "dashboard" },
+    { name: "Products",href: "/products", icon: Package, resource: "products"  },
+    { name: "Scan",    href: "/scan",     icon: ScanLine,resource: "scan",    highlight: true },
+    { name: "Billing", href: "/billing",  icon: Receipt, resource: "billing"  },
+    { name: "Logs",    href: "/logs",     icon: Clock,   resource: "logs"     },
+    { name: "Profile", href: "/profile",  icon: User,    resource: null       },
   ];
+
+  /* Always show Profile. Filter others by permission. Keep max 6 items for mobile. */
+  const navItems = allItems.filter((item) => !item.resource || visible(item.resource));
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border"

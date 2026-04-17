@@ -11,6 +11,7 @@ import returnsRouter     from "./returns";
 import reportsRouter     from "./reports";
 import customersRouter   from "./customers";
 import categoriesRouter  from "./categories";
+import staffRouter       from "./staff";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(returnsRouter);
 router.use(reportsRouter);
 router.use(customersRouter);
 router.use(categoriesRouter);
+router.use(staffRouter);
 
 export default router;

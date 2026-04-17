@@ -16,7 +16,7 @@ Mobile-first inventory management web app for a toy mall. Ultra-fast QR-based st
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec at lib/api-spec/openapi.yaml)
 - **QR Scanner**: html5-qrcode
-- **State**: Zustand (role/auth state)
+- **State**: Zustand persist (auth: `toy-mall-auth-v2` — stores staffId, staffName, role, permissions)
 - **Build**: esbuild (CJS bundle)
 - **Real-time**: SSE (Server-Sent Events) for live dashboard updates
 
@@ -30,7 +30,9 @@ Mobile-first inventory management web app for a toy mall. Ultra-fast QR-based st
 - **Product Detail** (/product?sku=SKU) — Stock IN/OUT with optimistic UI, QR code, imageUrl field
 - **Scan** (/scan) — Full-screen camera QR scanner + USB/manual fallback. Keyboard shortcuts: B=billing, S=stock-in, Enter=checkout, Esc=close modal, Ctrl+K=toggle mode
 - **Logs** (/logs) — Paginated stock activity logs with type filter
-- **Profile** (/profile) — Role switcher (Admin/Staff)
+- **Login** (/login) — Staff selection + 4-digit PIN login. Auto-redirects here if not authenticated
+- **Profile** (/profile) — Logged-in user info, Sign Out, Staff Management link (owner only)
+- **Staff Management** (/staff) — Owner-only: create/edit/deactivate staff, configure per-page permissions (None/Read/Write per resource)
 - **Billing** (/billing) — Recent bills list
 - **Bill Detail** (/bill/:id) — Receipt view with print + Return/Refund flow
 - **Suppliers** (/suppliers) — Full CRUD for vendor management (Admin-gated)
@@ -46,6 +48,8 @@ Mobile-first inventory management web app for a toy mall. Ultra-fast QR-based st
 - **bill_items** — id, bill_id (fk), product_id (fk), product_name, product_sku, quantity, price, subtotal
 - **suppliers** — id, name, contact, email, phone, address, notes, created_at
 - **returns** — id, bill_id (fk), reason, total_refund, created_at + return_items sub-records
+- **staff_profiles** — id, name, pin (4-digit plain), role (owner|staff), is_active, created_at
+- **staff_permissions** — id, staff_id (fk), resource, level (none|read|write) — unique per staff+resource
 
 ### API Routes (artifacts/api-server/src/routes/)
 - `products.ts` — CRUD + stock update + QR code + bulk-import + imageUrl/supplierId PATCH
@@ -58,6 +62,16 @@ Mobile-first inventory management web app for a toy mall. Ultra-fast QR-based st
 - `customers.ts` — Customer list + bill history by phone
 - `reports.ts` — Revenue trend + end-of-day summary
 - `events.ts` — SSE real-time event broadcast
+- `staff.ts` — Staff CRUD + `POST /api/auth/login` (PIN validation) + permissions GET/PUT
+
+## Role Management & Auth
+- Owner account seeded in DB (name="Owner", PIN="1234", role="owner") — change via Staff Management
+- Staff log in by selecting their name then entering their 4-digit PIN
+- Owners always have "write" access to everything; staff permissions are per-resource in DB
+- Resources: dashboard, products, scan, billing, logs, reports, customers, categories, labels, suppliers, staff
+- Access levels: none (hidden), read (view only), write (full CRUD)
+- Route guards: accessing any page without auth → redirect to /login; access denied → "Access Restricted" screen
+- Nav (sidebar + bottom) filters items by current user's permissions
 
 ## Key Business Rules
 - OUT does NOT allow stock < 0 → returns 400 "Insufficient stock"

@@ -1,63 +1,99 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { CartProvider } from "@/contexts/cart-context";
 import { useRealtime } from "@/hooks/use-realtime";
+import { useAuth, usePermission } from "@/hooks/use-auth";
+import { type ResourceKey } from "@/lib/permissions";
 import NotFound from "@/pages/not-found";
 
-import Dashboard     from "@/pages/Dashboard";
-import Products      from "@/pages/Products";
-import ProductsNew   from "@/pages/ProductsNew";
-import ProductDetail from "@/pages/ProductDetail";
-import Scan          from "@/pages/Scan";
-import Logs          from "@/pages/Logs";
-import Profile       from "@/pages/Profile";
-import Bill          from "@/pages/Bill";
-import Billing       from "@/pages/Billing";
-import Suppliers     from "@/pages/Suppliers";
-import Customers     from "@/pages/Customers";
-import Report        from "@/pages/Report";
-import Labels        from "@/pages/Labels";
-import Categories    from "@/pages/Categories";
+import Dashboard      from "@/pages/Dashboard";
+import Products       from "@/pages/Products";
+import ProductsNew    from "@/pages/ProductsNew";
+import ProductDetail  from "@/pages/ProductDetail";
+import Scan           from "@/pages/Scan";
+import Logs           from "@/pages/Logs";
+import Profile        from "@/pages/Profile";
+import Bill           from "@/pages/Bill";
+import Billing        from "@/pages/Billing";
+import Suppliers      from "@/pages/Suppliers";
+import Customers      from "@/pages/Customers";
+import Report         from "@/pages/Report";
+import Labels         from "@/pages/Labels";
+import Categories     from "@/pages/Categories";
+import Login          from "@/pages/Login";
+import StaffManagement from "@/pages/StaffManagement";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: true,
-      staleTime: 1000 * 30,    // 30 s — SSE invalidates instantly anyway
+      staleTime: 1000 * 30,
     },
   },
 });
 
-/** Mounts the SSE real-time hook inside the QueryClient context */
 function RealtimeProvider({ children }: { children: React.ReactNode }) {
   useRealtime();
   return <>{children}</>;
 }
 
+/** Render page only if user has required access level, else show blocked screen */
+function Protected({ resource, children }: { resource: ResourceKey; children: React.ReactNode }) {
+  const level = usePermission(resource);
+  if (level === "none") {
+    return (
+      <div className="flex flex-col h-full items-center justify-center gap-4 text-center px-6">
+        <div className="text-5xl">🔒</div>
+        <div>
+          <p className="text-xl font-black text-foreground">Access Restricted</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            You don't have permission to view this page.<br />
+            Ask the owner to grant you access.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 function Router() {
+  const { isLoggedIn } = useAuth();
+  const [location] = useLocation();
+
+  if (!isLoggedIn && location !== "/login") {
+    return <Redirect to="/login" />;
+  }
+
   return (
-    <AppLayout>
-      <Switch>
-        <Route path="/"             component={Dashboard} />
-        <Route path="/products"     component={Products} />
-        <Route path="/products/new" component={ProductsNew} />
-        <Route path="/product"      component={ProductDetail} />
-        <Route path="/scan"         component={Scan} />
-        <Route path="/logs"         component={Logs} />
-        <Route path="/profile"      component={Profile} />
-        <Route path="/billing"      component={Billing} />
-        <Route path="/bill/:id"     component={Bill} />
-        <Route path="/suppliers"    component={Suppliers} />
-        <Route path="/customers"    component={Customers} />
-        <Route path="/report"       component={Report} />
-        <Route path="/labels"       component={Labels} />
-        <Route path="/categories"   component={Categories} />
-        <Route                      component={NotFound} />
-      </Switch>
-    </AppLayout>
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route>
+        <AppLayout>
+          <Switch>
+            <Route path="/"             component={() => <Protected resource="dashboard"><Dashboard /></Protected>} />
+            <Route path="/products"     component={() => <Protected resource="products"><Products /></Protected>} />
+            <Route path="/products/new" component={() => <Protected resource="products"><ProductsNew /></Protected>} />
+            <Route path="/product"      component={() => <Protected resource="products"><ProductDetail /></Protected>} />
+            <Route path="/scan"         component={() => <Protected resource="scan"><Scan /></Protected>} />
+            <Route path="/logs"         component={() => <Protected resource="logs"><Logs /></Protected>} />
+            <Route path="/profile"      component={Profile} />
+            <Route path="/billing"      component={() => <Protected resource="billing"><Billing /></Protected>} />
+            <Route path="/bill/:id"     component={() => <Protected resource="billing"><Bill /></Protected>} />
+            <Route path="/suppliers"    component={() => <Protected resource="suppliers"><Suppliers /></Protected>} />
+            <Route path="/customers"    component={() => <Protected resource="customers"><Customers /></Protected>} />
+            <Route path="/report"       component={() => <Protected resource="reports"><Report /></Protected>} />
+            <Route path="/labels"       component={() => <Protected resource="labels"><Labels /></Protected>} />
+            <Route path="/categories"   component={() => <Protected resource="categories"><Categories /></Protected>} />
+            <Route path="/staff"        component={() => <Protected resource="staff"><StaffManagement /></Protected>} />
+            <Route                      component={NotFound} />
+          </Switch>
+        </AppLayout>
+      </Route>
+    </Switch>
   );
 }
 
