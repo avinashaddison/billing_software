@@ -25,6 +25,9 @@ export default function Login() {
   const [pin, setPin]               = useState("");
   const [shaking, setShaking]       = useState(false);
   const [checking, setChecking]     = useState(false);
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
+  const [lockedUntil, setLockedUntil]   = useState<Date | null>(null);
+  const [lockCountdown, setLockCountdown] = useState("");
   const lastDigitRef = useRef<number>(0);
 
   /* Redirect if already logged in */
@@ -46,6 +49,21 @@ export default function Login() {
     if (pin.length === 4 && selected) handleLogin();
   }, [pin]);
 
+  /* Lockout countdown ticker */
+  useEffect(() => {
+    if (!lockedUntil) { setLockCountdown(""); return; }
+    const tick = () => {
+      const ms = lockedUntil.getTime() - Date.now();
+      if (ms <= 0) { setLockedUntil(null); setLockCountdown(""); setAttemptsLeft(null); return; }
+      const m = Math.floor(ms / 60_000);
+      const s = Math.floor((ms % 60_000) / 1000);
+      setLockCountdown(`${m}:${String(s).padStart(2, "0")}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lockedUntil]);
+
   const addDigit = (d: string) => {
     if (pin.length >= 4) return;
     setPin((p) => p + d);
@@ -54,7 +72,7 @@ export default function Login() {
   const removeDigit = () => setPin((p) => p.slice(0, -1));
 
   const handleLogin = async () => {
-    if (checking || !selected) return;
+    if (checking || !selected || lockedUntil) return;
     setChecking(true);
     try {
       const r = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -63,13 +81,29 @@ export default function Login() {
         body: JSON.stringify({ staffId: selected.id, pin }),
       });
       const data = await r.json();
+
+      if (r.status === 429) {
+        /* Account locked */
+        setPin("");
+        setShaking(true);
+        setTimeout(() => setShaking(false), 600);
+        if (data.lockedUntil) setLockedUntil(new Date(data.lockedUntil));
+        setAttemptsLeft(0);
+        return;
+      }
+
       if (!r.ok) {
         setPin("");
         setShaking(true);
         setTimeout(() => setShaking(false), 600);
-        toast.error(data.error || "Incorrect PIN");
+        if (data.attemptsLeft !== undefined) setAttemptsLeft(data.attemptsLeft);
+        else toast.error(data.message || data.error || "Incorrect PIN");
         return;
       }
+
+      /* Success */
+      setAttemptsLeft(null);
+      setLockedUntil(null);
       login({ id: data.id, name: data.name, role: data.role as StaffRole, permissions: data.permissions as Permissions });
       setLocation("/");
     } catch {
@@ -142,7 +176,7 @@ export default function Login() {
         <div className="w-full max-w-xs">
           {/* Back + user name */}
           <div className="flex items-center gap-3 mb-6">
-            <button onClick={() => { setSelected(null); setPin(""); }}
+            <button onClick={() => { setSelected(null); setPin(""); setAttemptsLeft(null); setLockedUntil(null); }}
               className="w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground transition-colors text-lg">
               ‹
             </button>
@@ -159,12 +193,34 @@ export default function Login() {
 
           <p className="text-center text-sm font-bold text-muted-foreground mb-5">Enter your 4-digit PIN</p>
 
+          {/* Lock banner */}
+          {lockedUntil ? (
+            <div className="mb-5 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-2xl text-center">
+              <p className="text-sm font-bold text-red-700 dark:text-red-400">Account Locked</p>
+              <p className="text-xs text-red-600 dark:text-red-500 mt-0.5">
+                Too many wrong PINs. Try again in
+              </p>
+              <p className="text-2xl font-black text-red-700 dark:text-red-400 mt-1 font-mono">{lockCountdown}</p>
+            </div>
+          ) : attemptsLeft !== null && (
+            <div className="mb-4 p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-center">
+              <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                Wrong PIN — {attemptsLeft} attempt{attemptsLeft !== 1 ? "s" : ""} remaining before lockout
+              </p>
+            </div>
+          )}
+
           {/* Dots */}
           <div className={`flex justify-center gap-5 mb-8 ${shaking ? "animate-[shake_0.5s_ease]" : ""}`}>
-            {[0,1,2,3].map((i) => <PinDot key={i} filled={i < pin.length} />)}
+            {[0,1,2,3].map((i) => (
+              <PinDot
+                key={i}
+                filled={i < pin.length}
+              />
+            ))}
           </div>
 
-          {/* Keypad */}
+          {/* Keypad — disabled while locked */}
           <div className="grid grid-cols-3 gap-3">
             {keypad.flat().map((key, idx) => {
               if (key === "") return <div key={idx} />;
@@ -172,12 +228,12 @@ export default function Login() {
                 <button
                   key={idx}
                   onClick={() => key === "⌫" ? removeDigit() : addDigit(key)}
-                  disabled={checking}
+                  disabled={checking || !!lockedUntil}
                   className={`h-16 rounded-2xl text-xl font-bold transition-all active:scale-95 ${
                     key === "⌫"
                       ? "bg-muted text-muted-foreground hover:bg-muted/70"
                       : "bg-card border hover:bg-muted shadow-sm text-foreground"
-                  } disabled:opacity-50`}
+                  } disabled:opacity-40 disabled:cursor-not-allowed`}
                 >
                   {key === "⌫" ? <Delete className="w-5 h-5 mx-auto" /> : key}
                 </button>
@@ -185,16 +241,15 @@ export default function Login() {
             })}
           </div>
 
-          {/* Manual confirm (if less than 4) */}
-          {pin.length > 0 && pin.length < 4 && (
-            <p className="text-center text-xs text-muted-foreground mt-4">
-              Enter all 4 digits — PIN submits automatically
-            </p>
-          )}
           {checking && (
             <div className="flex items-center justify-center gap-2 mt-4 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" /> Verifying…
             </div>
+          )}
+          {!lockedUntil && !checking && pin.length === 0 && attemptsLeft === null && (
+            <p className="text-center text-xs text-muted-foreground mt-4">
+              PIN submits automatically after 4 digits
+            </p>
           )}
         </div>
       )}

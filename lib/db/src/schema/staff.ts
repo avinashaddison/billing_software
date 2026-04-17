@@ -1,12 +1,14 @@
-import { pgTable, text, uuid, boolean, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, boolean, timestamp, integer, unique } from "drizzle-orm/pg-core";
 
 export const staffProfilesTable = pgTable("staff_profiles", {
-  id:        uuid("id").primaryKey().defaultRandom(),
-  name:      text("name").notNull(),
-  pin:       text("pin").notNull(),
-  role:      text("role").notNull().default("staff"),   // "owner" | "staff"
-  isActive:  boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  id:             uuid("id").primaryKey().defaultRandom(),
+  name:           text("name").notNull(),
+  pin:            text("pin").notNull(),               // bcrypt hash — never plain text
+  role:           text("role").notNull().default("staff"),
+  isActive:       boolean("is_active").notNull().default(true),
+  failedAttempts: integer("failed_attempts").notNull().default(0),
+  lockedUntil:    timestamp("locked_until", { withTimezone: true }),
+  createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const staffPermissionsTable = pgTable("staff_permissions", {
