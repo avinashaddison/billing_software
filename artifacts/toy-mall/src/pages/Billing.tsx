@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { format, isToday, isThisWeek } from "date-fns";
 import {
   Receipt, ChevronRight, IndianRupee, ShoppingBag,
-  CalendarDays, TrendingUp, Loader2,
+  CalendarDays, TrendingUp, Search, X,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -26,6 +26,7 @@ export default function Billing() {
   const [bills, setBills]     = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState<Filter>("all");
+  const [search, setSearch]   = useState("");
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/bills`)
@@ -42,9 +43,18 @@ export default function Billing() {
   const weekRevenue  = weekBills.reduce((s, b) => s + b.totalAmount, 0);
   const totalRevenue = bills.reduce((s, b) => s + b.totalAmount, 0);
 
-  const filtered =
+  /* ── Filter + search pipeline ── */
+  const timeFiltered =
     filter === "today" ? todayBills :
     filter === "week"  ? weekBills  : bills;
+
+  const q = search.trim().toLowerCase().replace(/^#/, "");
+  const filtered = q
+    ? timeFiltered.filter((b) =>
+        b.id.toLowerCase().includes(q) ||
+        b.totalAmount.toFixed(2).includes(q)
+      )
+    : timeFiltered;
 
   /* ── UI ── */
   return (
@@ -113,7 +123,7 @@ export default function Billing() {
         </div>
 
         {/* ── Filter pills ── */}
-        <div className="flex gap-2 px-4 md:px-6 mb-4">
+        <div className="flex gap-2 px-4 md:px-6 mb-3">
           {(["all", "week", "today"] as Filter[]).map((f) => (
             <button
               key={f}
@@ -129,6 +139,35 @@ export default function Billing() {
           ))}
         </div>
 
+        {/* ── Search bar ── */}
+        <div className="px-4 md:px-6 mb-4">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by Bill ID or amount…"
+              className="w-full h-10 pl-9 pr-10 rounded-xl border border-border bg-muted/50 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {search && (
+            <p className="text-xs text-muted-foreground mt-1.5 px-1">
+              {filtered.length === 0
+                ? "No bills match your search"
+                : `${filtered.length} bill${filtered.length !== 1 ? "s" : ""} found`}
+            </p>
+          )}
+        </div>
+
         {/* ── Bills list ── */}
         {loading ? (
           <div className="px-4 md:px-6 space-y-3">
@@ -142,8 +181,12 @@ export default function Billing() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <ShoppingBag className="w-16 h-16 mx-auto mb-4 opacity-20" />
-            <p className="font-bold text-lg">No bills {filter !== "all" ? `for ${filter === "today" ? "today" : "this week"}` : "yet"}</p>
-            <p className="text-sm mt-1">Complete a checkout to generate a bill.</p>
+            <p className="font-bold text-lg">
+              {search ? `No results for "${search.replace(/^#/, "#").toUpperCase()}"` : `No bills ${filter !== "all" ? `for ${filter === "today" ? "today" : "this week"}` : "yet"}`}
+            </p>
+            <p className="text-sm mt-1">
+              {search ? "Try a different bill ID or amount." : "Complete a checkout to generate a bill."}
+            </p>
           </div>
         ) : (
           <>
