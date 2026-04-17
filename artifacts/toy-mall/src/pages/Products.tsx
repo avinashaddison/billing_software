@@ -121,7 +121,7 @@ export default function Products() {
                       <Badge variant="secondary" className="text-xs">{product.category}</Badge>
                     </div>
                     <div className="w-20 text-right">
-                      <p className="font-semibold">${product.price.toFixed(2)}</p>
+                      <p className="font-semibold">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     <div className="w-20 text-right flex items-center justify-end gap-1.5">
                       {product.stock <= product.lowStockThreshold && (

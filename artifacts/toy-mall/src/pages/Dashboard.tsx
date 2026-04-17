@@ -31,7 +31,7 @@ export default function Dashboard() {
       {/* Stats grid: 2 cols on mobile, 4 cols on desktop */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard title="Total Products" value={summary?.totalProducts} icon={Package} loading={loadingSummary} testid="stat-total-products" />
-        <StatCard title="Stock Value" value={summary ? `$${summary.totalStockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : undefined} icon={DollarSign} loading={loadingSummary} testid="stat-stock-value" />
+        <StatCard title="Stock Value" value={summary ? `₹${summary.totalStockValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}` : undefined} icon={DollarSign} loading={loadingSummary} testid="stat-stock-value" />
         <StatCard title="Today IN" value={activity?.inQuantity} subtitle={`${activity?.inCount ?? 0} transactions`} icon={ArrowDownToLine} loading={loadingActivity} className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900" valueClassName="text-green-700 dark:text-green-400" testid="stat-today-in" />
         <StatCard title="Today OUT" value={activity?.outQuantity} subtitle={`${activity?.outCount ?? 0} transactions`} icon={ArrowUpToLine} loading={loadingActivity} className="bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900" valueClassName="text-red-700 dark:text-red-400" testid="stat-today-out" />
       </div>

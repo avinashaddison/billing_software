@@ -130,7 +130,7 @@ export default function CreateProduct() {
                 name="price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="font-bold text-muted-foreground">Price ($)</FormLabel>
+                    <FormLabel className="font-bold text-muted-foreground">Price (₹)</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" placeholder="0.00" className="h-14 text-lg rounded-xl font-mono" {...field} data-testid="input-price" />
                     </FormControl>

@@ -177,7 +177,7 @@ export default function ProductDetail() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Price</p>
-                  <p className="text-xl font-bold">${product.price.toFixed(2)}</p>
+                  <p className="text-xl font-bold">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Current Stock</p>
