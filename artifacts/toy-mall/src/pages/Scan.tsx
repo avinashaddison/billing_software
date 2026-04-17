@@ -20,6 +20,7 @@ export default function Scan() {
           fps: 10, 
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1,
+          videoConstraints: { facingMode: "environment" },
           formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.EAN_13]
         },
         false
