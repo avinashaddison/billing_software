@@ -1,9 +1,11 @@
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Plus } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
 
 export function SideNav() {
   const [location] = useLocation();
+  const { isDark, toggleTheme } = useTheme();
 
   const navItems = [
     { name: "Dashboard", href: "/", icon: Home },
@@ -60,7 +62,17 @@ export function SideNav() {
         })}
       </nav>
 
-      <div className="px-3 py-4 border-t border-border">
+      <div className="px-3 py-4 border-t border-border space-y-2">
+        {/* Dark / Light toggle */}
+        <button
+          onClick={toggleTheme}
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors font-semibold text-sm"
+          title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {isDark ? <Sun size={16} /> : <Moon size={16} />}
+          {isDark ? "Light Mode" : "Dark Mode"}
+        </button>
+
         <Link
           href="/products/new"
           className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted text-foreground font-semibold text-sm hover:bg-muted/70 transition-colors"
