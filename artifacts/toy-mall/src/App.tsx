@@ -1,9 +1,10 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { CartProvider } from "@/contexts/cart-context";
+import { useRealtime } from "@/hooks/use-realtime";
 import NotFound from "@/pages/not-found";
 
 import Dashboard     from "@/pages/Dashboard";
@@ -19,11 +20,17 @@ import Billing       from "@/pages/Billing";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: true,
+      staleTime: 1000 * 30,    // 30 s — SSE invalidates instantly anyway
     },
   },
 });
+
+/** Mounts the SSE real-time hook inside the QueryClient context */
+function RealtimeProvider({ children }: { children: React.ReactNode }) {
+  useRealtime();
+  return <>{children}</>;
+}
 
 function Router() {
   return (
@@ -50,10 +57,12 @@ function App() {
       <TooltipProvider>
         <CartProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
+            <RealtimeProvider>
+              <Router />
+            </RealtimeProvider>
           </WouterRouter>
         </CartProvider>
-        <Toaster />
+        <Toaster richColors position="top-right" />
       </TooltipProvider>
     </QueryClientProvider>
   );

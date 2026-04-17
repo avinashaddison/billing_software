@@ -4,6 +4,31 @@ import { Package, IndianRupee, AlertTriangle, ArrowDownToLine, ArrowUpToLine, La
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+function LiveBadge() {
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    const es = new EventSource(`${BASE_URL}/api/events`);
+    es.addEventListener("connected", () => setConnected(true));
+    es.onerror = () => setConnected(false);
+    return () => es.close();
+  }, []);
+
+  return (
+    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+      connected
+        ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30"
+        : "bg-zinc-500/10 text-zinc-500 border-zinc-500/20"
+    }`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-500 animate-pulse" : "bg-zinc-500"}`} />
+      {connected ? "LIVE" : "Connecting…"}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary({ query: { queryKey: getGetDashboardSummaryQueryKey() } });
@@ -16,16 +41,22 @@ export default function Dashboard() {
       {/* Mobile-only header */}
       <div className="flex items-center justify-between mb-2 md:hidden">
         <h1 className="text-2xl font-black text-foreground tracking-tight">ToyMall</h1>
-        <Badge variant="outline" className="font-semibold bg-primary/10 text-primary border-primary/20">Staff View</Badge>
+        <div className="flex items-center gap-2">
+          <LiveBadge />
+          <Badge variant="outline" className="font-semibold bg-primary/10 text-primary border-primary/20">Staff View</Badge>
+        </div>
       </div>
 
       {/* Desktop page title */}
       <div className="hidden md:flex items-center justify-between mb-2">
         <div>
           <h1 className="text-2xl font-black text-foreground tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Overview of your inventory</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Overview of your inventory · updates in real time</p>
         </div>
-        <Badge variant="outline" className="font-semibold bg-primary/10 text-primary border-primary/20 text-sm px-3 py-1">Staff View</Badge>
+        <div className="flex items-center gap-3">
+          <LiveBadge />
+          <Badge variant="outline" className="font-semibold bg-primary/10 text-primary border-primary/20 text-sm px-3 py-1">Staff View</Badge>
+        </div>
       </div>
 
       {/* Stats grid: 2 cols on mobile, 4 cols on desktop */}

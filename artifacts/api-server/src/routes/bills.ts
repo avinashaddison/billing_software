@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable } from "@workspace/db";
+import { broadcast } from "../lib/sse";
 
 const router: IRouter = Router();
 
@@ -119,6 +120,15 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         items: processedItems,
         saleItems: saleItemRows,
       };
+    });
+
+    // Broadcast to all SSE clients (realtime)
+    broadcast("bill_created", {
+      billId:      result.bill.id,
+      totalAmount: result.bill.totalAmount,
+      itemsCount:  result.bill.itemsCount,
+      paymentMode: result.bill.paymentMode,
+      createdAt:   result.bill.createdAt,
     });
 
     res.status(201).json(result);

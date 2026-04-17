@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, and, lte } from "drizzle-orm";
 import { db, productsTable, stockLogsTable, salesTable } from "@workspace/db";
+import { broadcast } from "../lib/sse";
 import {
   ListProductsQueryParams,
   CreateProductBody,
@@ -82,6 +83,8 @@ router.post("/products", async (req, res): Promise<void> => {
       lowStockThreshold: lowStockThreshold ?? 5,
     })
     .returning();
+
+  broadcast("product_created", { productId: product.id, name: product.name, sku: product.sku });
 
   res.status(201).json({ ...product, price: Number(product.price) });
 });
@@ -185,6 +188,8 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  broadcast("product_updated", { productId: product.id, name: product.name, sku: product.sku });
+
   res.json({ ...product, price: Number(product.price) });
 });
 
@@ -281,12 +286,32 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
     };
   }
 
+  // Broadcast stock change to SSE clients
+  broadcast("stock_updated", {
+    productId:   params.data.id,
+    productName: product.name,
+    productSku:  product.sku,
+    type,
+    quantity,
+    newStock,
+  });
+
+  // Low-stock alert when stock falls to or below threshold
+  if (newStock <= updatedProduct.lowStockThreshold) {
+    broadcast("low_stock_alert", {
+      productId:   params.data.id,
+      productName: product.name,
+      stock:       newStock,
+      threshold:   updatedProduct.lowStockThreshold,
+    });
+  }
+
   res.json({
     product: { ...updatedProduct, price: Number(updatedProduct.price) },
     log: {
       ...log,
       productName: product.name,
-      productSku: product.sku,
+      productSku:  product.sku,
     },
     ...(sale ? { sale } : {}),
   });
