@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
-import { CheckCircle2, ArrowLeft, ScanLine, Printer } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, ScanLine, Printer } from "lucide-react";
 
 interface BillItem {
   id: string;
@@ -19,9 +18,20 @@ interface BillData {
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
+/* ─── tiny helpers ───────────────────────────────────────────────── */
+function pad(s: string, len: number, right = false) {
+  const str = String(s);
+  if (str.length >= len) return str.slice(0, len);
+  const spaces = " ".repeat(len - str.length);
+  return right ? spaces + str : str + spaces;
+}
+
+const LINE = "─".repeat(36);
+const DASH = "- ".repeat(18).trimEnd();
+
+/* ─── Component ──────────────────────────────────────────────────── */
 export default function Bill() {
   const { id: billId } = useParams<{ id: string }>();
-
   const [data, setData]       = useState<BillData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -35,112 +45,227 @@ export default function Bill() {
       .finally(() => setLoading(false));
   }, [billId]);
 
+  /* ── loading / error ── */
   if (loading) {
     return (
-      <div className="flex flex-col h-full items-center justify-center gap-4">
-        <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-        <p className="text-muted-foreground font-medium">Loading bill…</p>
+      <div className="flex h-full items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-4 border-black border-t-transparent animate-spin" />
       </div>
     );
   }
-
   if (error || !data) {
     return (
-      <div className="flex flex-col h-full items-center justify-center gap-4 p-6 text-center">
-        <p className="text-red-500 font-bold">{error || "Bill not found"}</p>
-        <Link href="/scan"><Button variant="outline">Back to Scanner</Button></Link>
+      <div className="flex h-full items-center justify-center p-6 text-center">
+        <p className="font-mono text-red-600">{error ?? "Bill not found"}</p>
       </div>
     );
   }
 
   const { bill, items } = data;
-  const date = new Date(bill.createdAt).toLocaleString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
+  const dt = new Date(bill.createdAt);
+  const dateStr = dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const timeStr = dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const billNo  = bill.id.slice(0, 8).toUpperCase();
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-y-auto">
-      {/* Header */}
-      <div className="p-4 md:px-6 border-b flex items-center gap-3 sticky top-0 bg-background z-10">
-        <Link href="/scan" className="p-2 -ml-2 rounded-full hover:bg-muted active:scale-95 transition-all">
-          <ArrowLeft className="w-6 h-6" />
-        </Link>
-        <h1 className="text-xl font-black">Bill Receipt</h1>
-      </div>
+    <>
+      {/* ── Print CSS ── */}
+      <style>{`
+        @media print {
+          html, body { margin: 0; padding: 0; background: white; }
+          .no-print { display: none !important; }
+          .receipt-shell {
+            padding: 0 !important;
+            background: white !important;
+            display: block !important;
+          }
+          .receipt-card {
+            box-shadow: none !important;
+            border: none !important;
+            max-width: 100% !important;
+            border-radius: 0 !important;
+            page-break-inside: avoid;
+          }
+        }
+      `}</style>
 
-      <div className="p-4 md:p-6 max-w-md mx-auto w-full space-y-4 pb-24 md:pb-6">
+      <div className="receipt-shell flex flex-col h-full bg-gray-100 dark:bg-neutral-900 overflow-y-auto">
 
-        {/* Success Banner */}
-        <div className="flex flex-col items-center text-center py-6">
-          <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950/50 flex items-center justify-center mb-3">
-            <CheckCircle2 className="w-9 h-9 text-green-600 dark:text-green-400" />
-          </div>
-          <h2 className="text-2xl font-black text-green-700 dark:text-green-400">Checkout Successful!</h2>
-          <p className="text-sm text-muted-foreground mt-1">Stock has been updated</p>
-        </div>
-
-        {/* Bill Card */}
-        <div className="bg-card border rounded-2xl overflow-hidden">
-          {/* Bill header */}
-          <div className="bg-primary/10 px-4 py-3 border-b flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground font-mono">Bill #{bill.id.slice(0, 8).toUpperCase()}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{date}</p>
-            </div>
-            <span className="text-xs bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-400 font-bold px-2.5 py-1 rounded-full">
-              PAID
-            </span>
-          </div>
-
-          {/* Items */}
-          <div className="divide-y divide-border">
-            {items.map((item) => (
-              <div key={item.id} className="px-4 py-3 flex items-center justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate">{item.productName}</p>
-                  <p className="text-xs font-mono text-muted-foreground">{item.productSku}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-bold">₹{item.subtotal.toLocaleString("en-IN")}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {item.quantity} × ₹{item.price.toLocaleString("en-IN")}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Total */}
-          <div className="px-4 py-4 bg-muted/30 border-t flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">{bill.itemsCount} item{bill.itemsCount !== 1 ? "s" : ""}</p>
-              <p className="font-black text-xl">Total</p>
-            </div>
-            <p className="font-black text-2xl text-primary">
-              ₹{bill.totalAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-            </p>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            variant="outline"
-            className="h-12 font-bold rounded-xl"
+        {/* ── Top bar (screen only) ── */}
+        <div className="no-print sticky top-0 z-10 bg-white dark:bg-neutral-800 border-b flex items-center gap-3 px-4 py-3 shadow-sm">
+          <Link href="/billing" className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-700 transition-all">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <h1 className="font-bold text-base flex-1">Receipt</h1>
+          <button
             onClick={() => window.print()}
+            className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-bold rounded-full hover:bg-neutral-800 active:scale-95 transition-all"
           >
-            <Printer className="w-4 h-4 mr-2" />
+            <Printer className="w-4 h-4" />
             Print
-          </Button>
-          <Link href="/scan">
-            <Button className="w-full h-12 font-bold rounded-xl">
-              <ScanLine className="w-4 h-4 mr-2" />
+          </button>
+        </div>
+
+        {/* ── Receipt wrapper ── */}
+        <div className="receipt-card mx-auto my-6 w-full max-w-sm bg-white shadow-2xl rounded-sm overflow-hidden"
+             style={{ fontFamily: "'Courier New', Courier, monospace" }}>
+
+          {/* Zigzag top edge */}
+          <div className="no-print w-full overflow-hidden leading-none" style={{ marginBottom: "-1px" }}>
+            <svg viewBox="0 0 300 12" preserveAspectRatio="none" className="w-full" height="12">
+              <path d="M0,0 L10,12 L20,0 L30,12 L40,0 L50,12 L60,0 L70,12 L80,0 L90,12 L100,0 L110,12 L120,0 L130,12 L140,0 L150,12 L160,0 L170,12 L180,0 L190,12 L200,0 L210,12 L220,0 L230,12 L240,0 L250,12 L260,0 L270,12 L280,0 L290,12 L300,0 L300,0 L0,0 Z"
+                    fill="#f3f4f6"/>
+            </svg>
+          </div>
+
+          <div className="px-5 py-4 text-black text-[13px] leading-relaxed">
+
+            {/* ── STORE HEADER ── */}
+            <div className="text-center mb-2">
+              <div className="text-xl font-black tracking-widest uppercase">ToyMall</div>
+              <div className="text-[11px] tracking-wide mt-0.5">The Complete Toy Store</div>
+              <div className="text-[11px] mt-0.5">📞 +91 98765 43210</div>
+              <div className="text-[11px]">123, Mall Road, New Delhi - 110001</div>
+            </div>
+
+            <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
+
+            {/* ── BILL INFO ── */}
+            <div className="text-[12px] space-y-0.5">
+              <div className="flex justify-between">
+                <span>Bill No :</span>
+                <span className="font-bold">#{billNo}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Date    :</span>
+                <span>{dateStr}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Time    :</span>
+                <span>{timeStr}</span>
+              </div>
+            </div>
+
+            <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
+
+            {/* ── ITEMS HEADER ── */}
+            <div className="text-[11px] font-bold flex justify-between mb-1">
+              <span className="flex-1">ITEM</span>
+              <span className="w-8 text-center">QTY</span>
+              <span className="w-20 text-right">AMOUNT</span>
+            </div>
+            <div className="text-[11px] text-gray-400">{DASH}</div>
+
+            {/* ── ITEMS ── */}
+            <div className="space-y-2 my-2">
+              {items.map((item, i) => {
+                const name    = item.productName.length > 22
+                  ? item.productName.slice(0, 20) + ".."
+                  : item.productName;
+                const subtotal = `Rs.${item.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                const rate     = `@ Rs.${item.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })} each`;
+
+                return (
+                  <div key={item.id}>
+                    <div className="flex justify-between items-start text-[12px]">
+                      <span className="flex-1 font-semibold">{name}</span>
+                      <span className="w-8 text-center">{item.quantity}</span>
+                      <span className="w-20 text-right font-bold">{subtotal}</span>
+                    </div>
+                    <div className="text-[10px] text-gray-500 pl-0">{rate}</div>
+                    {i < items.length - 1 && (
+                      <div className="text-[10px] text-gray-200 mt-1">{"· ".repeat(18).trimEnd()}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="text-[11px] text-gray-400">{DASH}</div>
+
+            {/* ── SUMMARY ── */}
+            <div className="text-[12px] space-y-0.5 my-2">
+              <div className="flex justify-between">
+                <span>Total Items :</span>
+                <span>{bill.itemsCount}</span>
+              </div>
+              <div className="flex justify-between font-bold text-[13px]">
+                <span>Sub Total   :</span>
+                <span>Rs.{bill.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between text-[11px] text-gray-500">
+                <span>Tax (GST)   :</span>
+                <span>Incl.</span>
+              </div>
+            </div>
+
+            <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
+
+            {/* ── GRAND TOTAL ── */}
+            <div className="flex justify-between items-center my-2">
+              <span className="text-base font-black tracking-wide">TOTAL</span>
+              <span className="text-xl font-black">
+                Rs.{bill.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            {/* ── PAYMENT ── */}
+            <div className="text-[11px] flex justify-between text-gray-600">
+              <span>Payment Mode :</span>
+              <span className="font-bold">CASH / UPI</span>
+            </div>
+            <div className="text-[11px] flex justify-between text-gray-600 mb-2">
+              <span>Status       :</span>
+              <span className="font-black">✓ PAID</span>
+            </div>
+
+            <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
+
+            {/* ── FOOTER ── */}
+            <div className="text-center text-[11px] space-y-1 mt-2">
+              <div className="font-black text-sm tracking-wide">** THANK YOU! **</div>
+              <div>Please Visit Again!</div>
+              <div className="text-gray-500 text-[10px] mt-1">
+                Goods once sold will not be<br />returned or exchanged.
+              </div>
+              <div className="text-gray-400 text-[10px] mt-2">
+                — Powered by ToyMall POS —
+              </div>
+              <div className="font-mono text-[10px] text-gray-400 mt-1">
+                #{bill.id.slice(0, 16).toUpperCase()}
+              </div>
+            </div>
+
+            <div className="text-center text-[11px] mt-3 tracking-widest">{LINE}</div>
+          </div>
+
+          {/* Zigzag bottom edge */}
+          <div className="no-print w-full overflow-hidden leading-none" style={{ marginTop: "-1px" }}>
+            <svg viewBox="0 0 300 12" preserveAspectRatio="none" className="w-full" height="12">
+              <path d="M0,12 L10,0 L20,12 L30,0 L40,12 L50,0 L60,12 L70,0 L80,12 L90,0 L100,12 L110,0 L120,12 L130,0 L140,12 L150,0 L160,12 L170,0 L180,12 L190,0 L200,12 L210,0 L220,12 L230,0 L240,12 L250,0 L260,12 L270,0 L280,12 L290,0 L300,12 L300,12 L0,12 Z"
+                    fill="#f3f4f6"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* ── Action buttons (screen only) ── */}
+        <div className="no-print flex gap-3 px-4 pb-8 max-w-sm mx-auto w-full">
+          <button
+            onClick={() => window.print()}
+            className="flex-1 h-12 flex items-center justify-center gap-2 bg-black text-white font-bold rounded-2xl hover:bg-neutral-800 active:scale-95 transition-all text-sm"
+          >
+            <Printer className="w-4 h-4" />
+            Print Receipt
+          </button>
+          <Link href="/scan" className="flex-1">
+            <button className="w-full h-12 flex items-center justify-center gap-2 border-2 border-black text-black font-bold rounded-2xl hover:bg-gray-50 active:scale-95 transition-all text-sm dark:border-white dark:text-white dark:hover:bg-neutral-800">
+              <ScanLine className="w-4 h-4" />
               New Sale
-            </Button>
+            </button>
           </Link>
         </div>
+
       </div>
-    </div>
+    </>
   );
 }
