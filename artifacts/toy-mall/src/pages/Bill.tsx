@@ -12,7 +12,14 @@ interface BillItem {
 }
 
 interface BillData {
-  bill: { id: string; totalAmount: number; itemsCount: number; createdAt: string };
+  bill: {
+    id: string;
+    totalAmount: number;
+    itemsCount: number;
+    createdAt: string;
+    paymentMode?: string;
+    customerPhone?: string | null;
+  };
   items: BillItem[];
 }
 
@@ -210,9 +217,15 @@ export default function Bill() {
             </div>
 
             {/* ── PAYMENT ── */}
+            {bill.customerPhone && (
+              <div className="text-[11px] flex justify-between text-gray-600">
+                <span>Customer Ph :</span>
+                <span className="font-bold">+91 {bill.customerPhone}</span>
+              </div>
+            )}
             <div className="text-[11px] flex justify-between text-gray-600">
               <span>Payment Mode :</span>
-              <span className="font-bold">CASH / UPI</span>
+              <span className="font-bold">{(bill.paymentMode ?? "cash").toUpperCase()}</span>
             </div>
             <div className="text-[11px] flex justify-between text-gray-600 mb-2">
               <span>Status       :</span>

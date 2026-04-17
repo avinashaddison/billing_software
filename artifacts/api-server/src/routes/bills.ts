@@ -4,12 +4,21 @@ import { db, billsTable, saleItemsTable, productsTable, stockLogsTable } from "@
 
 const router: IRouter = Router();
 
+type PaymentMode = "cash" | "upi";
+
 function isValidCheckoutBody(body: unknown): body is {
   items: Array<{ productId: string; quantity: number; price: number }>;
+  paymentMode: PaymentMode;
+  customerPhone?: string;
 } {
   if (!body || typeof body !== "object") return false;
   const b = body as Record<string, unknown>;
   if (!Array.isArray(b.items) || b.items.length === 0) return false;
+  if (b.paymentMode !== "cash" && b.paymentMode !== "upi") return false;
+  if (b.customerPhone !== undefined && b.customerPhone !== "") {
+    if (typeof b.customerPhone !== "string") return false;
+    if (!/^\d{10}$/.test(b.customerPhone)) return false;
+  }
   return b.items.every(
     (item) =>
       item &&
@@ -24,11 +33,13 @@ function isValidCheckoutBody(body: unknown): body is {
 
 router.post("/bills/checkout", async (req, res): Promise<void> => {
   if (!isValidCheckoutBody(req.body)) {
-    res.status(400).json({ error: "Invalid checkout payload. Must have items array with productId, quantity, price." });
+    res.status(400).json({
+      error: "Invalid checkout payload. Requires items[], paymentMode (cash|upi), and optional 10-digit customerPhone.",
+    });
     return;
   }
 
-  const { items } = req.body;
+  const { items, paymentMode, customerPhone } = req.body;
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -47,9 +58,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           .from(productsTable)
           .where(eq(productsTable.id, item.productId));
 
-        if (!product) {
-          throw new Error(`Product not found: ${item.productId}`);
-        }
+        if (!product) throw new Error(`Product not found: ${item.productId}`);
 
         if (product.stock < item.quantity) {
           throw new Error(
@@ -79,14 +88,16 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         });
       }
 
-      const totalAmount = processedItems.reduce((sum, i) => sum + i.subtotal, 0);
-      const itemsCount  = processedItems.reduce((sum, i) => sum + i.quantity, 0);
+      const totalAmount = processedItems.reduce((s, i) => s + i.subtotal, 0);
+      const itemsCount  = processedItems.reduce((s, i) => s + i.quantity, 0);
 
       const [bill] = await tx
         .insert(billsTable)
         .values({
-          totalAmount: String(totalAmount),
+          totalAmount:   String(totalAmount),
           itemsCount,
+          paymentMode,
+          customerPhone: customerPhone || null,
         })
         .returning();
 
@@ -134,10 +145,7 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
     .from(billsTable)
     .where(eq(billsTable.id, id));
 
-  if (!bill) {
-    res.status(404).json({ error: "Bill not found" });
-    return;
-  }
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
 
   const items = await db
     .select({
