@@ -3,21 +3,23 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { CartProvider } from "@/contexts/cart-context";
 import NotFound from "@/pages/not-found";
 
-import Dashboard from "@/pages/Dashboard";
-import Products from "@/pages/Products";
-import ProductsNew from "@/pages/ProductsNew";
+import Dashboard     from "@/pages/Dashboard";
+import Products      from "@/pages/Products";
+import ProductsNew   from "@/pages/ProductsNew";
 import ProductDetail from "@/pages/ProductDetail";
-import Scan from "@/pages/Scan";
-import Logs from "@/pages/Logs";
-import Profile from "@/pages/Profile";
+import Scan          from "@/pages/Scan";
+import Logs          from "@/pages/Logs";
+import Profile       from "@/pages/Profile";
+import Bill          from "@/pages/Bill";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
     },
   },
 });
@@ -26,14 +28,15 @@ function Router() {
   return (
     <AppLayout>
       <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/products" component={Products} />
+        <Route path="/"             component={Dashboard} />
+        <Route path="/products"     component={Products} />
         <Route path="/products/new" component={ProductsNew} />
-        <Route path="/product" component={ProductDetail} />
-        <Route path="/scan" component={Scan} />
-        <Route path="/logs" component={Logs} />
-        <Route path="/profile" component={Profile} />
-        <Route component={NotFound} />
+        <Route path="/product"      component={ProductDetail} />
+        <Route path="/scan"         component={Scan} />
+        <Route path="/logs"         component={Logs} />
+        <Route path="/profile"      component={Profile} />
+        <Route path="/bill/:id"     component={Bill} />
+        <Route                      component={NotFound} />
       </Switch>
     </AppLayout>
   );
@@ -43,9 +46,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <CartProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+        </CartProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

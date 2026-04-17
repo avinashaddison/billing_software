@@ -4,6 +4,7 @@ import productsRouter from "./products";
 import stockLogsRouter from "./stock-logs";
 import salesRouter from "./sales";
 import dashboardRouter from "./dashboard";
+import billsRouter from "./bills";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(productsRouter);
 router.use(stockLogsRouter);
 router.use(salesRouter);
 router.use(dashboardRouter);
+router.use(billsRouter);
 
 export default router;

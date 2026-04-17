@@ -1,9 +1,11 @@
 import { Link, useLocation } from "wouter";
 import { Home, Package, ScanLine, Clock, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/contexts/cart-context";
 
 export function BottomNav() {
   const [location] = useLocation();
+  const { count } = useCart();
 
   const navItems = [
     { name: "Dashboard", href: "/", icon: Home },
@@ -23,8 +25,15 @@ export function BottomNav() {
           if (item.highlight) {
             return (
               <Link key={item.name} href={item.href} className="relative -top-4 flex flex-col items-center justify-center group" data-testid={`nav-${item.name.toLowerCase()}`}>
-                <div className="w-14 h-14 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
-                  <Icon size={28} />
+                <div className="relative">
+                  <div className="w-14 h-14 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
+                    <Icon size={28} />
+                  </div>
+                  {count > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 shadow-md">
+                      {count > 99 ? "99+" : count}
+                    </span>
+                  )}
                 </div>
                 <span className="text-[10px] mt-1 font-semibold text-primary">Scan</span>
               </Link>

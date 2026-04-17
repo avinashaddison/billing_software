@@ -2,10 +2,12 @@ import { Link, useLocation } from "wouter";
 import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
+import { useCart } from "@/contexts/cart-context";
 
 export function SideNav() {
   const [location] = useLocation();
   const { isDark, toggleTheme } = useTheme();
+  const { count } = useCart();
 
   const navItems = [
     { name: "Dashboard", href: "/", icon: Home },
@@ -34,11 +36,16 @@ export function SideNav() {
               <Link
                 key={item.name}
                 href={item.href}
-                className="flex items-center gap-3 px-3 py-3 rounded-xl bg-primary text-primary-foreground font-bold shadow-md hover:opacity-90 active:scale-[0.98] transition-all my-2"
+                className="flex items-center gap-3 px-3 py-3 rounded-xl bg-primary text-primary-foreground font-bold shadow-md hover:opacity-90 active:scale-[0.98] transition-all my-2 relative"
                 data-testid={`nav-${item.name.toLowerCase()}`}
               >
                 <Icon size={20} />
-                <span>{item.name}</span>
+                <span className="flex-1">{item.name}</span>
+                {count > 0 && (
+                  <span className="min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
+                    {count > 99 ? "99+" : count}
+                  </span>
+                )}
               </Link>
             );
           }

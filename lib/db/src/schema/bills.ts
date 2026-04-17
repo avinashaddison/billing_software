@@ -1,0 +1,18 @@
+import { pgTable, uuid, numeric, integer, timestamp } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
+
+export const billsTable = pgTable("bills", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
+  itemsCount: integer("items_count").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertBillSchema = createInsertSchema(billsTable).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBill = z.infer<typeof insertBillSchema>;
+export type Bill = typeof billsTable.$inferSelect;
