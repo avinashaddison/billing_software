@@ -4,11 +4,11 @@ import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { getCategoryStyle, getCategoryEmoji } from "@/lib/category-colors";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -260,65 +260,77 @@ export default function Products() {
             <div className="p-4 space-y-3 md:hidden">
               {products?.map((product) => (
                 <Link key={product.id} href={`/product?sku=${product.sku}`} className="block">
-                  <div className="p-4 rounded-xl border bg-card hover:bg-muted/50 active:scale-[0.98] transition-all flex items-center justify-between" data-testid={`card-product-${product.id}`}>
-                    <div className="flex-1 min-w-0 pr-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-bold text-lg truncate">{product.name}</h3>
+                  {(() => {
+                    const cs = getCategoryStyle(product.category);
+                    const emoji = getCategoryEmoji(product.category);
+                    const isLow = product.stock <= product.lowStockThreshold;
+                    return (
+                      <div className="p-4 rounded-xl border bg-card hover:bg-muted/30 active:scale-[0.98] transition-all flex items-center justify-between relative overflow-hidden" data-testid={`card-product-${product.id}`}>
+                        {/* Left color bar */}
+                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${cs.dot}`} />
+                        <div className="flex-1 min-w-0 pr-4 pl-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-base">{emoji}</span>
+                            <h3 className="font-bold text-base truncate">{product.name}</h3>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md text-xs">{product.sku}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cs.badge}`}>{product.category}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end flex-shrink-0">
+                          <div className={`text-2xl font-black leading-none flex items-center gap-1 ${isLow ? "text-red-600 dark:text-red-400" : ""}`}>
+                            {isLow && <AlertTriangle className="w-4 h-4" />}
+                            {product.stock}
+                          </div>
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Left</span>
+                          <span className="text-[10px] text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md">{product.sku}</span>
-                        <Badge variant="secondary" className="text-[10px]">{product.category}</Badge>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end flex-shrink-0">
-                      <div className="text-2xl font-black leading-none flex items-center gap-1">
-                        {product.stock <= product.lowStockThreshold && (
-                          <AlertTriangle className="w-4 h-4 text-destructive" />
-                        )}
-                        <span className={product.stock <= product.lowStockThreshold ? "text-destructive" : ""}>
-                          {product.stock}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Left</span>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </Link>
               ))}
             </div>
 
             {/* Desktop: table rows */}
             <div className="hidden md:block">
-              {products?.map((product) => (
-                <Link key={product.id} href={`/product?sku=${product.sku}`} className="block" data-testid={`card-product-${product.id}`}>
-                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-6 py-4 hover:bg-muted/40 transition-colors items-center">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <Package className="w-4 h-4 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold truncate">{product.name}</p>
-                          <p className="text-xs font-mono text-muted-foreground">{product.sku}</p>
+              {products?.map((product) => {
+                const cs = getCategoryStyle(product.category);
+                const emoji = getCategoryEmoji(product.category);
+                const isLow = product.stock <= product.lowStockThreshold;
+                return (
+                  <Link key={product.id} href={`/product?sku=${product.sku}`} className="block" data-testid={`card-product-${product.id}`}>
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-6 py-3.5 hover:bg-muted/40 transition-colors items-center border-b last:border-0">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-xl ${cs.bg} ${cs.border} border flex items-center justify-center shrink-0 text-base`}>
+                            {emoji}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold truncate">{product.name}</p>
+                            <p className="text-xs font-mono text-muted-foreground">{product.sku}</p>
+                          </div>
                         </div>
                       </div>
+                      <div className="w-32 text-center">
+                        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${cs.badge}`}>
+                          {product.category}
+                        </span>
+                      </div>
+                      <div className="w-24 text-right">
+                        <p className="font-semibold">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      </div>
+                      <div className="w-20 text-right flex items-center justify-end gap-1.5">
+                        {isLow && <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />}
+                        <p className={`text-xl font-black ${isLow ? "text-destructive" : ""}`}>
+                          {product.stock}
+                        </p>
+                      </div>
                     </div>
-                    <div className="w-28 text-center">
-                      <Badge variant="secondary" className="text-xs">{product.category}</Badge>
-                    </div>
-                    <div className="w-20 text-right">
-                      <p className="font-semibold">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
-                    <div className="w-20 text-right flex items-center justify-end gap-1.5">
-                      {product.stock <= product.lowStockThreshold && (
-                        <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
-                      )}
-                      <p className={`text-xl font-black ${product.stock <= product.lowStockThreshold ? "text-destructive" : ""}`}>
-                        {product.stock}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           </>
         )}
