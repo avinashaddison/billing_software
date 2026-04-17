@@ -14,6 +14,7 @@ import Scan          from "@/pages/Scan";
 import Logs          from "@/pages/Logs";
 import Profile       from "@/pages/Profile";
 import Bill          from "@/pages/Bill";
+import Billing       from "@/pages/Billing";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +36,7 @@ function Router() {
         <Route path="/scan"         component={Scan} />
         <Route path="/logs"         component={Logs} />
         <Route path="/profile"      component={Profile} />
+        <Route path="/billing"      component={Billing} />
         <Route path="/bill/:id"     component={Bill} />
         <Route                      component={NotFound} />
       </Switch>

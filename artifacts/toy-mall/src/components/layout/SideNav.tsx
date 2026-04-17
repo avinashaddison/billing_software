@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -10,11 +10,12 @@ export function SideNav() {
   const { count } = useCart();
 
   const navItems = [
-    { name: "Dashboard", href: "/", icon: Home },
-    { name: "Products", href: "/products", icon: Package },
-    { name: "Scan", href: "/scan", icon: ScanLine, highlight: true },
-    { name: "Logs", href: "/logs", icon: Clock },
-    { name: "Profile", href: "/profile", icon: User },
+    { name: "Dashboard", href: "/",        icon: Home    },
+    { name: "Products",  href: "/products", icon: Package },
+    { name: "Scan",      href: "/scan",     icon: ScanLine, highlight: true },
+    { name: "Billing",   href: "/billing",  icon: Receipt },
+    { name: "Logs",      href: "/logs",     icon: Clock   },
+    { name: "Profile",   href: "/profile",  icon: User    },
   ];
 
   return (
