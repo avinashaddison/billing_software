@@ -1,9 +1,10 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="32" height="32" rx="7" fill="#2563EB"/>
-  <rect x="8" y="5" width="16" height="20" rx="1.5" fill="white"/>
-  <path d="M8 25 L9.6 23.5 L11.2 25 L12.8 23.5 L14.4 25 L16 23.5 L17.6 25 L19.2 23.5 L20.8 25 L22.4 23.5 L24 25 V27 H8 V25Z" fill="#2563EB"/>
-  <rect x="10" y="9" width="12" height="1.5" rx="0.75" fill="#2563EB"/>
-  <rect x="10" y="13" width="12" height="1.5" rx="0.75" fill="#2563EB"/>
-  <rect x="10" y="17" width="8" height="1.5" rx="0.75" fill="#2563EB"/>
-  <rect x="19" y="17" width="3" height="1.5" rx="0.75" fill="#93C5FD"/>
+  <path d="M8 6.5C8 5.67 8.67 5 9.5 5H21L24 8V25C24 25.83 23.33 26.5 22.5 26.5H9.5C8.67 26.5 8 25.83 8 25V6.5Z" fill="white"/>
+  <path d="M21 5L24 8H22C21.45 8 21 7.55 21 7V5Z" fill="#BFDBFE"/>
+  <path d="M8 25 L9.33 23.75 L10.67 25 L12 23.75 L13.33 25 L14.67 23.75 L16 25 L17.33 23.75 L18.67 25 L20 23.75 L21.33 25 L22.67 23.75 L24 25" stroke="#2563EB" stroke-width="1.4" fill="none"/>
+  <rect x="10" y="10" width="9" height="1.4" rx="0.7" fill="#2563EB"/>
+  <rect x="10" y="13.5" width="12" height="1.4" rx="0.7" fill="#2563EB"/>
+  <rect x="10" y="17" width="7" height="1.4" rx="0.7" fill="#2563EB"/>
+  <rect x="18.5" y="17" width="3.5" height="1.4" rx="0.7" fill="#93C5FD"/>
 </svg>
