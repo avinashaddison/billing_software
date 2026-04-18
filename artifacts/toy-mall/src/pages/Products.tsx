@@ -257,7 +257,7 @@ export default function Products() {
   const [showImport, setShowImport] = useState(false);
   const debouncedSearch             = useDebounce(search, 300);
   const { role }                    = useAuth();
-  const isAdmin                     = role === "Admin";
+  const isAdmin                     = role === "owner";
 
   const { data: products, isLoading } = useListProducts(
     { search: debouncedSearch || undefined },

@@ -19,7 +19,7 @@ async function fetchSuppliers(): Promise<Supplier[]> {
 
 export default function Suppliers() {
   const { role } = useAuth();
-  const isAdmin = role === "Admin";
+  const isAdmin = role === "owner";
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState("");

@@ -65,6 +65,7 @@ function AnimatedTotal({ value }: { value: number }) {
       const t = setTimeout(() => setPulse(false), 400);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [value]);
   return (
     <span

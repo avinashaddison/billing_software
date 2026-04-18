@@ -160,7 +160,7 @@ export default function CreateProduct() {
 
   /* Merge: hardcoded cats keep rich metadata; API-only cats get generic entry */
   const hardcodedNames = new Set(CATEGORIES.filter((c) => c.value !== "__custom__").map((c) => c.value));
-  const extraApiCats = apiCats.filter((a) => !hardcodedNames.has(a.name));
+  const extraApiCats = apiCats.filter((a) => !(hardcodedNames as Set<string>).has(a.name));
 
   const [autoSku, setAutoSku]             = useState<string>("");
   const [skuLoading, setSkuLoading]       = useState(false);
@@ -220,7 +220,7 @@ export default function CreateProduct() {
     const finalCategory = isCustom ? (data.customCategory?.trim() || "") : data.category;
     if (!finalCategory) { toast.error("Please enter a custom category name"); return; }
     createProduct.mutate(
-      { data: { name: data.name, category: finalCategory, price: data.price, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || undefined } },
+      { data: { name: data.name, category: finalCategory, price: data.price, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || undefined } as any },
       {
         onSuccess: (product) => {
           toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
@@ -327,10 +327,10 @@ export default function CreateProduct() {
                   <div className="relative">
                     <FormControl>
                       <Input
-                        ref={nameRef}
                         placeholder={activeCat?.placeholder ?? "Select a category first…"}
                         className="h-14 text-lg rounded-xl"
                         {...field}
+                        ref={nameRef}
                         onFocus={handleNameFocus}
                         onBlur={handleNameBlur}
                         disabled={!selectedCategory || (isCustom && !customCategoryVal.trim())}

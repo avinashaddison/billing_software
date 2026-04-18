@@ -8,7 +8,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ListStockLogsType } from "@workspace/api-client-react/src/generated/api.schemas";
+import { ListStockLogsType } from "@workspace/api-client-react";
 import { Link } from "wouter";
 
 /* ── Types ───────────────────────────────────────────────────────── */

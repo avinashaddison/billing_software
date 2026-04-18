@@ -101,7 +101,7 @@ export function useRealtime() {
         };
         toast.warning(
           `⚠️ Low stock: ${d.productName} — only ${d.stock} unit${d.stock !== 1 ? "s" : ""} left (threshold: ${d.threshold})`,
-          { duration: 8000, important: true }
+          { duration: 8000 }
         );
       });
 
