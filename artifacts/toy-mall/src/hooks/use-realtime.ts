@@ -7,6 +7,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useCart, type CartItem } from "@/contexts/cart-context";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -16,7 +17,8 @@ export type SseEventType =
   | "bill_created"
   | "product_created"
   | "product_updated"
-  | "low_stock_alert";
+  | "low_stock_alert"
+  | "cart_updated";
 
 /** Invalidate all dashboard-related queries */
 function invalidateDashboard(qc: ReturnType<typeof useQueryClient>) {
@@ -44,8 +46,12 @@ function invalidateAllProducts(qc: ReturnType<typeof useQueryClient>) {
 }
 
 export function useRealtime() {
-  const qc  = useQueryClient();
-  const ref = useRef<EventSource | null>(null);
+  const qc             = useQueryClient();
+  const ref            = useRef<EventSource | null>(null);
+  const { syncFromServer } = useCart();
+  // Keep syncFromServer in a ref so the SSE effect never needs to reconnect when it changes
+  const syncRef = useRef(syncFromServer);
+  useEffect(() => { syncRef.current = syncFromServer; }, [syncFromServer]);
 
   useEffect(() => {
     let retryTimer: ReturnType<typeof setTimeout>;
@@ -109,6 +115,12 @@ export function useRealtime() {
       es.addEventListener("product_updated", () => {
         invalidateAllProducts(qc);
         invalidateDashboard(qc);
+      });
+
+      /* ── shared cart updated (cross-device sync) ── */
+      es.addEventListener("cart_updated", (e) => {
+        const d = JSON.parse(e.data) as { items: CartItem[]; count: number; total: number };
+        syncRef.current(d.items);
       });
 
       /* ── low stock alert ── */

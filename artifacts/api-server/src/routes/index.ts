@@ -13,6 +13,7 @@ import customersRouter   from "./customers";
 import categoriesRouter  from "./categories";
 import staffRouter       from "./staff";
 import uploadRouter      from "./upload";
+import sharedCartRouter  from "./shared-cart";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(customersRouter);
 router.use(categoriesRouter);
 router.use(staffRouter);
 router.use(uploadRouter);
+router.use(sharedCartRouter);
 
 export default router;
