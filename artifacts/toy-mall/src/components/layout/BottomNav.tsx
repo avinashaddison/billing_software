@@ -32,44 +32,42 @@ export function BottomNav() {
 
   return (
     <>
-      {/* ── Ongoing Checkout strip — floats above bottom nav when cart has items ── */}
-      {count > 0 && (
-        <Link
-          href="/checkout"
-          className={cn(
-            "md:hidden fixed left-0 right-0 z-[49] flex items-center gap-3 px-4 py-3",
-            "animate-in slide-in-from-bottom-2 duration-300",
-            isOnCheckout
-              ? "bg-green-700 text-white"
-              : "bg-primary text-primary-foreground",
-          )}
-          style={{ bottom: "64px" }}
-        >
-          {/* Live pulse dot */}
-          <div className="relative shrink-0">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-ping absolute" />
-            <div className="w-2 h-2 rounded-full bg-green-400" />
-          </div>
+      {/* ── Ongoing Checkout strip — floats above bottom nav, always mounted for smooth exit anim ── */}
+      <Link
+        href="/checkout"
+        aria-hidden={count === 0}
+        tabIndex={count === 0 ? -1 : 0}
+        className={cn(
+          "md:hidden fixed left-0 right-0 z-[49] flex items-center gap-3 px-4 py-3",
+          "transition-all duration-300 ease-in-out",
+          count > 0
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 translate-y-3 pointer-events-none",
+          isOnCheckout ? "bg-green-700 text-white" : "bg-primary text-primary-foreground",
+        )}
+        style={{ bottom: "64px" }}
+      >
+        {/* Live pulse dot */}
+        <div className="relative shrink-0 w-2 h-2">
+          <div className="w-2 h-2 rounded-full bg-green-400 animate-ping absolute" />
+          <div className="w-2 h-2 rounded-full bg-green-400" />
+        </div>
 
-          {/* Cart icon + label */}
-          <ShoppingCart className="w-4 h-4 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-black leading-none">
-              Ongoing Checkout
-            </p>
-            <p className="text-[10px] font-medium opacity-80 mt-0.5 truncate">
-              {count} item{count !== 1 ? "s" : ""} in cart
-            </p>
-          </div>
-
-          {/* Running total */}
-          <p className="font-black text-sm tabular-nums shrink-0">
-            ₹{total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {/* Cart icon + label */}
+        <ShoppingCart className="w-4 h-4 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-black leading-none">Ongoing Checkout</p>
+          <p className="text-[10px] font-medium opacity-80 mt-0.5 truncate">
+            {count} item{count !== 1 ? "s" : ""} in cart
           </p>
+        </div>
 
-          <ArrowRight className="w-4 h-4 shrink-0 opacity-80" />
-        </Link>
-      )}
+        {/* Running total */}
+        <p className="font-black text-sm tabular-nums shrink-0">
+          ₹{total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </p>
+        <ArrowRight className="w-4 h-4 shrink-0 opacity-80" />
+      </Link>
 
       {/* ── Main bottom nav ── */}
       <nav

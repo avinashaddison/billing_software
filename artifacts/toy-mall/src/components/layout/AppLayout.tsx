@@ -1,7 +1,6 @@
 import { BottomNav } from "./BottomNav";
 import { SideNav }   from "./SideNav";
 import { useOnline }  from "@/hooks/use-online";
-import { useCart }    from "@/contexts/cart-context";
 import { WifiOff }   from "lucide-react";
 
 interface AppLayoutProps {
@@ -10,7 +9,6 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const isOnline = useOnline();
-  const { count } = useCart();
 
   return (
     <div className="flex min-h-[100dvh] bg-muted/30">
@@ -31,7 +29,9 @@ export function AppLayout({ children }: AppLayoutProps) {
           - +48px (pb-12) when cart strip is visible (count > 0)
           Desktop: no padding needed (side nav, no bottom nav)
         */}
-        <main className={`flex-1 w-full max-w-md mx-auto md:max-w-none md:pb-0 ${count > 0 ? "pb-32" : "pb-20"}`}>
+        {/* pb-32 = 128px on mobile: 64px bottom nav + 48px cart strip + 16px breathing room.
+            The strip is always mounted (opacity animated), so we always reserve its height. */}
+        <main className="flex-1 w-full max-w-md mx-auto md:max-w-none pb-32 md:pb-0">
           {children}
         </main>
       </div>
