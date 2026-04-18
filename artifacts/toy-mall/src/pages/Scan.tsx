@@ -521,6 +521,7 @@ export default function Scan() {
         setLastAddedId(cached.id);
         setTimeout(() => setLastAddedId(null), 700);
         toast.success(`Added: ${cached.name}`, { duration: 1500 });
+        setLocation("/checkout");
       } else {
         setStockProduct(cached);
         setStockSuccess(null);
@@ -537,6 +538,7 @@ export default function Scan() {
           setLastAddedId(product.id);
           setTimeout(() => setLastAddedId(null), 700);
           toast.success(`Added: ${product.name}`, { duration: 1500 });
+          setLocation("/checkout");
         } else {
           setStockProduct(product);
           setStockSuccess(null);
