@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useLocation } from "wouter";
 import {
   ScanLine, ArrowRight, Trash2, Plus, Minus,
@@ -410,6 +410,51 @@ function useScanner(
   }, [active, videoRef]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+/* ── Memoized cart item row — only re-renders when its own props change ── */
+interface CartItemRowProps {
+  item: { productId: string; name: string; sku: string; price: number; quantity: number };
+  isNew: boolean;
+  onQtyChange: (productId: string, qty: number) => void;
+  onRemove: (productId: string) => void;
+}
+const CartItemRow = memo(function CartItemRow({ item, isNew, onQtyChange, onRemove }: CartItemRowProps) {
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-all duration-300 ${
+        isNew
+          ? "bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-700 shadow-sm scale-[1.01]"
+          : "bg-card border-border scale-100"
+      }`}>
+      <div className={`shrink-0 w-2 h-2 rounded-full transition-all duration-300 ${isNew ? "bg-green-500" : "bg-muted-foreground/20"}`} />
+      <div className="flex-1 min-w-0">
+        <p className={`font-bold text-sm truncate ${isNew ? "text-green-700 dark:text-green-300" : "text-foreground"}`}>{item.name}</p>
+        <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          ₹{item.price.toLocaleString("en-IN")} × {item.quantity} ={" "}
+          <span className={`font-bold ${isNew ? "text-green-600 dark:text-green-400" : "text-foreground"}`}>
+            ₹{(item.price * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </span>
+        </p>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <button onClick={() => onQtyChange(item.productId, item.quantity - 1)}
+          className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border">
+          <Minus className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+        <span className="w-7 text-center font-black text-sm tabular-nums">{item.quantity}</span>
+        <button onClick={() => onQtyChange(item.productId, item.quantity + 1)}
+          className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border">
+          <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+      </div>
+      <button onClick={() => onRemove(item.productId)}
+        className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 active:scale-90 flex items-center justify-center transition-all shrink-0 border border-red-200 dark:border-red-800">
+        <X className="w-3.5 h-3.5 text-red-500" />
+      </button>
+    </div>
+  );
+});
+
 /* ═══════════════════════════════════════════════════════════════════
    Main component
 ══════════════════════════════════════════════════════════════════════ */
@@ -679,44 +724,15 @@ export default function Scan() {
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
                 Cart · {count} item{count !== 1 ? "s" : ""}
               </p>
-              {items.map((item) => {
-                const isNew = item.productId === lastAddedId;
-                return (
-                  <div key={item.productId}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-all duration-300 ${
-                      isNew
-                        ? "bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-700 shadow-sm scale-[1.01]"
-                        : "bg-card border-border scale-100"
-                    }`}>
-                    <div className={`shrink-0 w-2 h-2 rounded-full transition-all duration-300 ${isNew ? "bg-green-500" : "bg-muted-foreground/20"}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-bold text-sm truncate ${isNew ? "text-green-700 dark:text-green-300" : "text-foreground"}`}>{item.name}</p>
-                      <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        ₹{item.price.toLocaleString("en-IN")} × {item.quantity} ={" "}
-                        <span className={`font-bold ${isNew ? "text-green-600 dark:text-green-400" : "text-foreground"}`}>
-                          ₹{(item.price * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => handleQtyChange(item.productId, item.quantity - 1)}
-                        className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border">
-                        <Minus className="w-3.5 h-3.5 text-muted-foreground" />
-                      </button>
-                      <span className="w-7 text-center font-black text-sm tabular-nums">{item.quantity}</span>
-                      <button onClick={() => handleQtyChange(item.productId, item.quantity + 1)}
-                        className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border">
-                        <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-                      </button>
-                    </div>
-                    <button onClick={() => removeItem(item.productId)}
-                      className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 active:scale-90 flex items-center justify-center transition-all shrink-0 border border-red-200 dark:border-red-800">
-                      <X className="w-3.5 h-3.5 text-red-500" />
-                    </button>
-                  </div>
-                );
-              })}
+              {items.map((item) => (
+                <CartItemRow
+                  key={item.productId}
+                  item={item}
+                  isNew={item.productId === lastAddedId}
+                  onQtyChange={handleQtyChange}
+                  onRemove={removeItem}
+                />
+              ))}
             </>
           )}
         </div>
