@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, Receipt, FileText, Users, Tag, Truck, Layers, Users2 } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -24,7 +24,7 @@ export function SideNav() {
     { name: "Dashboard", href: "/",          icon: Home,     highlight: false, resource: "dashboard" },
     { name: "Products",  href: "/products",  icon: Package,  highlight: false, resource: "products"  },
     { name: "Scan",      href: "/scan",      icon: ScanLine, highlight: true,  resource: "scan"      },
-    { name: "Billing",   href: "/billing",   icon: Receipt,  highlight: false, resource: "billing"   },
+    { name: "Billing",   href: "/billing",   icon: IndianRupee,  highlight: false, resource: "billing"   },
     { name: "Logs",      href: "/logs",      icon: Clock,    highlight: false, resource: "logs"      },
     { name: "Profile",   href: "/profile",   icon: User,     highlight: false, resource: null        },
   ].filter((item) => !item.resource || visible(item.resource));

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Receipt } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, IndianRupee } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
@@ -21,7 +21,7 @@ export function BottomNav() {
     { name: "Home",    href: "/",        icon: Home,    resource: "dashboard" },
     { name: "Products",href: "/products", icon: Package, resource: "products"  },
     { name: "Scan",    href: "/scan",     icon: ScanLine,resource: "scan",    highlight: true },
-    { name: "Billing", href: "/billing",  icon: Receipt, resource: "billing"  },
+    { name: "Billing", href: "/billing",  icon: IndianRupee, resource: "billing"  },
     { name: "Logs",    href: "/logs",     icon: Clock,   resource: "logs"     },
     { name: "Profile", href: "/profile",  icon: User,    resource: null       },
   ];

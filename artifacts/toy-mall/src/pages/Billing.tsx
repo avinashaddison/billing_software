@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { format, isToday, isThisWeek } from "date-fns";
 import {
-  Receipt, ChevronRight, IndianRupee, ShoppingBag,
-  CalendarDays, TrendingUp, Search, X,
+  ChevronRight, IndianRupee, ShoppingBag,
+  CalendarDays, TrendingUp, Search, X, FileText,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -63,7 +63,7 @@ export default function Billing() {
       {/* Header */}
       <div className="p-4 md:px-6 border-b sticky top-0 bg-background z-10">
         <div className="flex items-center gap-2 mb-1">
-          <Receipt className="w-6 h-6 text-primary hidden md:block" />
+          <IndianRupee className="w-6 h-6 text-primary hidden md:block" />
           <h1 className="text-2xl font-black">Billing</h1>
         </div>
         <p className="text-sm text-muted-foreground hidden md:block">
@@ -206,7 +206,7 @@ export default function Billing() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-950/50 flex items-center justify-center shrink-0">
-                          <Receipt className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          <FileText className="w-5 h-5 text-green-600 dark:text-green-400" />
                         </div>
                         <div>
                           <p className="font-bold text-sm">
@@ -246,7 +246,7 @@ export default function Billing() {
                       <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-4 hover:bg-muted/30 transition-colors items-center cursor-pointer group">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-950/50 flex items-center justify-center shrink-0">
-                            <Receipt className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            <FileText className="w-4 h-4 text-green-600 dark:text-green-400" />
                           </div>
                           <div>
                             <p className="font-bold font-mono text-sm">
