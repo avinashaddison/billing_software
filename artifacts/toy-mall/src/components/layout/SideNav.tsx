@@ -40,9 +40,16 @@ export function SideNav() {
 
   return (
     <aside className="hidden md:flex flex-col w-56 min-h-screen bg-background border-r border-border shrink-0 sticky top-0 h-screen">
-      <div className="px-5 py-6 border-b border-border">
-        <h1 className="text-xl font-black tracking-tight text-foreground">VishwaKarma Complex</h1>
-        <p className="text-xs text-muted-foreground font-medium mt-0.5">Billing Management</p>
+      <div className="px-4 py-4 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-sm shadow-primary/30">
+            <span className="text-base leading-none">🧸</span>
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-[13px] font-black tracking-tight text-foreground leading-tight whitespace-nowrap">VishwaKarma Complex</h1>
+            <p className="text-[10px] text-muted-foreground font-medium mt-px">Billing Management</p>
+          </div>
+        </div>
       </div>
 
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
