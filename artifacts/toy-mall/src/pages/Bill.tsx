@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
-import { ArrowLeft, ScanLine, Printer, RotateCcw, X, Minus, Plus, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, ScanLine, Printer, RotateCcw, X, Minus, Plus, Check, Loader2, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface BillItem {
@@ -192,6 +192,44 @@ export default function Bill() {
   const dateStr = dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   const timeStr = dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
   const billNo  = bill.id.slice(0, 8).toUpperCase();
+
+  const buildShareText = () => {
+    const itemLines = items
+      .map((it) => `  • ${it.productName} × ${it.quantity} — ₹${it.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+      .join("\n");
+    return [
+      `🛍️ VishwaKarma Complex — Receipt`,
+      `Bill #${billNo}  |  ${dateStr} ${timeStr}`,
+      ``,
+      itemLines,
+      ``,
+      `Total: ₹${bill.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `Payment: ${(bill.paymentMode ?? "CASH").toUpperCase()}`,
+      ``,
+      `Thank you for shopping with us! 🎉`,
+      ``,
+      `Ref: ${bill.id}`,
+    ].join("\n");
+  };
+
+  const handleShare = async () => {
+    const text = buildShareText();
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: `Receipt #${billNo}`, text });
+        toast.success("Receipt shared!");
+      } catch {
+        /* user dismissed — do nothing */
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success("Receipt copied to clipboard!");
+      } catch {
+        toast.error("Could not copy receipt");
+      }
+    }
+  };
 
   return (
     <>
@@ -414,6 +452,15 @@ export default function Bill() {
               </button>
             </Link>
           </div>
+          {bill.customerPhone && (
+            <button
+              onClick={handleShare}
+              className="w-full h-10 flex items-center justify-center gap-2 border border-green-400 text-green-700 dark:text-green-400 font-bold rounded-2xl hover:bg-green-50 dark:hover:bg-green-950/20 active:scale-95 transition-all text-sm"
+            >
+              <Share2 className="w-4 h-4" />
+              Share Receipt
+            </button>
+          )}
           <button
             onClick={() => setShowReturn(true)}
             className="w-full h-10 flex items-center justify-center gap-2 border border-orange-400 text-orange-600 font-bold rounded-2xl hover:bg-orange-50 dark:hover:bg-orange-950/20 active:scale-95 transition-all text-sm"
