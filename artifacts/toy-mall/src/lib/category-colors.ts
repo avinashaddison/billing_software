@@ -50,3 +50,39 @@ export const CATEGORY_EMOJI: Record<string, string> = {
 export function getCategoryEmoji(category: string): string {
   return CATEGORY_EMOJI[category] ?? "🎁";
 }
+
+export type CategoryHex = { strip: string; badge: string; text: string };
+
+const CATEGORY_HEX_MAP: Record<string, CategoryHex> = {
+  "Remote Cars":     { strip: "#ef4444", badge: "#fee2e2", text: "#b91c1c" },
+  "Remote Control":  { strip: "#ef4444", badge: "#fee2e2", text: "#b91c1c" },
+  "Teddy Bears":     { strip: "#ec4899", badge: "#fce7f3", text: "#be185d" },
+  "Plush Toys":      { strip: "#ec4899", badge: "#fce7f3", text: "#be185d" },
+  "Building Blocks": { strip: "#f59e0b", badge: "#fef3c7", text: "#b45309" },
+  "Drones":          { strip: "#0ea5e9", badge: "#e0f2fe", text: "#0369a1" },
+  "Dolls":           { strip: "#a855f7", badge: "#f3e8ff", text: "#7e22ce" },
+  "Action Figures":  { strip: "#3b82f6", badge: "#dbeafe", text: "#1d4ed8" },
+  "Board Games":     { strip: "#22c55e", badge: "#dcfce7", text: "#15803d" },
+  "Puzzles":         { strip: "#14b8a6", badge: "#ccfbf1", text: "#0f766e" },
+  "Outdoor Toys":    { strip: "#84cc16", badge: "#f7fee7", text: "#3f6212" },
+};
+
+const HEX_FALLBACKS: CategoryHex[] = [
+  { strip: "#8b5cf6", badge: "#ede9fe", text: "#5b21b6" },
+  { strip: "#f43f5e", badge: "#ffe4e6", text: "#9f1239" },
+  { strip: "#06b6d4", badge: "#cffafe", text: "#0e7490" },
+  { strip: "#f97316", badge: "#ffedd5", text: "#c2410c" },
+  { strip: "#6366f1", badge: "#e0e7ff", text: "#3730a3" },
+  { strip: "#10b981", badge: "#d1fae5", text: "#065f46" },
+];
+
+const hexCache = new Map<string, CategoryHex>();
+
+export function getCategoryHex(category: string): CategoryHex {
+  if (CATEGORY_HEX_MAP[category]) return CATEGORY_HEX_MAP[category];
+  if (hexCache.has(category)) return hexCache.get(category)!;
+  const idx = [...category].reduce((a, c) => a + c.charCodeAt(0), 0) % HEX_FALLBACKS.length;
+  const hex = HEX_FALLBACKS[idx];
+  hexCache.set(category, hex);
+  return hex;
+}

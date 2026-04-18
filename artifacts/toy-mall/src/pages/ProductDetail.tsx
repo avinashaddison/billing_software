@@ -16,36 +16,9 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { playTick, playStockIn, playStockOut, playError } from "@/lib/sounds";
-import { getCategoryStyle, getCategoryEmoji } from "@/lib/category-colors";
+import { getCategoryStyle, getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-
-/* ── Category hex colours for the QR panel inline strip ─────────── */
-const CAT_HEX: Record<string, { strip: string; badge: string; text: string }> = {
-  "Remote Cars":     { strip: "#ef4444", badge: "#fee2e2", text: "#b91c1c" },
-  "Remote Control":  { strip: "#ef4444", badge: "#fee2e2", text: "#b91c1c" },
-  "Teddy Bears":     { strip: "#ec4899", badge: "#fce7f3", text: "#be185d" },
-  "Plush Toys":      { strip: "#ec4899", badge: "#fce7f3", text: "#be185d" },
-  "Building Blocks": { strip: "#f59e0b", badge: "#fef3c7", text: "#b45309" },
-  "Drones":          { strip: "#0ea5e9", badge: "#e0f2fe", text: "#0369a1" },
-  "Dolls":           { strip: "#a855f7", badge: "#f3e8ff", text: "#7e22ce" },
-  "Action Figures":  { strip: "#3b82f6", badge: "#dbeafe", text: "#1d4ed8" },
-  "Board Games":     { strip: "#22c55e", badge: "#dcfce7", text: "#15803d" },
-  "Puzzles":         { strip: "#14b8a6", badge: "#ccfbf1", text: "#0f766e" },
-  "Outdoor Toys":    { strip: "#84cc16", badge: "#f7fee7", text: "#3f6212" },
-};
-function getCatHex(cat: string) {
-  if (CAT_HEX[cat]) return CAT_HEX[cat];
-  const fallbacks = [
-    { strip: "#8b5cf6", badge: "#ede9fe", text: "#5b21b6" },
-    { strip: "#f43f5e", badge: "#ffe4e6", text: "#9f1239" },
-    { strip: "#06b6d4", badge: "#cffafe", text: "#0e7490" },
-    { strip: "#f97316", badge: "#ffedd5", text: "#c2410c" },
-    { strip: "#6366f1", badge: "#e0e7ff", text: "#3730a3" },
-    { strip: "#10b981", badge: "#d1fae5", text: "#065f46" },
-  ];
-  return fallbacks[[...cat].reduce((a, c) => a + c.charCodeAt(0), 0) % fallbacks.length];
-}
 
 const PRESET_QTYS = [1, 5, 10, 25, 50];
 
@@ -195,7 +168,7 @@ export default function ProductDetail() {
   const stockPct      = Math.min(product.stock / Math.max(product.lowStockThreshold * 4, 1), 1) * 100;
   const barColor      = isLowStock ? "bg-red-500" : isAmberStock ? "bg-amber-400" : "bg-green-500";
   const catStyle      = getCategoryStyle(product.category);
-  const hex           = getCatHex(product.category);
+  const hex           = getCategoryHex(product.category);
   const emoji         = getCategoryEmoji(product.category);
   const imageUrl      = "imageUrl" in product ? (product.imageUrl as string | null | undefined) : null;
 

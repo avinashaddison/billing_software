@@ -1,44 +1,16 @@
 import { useState, useEffect } from "react";
 import { Tag, Printer, Loader2, Search, Check, Package, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { getCategoryEmoji } from "@/lib/category-colors";
+import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 interface Product { id: string; name: string; sku: string; price: number; category: string; stock: number; }
 interface QrData   { sku: string; url: string; qrDataUrl: string; }
 
-/* Per-category hex colours used in print labels (inline styles only — Tailwind won't work in print) */
-const CAT_HEX: Record<string, { strip: string; badge: string; text: string }> = {
-  "Remote Cars":     { strip: "#ef4444", badge: "#fee2e2", text: "#b91c1c" },
-  "Remote Control":  { strip: "#ef4444", badge: "#fee2e2", text: "#b91c1c" },
-  "Teddy Bears":     { strip: "#ec4899", badge: "#fce7f3", text: "#be185d" },
-  "Plush Toys":      { strip: "#ec4899", badge: "#fce7f3", text: "#be185d" },
-  "Building Blocks": { strip: "#f59e0b", badge: "#fef3c7", text: "#b45309" },
-  "Drones":          { strip: "#0ea5e9", badge: "#e0f2fe", text: "#0369a1" },
-  "Dolls":           { strip: "#a855f7", badge: "#f3e8ff", text: "#7e22ce" },
-  "Action Figures":  { strip: "#3b82f6", badge: "#dbeafe", text: "#1d4ed8" },
-  "Board Games":     { strip: "#22c55e", badge: "#dcfce7", text: "#15803d" },
-  "Puzzles":         { strip: "#14b8a6", badge: "#ccfbf1", text: "#0f766e" },
-  "Outdoor Toys":    { strip: "#84cc16", badge: "#f7fee7", text: "#3f6212" },
-};
-function getCatHex(cat: string) {
-  if (CAT_HEX[cat]) return CAT_HEX[cat];
-  const idx = [...cat].reduce((a, c) => a + c.charCodeAt(0), 0) % 6;
-  const fallbacks = [
-    { strip: "#8b5cf6", badge: "#ede9fe", text: "#5b21b6" },
-    { strip: "#f43f5e", badge: "#ffe4e6", text: "#9f1239" },
-    { strip: "#06b6d4", badge: "#cffafe", text: "#0e7490" },
-    { strip: "#f97316", badge: "#ffedd5", text: "#c2410c" },
-    { strip: "#6366f1", badge: "#e0e7ff", text: "#3730a3" },
-    { strip: "#10b981", badge: "#d1fae5", text: "#065f46" },
-  ];
-  return fallbacks[idx];
-}
-
 /* ── Single printed label card ─────────────────────────────────── */
 function PrintLabel({ p, qr }: { p: Product; qr: QrData | undefined }) {
-  const hex = getCatHex(p.category);
+  const hex = getCategoryHex(p.category);
   const emoji = getCategoryEmoji(p.category);
   return (
     <div style={{
@@ -104,7 +76,7 @@ function PrintLabel({ p, qr }: { p: Product; qr: QrData | undefined }) {
 
 /* ── On-screen label preview card ──────────────────────────────── */
 function PreviewCard({ p, qr }: { p: Product; qr: QrData | undefined }) {
-  const hex = getCatHex(p.category);
+  const hex = getCategoryHex(p.category);
   const emoji = getCategoryEmoji(p.category);
   return (
     <div className="rounded-2xl overflow-hidden border shadow-md bg-white" style={{ width: 160 }}>
@@ -283,7 +255,7 @@ export default function Labels() {
             <div className="divide-y divide-border">
               {filtered.map((p) => {
                 const isSelected = selected.has(p.id);
-                const hex = getCatHex(p.category);
+                const hex = getCategoryHex(p.category);
                 const emoji = getCategoryEmoji(p.category);
                 return (
                   <button key={p.id} onClick={() => toggle(p.id)}
