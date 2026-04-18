@@ -49,6 +49,8 @@ export const CreateProductBody = zod.object({
   price: zod.number(),
   stock: zod.number().optional(),
   lowStockThreshold: zod.number().optional(),
+  imageUrl: zod.string().optional(),
+  supplierId: zod.string().optional(),
 });
 
 /**

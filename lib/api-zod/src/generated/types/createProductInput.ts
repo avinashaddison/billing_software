@@ -13,4 +13,6 @@ export interface CreateProductInput {
   price: number;
   stock?: number;
   lowStockThreshold?: number;
+  imageUrl?: string;
+  supplierId?: string;
 }

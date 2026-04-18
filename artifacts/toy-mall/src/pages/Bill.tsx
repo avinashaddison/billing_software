@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 interface BillItem {
   id: string;
+  productId: string;
   productName: string;
   productSku: string;
   quantity: number;
@@ -53,7 +54,11 @@ function ReturnModal({ billId, items, onClose }: { billId: string; items: BillIt
     if (selected.size === 0) { toast.error("Select at least one item to return"); return; }
     setProcessing(true);
     try {
-      const returnItems = Array.from(selected).map((id) => ({ billItemId: id, quantity: qtys[id] }));
+      /* Build items using productId (not the sale-item id) */
+      const returnItems = Array.from(selected).map((saleItemId) => {
+        const item = items.find((i) => i.id === saleItemId)!;
+        return { productId: item.productId, quantity: qtys[saleItemId] };
+      });
       const r = await fetch(`${BASE_URL}/api/returns`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,7 +66,10 @@ function ReturnModal({ billId, items, onClose }: { billId: string; items: BillIt
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       const data = await r.json();
-      toast.success(`Return processed — ₹${data.totalRefund?.toLocaleString("en-IN", { maximumFractionDigits: 0 })} refunded, stock restocked`);
+      const refundStr = data.totalRefund != null
+        ? `₹${data.totalRefund.toLocaleString("en-IN", { maximumFractionDigits: 0 })} refunded, `
+        : "";
+      toast.success(`Return processed — ${refundStr}stock restocked`);
       onClose(true);
     } catch (e: any) { toast.error(e.message || "Return failed"); }
     finally { setProcessing(false); }

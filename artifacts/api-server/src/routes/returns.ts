@@ -33,56 +33,92 @@ router.get("/returns", async (req, res): Promise<void> => {
   res.json(rows.map((r) => ({ ...r, refundAmount: Number(r.refundAmount) })));
 });
 
-/** POST /api/returns  — create return + restock */
+/**
+ * POST /api/returns
+ * Supports two formats:
+ *   Single: { billId, productId, quantity, reason?, notes? }
+ *   Batch:  { billId, items: [{productId, quantity}], reason?, notes? }
+ *
+ * Restocks each returned product and calculates total refund.
+ */
 router.post("/returns", async (req, res): Promise<void> => {
-  const { billId, productId, quantity, reason, notes } = req.body;
+  const { billId, productId, quantity, reason, notes, items } = req.body;
 
-  if (!billId || !productId || !quantity || quantity < 1) {
-    res.status(400).json({ error: "billId, productId and quantity are required" });
+  /* Normalise to a single array of {productId, quantity} */
+  let lineItems: Array<{ productId: string; quantity: number }> = [];
+
+  if (Array.isArray(items) && items.length > 0) {
+    lineItems = items.map((i: { productId: string; quantity: number }) => ({
+      productId: String(i.productId),
+      quantity:  Number(i.quantity),
+    }));
+  } else if (productId && quantity) {
+    lineItems = [{ productId: String(productId), quantity: Number(quantity) }];
+  } else {
+    res.status(400).json({ error: "Provide either items[] or (productId + quantity)" });
     return;
   }
 
-  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, productId));
-  if (!product) { res.status(404).json({ error: "Product not found" }); return; }
+  if (!billId) {
+    res.status(400).json({ error: "billId is required" });
+    return;
+  }
 
+  /* Validate bill exists */
   const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, billId));
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
 
-  const refundAmount = Number(product.price) * quantity;
-
+  /* Process each line item in a single transaction */
   const result = await db.transaction(async (tx) => {
-    const [ret] = await tx
-      .insert(returnsTable)
-      .values({
-        billId,
-        productId,
-        quantity,
-        refundAmount: String(refundAmount),
-        reason:       reason || "customer_return",
-        notes:        notes || null,
-      })
-      .returning();
+    let totalRefund = 0;
+    const returnRows: Array<typeof returnsTable.$inferSelect> = [];
 
-    // Restock the product
-    const [updated] = await tx
-      .update(productsTable)
-      .set({ stock: product.stock + quantity })
-      .where(eq(productsTable.id, productId))
-      .returning();
+    for (const line of lineItems) {
+      if (!line.productId || !line.quantity || line.quantity < 1) continue;
 
-    return { return: ret, newStock: updated.stock };
+      const [product] = await tx.select().from(productsTable).where(eq(productsTable.id, line.productId));
+      if (!product) continue;
+
+      const refundAmount = Number(product.price) * line.quantity;
+      totalRefund += refundAmount;
+
+      const [ret] = await tx
+        .insert(returnsTable)
+        .values({
+          billId,
+          productId:    line.productId,
+          quantity:     line.quantity,
+          refundAmount: String(refundAmount),
+          reason:       reason || "customer_return",
+          notes:        notes || null,
+        })
+        .returning();
+
+      await tx
+        .update(productsTable)
+        .set({ stock: product.stock + line.quantity })
+        .where(eq(productsTable.id, line.productId));
+
+      broadcast("stock_updated", {
+        productId:   line.productId,
+        productName: product.name,
+        productSku:  product.sku,
+        type:        "IN",
+        quantity:    line.quantity,
+        newStock:    product.stock + line.quantity,
+      });
+
+      returnRows.push(ret);
+    }
+
+    return { returns: returnRows, totalRefund };
   });
 
-  broadcast("stock_updated", {
-    productId,
-    productName: product.name,
-    productSku:  product.sku,
-    type:        "IN",
-    quantity,
-    newStock:    result.newStock,
+  res.status(201).json({
+    returns:     result.returns.map((r) => ({ ...r, refundAmount: Number(r.refundAmount) })),
+    totalRefund: result.totalRefund,
+    count:       result.returns.length,
   });
-
-  res.status(201).json({ ...result.return, refundAmount: Number(result.return.refundAmount) });
 });
 
 export default router;

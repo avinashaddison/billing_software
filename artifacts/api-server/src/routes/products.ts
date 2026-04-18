@@ -70,7 +70,7 @@ router.post("/products", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, sku, category, price, stock, lowStockThreshold } = parsed.data;
+  const { name, sku, category, price, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
 
   const [product] = await db
     .insert(productsTable)
@@ -81,6 +81,8 @@ router.post("/products", async (req, res): Promise<void> => {
       price: String(price),
       stock: stock ?? 0,
       lowStockThreshold: lowStockThreshold ?? 5,
+      imageUrl: imageUrl ?? null,
+      supplierId: supplierId ?? null,
     })
     .returning();
 
