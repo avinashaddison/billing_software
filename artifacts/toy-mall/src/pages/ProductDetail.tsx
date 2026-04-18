@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { playTick, playStockIn, playStockOut, playError } from "@/lib/sounds";
-import { getCategoryEmoji } from "@/lib/category-colors";
+import { getCategoryStyle, getCategoryEmoji } from "@/lib/category-colors";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -194,9 +194,10 @@ export default function ProductDetail() {
   const isAmberStock  = !isLowStock && product.stock <= product.lowStockThreshold * 2;
   const stockPct      = Math.min(product.stock / Math.max(product.lowStockThreshold * 4, 1), 1) * 100;
   const barColor      = isLowStock ? "bg-red-500" : isAmberStock ? "bg-amber-400" : "bg-green-500";
+  const catStyle      = getCategoryStyle(product.category);
   const hex           = getCatHex(product.category);
   const emoji         = getCategoryEmoji(product.category);
-  const imageUrl      = (product as any).imageUrl as string | null | undefined;
+  const imageUrl      = "imageUrl" in product ? (product.imageUrl as string | null | undefined) : null;
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -272,7 +273,7 @@ export default function ProductDetail() {
               <img
                 src={imageUrl}
                 alt={product.name}
-                className="w-full object-cover max-h-48"
+                className="w-full object-cover max-h-48 rounded-2xl"
               />
             ) : (
               <div className="relative overflow-hidden">
@@ -289,10 +290,8 @@ export default function ProductDetail() {
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">SKU</p>
                   <p className="text-xl font-mono font-black">{product.sku}</p>
                 </div>
-                {/* Category-coloured badge */}
-                <span
-                  className="text-xs font-bold px-3 py-1 rounded-full"
-                  style={{ background: hex.badge, color: hex.text }}>
+                {/* Category-coloured badge — uses getCategoryStyle like the rest of the app */}
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${catStyle.badge}`}>
                   {emoji} {product.category}
                 </span>
               </div>
