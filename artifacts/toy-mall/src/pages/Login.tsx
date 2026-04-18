@@ -253,6 +253,17 @@ export default function Login() {
           )}
         </div>
       )}
+
+      {/* Developer credit */}
+      <div className="mt-10 flex flex-col items-center gap-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Developed by</p>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-violet-500/20 bg-gradient-to-r from-violet-500/8 via-blue-500/8 to-cyan-500/8">
+          <span className="text-sm">⚡</span>
+          <span className="text-[13px] font-black bg-gradient-to-r from-violet-500 via-blue-500 to-cyan-400 bg-clip-text text-transparent tracking-wide">
+            AddisonX Media
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
