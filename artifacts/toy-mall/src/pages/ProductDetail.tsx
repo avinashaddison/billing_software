@@ -9,16 +9,45 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { playTick, playStockIn, playStockOut, playError } from "@/lib/sounds";
+import { getCategoryEmoji } from "@/lib/category-colors";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+/* ── Category hex colours for the QR panel inline strip ─────────── */
+const CAT_HEX: Record<string, { strip: string; badge: string; text: string }> = {
+  "Remote Cars":     { strip: "#ef4444", badge: "#fee2e2", text: "#b91c1c" },
+  "Remote Control":  { strip: "#ef4444", badge: "#fee2e2", text: "#b91c1c" },
+  "Teddy Bears":     { strip: "#ec4899", badge: "#fce7f3", text: "#be185d" },
+  "Plush Toys":      { strip: "#ec4899", badge: "#fce7f3", text: "#be185d" },
+  "Building Blocks": { strip: "#f59e0b", badge: "#fef3c7", text: "#b45309" },
+  "Drones":          { strip: "#0ea5e9", badge: "#e0f2fe", text: "#0369a1" },
+  "Dolls":           { strip: "#a855f7", badge: "#f3e8ff", text: "#7e22ce" },
+  "Action Figures":  { strip: "#3b82f6", badge: "#dbeafe", text: "#1d4ed8" },
+  "Board Games":     { strip: "#22c55e", badge: "#dcfce7", text: "#15803d" },
+  "Puzzles":         { strip: "#14b8a6", badge: "#ccfbf1", text: "#0f766e" },
+  "Outdoor Toys":    { strip: "#84cc16", badge: "#f7fee7", text: "#3f6212" },
+};
+function getCatHex(cat: string) {
+  if (CAT_HEX[cat]) return CAT_HEX[cat];
+  const fallbacks = [
+    { strip: "#8b5cf6", badge: "#ede9fe", text: "#5b21b6" },
+    { strip: "#f43f5e", badge: "#ffe4e6", text: "#9f1239" },
+    { strip: "#06b6d4", badge: "#cffafe", text: "#0e7490" },
+    { strip: "#f97316", badge: "#ffedd5", text: "#c2410c" },
+    { strip: "#6366f1", badge: "#e0e7ff", text: "#3730a3" },
+    { strip: "#10b981", badge: "#d1fae5", text: "#065f46" },
+  ];
+  return fallbacks[[...cat].reduce((a, c) => a + c.charCodeAt(0), 0) % fallbacks.length];
+}
+
+const PRESET_QTYS = [1, 5, 10, 25, 50];
 
 export default function ProductDetail() {
   const searchParams = new URLSearchParams(useSearch());
@@ -60,20 +89,11 @@ export default function ProductDetail() {
 
   const handleStockAction = async (type: "IN" | "OUT") => {
     if (!product) return;
-    if (quantity <= 0) {
-      playError();
-      toast.error("Quantity must be at least 1");
-      return;
-    }
-    if (type === "OUT" && product.stock < quantity) {
-      playError();
-      toast.error("Insufficient stock");
-      return;
-    }
+    if (quantity <= 0) { playError(); toast.error("Quantity must be at least 1"); return; }
+    if (type === "OUT" && product.stock < quantity) { playError(); toast.error("Insufficient stock"); return; }
 
     const previousStock = product.stock;
     const newStock = type === "IN" ? previousStock + quantity : previousStock - quantity;
-
     queryClient.setQueryData(getGetProductBySkuQueryKey(sku), { ...product, stock: newStock });
 
     try {
@@ -125,10 +145,10 @@ export default function ProductDetail() {
     const price = parseFloat(editForm.price);
     const threshold = parseInt(editForm.lowStockThreshold, 10);
     const category = editForm.category.trim();
-    if (!name)              { toast.error("Name is required"); return; }
-    if (isNaN(price) || price <= 0) { toast.error("Enter a valid price"); return; }
+    if (!name)                          { toast.error("Name is required"); return; }
+    if (isNaN(price) || price <= 0)     { toast.error("Enter a valid price"); return; }
     if (isNaN(threshold) || threshold < 0) { toast.error("Enter a valid threshold"); return; }
-    if (!category)          { toast.error("Category is required"); return; }
+    if (!category)                      { toast.error("Category is required"); return; }
     setEditSaving(true);
     try {
       const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
@@ -170,11 +190,17 @@ export default function ProductDetail() {
 
   if (!product) return null;
 
-  const isLowStock = product.stock <= product.lowStockThreshold;
+  const isLowStock    = product.stock <= product.lowStockThreshold;
+  const isAmberStock  = !isLowStock && product.stock <= product.lowStockThreshold * 2;
+  const stockPct      = Math.min(product.stock / Math.max(product.lowStockThreshold * 4, 1), 1) * 100;
+  const barColor      = isLowStock ? "bg-red-500" : isAmberStock ? "bg-amber-400" : "bg-green-500";
+  const hex           = getCatHex(product.category);
+  const emoji         = getCategoryEmoji(product.category);
+  const imageUrl      = (product as any).imageUrl as string | null | undefined;
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="p-4 md:px-6 border-b flex items-center justify-between sticky top-0 bg-background z-10">
         <div className="flex items-center gap-3 min-w-0">
           <Link href="/products" className="p-2 -ml-2 rounded-full hover:bg-muted active:scale-95 transition-all shrink-0">
@@ -234,81 +260,120 @@ export default function ProductDetail() {
         </div>
       )}
 
-      {/* Content: mobile = stacked, desktop = 3 columns */}
+      {/* ── Content ── */}
       <div className="p-4 md:p-6 overflow-y-auto flex-1 pb-32 md:pb-6">
         <div className="grid gap-4 md:grid-cols-3">
 
-          {/* ── Col 1: Product info ── */}
-          <div className="p-5 bg-card border rounded-3xl shadow-sm relative overflow-hidden">
-            <div className="absolute -right-4 -top-4 opacity-5">
-              <Package className="w-32 h-32" />
-            </div>
+          {/* ══ Col 1: Product info ══ */}
+          <div className="bg-card border rounded-3xl shadow-sm overflow-hidden">
 
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">SKU</p>
-                <p className="text-xl font-mono font-black">{product.sku}</p>
-              </div>
-              <Badge variant="secondary" className="text-xs px-3 py-1 font-bold">{product.category}</Badge>
-            </div>
-
-            <div className="space-y-4 border-t pt-4">
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Price</p>
-                <p className="text-2xl font-bold">
-                  ₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Current Stock</p>
-                <div className="flex items-center gap-2">
-                  {isLowStock && <AlertTriangle className="w-5 h-5 text-destructive animate-pulse" />}
-                  <p className={`text-5xl font-black leading-none ${isLowStock ? "text-destructive" : ""}`} data-testid="text-stock-count">
-                    {product.stock}
-                  </p>
-                  <span className="text-sm text-muted-foreground font-semibold self-end mb-1">units</span>
-                </div>
-              </div>
-
-              {isLowStock && (
-                <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl px-3 py-2">
-                  <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-                  <p className="text-xs font-bold text-red-700 dark:text-red-400">
-                    Low stock! Threshold: {product.lowStockThreshold} units
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Low Stock Threshold</p>
-                <p className="text-sm font-semibold">{product.lowStockThreshold} units</p>
-              </div>
-            </div>
-
-            {/* Image upload section */}
-            <div className="mt-4 pt-4 border-t">
-              <ImageUploader
-                value={(product as any).imageUrl ?? ""}
-                onChange={(url) => saveImageUrl(url)}
-                onClear={() => saveImageUrl("")}
-                label="Product Image"
+            {/* Product image — shown prominently if available */}
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={product.name}
+                className="w-full object-cover max-h-48"
               />
-              {savingImg && <p className="text-xs text-muted-foreground mt-1">Saving…</p>}
-            </div>
+            ) : (
+              <div className="relative overflow-hidden">
+                <div className="absolute -right-4 -top-4 opacity-5 pointer-events-none">
+                  <Package className="w-32 h-32" />
+                </div>
+              </div>
+            )}
 
-            <div className="mt-4 pt-4 border-t">
-              <Link href="/logs" className="flex items-center justify-between text-sm font-semibold text-primary hover:underline">
-                View stock history
-                <ChevronRight className="w-4 h-4" />
-              </Link>
+            <div className="p-5">
+              {/* SKU row + category badge */}
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">SKU</p>
+                  <p className="text-xl font-mono font-black">{product.sku}</p>
+                </div>
+                {/* Category-coloured badge */}
+                <span
+                  className="text-xs font-bold px-3 py-1 rounded-full"
+                  style={{ background: hex.badge, color: hex.text }}>
+                  {emoji} {product.category}
+                </span>
+              </div>
+
+              <div className="space-y-4 border-t pt-4">
+                {/* Price */}
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Price</p>
+                  <p className="text-2xl font-bold">
+                    ₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+
+                {/* Stock count + progress bar */}
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Current Stock</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    {isLowStock && <AlertTriangle className="w-5 h-5 text-destructive animate-pulse shrink-0" />}
+                    <p className={`text-5xl font-black leading-none ${isLowStock ? "text-destructive" : ""}`} data-testid="text-stock-count">
+                      {product.stock}
+                    </p>
+                    <span className="text-sm text-muted-foreground font-semibold self-end mb-1">units</span>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                      style={{ width: `${stockPct}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {isLowStock
+                      ? "⚠ Below threshold — restock soon"
+                      : isAmberStock
+                      ? "Running low — consider restocking"
+                      : "Stock level looks good"}
+                  </p>
+                </div>
+
+                {isLowStock && (
+                  <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl px-3 py-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                    <p className="text-xs font-bold text-red-700 dark:text-red-400">
+                      Low stock! Threshold: {product.lowStockThreshold} units
+                    </p>
+                  </div>
+                )}
+
+                {/* Threshold */}
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Low Stock Threshold</p>
+                  <p className="text-sm font-semibold">{product.lowStockThreshold} units</p>
+                </div>
+              </div>
+
+              {/* Image upload */}
+              <div className="mt-4 pt-4 border-t">
+                <ImageUploader
+                  value={imageUrl ?? ""}
+                  onChange={(url) => saveImageUrl(url)}
+                  onClear={() => saveImageUrl("")}
+                  label="Product Image"
+                />
+                {savingImg && <p className="text-xs text-muted-foreground mt-1">Saving…</p>}
+              </div>
+
+              {/* Stock history link */}
+              <div className="mt-4 pt-4 border-t">
+                <Link href="/logs" className="flex items-center justify-between text-sm font-semibold text-primary hover:underline">
+                  View stock history
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
           </div>
 
-          {/* ── Col 2: Stock adjust ── */}
+          {/* ══ Col 2: Stock adjust ══ */}
           <div className="p-5 bg-card border rounded-3xl shadow-sm flex flex-col gap-6">
             <h2 className="text-lg font-bold text-center">Quick Adjust</h2>
 
+            {/* +/- quantity picker */}
             <div className="flex items-center justify-center gap-4">
               <Button
                 variant="outline"
@@ -318,7 +383,6 @@ export default function ProductDetail() {
               >
                 −
               </Button>
-
               <div className="relative">
                 <Input
                   type="number"
@@ -330,7 +394,6 @@ export default function ProductDetail() {
                   Quantity
                 </span>
               </div>
-
               <Button
                 variant="outline"
                 size="icon"
@@ -341,7 +404,25 @@ export default function ProductDetail() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-6 flex-1">
+            {/* Preset quantity chips */}
+            <div className="flex flex-wrap gap-2 justify-center mt-2">
+              {PRESET_QTYS.map((n) => (
+                <button
+                  key={n}
+                  onClick={() => { playTick(); setQuantity(n); }}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all active:scale-95 ${
+                    quantity === n
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/70"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+
+            {/* Stock IN / OUT buttons */}
+            <div className="grid grid-cols-2 gap-3 flex-1">
               <Button
                 className="h-24 text-lg font-black rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow-lg active:scale-95 transition-all flex flex-col gap-1 items-center justify-center"
                 onClick={() => handleStockAction("IN")}
@@ -351,7 +432,6 @@ export default function ProductDetail() {
                 <ArrowDownToLine className="w-6 h-6" />
                 STOCK IN
               </Button>
-
               <Button
                 className="h-24 text-lg font-black rounded-2xl bg-red-600 hover:bg-red-700 text-white shadow-lg active:scale-95 transition-all flex flex-col gap-1 items-center justify-center"
                 onClick={() => handleStockAction("OUT")}
@@ -364,41 +444,70 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {/* ── Col 3: QR Code (always visible) ── */}
-          <div className="p-5 bg-card border rounded-3xl shadow-sm flex flex-col items-center justify-center gap-4">
-            <div className="text-center">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Product QR Code</p>
-              <p className="text-sm text-muted-foreground">Scan to open this product</p>
+          {/* ══ Col 3: QR Code (redesigned) ══ */}
+          <div className="bg-card border rounded-3xl shadow-sm overflow-hidden flex flex-col">
+            {/* Coloured top strip */}
+            <div
+              className="flex items-center justify-between px-4 py-2.5 shrink-0"
+              style={{ background: hex.strip }}>
+              <span className="text-xs font-black text-white tracking-tight">VishwaKarma Complex</span>
+              <span className="text-lg">{emoji}</span>
             </div>
 
-            {qrLoading ? (
-              <Skeleton className="w-48 h-48 rounded-2xl" />
-            ) : qrData?.qrDataUrl ? (
-              <img
-                src={qrData.qrDataUrl}
-                alt={`QR code for ${product.sku}`}
-                className="w-48 h-48 rounded-2xl border-4 border-muted shadow-sm"
-              />
-            ) : (
-              <div className="w-48 h-48 rounded-2xl border-2 border-dashed border-muted flex items-center justify-center text-muted-foreground text-sm">
-                QR unavailable
+            <div className="flex flex-col items-center gap-3 p-5 flex-1 justify-center">
+              {/* Category badge */}
+              <span
+                className="text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide"
+                style={{ background: hex.badge, color: hex.text }}>
+                {product.category}
+              </span>
+
+              {/* Label above QR */}
+              <p className="text-xs text-muted-foreground font-medium">Scan to open this product</p>
+
+              {/* QR image */}
+              {qrLoading ? (
+                <Skeleton className="w-48 h-48 rounded-2xl" />
+              ) : qrData?.qrDataUrl ? (
+                <img
+                  src={qrData.qrDataUrl}
+                  alt={`QR code for ${product.sku}`}
+                  className="w-48 h-48 rounded-2xl shadow-sm"
+                  style={{ border: `3px solid ${hex.strip}` }}
+                />
+              ) : (
+                <div className="w-48 h-48 rounded-2xl border-2 border-dashed border-muted flex items-center justify-center text-muted-foreground text-sm">
+                  QR unavailable
+                </div>
+              )}
+
+              {/* SKU + name */}
+              <div className="text-center space-y-0.5">
+                <p className="font-mono font-black text-lg tracking-widest">{product.sku}</p>
+                <p className="text-xs text-muted-foreground">{product.name}</p>
               </div>
-            )}
 
-            <div className="text-center space-y-1">
-              <p className="font-mono font-black text-lg tracking-widest">{product.sku}</p>
-              <p className="text-xs text-muted-foreground">{product.name}</p>
+              {/* Action buttons */}
+              {qrData?.qrDataUrl && (
+                <div className="flex gap-2 w-full mt-1">
+                  <a
+                    href={qrData.qrDataUrl}
+                    download={`${product.sku}-qr.png`}
+                    className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Download QR
+                  </a>
+                  <button
+                    onClick={() => setLocation("/labels")}
+                    className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white transition-colors active:scale-95"
+                    style={{ background: hex.strip }}>
+                    <Printer className="w-3.5 h-3.5" />
+                    Print Label
+                  </button>
+                </div>
+              )}
             </div>
-
-            {qrData?.qrDataUrl && (
-              <a
-                href={qrData.qrDataUrl}
-                download={`${product.sku}-qr.png`}
-                className="text-xs font-bold text-primary hover:underline"
-              >
-                Download QR →
-              </a>
-            )}
           </div>
 
         </div>
