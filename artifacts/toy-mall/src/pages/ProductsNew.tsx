@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useCreateProduct, getListProductsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Lightbulb, Tag, PenLine, ImageIcon } from "lucide-react";
+import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Lightbulb, Tag, PenLine } from "lucide-react";
+import { ImageUploader } from "@/components/ui/ImageUploader";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -124,7 +125,7 @@ const createProductSchema = z.object({
   price:             z.coerce.number().min(0.01, "Price must be greater than 0"),
   stock:             z.coerce.number().int().min(0, "Stock cannot be negative").optional().default(0),
   lowStockThreshold: z.coerce.number().int().min(0).optional().default(5),
-  imageUrl:          z.string().url("Enter a valid image URL").optional().or(z.literal("")),
+  imageUrl:          z.string().optional().or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof createProductSchema>;
@@ -413,32 +414,16 @@ export default function CreateProduct() {
                 )} />
               </div>
 
-              {/* Image URL */}
+              {/* Image upload */}
               <FormField control={form.control} name="imageUrl" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="font-bold text-muted-foreground">
-                    <ImageIcon className="w-3.5 h-3.5 inline mr-1.5" />Product Image URL
-                    <span className="ml-1.5 text-xs font-normal normal-case">(optional)</span>
-                  </FormLabel>
                   <FormControl>
-                    <Input
-                      type="url"
-                      placeholder="https://example.com/image.jpg"
-                      className="h-12 rounded-xl"
-                      {...field}
+                    <ImageUploader
+                      value={field.value || ""}
+                      onChange={(url) => field.onChange(url)}
+                      onClear={() => field.onChange("")}
                     />
                   </FormControl>
-                  {field.value && (
-                    <div className="flex items-center gap-3 mt-2">
-                      <img
-                        src={field.value}
-                        alt="Preview"
-                        className="w-14 h-14 rounded-xl object-cover border"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                      />
-                      <p className="text-xs text-muted-foreground">Image preview</p>
-                    </div>
-                  )}
                   <FormMessage />
                 </FormItem>
               )} />

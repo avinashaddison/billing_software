@@ -12,6 +12,7 @@ import reportsRouter     from "./reports";
 import customersRouter   from "./customers";
 import categoriesRouter  from "./categories";
 import staffRouter       from "./staff";
+import uploadRouter      from "./upload";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(reportsRouter);
 router.use(customersRouter);
 router.use(categoriesRouter);
 router.use(staffRouter);
+router.use(uploadRouter);
 
 export default router;
