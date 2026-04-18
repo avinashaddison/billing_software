@@ -109,6 +109,11 @@ interface CheckoutModalProps {
 }
 function CheckoutModal({ total, count, onCancel, onConfirm, loading }: CheckoutModalProps) {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
+  /* Ref mirrors state so handleSubmit always reads the *latest* value
+     even when the UPI button and Confirm are tapped almost simultaneously
+     (React 18 batches those events; the closure would capture the old state) */
+  const paymentModeRef = useRef<PaymentMode>("cash");
+
   const [phone, setPhone]             = useState("");
   const [phoneError, setPhoneError]   = useState("");
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -116,10 +121,15 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading }: CheckoutM
 
   const validatePhone = (v: string) => (!v || /^\d{10}$/.test(v)) ? "" : "Enter a valid 10-digit number";
 
+  const selectPaymentMode = (pm: PaymentMode) => {
+    paymentModeRef.current = pm;   // synchronous — safe to read immediately
+    setPaymentMode(pm);            // triggers visual re-render
+  };
+
   const handleSubmit = () => {
     const err = validatePhone(phone);
     if (err) { setPhoneError(err); return; }
-    onConfirm(paymentMode, phone);
+    onConfirm(paymentModeRef.current, phone);  // use ref, not state
   };
 
   return (
@@ -168,7 +178,7 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading }: CheckoutM
               ] as const).map(({ value, label, Icon, activeClass, iconClass, textClass }) => {
                 const active = paymentMode === value;
                 return (
-                  <button key={value} onClick={() => setPaymentMode(value)}
+                  <button key={value} type="button" onClick={() => selectPaymentMode(value)}
                     className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 ${active ? activeClass : "border-border bg-muted/40 hover:bg-muted"}`}>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${active ? iconClass : "bg-muted text-muted-foreground"}`}>
                       <Icon className="w-4 h-4" />
@@ -203,11 +213,11 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading }: CheckoutM
 
         {/* Actions */}
         <div className="px-5 pb-6 grid grid-cols-2 gap-3">
-          <button onClick={onCancel} disabled={loading}
+          <button type="button" onClick={onCancel} disabled={loading}
             className="py-3.5 rounded-2xl border border-border text-muted-foreground font-bold text-sm hover:bg-muted active:scale-95 transition-all disabled:opacity-40">
             Cancel
           </button>
-          <button onClick={handleSubmit} disabled={loading || !!validatePhone(phone)}
+          <button type="button" onClick={handleSubmit} disabled={loading || !!validatePhone(phone)}
             className="py-3.5 rounded-2xl bg-green-600 hover:bg-green-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 active:scale-95 transition-all disabled:opacity-50">
             {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : <><Receipt className="w-4 h-4" /> Confirm & Print</>}
           </button>
