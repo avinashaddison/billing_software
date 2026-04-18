@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import {
   ScanLine, ArrowRight, Trash2, Plus, Minus,
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
@@ -296,9 +295,13 @@ function StockInPanel({ product, onConfirm, onDismiss, loading }: StockInPanelPr
   );
 }
 
-/* ── Scanner hook ────────────────────────────────────────────────── */
+/* ── Native camera scanner hook ──────────────────────────────────
+   Uses getUserMedia for reliable video rendering, then BarcodeDetector
+   (Chrome Android 83+, Safari 17+) for decoding. No external lib needed.
+────────────────────────────────────────────────────────────────── */
 function useScanner(
   active: boolean,
+  videoRef: React.RefObject<HTMLVideoElement | null>,
   onScan: (sku: string) => void,
   onCameraError?: (msg: string) => void,
 ) {
@@ -309,78 +312,92 @@ function useScanner(
   useEffect(() => {
     if (!active) return;
 
-    let mounted   = true;
-    let isStarted = false;
-    let scanner: Html5Qrcode | null = null;
+    let mounted = true;
+    let stream: MediaStream | null = null;
+    let rafId   = 0;
 
-    /* Safe async teardown — only stop() if start() succeeded */
-    const teardown = async () => {
-      if (!scanner) return;
-      const s = scanner;
-      scanner = null;
-      if (isStarted) {
-        try { await s.stop(); } catch { /* ignore */ }
-      }
-      try { s.clear(); } catch { /* ignore */ }
-      /* Brute-force clear the DOM node so next mount starts fresh */
-      const el = document.getElementById("reader");
-      if (el) el.innerHTML = "";
+    const stopStream = () => {
+      cancelAnimationFrame(rafId);
+      stream?.getTracks().forEach((t) => t.stop());
+      stream = null;
+      const v = videoRef.current;
+      if (v) { v.srcObject = null; }
     };
 
-    try {
-      scanner = new Html5Qrcode("reader", { verbose: false });
-    } catch {
-      onCameraError?.("Camera unavailable. Use manual SKU entry below.");
-      return;
-    }
-
-    scanner
-      .start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 200, height: 200 },
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.CODE_39,
-          ],
-        },
-        (raw) => {
-          if (processingRef.current) return;
-          processingRef.current = true;
-          let sku = raw;
-          try {
-            if (raw.includes("product?sku=")) {
-              const u = new URL(raw.startsWith("http") ? raw : `http://x${raw}`);
-              sku = u.searchParams.get("sku") ?? raw;
-            }
-          } catch { /* use raw */ }
-          onScanRef.current(sku.toUpperCase());
-          setTimeout(() => { processingRef.current = false; }, 1500);
-        },
-        () => { /* per-frame errors — ignore */ },
-      )
-      .then(() => {
-        if (!mounted) { teardown(); return; }
-        isStarted = true;
-      })
-      .catch((err) => {
+    async function startCamera() {
+      /* ── 1. Request camera ── */
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+      } catch (err: unknown) {
         if (!mounted) return;
-        const msg = (err?.message ?? String(err)).toLowerCase();
-        if (msg.includes("permission") || msg.includes("denied")) {
+        const msg = ((err as Error)?.message ?? String(err)).toLowerCase();
+        if (msg.includes("permission") || msg.includes("denied") || msg.includes("notallowed")) {
           onCameraError?.("Camera permission denied. Please allow camera access and try again.");
         } else {
           onCameraError?.("Camera unavailable. Use manual SKU entry below.");
         }
+        return;
+      }
+
+      if (!mounted) { stream.getTracks().forEach((t) => t.stop()); return; }
+
+      /* ── 2. Attach stream to <video> ── */
+      const video = videoRef.current;
+      if (!video) { stream.getTracks().forEach((t) => t.stop()); return; }
+      video.srcObject = stream;
+      try { await video.play(); } catch { /* autoplay blocked — still shows */ }
+
+      if (!mounted) return;
+
+      /* ── 3. Check BarcodeDetector support ── */
+      type BD = { detect(src: HTMLVideoElement): Promise<Array<{ rawValue: string }>> };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const BDClass = (window as any).BarcodeDetector as (new (o: object) => BD) | undefined;
+      if (!BDClass) {
+        onCameraError?.("Barcode detection not supported on this browser. Please type SKU manually.");
+        return;
+      }
+
+      const detector: BD = new BDClass({
+        formats: ["qr_code", "code_128", "ean_13", "code_39", "ean_8", "upc_a", "upc_e"],
       });
+
+      /* ── 4. Scan loop ~10 fps ── */
+      const tick = async () => {
+        if (!mounted) return;
+        if (!processingRef.current && video.readyState >= 2) {
+          try {
+            const codes = await detector.detect(video);
+            if (codes.length > 0 && !processingRef.current) {
+              const raw = codes[0].rawValue;
+              processingRef.current = true;
+              let sku = raw;
+              try {
+                if (raw.includes("product?sku=")) {
+                  const u = new URL(raw.startsWith("http") ? raw : `http://x${raw}`);
+                  sku = u.searchParams.get("sku") ?? raw;
+                }
+              } catch { /* use raw */ }
+              onScanRef.current(sku.toUpperCase());
+              setTimeout(() => { processingRef.current = false; }, 1500);
+            }
+          } catch { /* per-frame errors — ignore */ }
+        }
+        rafId = window.setTimeout(() => { rafId = requestAnimationFrame(tick); }, 100);
+      };
+      rafId = requestAnimationFrame(tick);
+    }
+
+    startCamera();
 
     return () => {
       mounted = false;
-      teardown();
+      stopStream();
     };
-  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [active, videoRef]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -404,12 +421,14 @@ export default function Scan() {
   const [stockSuccess, setStockSuccess]   = useState<{ name: string; added: number; newStock: number } | null>(null);
   const [cameraError, setCameraError]     = useState<string | null>(null);
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   const isBilling = mode === "billing";
   const isStockIn = mode === "stockin";
 
   const handleScan = useCallback((sku: string) => { setLookupSku(sku); }, []);
   const handleCameraError = useCallback((msg: string) => { setCameraError(msg); }, []);
-  useScanner(showScanner, handleScan, handleCameraError);
+  useScanner(showScanner, videoRef, handleScan, handleCameraError);
 
   useEffect(() => {
     if (!lookupSku) return;
@@ -579,8 +598,14 @@ export default function Scan() {
               </div>
             ) : (
               <>
-                {/* Html5Qrcode renders video inside a nested div */}
-                <div id="reader" className="absolute inset-0" />
+                {/* Native video element — sized by CSS, never 0×0 */}
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
                 {/* Corner brackets overlay */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                   <div className="w-36 h-36 relative">

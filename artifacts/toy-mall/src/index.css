@@ -138,32 +138,3 @@
   75% { transform: translateX(-4px); }
   90% { transform: translateX(4px); }
 }
-
-/* ── QR Camera Scanner (html5-qrcode) ──────────────────────────── */
-#reader {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-#reader > div {
-  position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-#reader video {
-  position: absolute;
-  inset: 0;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover;
-}
-#reader canvas,
-#reader img,
-#reader__header_message,
-#reader__status_span,
-#reader__filescan_input,
-#reader__dashboard,
-#reader__dashboard_section {
-  display: none !important;
-}
