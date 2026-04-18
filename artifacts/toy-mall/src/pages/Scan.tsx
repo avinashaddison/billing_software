@@ -12,6 +12,9 @@ import { toast } from "sonner";
 import { playScanBeep, playError, playCheckoutSuccess, playTick, playStockIn } from "@/lib/sounds";
 import { useCart } from "@/contexts/cart-context";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
+import { useOfflineQueue } from "@/hooks/use-offline-queue";
+import { useOnline }       from "@/hooks/use-online";
+import { WifiOff, RefreshCw } from "lucide-react";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -464,6 +467,9 @@ export default function Scan() {
   const [, setLocation] = useLocation();
   const { items, count, total, addItem, removeItem, updateQty, clearCart } = useCart();
 
+  const isOnline = useOnline();
+  const { pendingCount, enqueue, syncAll } = useOfflineQueue();
+
   /* ── Pre-load ALL products into memory for instant SKU lookup ── */
   const { data: allProducts } = useListProducts(
     {},
@@ -568,6 +574,22 @@ export default function Scan() {
 
   const handleConfirmCheckout = async (paymentMode: PaymentMode, customerPhone: string) => {
     if (!items.length) return;
+
+    /* ── Offline: queue the bill locally, sync later ── */
+    if (!isOnline) {
+      enqueue({
+        items:         items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+        paymentMode,
+        customerPhone: customerPhone || undefined,
+        total,
+        itemsCount:    count,
+      });
+      playCheckoutSuccess();
+      clearCart();
+      setShowModal(false);
+      return;
+    }
+
     setChecking(true);
     try {
       const result = await postCheckout({
@@ -617,6 +639,24 @@ export default function Scan() {
           onConfirm={handleConfirmCheckout}
           loading={checking}
         />
+      )}
+
+      {/* ── Offline / pending sync banner ── */}
+      {(!isOnline || pendingCount > 0) && (
+        <div className={`flex items-center justify-between gap-2 px-4 py-1.5 text-xs font-bold ${!isOnline ? "bg-red-600 text-white" : "bg-amber-500 text-white"}`}>
+          <div className="flex items-center gap-1.5">
+            <WifiOff className="w-3 h-3" />
+            {!isOnline
+              ? "Offline — bills will be saved and synced when reconnected"
+              : `${pendingCount} bill${pendingCount !== 1 ? "s" : ""} pending sync`
+            }
+          </div>
+          {isOnline && pendingCount > 0 && (
+            <button onClick={syncAll} className="flex items-center gap-1 underline underline-offset-2">
+              <RefreshCw className="w-3 h-3" /> Sync now
+            </button>
+          )}
+        </div>
       )}
 
       {/* ── Header ── */}
