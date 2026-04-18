@@ -309,7 +309,30 @@ function useScanner(
   useEffect(() => {
     if (!active) return;
 
-    const scanner = new Html5Qrcode("reader", { verbose: false });
+    let mounted   = true;
+    let isStarted = false;
+    let scanner: Html5Qrcode | null = null;
+
+    /* Safe async teardown — only stop() if start() succeeded */
+    const teardown = async () => {
+      if (!scanner) return;
+      const s = scanner;
+      scanner = null;
+      if (isStarted) {
+        try { await s.stop(); } catch { /* ignore */ }
+      }
+      try { s.clear(); } catch { /* ignore */ }
+      /* Brute-force clear the DOM node so next mount starts fresh */
+      const el = document.getElementById("reader");
+      if (el) el.innerHTML = "";
+    };
+
+    try {
+      scanner = new Html5Qrcode("reader", { verbose: false });
+    } catch {
+      onCameraError?.("Camera unavailable. Use manual SKU entry below.");
+      return;
+    }
 
     scanner
       .start(
@@ -339,9 +362,14 @@ function useScanner(
         },
         () => { /* per-frame errors — ignore */ },
       )
+      .then(() => {
+        if (!mounted) { teardown(); return; }
+        isStarted = true;
+      })
       .catch((err) => {
-        const msg = err?.message ?? String(err);
-        if (msg.toLowerCase().includes("permission")) {
+        if (!mounted) return;
+        const msg = (err?.message ?? String(err)).toLowerCase();
+        if (msg.includes("permission") || msg.includes("denied")) {
           onCameraError?.("Camera permission denied. Please allow camera access and try again.");
         } else {
           onCameraError?.("Camera unavailable. Use manual SKU entry below.");
@@ -349,7 +377,8 @@ function useScanner(
       });
 
     return () => {
-      scanner.stop().catch(() => {}).finally(() => { scanner.clear().catch(() => {}); });
+      mounted = false;
+      teardown();
     };
   }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
 }
