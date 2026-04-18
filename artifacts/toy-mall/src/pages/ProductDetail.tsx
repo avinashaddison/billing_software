@@ -9,7 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3 } from "lucide-react";
+import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2 } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,10 +25,14 @@ export default function ProductDetail() {
   const sku = searchParams.get("sku") || "";
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  const { userId } = useAuth();
+  const { userId, role } = useAuth();
+  const isOwner = role === "owner";
 
   const [quantity, setQuantity]         = useState<number>(1);
   const [savingImg, setSavingImg]       = useState(false);
+  const [editOpen, setEditOpen]         = useState(false);
+  const [editSaving, setEditSaving]     = useState(false);
+  const [editForm, setEditForm]         = useState({ name: "", price: "", category: "", lowStockThreshold: "" });
 
   const { data: product, isLoading, isError } = useGetProductBySku(sku, {
     query: {
@@ -104,6 +108,44 @@ export default function ProductDetail() {
     finally { setSavingImg(false); }
   };
 
+  const openEdit = () => {
+    if (!product) return;
+    setEditForm({
+      name: product.name,
+      price: String(product.price),
+      category: product.category,
+      lowStockThreshold: String(product.lowStockThreshold),
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!product) return;
+    const name = editForm.name.trim();
+    const price = parseFloat(editForm.price);
+    const threshold = parseInt(editForm.lowStockThreshold, 10);
+    const category = editForm.category.trim();
+    if (!name)              { toast.error("Name is required"); return; }
+    if (isNaN(price) || price <= 0) { toast.error("Enter a valid price"); return; }
+    if (isNaN(threshold) || threshold < 0) { toast.error("Enter a valid threshold"); return; }
+    if (!category)          { toast.error("Category is required"); return; }
+    setEditSaving(true);
+    try {
+      const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, price, category, lowStockThreshold: threshold }),
+      });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
+      toast.success("Product updated");
+      setEditOpen(false);
+      queryClient.invalidateQueries({ queryKey: getGetProductBySkuQueryKey(sku) });
+      queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetLowStockProductsQueryKey() });
+    } catch (e: any) { toast.error(e.message || "Update failed"); }
+    finally { setEditSaving(false); }
+  };
+
   if (!sku) {
     return (
       <div className="p-6 text-center">
@@ -143,10 +185,54 @@ export default function ProductDetail() {
             <p className="text-xs font-mono text-muted-foreground">{product.sku}</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" className="rounded-full w-10 h-10 shrink-0">
-          <Edit3 className="w-5 h-5 text-muted-foreground" />
-        </Button>
+        {isOwner && (
+          <Button variant="ghost" size="icon" className="rounded-full w-10 h-10 shrink-0" onClick={openEdit}>
+            <Edit3 className="w-5 h-5 text-muted-foreground" />
+          </Button>
+        )}
       </div>
+
+      {/* ── Edit panel ── */}
+      {editOpen && (
+        <div className="border-b bg-primary/5 px-4 md:px-6 py-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center justify-between">
+            <h2 className="font-black text-base flex items-center gap-2">
+              <Edit3 className="w-4 h-4 text-primary" /> Edit Product
+            </h2>
+            <button onClick={() => setEditOpen(false)} className="w-7 h-7 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs font-bold text-muted-foreground mb-1">Product Name</p>
+              <Input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Bunny Soft Toy" className="h-11 rounded-xl" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground mb-1">Category</p>
+              <Input value={editForm.category} onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
+                placeholder="e.g. Plush Toys" className="h-11 rounded-xl" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground mb-1">Price (₹)</p>
+              <Input type="number" min={0.01} step={0.01} value={editForm.price}
+                onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
+                placeholder="0.00" className="h-11 rounded-xl" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground mb-1">Low Stock Threshold</p>
+              <Input type="number" min={0} step={1} value={editForm.lowStockThreshold}
+                onChange={(e) => setEditForm((f) => ({ ...f, lowStockThreshold: e.target.value }))}
+                placeholder="5" className="h-11 rounded-xl" />
+            </div>
+          </div>
+          <button onClick={handleEditSave} disabled={editSaving}
+            className="w-full h-12 bg-primary text-primary-foreground rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50">
+            {editSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Check className="w-4 h-4" /> Save Changes</>}
+          </button>
+        </div>
+      )}
 
       {/* Content: mobile = stacked, desktop = 3 columns */}
       <div className="p-4 md:p-6 overflow-y-auto flex-1 pb-32 md:pb-6">

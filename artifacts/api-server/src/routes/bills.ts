@@ -26,9 +26,9 @@ function isValidCheckoutBody(body: unknown): body is {
       typeof item === "object" &&
       typeof (item as Record<string, unknown>).productId === "string" &&
       typeof (item as Record<string, unknown>).quantity === "number" &&
-      (item as Record<string, unknown>).quantity > 0 &&
+      ((item as Record<string, unknown>).quantity as number) > 0 &&
       typeof (item as Record<string, unknown>).price === "number" &&
-      (item as Record<string, unknown>).price > 0
+      ((item as Record<string, unknown>).price as number) > 0
   );
 }
 

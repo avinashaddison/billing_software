@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
 import { ArrowLeft, ScanLine, Printer, RotateCcw, X, Minus, Plus, Check, Loader2, Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { STORE_INFO } from "@/lib/store-info";
 
 interface BillItem {
   id: string;
@@ -198,7 +199,7 @@ export default function Bill() {
       .map((it) => `  • ${it.productName} × ${it.quantity} — ₹${it.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
       .join("\n");
     return [
-      `🛍️ VishwaKarma Complex — Receipt`,
+      `🛍️ ${STORE_INFO.name} — Receipt`,
       `Bill #${billNo}  |  ${dateStr} ${timeStr}`,
       ``,
       itemLines,
@@ -303,10 +304,10 @@ export default function Bill() {
 
             {/* ── STORE HEADER ── */}
             <div className="text-center mb-2">
-              <div className="text-xl font-black tracking-widest uppercase">VishwaKarma Complex</div>
-              <div className="text-[11px] tracking-wide mt-0.5">The Complete Toy Store</div>
-              <div className="text-[11px] mt-0.5">📞 +91 98765 43210</div>
-              <div className="text-[11px]">123, Mall Road, New Delhi - 110001</div>
+              <div className="text-xl font-black tracking-widest uppercase">{STORE_INFO.name}</div>
+              <div className="text-[11px] tracking-wide mt-0.5">{STORE_INFO.tagline}</div>
+              <div className="text-[11px] mt-0.5">📞 {STORE_INFO.phone}</div>
+              <div className="text-[11px]">{STORE_INFO.address}</div>
             </div>
 
             <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
@@ -416,7 +417,7 @@ export default function Bill() {
                 Goods once sold will not be<br />returned or exchanged.
               </div>
               <div className="text-gray-400 text-[10px] mt-2">
-                — Powered by VishwaKarma Complex —
+                — {STORE_INFO.name} —
               </div>
               <div className="font-mono text-[10px] text-gray-400 mt-1">
                 #{bill.id.slice(0, 16).toUpperCase()}
@@ -452,15 +453,13 @@ export default function Bill() {
               </button>
             </Link>
           </div>
-          {bill.customerPhone && (
-            <button
-              onClick={handleShare}
-              className="w-full h-10 flex items-center justify-center gap-2 border border-green-400 text-green-700 dark:text-green-400 font-bold rounded-2xl hover:bg-green-50 dark:hover:bg-green-950/20 active:scale-95 transition-all text-sm"
-            >
-              <Share2 className="w-4 h-4" />
-              Share Receipt
-            </button>
-          )}
+          <button
+            onClick={handleShare}
+            className="w-full h-10 flex items-center justify-center gap-2 border border-green-400 text-green-700 dark:text-green-400 font-bold rounded-2xl hover:bg-green-50 dark:hover:bg-green-950/20 active:scale-95 transition-all text-sm"
+          >
+            <Share2 className="w-4 h-4" />
+            Share Receipt
+          </button>
           <button
             onClick={() => setShowReturn(true)}
             className="w-full h-10 flex items-center justify-center gap-2 border border-orange-400 text-orange-600 font-bold rounded-2xl hover:bg-orange-50 dark:hover:bg-orange-950/20 active:scale-95 transition-all text-sm"

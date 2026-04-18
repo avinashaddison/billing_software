@@ -1,6 +1,6 @@
 import { useState, useRef, memo } from "react";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -253,21 +253,35 @@ const ProductDesktopRow = memo(function ProductDesktopRow({ product }: ProductRo
 });
 
 export default function Products() {
+  const searchStr                   = useSearch();
+  const urlParams                   = new URLSearchParams(searchStr);
+  const filterLowStock              = urlParams.get("filter") === "lowstock";
   const [search, setSearch]         = useState("");
   const [showImport, setShowImport] = useState(false);
   const debouncedSearch             = useDebounce(search, 300);
   const { role }                    = useAuth();
   const isAdmin                     = role === "owner";
 
-  const { data: products, isLoading } = useListProducts(
+  const { data: allProducts, isLoading } = useListProducts(
     { search: debouncedSearch || undefined },
     { query: { queryKey: getListProductsQueryKey({ search: debouncedSearch || undefined }) } }
   );
+
+  const products = filterLowStock
+    ? allProducts?.filter((p) => p.stock <= p.lowStockThreshold)
+    : allProducts;
 
   return (
     <div className="flex flex-col h-full">
       {showImport && <CsvImportModal onClose={() => setShowImport(false)} />}
       <div className="p-4 md:p-6 bg-background border-b sticky top-0 z-10 space-y-3">
+        {filterLowStock && (
+          <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2 text-sm">
+            <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+            <span className="font-bold text-red-700 dark:text-red-400">Showing low-stock items only</span>
+            <Link href="/products" className="ml-auto text-xs text-red-500 hover:underline font-bold">Clear filter</Link>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black tracking-tight">Products</h1>

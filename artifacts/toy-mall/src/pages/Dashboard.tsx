@@ -277,8 +277,8 @@ export default function Dashboard() {
                 </Link>
               ))}
               {lowStock.length > 6 && (
-                <Link href="/products" className="block text-center text-sm font-bold text-primary py-2 hover:underline">
-                  View all {lowStock.length} alerts →
+                <Link href="/products?filter=lowstock" className="block text-center text-sm font-bold text-primary py-2 hover:underline">
+                  View all {lowStock.length} low-stock alerts →
                 </Link>
               )}
             </div>
