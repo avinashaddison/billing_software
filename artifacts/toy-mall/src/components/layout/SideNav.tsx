@@ -1,5 +1,6 @@
+import { Fragment } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2 } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -72,6 +73,39 @@ export function SideNav() {
                   </span>
                 )}
               </Link>
+            );
+          }
+
+          /* Billing item — append Ongoing Checkout sub-link when cart has items */
+          if (item.href === "/billing" && count > 0) {
+            const isCheckoutActive = location === "/checkout";
+            return (
+              <Fragment key={item.name}>
+                <Link href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-3 rounded-xl font-semibold transition-all",
+                    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                  data-testid="nav-billing">
+                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                  <span>{item.name}</span>
+                </Link>
+                <Link href="/checkout"
+                  className={cn(
+                    "flex items-center gap-2 pl-8 pr-3 py-2 rounded-xl font-semibold text-sm transition-all",
+                    isCheckoutActive
+                      ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                  data-testid="nav-ongoing-checkout">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                  <ShoppingCart size={15} strokeWidth={isCheckoutActive ? 2.5 : 2} />
+                  <span className="flex-1">Ongoing Checkout</span>
+                  <span className="min-w-[18px] h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1">
+                    {count > 99 ? "99+" : count}
+                  </span>
+                </Link>
+              </Fragment>
             );
           }
 
