@@ -229,7 +229,7 @@ export default function Checkout() {
             <ShoppingCart className="w-4 h-4 text-green-600 dark:text-green-400" />
           </div>
           <div>
-            <h1 className="text-base font-black leading-none">Ongoing Checkout</h1>
+            <h1 className="text-base font-black leading-none">Ongoing</h1>
             <p className="text-[10px] text-muted-foreground mt-0.5">
               {hasItems
                 ? `${count} item${count !== 1 ? "s" : ""} · review and complete the sale`

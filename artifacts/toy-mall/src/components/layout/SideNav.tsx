@@ -100,7 +100,7 @@ export function SideNav() {
                   data-testid="nav-ongoing-checkout">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
                   <ShoppingCart size={15} strokeWidth={isCheckoutActive ? 2.5 : 2} />
-                  <span className="flex-1">Ongoing Checkout</span>
+                  <span className="flex-1">Ongoing</span>
                   <span className="min-w-[18px] h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1">
                     {count > 99 ? "99+" : count}
                   </span>

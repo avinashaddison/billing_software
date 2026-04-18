@@ -56,7 +56,7 @@ export function BottomNav() {
         {/* Cart icon + label */}
         <ShoppingCart className="w-4 h-4 shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-black leading-none">Ongoing Checkout</p>
+          <p className="text-xs font-black leading-none">Ongoing</p>
           <p className="text-[10px] font-medium opacity-80 mt-0.5 truncate">
             {count} item{count !== 1 ? "s" : ""} in cart
           </p>
