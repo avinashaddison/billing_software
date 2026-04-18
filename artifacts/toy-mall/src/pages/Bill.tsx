@@ -305,8 +305,8 @@ export default function Bill() {
                 const name    = item.productName.length > 22
                   ? item.productName.slice(0, 20) + ".."
                   : item.productName;
-                const subtotal = `Rs.${item.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                const rate     = `@ Rs.${item.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })} each`;
+                const subtotal = `₹${item.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                const rate     = `@ ₹${item.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })} each`;
 
                 return (
                   <div key={item.id}>
@@ -334,7 +334,7 @@ export default function Bill() {
               </div>
               <div className="flex justify-between font-bold text-[13px]">
                 <span>Sub Total   :</span>
-                <span>Rs.{bill.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span>₹{bill.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-[11px] text-gray-500">
                 <span>Tax (GST)   :</span>
@@ -348,7 +348,7 @@ export default function Bill() {
             <div className="flex justify-between items-center my-2">
               <span className="text-base font-black tracking-wide">TOTAL</span>
               <span className="text-xl font-black">
-                Rs.{bill.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹{bill.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
 
