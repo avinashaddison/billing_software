@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import {
   ScanLine, ArrowRight, Trash2, Plus, Minus,
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
@@ -297,38 +297,61 @@ function StockInPanel({ product, onConfirm, onDismiss, loading }: StockInPanelPr
 }
 
 /* ── Scanner hook ────────────────────────────────────────────────── */
-function useScanner(active: boolean, onScan: (sku: string) => void) {
+function useScanner(
+  active: boolean,
+  onScan: (sku: string) => void,
+  onCameraError?: (msg: string) => void,
+) {
   const processingRef = useRef(false);
+  const onScanRef     = useRef(onScan);
+  useEffect(() => { onScanRef.current = onScan; }, [onScan]);
+
   useEffect(() => {
     if (!active) return;
-    const scanner = new Html5QrcodeScanner(
-      "reader",
-      {
-        fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1,
-        videoConstraints: { facingMode: "environment" },
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.QR_CODE,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.EAN_13,
-        ],
-      },
-      false
-    );
-    scanner.render((raw) => {
-      if (processingRef.current) return;
-      processingRef.current = true;
-      let sku = raw;
-      try {
-        if (raw.includes("product?sku=")) {
-          const u = new URL(raw.startsWith("http") ? raw : `http://x${raw}`);
-          sku = u.searchParams.get("sku") ?? raw;
+
+    const scanner = new Html5Qrcode("reader", { verbose: false });
+
+    scanner
+      .start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 200, height: 200 },
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.CODE_39,
+          ],
+        },
+        (raw) => {
+          if (processingRef.current) return;
+          processingRef.current = true;
+          let sku = raw;
+          try {
+            if (raw.includes("product?sku=")) {
+              const u = new URL(raw.startsWith("http") ? raw : `http://x${raw}`);
+              sku = u.searchParams.get("sku") ?? raw;
+            }
+          } catch { /* use raw */ }
+          onScanRef.current(sku.toUpperCase());
+          setTimeout(() => { processingRef.current = false; }, 1500);
+        },
+        () => { /* per-frame errors — ignore */ },
+      )
+      .catch((err) => {
+        const msg = err?.message ?? String(err);
+        if (msg.toLowerCase().includes("permission")) {
+          onCameraError?.("Camera permission denied. Please allow camera access and try again.");
+        } else {
+          onCameraError?.("Camera unavailable. Use manual SKU entry below.");
         }
-      } catch { /* use raw */ }
-      onScan(sku.toUpperCase());
-      setTimeout(() => { processingRef.current = false; }, 1500);
-    }, () => {});
-    return () => { scanner.clear().catch(() => {}); };
-  }, [active, onScan]);
+      });
+
+    return () => {
+      scanner.stop().catch(() => {}).finally(() => { scanner.clear().catch(() => {}); });
+    };
+  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -350,12 +373,14 @@ export default function Scan() {
   const [stockProduct, setStockProduct]   = useState<ScannedProduct | null>(null);
   const [stockAdding, setStockAdding]     = useState(false);
   const [stockSuccess, setStockSuccess]   = useState<{ name: string; added: number; newStock: number } | null>(null);
+  const [cameraError, setCameraError]     = useState<string | null>(null);
 
   const isBilling = mode === "billing";
   const isStockIn = mode === "stockin";
 
   const handleScan = useCallback((sku: string) => { setLookupSku(sku); }, []);
-  useScanner(showScanner, handleScan);
+  const handleCameraError = useCallback((msg: string) => { setCameraError(msg); }, []);
+  useScanner(showScanner, handleScan, handleCameraError);
 
   useEffect(() => {
     if (!lookupSku) return;
@@ -475,7 +500,7 @@ export default function Scan() {
               {count}
             </div>
           )}
-          <button onClick={() => setShowScanner((v) => !v)}
+          <button onClick={() => { setShowScanner((v) => !v); setCameraError(null); }}
             className="w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors border">
             {showScanner ? <CameraOff className="w-4 h-4 text-muted-foreground" /> : <Camera className="w-4 h-4 text-muted-foreground" />}
           </button>
@@ -512,21 +537,36 @@ export default function Scan() {
           <div className={`w-full max-w-xs aspect-square bg-zinc-900 rounded-2xl overflow-hidden shadow-lg relative border-2 ${
             isBilling ? "border-green-500/40" : "border-blue-500/40"
           }`}>
-            <div id="reader"
-              className="w-full h-full [&>div]:border-none [&>div>video]:object-cover [&>div>video]:w-full [&>div>video]:h-full" />
-            {/* Corner brackets overlay */}
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="w-36 h-36 relative">
-                {(["top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-lg",
-                   "top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-lg",
-                   "bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-lg",
-                   "bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-lg",
-                ] as const).map((cls, i) => (
-                  <div key={i} className={`absolute w-6 h-6 ${cls} ${isBilling ? "border-green-400" : "border-blue-400"}`} />
-                ))}
-                <div className={`absolute top-1/2 left-0 right-0 h-0.5 animate-[scan_2s_ease-in-out_infinite] ${isBilling ? "bg-green-400/80" : "bg-blue-400/80"}`} />
+            {/* Camera error state */}
+            {cameraError ? (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-3 px-5 text-center">
+                <CameraOff className="w-10 h-10 text-zinc-400" />
+                <p className="text-zinc-300 text-sm font-medium leading-snug">{cameraError}</p>
+                <button
+                  onClick={() => { setCameraError(null); setShowScanner(false); setTimeout(() => setShowScanner(true), 100); }}
+                  className="mt-1 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors">
+                  Retry Camera
+                </button>
               </div>
-            </div>
+            ) : (
+              <>
+                {/* Html5Qrcode renders video inside a nested div */}
+                <div id="reader" className="absolute inset-0" />
+                {/* Corner brackets overlay */}
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="w-36 h-36 relative">
+                    {(["top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-lg",
+                       "top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-lg",
+                       "bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-lg",
+                       "bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-lg",
+                    ] as const).map((cls, i) => (
+                      <div key={i} className={`absolute w-6 h-6 ${cls} ${isBilling ? "border-green-400" : "border-blue-400"}`} />
+                    ))}
+                    <div className={`absolute top-1/2 left-0 right-0 h-0.5 animate-[scan_2s_ease-in-out_infinite] ${isBilling ? "bg-green-400/80" : "bg-blue-400/80"}`} />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           <div className="h-6 mt-1.5 flex items-center justify-center">
             {lookupSku ? (
@@ -534,7 +574,7 @@ export default function Scan() {
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Looking up {lookupSku}…
               </span>
-            ) : (
+            ) : cameraError ? null : (
               <span className="text-xs text-muted-foreground">Point camera at QR code or barcode</span>
             )}
           </div>
