@@ -1,9 +1,28 @@
+const MUTE_KEY = "toy-mall-sounds-muted";
+
 let ctx: AudioContext | null = null;
 
 function getCtx(): AudioContext {
   if (!ctx) ctx = new AudioContext();
   if (ctx.state === "suspended") ctx.resume();
   return ctx;
+}
+
+export function isSoundMuted(): boolean {
+  try { return localStorage.getItem(MUTE_KEY) === "1"; } catch { return false; }
+}
+
+export function setSoundMuted(v: boolean) {
+  try {
+    if (v) localStorage.setItem(MUTE_KEY, "1");
+    else localStorage.removeItem(MUTE_KEY);
+  } catch { /* ignore */ }
+}
+
+export function toggleSoundMute(): boolean {
+  const next = !isSoundMuted();
+  setSoundMuted(next);
+  return next;
 }
 
 function playTone(
@@ -13,6 +32,7 @@ function playTone(
   gain = 0.4,
   fadeOut = true
 ) {
+  if (isSoundMuted()) return;
   const ac = getCtx();
   const osc = ac.createOscillator();
   const gainNode = ac.createGain();

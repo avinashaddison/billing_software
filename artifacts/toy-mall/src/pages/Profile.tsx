@@ -1,16 +1,19 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { useLocation } from "wouter";
-import { Shield, LogOut, Sun, Moon, Users2, ChevronRight, Key } from "lucide-react";
+import { Shield, LogOut, Sun, Moon, Users2, ChevronRight, Key, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { isSoundMuted, toggleSoundMute } from "@/lib/sounds";
 
 export default function Profile() {
   const { role, staffName, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [, setLocation] = useLocation();
+  const [soundMuted, setSoundMuted] = useState(() => isSoundMuted());
 
   const initials = staffName
     ? staffName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)
@@ -66,6 +69,31 @@ export default function Profile() {
                 {isDark ? "Dark" : "Light"}
               </Label>
               <Switch id="theme-switch" checked={isDark} onCheckedChange={toggleTheme} />
+            </div>
+          </div>
+
+          {/* Sound effects */}
+          <div className="p-4 flex items-center justify-between border-b border-dashed border-muted">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                {soundMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </div>
+              <div>
+                <p className="font-bold">Sound Effects</p>
+                <p className="text-xs text-muted-foreground">
+                  {soundMuted ? "Scan & checkout sounds are off" : "Scan beeps and checkout chime are on"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="sound-switch" className="font-bold text-xs uppercase text-muted-foreground">
+                {soundMuted ? "Off" : "On"}
+              </Label>
+              <Switch
+                id="sound-switch"
+                checked={!soundMuted}
+                onCheckedChange={() => { const next = toggleSoundMute(); setSoundMuted(next); }}
+              />
             </div>
           </div>
 

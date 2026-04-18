@@ -5,11 +5,12 @@ import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
   Phone, Wallet, Banknote, Smartphone,
   PackagePlus, ShoppingBag, ArrowUpCircle, RotateCcw, Camera, CameraOff,
+  Volume2, VolumeX,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { playScanBeep, playError, playCheckoutSuccess, playTick, playStockIn } from "@/lib/sounds";
+import { playScanBeep, playError, playCheckoutSuccess, playTick, playStockIn, isSoundMuted, toggleSoundMute } from "@/lib/sounds";
 import { useCart } from "@/contexts/cart-context";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
@@ -486,6 +487,7 @@ export default function Scan() {
     return map;
   }, [allProducts]);
 
+  const [muted, setMuted]             = useState(() => isSoundMuted());
   const [mode, setMode]               = useState<PageMode>("billing");
   const [manualSku, setManualSku]     = useState("");
   const [checking, setChecking]       = useState(false);
@@ -679,6 +681,14 @@ export default function Scan() {
               {count}
             </div>
           )}
+          <button
+            onClick={() => { const next = toggleSoundMute(); setMuted(next); }}
+            title={muted ? "Sound off — tap to enable" : "Sound on — tap to mute"}
+            className="w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors border">
+            {muted
+              ? <VolumeX className="w-4 h-4 text-muted-foreground" />
+              : <Volume2 className="w-4 h-4 text-muted-foreground" />}
+          </button>
           <button onClick={() => { setShowScanner((v) => !v); setCameraError(null); }}
             className="w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors border">
             {showScanner ? <CameraOff className="w-4 h-4 text-muted-foreground" /> : <Camera className="w-4 h-4 text-muted-foreground" />}
