@@ -26,6 +26,23 @@ function invalidateDashboard(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["/api/dashboard/categories"] });
 }
 
+/**
+ * Invalidate ALL product-related queries:
+ * - /api/products          (list page)
+ * - /api/products/sku/:sku (ProductDetail page — was missing before!)
+ * - /api/products/:id      (any individual product fetch)
+ * - /api/stock-logs        (activity log)
+ */
+function invalidateAllProducts(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey[0];
+      return typeof key === "string" && key.startsWith("/api/products");
+    },
+  });
+  qc.invalidateQueries({ queryKey: ["/api/stock-logs"] });
+}
+
 export function useRealtime() {
   const qc  = useQueryClient();
   const ref = useRef<EventSource | null>(null);
@@ -51,8 +68,9 @@ export function useRealtime() {
           quantity:    number;
           newStock:    number;
         };
-        qc.invalidateQueries({ queryKey: ["/api/products"] });
-        qc.invalidateQueries({ queryKey: ["/api/stock-logs"] });
+
+        // Invalidate product list + the specific SKU query (ProductDetail page)
+        invalidateAllProducts(qc);
         invalidateDashboard(qc);
 
         if (d.type === "IN") {
@@ -70,7 +88,8 @@ export function useRealtime() {
           itemsCount:  number;
           paymentMode: string;
         };
-        qc.invalidateQueries({ queryKey: ["/api/products"] });
+        // Bill deducts stock from multiple products — invalidate all product queries
+        invalidateAllProducts(qc);
         invalidateDashboard(qc);
         toast.success(
           `🧾 Bill raised — ₹${d.totalAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })} · ${d.itemsCount} item${d.itemsCount !== 1 ? "s" : ""} · ${d.paymentMode.toUpperCase()}`,
@@ -81,14 +100,14 @@ export function useRealtime() {
       /* ── new product added ── */
       es.addEventListener("product_created", (e) => {
         const d = JSON.parse(e.data) as { name: string; sku: string };
-        qc.invalidateQueries({ queryKey: ["/api/products"] });
+        invalidateAllProducts(qc);
         invalidateDashboard(qc);
         toast.info(`🧸 New product — ${d.name} (${d.sku})`, { duration: 3000 });
       });
 
       /* ── product edited ── */
       es.addEventListener("product_updated", () => {
-        qc.invalidateQueries({ queryKey: ["/api/products"] });
+        invalidateAllProducts(qc);
         invalidateDashboard(qc);
       });
 
