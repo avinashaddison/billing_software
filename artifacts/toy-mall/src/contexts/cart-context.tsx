@@ -23,6 +23,42 @@ const CartContext = createContext<CartContextType | null>(null);
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
+const LS_KEY     = "toy-mall-cart";
+const SESSION_MS = 8 * 60 * 60 * 1000; // 8 hours
+
+interface PersistedCart {
+  items:     CartItem[];
+  savedAt:   number;
+}
+
+function loadFromStorage(): CartItem[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return [];
+    const parsed: PersistedCart = JSON.parse(raw);
+    if (Date.now() - parsed.savedAt > SESSION_MS) {
+      localStorage.removeItem(LS_KEY);
+      return [];
+    }
+    return Array.isArray(parsed.items) ? parsed.items : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToStorage(items: CartItem[]) {
+  try {
+    if (items.length === 0) {
+      localStorage.removeItem(LS_KEY);
+    } else {
+      const payload: PersistedCart = { items, savedAt: Date.now() };
+      localStorage.setItem(LS_KEY, JSON.stringify(payload));
+    }
+  } catch {
+    /* storage quota exceeded or private browsing — ignore */
+  }
+}
+
 /** Fire-and-forget server sync — never blocks the UI */
 function serverSync(method: string, path: string, body?: unknown) {
   fetch(`${BASE_URL}/api/shared-cart${path}`, {
@@ -33,11 +69,17 @@ function serverSync(method: string, path: string, body?: unknown) {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(() => loadFromStorage());
+
+  /* ── Persist to localStorage whenever items change ─────────────── */
+  useEffect(() => {
+    saveToStorage(items);
+  }, [items]);
 
   /* ── On mount: load any in-progress cart from the server ───────────
      This lets a PC open the Ongoing Checkout page and see what mobile
      has already scanned, even before any SSE event fires.
+     localStorage is the primary source; server fills in if empty.
   ─────────────────────────────────────────────────────────────────── */
   useEffect(() => {
     fetch(`${BASE_URL}/api/shared-cart`)
@@ -45,8 +87,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .then((data: { items: CartItem[] }) => {
         if (Array.isArray(data.items) && data.items.length > 0) {
           setItems((prev) => {
-            // If we already have local items (e.g., user started scanning before
-            // the fetch returned), keep local state and push it to the server.
+            // If we already have local items (localStorage or already scanned),
+            // keep local state and let it remain authoritative.
             if (prev.length > 0) return prev;
             return data.items;
           });
