@@ -41,8 +41,8 @@ export function SideNav() {
   return (
     <aside className="hidden md:flex flex-col w-56 min-h-screen bg-background border-r border-border shrink-0 sticky top-0 h-screen">
       <div className="px-5 py-6 border-b border-border">
-        <h1 className="text-xl font-black tracking-tight text-foreground">ToyMall</h1>
-        <p className="text-xs text-muted-foreground font-medium mt-0.5">Inventory System</p>
+        <h1 className="text-xl font-black tracking-tight text-foreground">VishwaKarma Complex</h1>
+        <p className="text-xs text-muted-foreground font-medium mt-0.5">Billing Management</p>
       </div>
 
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">

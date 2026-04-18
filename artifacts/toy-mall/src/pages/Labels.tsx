@@ -89,7 +89,7 @@ export default function Labels() {
                   <div style={{ fontSize: 12, fontWeight: "bold", marginBottom: 2 }}>{p.name.length > 22 ? p.name.slice(0, 20) + "…" : p.name}</div>
                   <div style={{ fontSize: 10, color: "#666", letterSpacing: 2, marginBottom: 4 }}>{p.sku}</div>
                   <div style={{ fontSize: 16, fontWeight: 900 }}>₹{p.price.toLocaleString("en-IN")}</div>
-                  <div style={{ fontSize: 10, color: "#999", marginTop: 4 }}>ToyMall</div>
+                  <div style={{ fontSize: 10, color: "#999", marginTop: 4 }}>VishwaKarma Complex</div>
                 </div>
               );
             })}

@@ -161,7 +161,7 @@ export default function Dashboard() {
       {/* Mobile header */}
       <div className="flex items-center justify-between md:hidden">
         <div>
-          <h1 className="text-2xl font-black text-foreground tracking-tight">ToyMall</h1>
+          <h1 className="text-2xl font-black text-foreground tracking-tight">VishwaKarma Complex</h1>
           <p className="text-xs text-muted-foreground">Inventory · real-time</p>
         </div>
         <div className="flex items-center gap-2">

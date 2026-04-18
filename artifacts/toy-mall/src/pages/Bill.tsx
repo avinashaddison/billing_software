@@ -265,7 +265,7 @@ export default function Bill() {
 
             {/* ── STORE HEADER ── */}
             <div className="text-center mb-2">
-              <div className="text-xl font-black tracking-widest uppercase">ToyMall</div>
+              <div className="text-xl font-black tracking-widest uppercase">VishwaKarma Complex</div>
               <div className="text-[11px] tracking-wide mt-0.5">The Complete Toy Store</div>
               <div className="text-[11px] mt-0.5">📞 +91 98765 43210</div>
               <div className="text-[11px]">123, Mall Road, New Delhi - 110001</div>
@@ -378,7 +378,7 @@ export default function Bill() {
                 Goods once sold will not be<br />returned or exchanged.
               </div>
               <div className="text-gray-400 text-[10px] mt-2">
-                — Powered by ToyMall POS —
+                — Powered by VishwaKarma Complex —
               </div>
               <div className="font-mono text-[10px] text-gray-400 mt-1">
                 #{bill.id.slice(0, 16).toUpperCase()}
