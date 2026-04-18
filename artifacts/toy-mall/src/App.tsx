@@ -4,7 +4,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { CartProvider } from "@/contexts/cart-context";
-import { useRealtime } from "@/hooks/use-realtime";
+import { useRealtime }         from "@/hooks/use-realtime";
+import { useInactivityLogout } from "@/hooks/use-inactivity";
 import { useAuth, usePermission } from "@/hooks/use-auth";
 import { type ResourceKey } from "@/lib/permissions";
 import NotFound from "@/pages/not-found";
@@ -39,6 +40,7 @@ const queryClient = new QueryClient({
 
 function RealtimeProvider({ children }: { children: React.ReactNode }) {
   useRealtime();
+  useInactivityLogout();
   return <>{children}</>;
 }
 

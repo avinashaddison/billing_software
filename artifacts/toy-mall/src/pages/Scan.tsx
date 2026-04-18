@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 import { useLocation } from "wouter";
 import {
   ScanLine, ArrowRight, Trash2, Plus, Minus,
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { playScanBeep, playError, playCheckoutSuccess, playTick, playStockIn } from "@/lib/sounds";
 import { useCart } from "@/contexts/cart-context";
+import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -463,6 +464,22 @@ export default function Scan() {
   const [, setLocation] = useLocation();
   const { items, count, total, addItem, removeItem, updateQty, clearCart } = useCart();
 
+  /* ── Pre-load ALL products into memory for instant SKU lookup ── */
+  const { data: allProducts } = useListProducts(
+    {},
+    { query: { queryKey: getListProductsQueryKey({}), staleTime: 1000 * 60 * 5, gcTime: 1000 * 60 * 15 } }
+  );
+  const skuCache = useMemo<Map<string, ScannedProduct>>(() => {
+    const map = new Map<string, ScannedProduct>();
+    (allProducts ?? []).forEach((p) => {
+      map.set(p.sku.toLowerCase(), {
+        id: p.id, name: p.name, sku: p.sku,
+        price: Number(p.price), stock: p.stock,
+      });
+    });
+    return map;
+  }, [allProducts]);
+
   const [mode, setMode]               = useState<PageMode>("billing");
   const [manualSku, setManualSku]     = useState("");
   const [checking, setChecking]       = useState(false);
@@ -489,6 +506,24 @@ export default function Scan() {
   useEffect(() => {
     if (!lookupSku) return;
     playScanBeep();
+
+    /* Try in-memory cache first (instant ~0ms), fall back to API */
+    const cached = skuCache.get(lookupSku.toLowerCase());
+    if (cached) {
+      if (isBilling) {
+        addItem({ productId: cached.id, sku: cached.sku, name: cached.name, price: cached.price });
+        setLastAddedId(cached.id);
+        setTimeout(() => setLastAddedId(null), 700);
+        toast.success(`Added: ${cached.name}`, { duration: 1500 });
+      } else {
+        setStockProduct(cached);
+        setStockSuccess(null);
+      }
+      setLookupSku(null);
+      return;
+    }
+
+    /* Cache miss — fetch from API (new product added after page load) */
     lookupBySku(lookupSku)
       .then((product) => {
         if (isBilling) {
@@ -503,7 +538,7 @@ export default function Scan() {
       })
       .catch(() => { playError(); toast.error(`SKU "${lookupSku}" not found`); })
       .finally(() => setLookupSku(null));
-  }, [lookupSku, isBilling, addItem]);
+  }, [lookupSku, isBilling, addItem, skuCache]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
