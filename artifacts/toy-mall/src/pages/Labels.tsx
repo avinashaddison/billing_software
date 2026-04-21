@@ -15,6 +15,16 @@ type LabelType = "qr" | "barcode";
 function PrintLabel({ p, qr, labelType }: { p: Product; qr: QrData | undefined; labelType: LabelType }) {
   const hex = getCategoryHex(p.category);
   const emoji = getCategoryEmoji(p.category);
+
+  /* Barcode mode: just the barcode strip, nothing else */
+  if (labelType === "barcode") {
+    return (
+      <div style={{ background: "#ffffff", pageBreakInside: "avoid", padding: "6px 4px" }}>
+        <BarcodeImage value={p.sku} height={60} fontSize={11} />
+      </div>
+    );
+  }
+
   return (
     <div style={{
       border: "1px solid #d1d5db",
@@ -50,28 +60,20 @@ function PrintLabel({ p, qr, labelType }: { p: Product; qr: QrData | undefined; 
           {p.category}
         </div>
 
-        {/* QR or Barcode */}
-        {labelType === "qr" ? (
-          qr
-            ? <img src={qr.qrDataUrl} alt={p.sku} style={{ width: 110, height: 110, display: "block", margin: "0 auto 6px" }} />
-            : <div style={{ width: 110, height: 110, background: "#f3f4f6", margin: "0 auto 6px", borderRadius: 6 }} />
-        ) : (
-          <div style={{ margin: "0 auto 6px", background: "#fff" }}>
-            <BarcodeImage value={p.sku} height={60} fontSize={11} />
-          </div>
-        )}
+        {/* QR */}
+        {qr
+          ? <img src={qr.qrDataUrl} alt={p.sku} style={{ width: 110, height: 110, display: "block", margin: "0 auto 6px" }} />
+          : <div style={{ width: 110, height: 110, background: "#f3f4f6", margin: "0 auto 6px", borderRadius: 6 }} />}
 
         {/* Product name */}
         <div style={{ fontSize: 12, fontWeight: 800, color: "#111827", lineHeight: 1.3, marginBottom: 3, minHeight: 32 }}>
           {p.name.length > 30 ? p.name.slice(0, 28) + "…" : p.name}
         </div>
 
-        {/* SKU (hide in barcode mode — already shown in barcode itself) */}
-        {labelType === "qr" && (
-          <div style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: "#6b7280", letterSpacing: 2, marginBottom: 6 }}>
-            {p.sku}
-          </div>
-        )}
+        {/* SKU */}
+        <div style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: "#6b7280", letterSpacing: 2, marginBottom: 6 }}>
+          {p.sku}
+        </div>
 
         {/* Divider */}
         <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "6px 0" }} />
