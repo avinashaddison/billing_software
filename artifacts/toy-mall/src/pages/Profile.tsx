@@ -29,7 +29,13 @@ export default function Profile() {
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="p-4 md:px-6 border-b sticky top-0 bg-background z-10">
-        <h1 className="text-2xl font-black tracking-tight">Profile</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-black tracking-tight">Profile</h1>
+          <button onClick={handleLogout}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 font-bold text-sm transition-colors active:scale-95">
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto pb-32 md:pb-6 md:max-w-xl">
