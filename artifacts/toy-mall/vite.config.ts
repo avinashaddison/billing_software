@@ -59,6 +59,14 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    // Proxy /api calls to the API server during local development.
+    // API_PORT defaults to 8080 (matches the Replit workflow).
+    proxy: {
+      "/api": {
+        target: `http://localhost:${process.env.API_PORT ?? 8080}`,
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     port,

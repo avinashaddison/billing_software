@@ -86,6 +86,8 @@ Mobile-first inventory management web app for a toy mall. Ultra-fast QR-based st
 
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
+- `pnpm run build:prod` — production build only (frontend + backend, no typecheck)
+- `pnpm run start` — start the production server (serves frontend + API on one port)
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
@@ -94,3 +96,33 @@ Mobile-first inventory management web app for a toy mall. Ultra-fast QR-based st
 ## Preview
 
 The app is available at the root preview path `/`. The API server runs on port 8080 internally.
+
+## Deployment (Render / Railway / any Node host)
+
+The app deploys as a **single service** — Express serves both `/api` routes and the compiled React frontend.
+
+**Build command:**
+```
+pnpm install --frozen-lockfile && pnpm run build:prod
+```
+
+**Start command:**
+```
+node artifacts/api-server/dist/index.mjs
+```
+
+**Required environment variables** (see `.env.example` for all options):
+| Variable | Description |
+|---|---|
+| `NODE_ENV` | Set to `production` |
+| `PORT` | Set automatically by Render/Railway |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `TELEGRAM_BOT_TOKEN` | (optional) Telegram alert bot token |
+| `TELEGRAM_CHAT_ID` | (optional) Telegram chat/user IDs |
+| `CLOUDINARY_URL` | (optional) Cloudinary for image uploads |
+| `STORE_NAME` | (optional) Store name in Telegram messages |
+
+**Platform config files:**
+- `render.yaml` — Render service definition (auto-detected)
+- `railway.toml` — Railway deployment config (auto-detected)
+- `Procfile` — Generic process file (Heroku, etc.)
