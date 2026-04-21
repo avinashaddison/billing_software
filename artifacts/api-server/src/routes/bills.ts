@@ -172,13 +172,15 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
       subtotal:    saleItemsTable.subtotal,
     })
     .from(saleItemsTable)
-    .innerJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
+    .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
     .where(eq(saleItemsTable.saleId, id));
 
   res.json({
     bill: { ...bill, totalAmount: Number(bill.totalAmount) },
     items: items.map((i) => ({
       ...i,
+      productName: i.productName ?? "Deleted Product",
+      productSku:  i.productSku  ?? "—",
       price:    Number(i.price),
       subtotal: Number(i.subtotal),
     })),

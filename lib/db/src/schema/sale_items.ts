@@ -10,7 +10,6 @@ export const saleItemsTable = pgTable("sale_items", {
     .notNull()
     .references(() => billsTable.id),
   productId: uuid("product_id")
-    .notNull()
     .references(() => productsTable.id),
   quantity: integer("quantity").notNull(),
   price: numeric("price", { precision: 15, scale: 2 }).notNull(),

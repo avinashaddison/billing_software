@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, and, lte } from "drizzle-orm";
-import { db, productsTable, stockLogsTable, salesTable } from "@workspace/db";
+import { db, productsTable, stockLogsTable, salesTable, saleItemsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import {
   ListProductsQueryParams,
@@ -236,10 +236,24 @@ router.delete("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const [product] = await db
-    .delete(productsTable)
-    .where(eq(productsTable.id, params.data.id))
-    .returning();
+  const { id } = params.data;
+
+  const [product] = await db.transaction(async (tx) => {
+    /* 1. Remove stock-movement logs (history has no value without the product) */
+    await tx.delete(stockLogsTable).where(eq(stockLogsTable.productId, id));
+
+    /* 2. Nullify the product reference in sale items so bill history is preserved */
+    await tx
+      .update(saleItemsTable)
+      .set({ productId: null })
+      .where(eq(saleItemsTable.productId, id));
+
+    /* 3. Delete the product itself */
+    return tx
+      .delete(productsTable)
+      .where(eq(productsTable.id, id))
+      .returning();
+  });
 
   if (!product) {
     res.status(404).json({ error: "Product not found" });
