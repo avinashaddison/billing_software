@@ -1,8 +1,10 @@
 import { logger } from "./logger";
 
-const API_BASE  = "https://api.telegram.org";
-const DIVIDER   = "━━━━━━━━━━━━━━━━━━━━━━";
+const API_BASE   = "https://api.telegram.org";
 const STORE_NAME = process.env.STORE_NAME || "Toy Mall";
+
+const D_HEAVY = "▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰";
+const D_THIN  = "─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─";
 
 function getChatIds(): string[] {
   const raw = process.env.TELEGRAM_CHAT_ID ?? "";
@@ -22,7 +24,11 @@ function escapeHtml(str: string): string {
 }
 
 function fmt(n: number): string {
-  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function row(label: string, value: string): string {
+  return `${label}  <b>${value}</b>`;
 }
 
 async function sendToOne(token: string, chatId: string, text: string): Promise<void> {
@@ -52,13 +58,13 @@ export interface SaleAlertItem {
 }
 
 export interface SaleAlertBill {
-  id:            string;
-  billNumber:    number;
-  totalAmount:   number;
-  itemsCount:    number;
-  paymentMode:   string;
+  id:             string;
+  billNumber:     number;
+  totalAmount:    number;
+  itemsCount:     number;
+  paymentMode:    string;
   customerPhone?: string | null;
-  createdAt:     string | Date;
+  createdAt:      string | Date;
 }
 
 export function sendSaleAlert(bill: SaleAlertBill, items: SaleAlertItem[]): void {
@@ -69,37 +75,47 @@ export function sendSaleAlert(bill: SaleAlertBill, items: SaleAlertItem[]): void
     hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata",
   });
   const date = dt.toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
+    weekday: "short", day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
   });
 
   const totalUnits = items.reduce((s, i) => s + i.quantity, 0);
   const modeEmoji  = bill.paymentMode === "upi" ? "📲" : "💵";
   const modeLabel  = bill.paymentMode === "upi" ? "UPI" : "Cash";
 
-  const itemLines = items.map((i) => [
-    `  <b>${escapeHtml(i.productName)}</b>`,
-    `  ${i.quantity} × ₹${fmt(i.price)}  =  ₹${fmt(i.subtotal)}`,
+  const itemLines = items.map((i, idx) => [
+    `${idx + 1}. <b>${escapeHtml(i.productName)}</b>`,
+    `    ▸ ${i.quantity} pc${i.quantity > 1 ? "s" : ""}  ×  ${fmt(i.price)}  <b>=  ${fmt(i.subtotal)}</b>`,
   ].join("\n")).join("\n\n");
 
-  const lines: string[] = [
-    `🧾 <b>SALE INVOICE — ${escapeHtml(STORE_NAME)}</b>`,
-    DIVIDER,
-    `📅 ${date}  •  ${time}`,
-    `🔖 Bill No: <b>#${bill.billNumber}</b>`,
-    `🆔 Ref: <code>${escapeHtml(bill.id)}</code>`,
-    bill.customerPhone ? `📞 Customer: ${escapeHtml(bill.customerPhone)}` : "",
-    DIVIDER,
-    `<b>ITEMS</b>`,
+  const lines = [
+    `🧾 <b>━━  SALE INVOICE  ━━</b> 🧾`,
+    `🏪  <b>${escapeHtml(STORE_NAME)}</b>`,
+    D_HEAVY,
+    ``,
+    row(`📅`, `${date}  •  ${time}`),
+    row(`🔖  Bill No  :`, `#${bill.billNumber}`),
+    `🆔  Ref  :  <code>${escapeHtml(bill.id.slice(0, 8).toUpperCase())}</code>`,
+    bill.customerPhone
+      ? row(`📞  Customer :`, escapeHtml(bill.customerPhone))
+      : null,
+    ``,
+    D_THIN,
+    `🛍  <b>ITEMS PURCHASED</b>`,
+    D_THIN,
     ``,
     itemLines,
     ``,
-    DIVIDER,
-    `  ${items.length} item${items.length !== 1 ? "s" : ""}  •  ${totalUnits} unit${totalUnits !== 1 ? "s" : ""} sold`,
-    DIVIDER,
-    `💰 <b>TOTAL: ₹${fmt(bill.totalAmount)}</b>`,
-    `${modeEmoji} Payment: <b>${modeLabel}</b>`,
-    DIVIDER,
-  ].filter((l) => l !== null && l !== undefined);
+    D_THIN,
+    `📦  ${items.length} item${items.length !== 1 ? "s" : ""}   •   📊  ${totalUnits} unit${totalUnits !== 1 ? "s" : ""} sold`,
+    D_THIN,
+    ``,
+    `💰  <b>GRAND TOTAL  :  ${fmt(bill.totalAmount)}</b>`,
+    `${modeEmoji}  <b>Payment Mode :  ${modeLabel}</b>`,
+    ``,
+    D_HEAVY,
+    `       ✨  <i>Thank you! Visit Again</i>  ✨`,
+    D_HEAVY,
+  ].filter((l): l is string => l !== null);
 
   sendMessage(lines.join("\n")).catch((err) =>
     logger.warn({ err }, "Telegram alert delivery error")
@@ -113,28 +129,38 @@ export function sendTestAlert(): Promise<void> {
 
   const dt   = new Date();
   const time = dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
-  const date = dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+  const date = dt.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 
   const lines = [
-    `🧾 <b>SALE INVOICE — ${escapeHtml(STORE_NAME)}</b>`,
-    DIVIDER,
-    `📅 ${date}  •  ${time}`,
-    `🔖 <code>test-0000-0000-0000-sample</code>`,
-    DIVIDER,
-    `<b>ITEMS</b>`,
+    `🧾 <b>━━  SALE INVOICE  ━━</b> 🧾`,
+    `🏪  <b>${escapeHtml(STORE_NAME)}</b>`,
+    D_HEAVY,
     ``,
-    `  <b>Bunny Soft Toy</b>`,
-    `  2 × ₹199.00  =  ₹398.00`,
+    row(`📅`, `${date}  •  ${time}`),
+    row(`🔖  Bill No  :`, `#99 (TEST)`),
+    `🆔  Ref  :  <code>TEST0000</code>`,
+    row(`📞  Customer :`, `9142644479`),
     ``,
-    `  <b>Lego City Set</b>`,
-    `  1 × ₹1,299.00  =  ₹1,299.00`,
+    D_THIN,
+    `🛍  <b>ITEMS PURCHASED</b>`,
+    D_THIN,
     ``,
-    DIVIDER,
-    `  2 items  •  3 units sold`,
-    DIVIDER,
-    `💰 <b>TOTAL: ₹1,697.00</b>`,
-    `📲 Payment: <b>UPI</b>`,
-    DIVIDER,
+    `1. <b>Bunny Soft Toy</b>`,
+    `    ▸ 2 pcs  ×  ₹199.00  <b>=  ₹398.00</b>`,
+    ``,
+    `2. <b>Lego City Set</b>`,
+    `    ▸ 1 pc  ×  ₹1,299.00  <b>=  ₹1,299.00</b>`,
+    ``,
+    D_THIN,
+    `📦  2 items   •   📊  3 units sold`,
+    D_THIN,
+    ``,
+    `💰  <b>GRAND TOTAL  :  ₹1,697.00</b>`,
+    `📲  <b>Payment Mode :  UPI</b>`,
+    ``,
+    D_HEAVY,
+    `       ✨  <i>Thank you! Visit Again</i>  ✨`,
+    D_HEAVY,
     ``,
     `<i>✅ Telegram alerts are working correctly!</i>`,
   ];
