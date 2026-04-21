@@ -2,7 +2,7 @@ import { useState, useRef, memo } from "react";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { Link, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
-import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText } from "lucide-react";
+import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,6 +23,55 @@ function parseCsv(text: string): { headers: string[]; rows: ImportRow[] } {
     return Object.fromEntries(headers.map((h, i) => [h, vals[i] ?? ""]));
   });
   return { headers, rows };
+}
+
+/* ── Delete confirmation modal ── */
+function DeleteConfirmModal({
+  product,
+  onConfirm,
+  onCancel,
+  deleting,
+}: {
+  product: { name: string; sku: string };
+  onConfirm: () => void;
+  onCancel: () => void;
+  deleting: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative w-full md:max-w-sm bg-background rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden">
+        <div className="p-6 text-center space-y-3">
+          <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center mx-auto">
+            <Trash2 className="w-7 h-7 text-red-600 dark:text-red-400" />
+          </div>
+          <h2 className="font-black text-lg">Delete Product?</h2>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-bold text-foreground">{product.name}</span>
+            <span className="font-mono text-xs ml-1 text-muted-foreground">({product.sku})</span>
+            {" "}will be permanently removed. This cannot be undone.
+          </p>
+        </div>
+        <div className="flex gap-3 p-4 border-t">
+          <button
+            onClick={onCancel}
+            disabled={deleting}
+            className="flex-1 h-12 rounded-2xl border font-bold text-sm hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={deleting}
+            className="flex-1 h-12 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+          >
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function CsvImportModal({ onClose }: { onClose: () => void }) {
@@ -89,13 +138,11 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
         <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
           {!parsed ? (
             <>
-              {/* Template hint */}
               <div className="bg-muted/50 rounded-xl p-3 text-xs space-y-1">
                 <p className="font-bold text-muted-foreground flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> CSV must have a <code className="bg-muted px-1 rounded">sku</code> column. Optional: name, category, price, stock, lowStockThreshold</p>
                 <p className="text-muted-foreground">Only existing SKUs are updated. New SKUs are skipped.</p>
               </div>
 
-              {/* Drop zone */}
               <div
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
@@ -111,7 +158,6 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
             </>
           ) : (
             <>
-              {/* Preview */}
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-600" />
                 <span className="font-bold">{fileName}</span>
@@ -184,11 +230,14 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-/* ── Memoized product rows — skips re-render if props unchanged ── */
+/* ── Memoized product rows ── */
 interface ProductRowProps {
   product: { id: string; name: string; sku: string; category: string; price: number; stock: number; lowStockThreshold: number; imageUrl?: string | null };
+  isAdmin?: boolean;
+  onDelete?: (product: { id: string; name: string; sku: string }) => void;
 }
-const ProductMobileCard = memo(function ProductMobileCard({ product }: ProductRowProps) {
+
+const ProductMobileCard = memo(function ProductMobileCard({ product, isAdmin, onDelete }: ProductRowProps) {
   const cs = getCategoryStyle(product.category);
   const emoji = getCategoryEmoji(product.category);
   const isLow = product.stock <= product.lowStockThreshold;
@@ -206,26 +255,37 @@ const ProductMobileCard = memo(function ProductMobileCard({ product }: ProductRo
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cs.badge}`}>{product.category}</span>
           </div>
         </div>
-        <div className="flex flex-col items-end flex-shrink-0">
-          <div className={`text-2xl font-black leading-none flex items-center gap-1 ${isLow ? "text-red-600 dark:text-red-400" : ""}`}>
-            {isLow && <AlertTriangle className="w-4 h-4" />}
-            {product.stock}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex flex-col items-end">
+            <div className={`text-2xl font-black leading-none flex items-center gap-1 ${isLow ? "text-red-600 dark:text-red-400" : ""}`}>
+              {isLow && <AlertTriangle className="w-4 h-4" />}
+              {product.stock}
+            </div>
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Left</span>
+            <span className="text-[10px] text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
           </div>
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Left</span>
-          <span className="text-[10px] text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
+          {isAdmin && onDelete && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(product); }}
+              className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center text-red-500 dark:text-red-400 transition-colors shrink-0"
+              aria-label="Delete product"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </Link>
   );
 });
 
-const ProductDesktopRow = memo(function ProductDesktopRow({ product }: ProductRowProps) {
+const ProductDesktopRow = memo(function ProductDesktopRow({ product, isAdmin, onDelete }: ProductRowProps) {
   const cs = getCategoryStyle(product.category);
   const emoji = getCategoryEmoji(product.category);
   const isLow = product.stock <= product.lowStockThreshold;
   return (
-    <Link href={`/product?sku=${product.sku}`} className="block" data-testid={`card-product-${product.id}`}>
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-6 py-3.5 hover:bg-muted/40 transition-colors items-center border-b last:border-0">
+    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-6 py-3.5 hover:bg-muted/40 transition-colors items-center border-b last:border-0" data-testid={`card-product-${product.id}`}>
+      <Link href={`/product?sku=${product.sku}`} className="contents">
         <div className="min-w-0">
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-xl ${cs.bg} ${cs.border} border flex items-center justify-center shrink-0 text-base`}>
@@ -247,8 +307,19 @@ const ProductDesktopRow = memo(function ProductDesktopRow({ product }: ProductRo
           {isLow && <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />}
           <p className={`text-xl font-black ${isLow ? "text-destructive" : ""}`}>{product.stock}</p>
         </div>
+      </Link>
+      <div className="w-10 flex items-center justify-center">
+        {isAdmin && onDelete && (
+          <button
+            onClick={() => onDelete(product)}
+            className="w-8 h-8 rounded-full hover:bg-red-100 dark:hover:bg-red-950/50 flex items-center justify-center text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            aria-label="Delete product"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
-    </Link>
+    </div>
   );
 });
 
@@ -258,9 +329,12 @@ export default function Products() {
   const filterLowStock              = urlParams.get("filter") === "lowstock";
   const [search, setSearch]         = useState("");
   const [showImport, setShowImport] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; sku: string } | null>(null);
+  const [deleting, setDeleting]     = useState(false);
   const debouncedSearch             = useDebounce(search, 300);
   const { role }                    = useAuth();
   const isAdmin                     = role === "owner";
+  const qc                          = useQueryClient();
 
   const { data: allProducts, isLoading } = useListProducts(
     { search: debouncedSearch || undefined },
@@ -271,9 +345,34 @@ export default function Products() {
     ? allProducts?.filter((p) => p.stock <= p.lowStockThreshold)
     : allProducts;
 
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      const r = await fetch(`${BASE_URL}/api/products/${pendingDelete.id}`, { method: "DELETE" });
+      if (!r.ok && r.status !== 204) throw new Error("Delete failed");
+      qc.invalidateQueries({ queryKey: getListProductsQueryKey() });
+      toast.success(`"${pendingDelete.name}" deleted`);
+      setPendingDelete(null);
+    } catch {
+      toast.error("Failed to delete product");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {showImport && <CsvImportModal onClose={() => setShowImport(false)} />}
+      {pendingDelete && (
+        <DeleteConfirmModal
+          product={pendingDelete}
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDelete(null)}
+          deleting={deleting}
+        />
+      )}
+
       <div className="p-4 md:p-6 bg-background border-b sticky top-0 z-10 space-y-3">
         {filterLowStock && (
           <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2 text-sm">
@@ -316,11 +415,12 @@ export default function Products() {
       </div>
 
       {/* Desktop table header */}
-      <div className="hidden md:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-6 py-2 border-b text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30">
+      <div className="hidden md:grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-6 py-2 border-b text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30">
         <span>Product</span>
-        <span className="w-28 text-center">Category</span>
-        <span className="w-20 text-right">Price</span>
+        <span className="w-32 text-center">Category</span>
+        <span className="w-24 text-right">Price</span>
         <span className="w-20 text-right">Stock</span>
+        <span className="w-10"></span>
       </div>
 
       <div className="flex-1 md:divide-y divide-border overflow-y-auto">
@@ -341,14 +441,24 @@ export default function Products() {
             {/* Mobile: card list */}
             <div className="p-4 space-y-3 md:hidden">
               {products?.map((product) => (
-                <ProductMobileCard key={product.id} product={product} />
+                <ProductMobileCard
+                  key={product.id}
+                  product={product}
+                  isAdmin={isAdmin}
+                  onDelete={setPendingDelete}
+                />
               ))}
             </div>
 
             {/* Desktop: table rows */}
             <div className="hidden md:block">
               {products?.map((product) => (
-                <ProductDesktopRow key={product.id} product={product} />
+                <ProductDesktopRow
+                  key={product.id}
+                  product={product}
+                  isAdmin={isAdmin}
+                  onDelete={setPendingDelete}
+                />
               ))}
             </div>
           </>
