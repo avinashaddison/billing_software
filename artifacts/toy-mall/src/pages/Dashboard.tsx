@@ -129,15 +129,17 @@ function LiveBadge() {
 }
 
 /* ── StatCard ────────────────────────────────────────────────────── */
-type Accent = "blue" | "green" | "red" | "purple";
+type Accent = "blue" | "green" | "red" | "purple" | "teal" | "slate";
 
 const accentMap: Record<Accent, {
   gradient: string; iconBg: string; iconColor: string; valColor: string; glow: string;
 }> = {
-  blue:   { gradient: "from-blue-500/10 via-blue-500/5 to-transparent",   iconBg: "bg-blue-500",    iconColor: "text-white", valColor: "text-foreground",                             glow: "shadow-blue-500/10"   },
-  purple: { gradient: "from-purple-500/10 via-purple-500/5 to-transparent", iconBg: "bg-purple-500",  iconColor: "text-white", valColor: "text-purple-600 dark:text-purple-400",       glow: "shadow-purple-500/10" },
-  green:  { gradient: "from-emerald-500/10 via-emerald-500/5 to-transparent", iconBg: "bg-emerald-500", iconColor: "text-white", valColor: "text-emerald-600 dark:text-emerald-400",   glow: "shadow-emerald-500/10" },
-  red:    { gradient: "from-red-500/10 via-red-500/5 to-transparent",      iconBg: "bg-red-500",     iconColor: "text-white", valColor: "text-red-600 dark:text-red-400",             glow: "shadow-red-500/10"    },
+  slate:  { gradient: "from-slate-500/8 via-slate-500/4 to-transparent",    iconBg: "bg-slate-500",   iconColor: "text-white", valColor: "text-foreground",                                glow: "shadow-slate-500/8"   },
+  teal:   { gradient: "from-teal-600/10 via-teal-600/5 to-transparent",     iconBg: "bg-teal-600",    iconColor: "text-white", valColor: "text-teal-700 dark:text-teal-300",               glow: "shadow-teal-600/10"   },
+  blue:   { gradient: "from-blue-500/10 via-blue-500/5 to-transparent",     iconBg: "bg-blue-500",    iconColor: "text-white", valColor: "text-foreground",                                glow: "shadow-blue-500/10"   },
+  purple: { gradient: "from-purple-500/10 via-purple-500/5 to-transparent", iconBg: "bg-purple-500",  iconColor: "text-white", valColor: "text-purple-600 dark:text-purple-400",           glow: "shadow-purple-500/10" },
+  green:  { gradient: "from-emerald-500/10 via-emerald-500/5 to-transparent", iconBg: "bg-emerald-500", iconColor: "text-white", valColor: "text-emerald-600 dark:text-emerald-400",      glow: "shadow-emerald-500/10" },
+  red:    { gradient: "from-red-500/10 via-red-500/5 to-transparent",       iconBg: "bg-red-500",     iconColor: "text-white", valColor: "text-red-600 dark:text-red-400",                glow: "shadow-red-500/10"    },
 };
 
 function StatCard({
@@ -203,9 +205,9 @@ export default function Dashboard() {
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard title="Total Products" icon={Package} accent="blue"
+        <StatCard title="Total Products" icon={Package} accent="slate"
           value={summary?.totalProducts} loading={loadingSummary} testid="stat-total-products" />
-        <StatCard title="Stock Value" icon={IndianRupee} accent="purple"
+        <StatCard title="Stock Value" icon={IndianRupee} accent="teal"
           value={summary ? `₹${Number(summary.totalStockValue).toLocaleString("en-IN", { maximumFractionDigits: 0 })}` : undefined}
           loading={loadingSummary} testid="stat-stock-value" />
         <StatCard title="Today IN" icon={ArrowDownToLine} accent="green"
