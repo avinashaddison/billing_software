@@ -9,7 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode, Pencil, QrCode } from "lucide-react";
+import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode, QrCode } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { BarcodeImage, barcodeSvgDataUrl } from "@/components/ui/BarcodeImage";
 import { Button } from "@/components/ui/button";
@@ -35,10 +35,7 @@ export default function ProductDetail() {
   const [savingImg, setSavingImg]       = useState(false);
   const [editOpen, setEditOpen]         = useState(false);
   const [editSaving, setEditSaving]     = useState(false);
-  const [editForm, setEditForm]         = useState({ name: "", price: "", category: "", lowStockThreshold: "", barcode: "" });
-  const [barcodeEditing, setBarcodeEditing] = useState(false);
-  const [barcodeVal, setBarcodeVal]         = useState("");
-  const [barcodeSaving, setBarcodeSaving]   = useState(false);
+  const [editForm, setEditForm]         = useState({ name: "", price: "", category: "", lowStockThreshold: "" });
   const [labelTab, setLabelTab]             = useState<"qr" | "barcode">("qr");
   const [printing, setPrinting]             = useState(false);
 
@@ -107,23 +104,6 @@ export default function ProductDetail() {
     finally { setSavingImg(false); }
   };
 
-  const saveBarcode = async (value: string | null) => {
-    if (!product) return;
-    setBarcodeSaving(true);
-    try {
-      const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ barcode: value }),
-      });
-      if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
-      queryClient.invalidateQueries({ queryKey: getGetProductBySkuQueryKey(sku) });
-      toast.success(value ? "Barcode saved" : "Barcode removed");
-      setBarcodeEditing(false);
-    } catch (e: any) { toast.error(e.message || "Failed to save barcode"); }
-    finally { setBarcodeSaving(false); }
-  };
-
   const printLabel = () => {
     setPrinting(true);
     setTimeout(() => { window.print(); setPrinting(false); }, 300);
@@ -136,7 +116,6 @@ export default function ProductDetail() {
       price: String(product.price),
       category: product.category,
       lowStockThreshold: String(product.lowStockThreshold),
-      barcode: ("barcode" in product ? (product as any).barcode : "") ?? "",
     });
     setEditOpen(true);
   };
@@ -156,7 +135,7 @@ export default function ProductDetail() {
       const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, price, category, lowStockThreshold: threshold, barcode: editForm.barcode.trim() || null }),
+        body: JSON.stringify({ name, price, category, lowStockThreshold: threshold }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       toast.success("Product updated");
@@ -301,17 +280,6 @@ export default function ProductDetail() {
                 onChange={(e) => setEditForm((f) => ({ ...f, lowStockThreshold: e.target.value }))}
                 placeholder="5" className="h-11 rounded-xl" />
             </div>
-            <div className="md:col-span-2">
-              <p className="text-xs font-bold text-muted-foreground mb-1">
-                Barcode <span className="font-normal text-muted-foreground/60">(optional · EAN-13, UPC-A, Code 128…)</span>
-              </p>
-              <Input value={editForm.barcode}
-                onChange={(e) => setEditForm((f) => ({ ...f, barcode: e.target.value }))}
-                placeholder="e.g. 8901234567890" className="h-11 rounded-xl font-mono" />
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Scan will match this barcode in addition to the SKU.
-              </p>
-            </div>
           </div>
           <button onClick={handleEditSave} disabled={editSaving}
             className="w-full h-12 bg-primary text-primary-foreground rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50">
@@ -405,72 +373,6 @@ export default function ProductDetail() {
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Low Stock Threshold</p>
                   <p className="text-sm font-semibold">{product.lowStockThreshold} units</p>
                 </div>
-              </div>
-
-              {/* ── Barcode (inline editable) ── */}
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Barcode className="w-3.5 h-3.5" /> Barcode
-                  </p>
-                  {!barcodeEditing && (
-                    <button
-                      onClick={() => {
-                        setBarcodeVal(("barcode" in product ? (product as any).barcode : "") ?? "");
-                        setBarcodeEditing(true);
-                      }}
-                      className="flex items-center gap-1 text-[11px] font-bold text-primary hover:underline"
-                    >
-                      <Pencil className="w-3 h-3" />
-                      {("barcode" in product && (product as any).barcode) ? "Edit" : "Add"}
-                    </button>
-                  )}
-                </div>
-
-                {barcodeEditing ? (
-                  <div className="space-y-2">
-                    <Input
-                      value={barcodeVal}
-                      onChange={(e) => setBarcodeVal(e.target.value)}
-                      placeholder="e.g. 8901234567890"
-                      className="h-10 rounded-xl font-mono text-sm"
-                      autoFocus
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => saveBarcode(barcodeVal.trim() || null)}
-                        disabled={barcodeSaving}
-                        className="flex-1 h-9 bg-primary text-primary-foreground rounded-xl text-xs font-black flex items-center justify-center gap-1.5 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
-                      >
-                        {barcodeSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                        Save
-                      </button>
-                      {("barcode" in product && (product as any).barcode) && (
-                        <button
-                          onClick={() => saveBarcode(null)}
-                          disabled={barcodeSaving}
-                          className="h-9 px-3 rounded-xl text-xs font-bold text-red-600 border border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 active:scale-95 transition-all disabled:opacity-50"
-                        >
-                          Remove
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setBarcodeEditing(false)}
-                        className="h-9 px-3 rounded-xl text-xs font-bold text-muted-foreground border hover:bg-muted active:scale-95 transition-all"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">Scanner will match this barcode in addition to the SKU.</p>
-                  </div>
-                ) : ("barcode" in product && (product as any).barcode) ? (
-                  <div className="flex items-center gap-2 bg-muted/50 rounded-xl px-3 py-2">
-                    <Barcode className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <span className="font-mono text-sm font-semibold tracking-widest flex-1">{(product as any).barcode}</span>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground italic">No barcode set — tap Add to link a manufacturer barcode.</p>
-                )}
               </div>
 
               {/* Image upload */}

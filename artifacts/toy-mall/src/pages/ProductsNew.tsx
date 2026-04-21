@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useCreateProduct, getListProductsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Lightbulb, Tag, PenLine, Barcode } from "lucide-react";
+import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Lightbulb, Tag, PenLine } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -125,7 +125,6 @@ const createProductSchema = z.object({
   price:             z.coerce.number().min(0.01, "Price must be greater than 0"),
   stock:             z.coerce.number().int().min(0, "Stock cannot be negative").optional().default(0),
   lowStockThreshold: z.coerce.number().int().min(0).optional().default(5),
-  barcode:           z.string().optional().or(z.literal("")),
   imageUrl:          z.string().optional().or(z.literal("")),
 });
 
@@ -170,7 +169,7 @@ export default function CreateProduct() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(createProductSchema),
-    defaultValues: { name: "", category: "", customCategory: "", price: undefined as unknown as number, stock: 0, lowStockThreshold: 5, barcode: "", imageUrl: "" },
+    defaultValues: { name: "", category: "", customCategory: "", price: undefined as unknown as number, stock: 0, lowStockThreshold: 5, imageUrl: "" },
   });
 
   const selectedCategory  = form.watch("category") as CategoryValue | "";
@@ -221,7 +220,7 @@ export default function CreateProduct() {
     const finalCategory = isCustom ? (data.customCategory?.trim() || "") : data.category;
     if (!finalCategory) { toast.error("Please enter a custom category name"); return; }
     createProduct.mutate(
-      { data: { name: data.name, category: finalCategory, price: data.price, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, barcode: data.barcode?.trim() || undefined, imageUrl: data.imageUrl || undefined } as any },
+      { data: { name: data.name, category: finalCategory, price: data.price, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || undefined } as any },
       {
         onSuccess: (product) => {
           toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
@@ -414,27 +413,6 @@ export default function CreateProduct() {
                   </FormItem>
                 )} />
               </div>
-
-              {/* Barcode */}
-              <FormField control={form.control} name="barcode" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-bold text-muted-foreground">
-                    <Barcode className="w-3.5 h-3.5 inline mr-1.5" />Manufacturer Barcode
-                    <span className="ml-1.5 font-normal text-muted-foreground/60 text-xs">(optional)</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="e.g. 8901234567890 (EAN-13, UPC-A, Code 128…)"
-                      className="h-12 rounded-xl font-mono"
-                      {...field}
-                    />
-                  </FormControl>
-                  <p className="text-[11px] text-muted-foreground">
-                    Enter the barcode printed on the box. The scanner will match this in addition to the SKU.
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )} />
 
               {/* Image upload */}
               <FormField control={form.control} name="imageUrl" render={({ field }) => (
