@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
+import { sendSaleAlert } from "../lib/telegram";
 
 const router: IRouter = Router();
 
@@ -130,6 +131,9 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
       paymentMode: result.bill.paymentMode,
       createdAt:   result.bill.createdAt,
     });
+
+    // Fire-and-forget Telegram alert (never blocks the response)
+    sendSaleAlert(result.bill, result.items);
 
     res.status(201).json(result);
   } catch (err: any) {

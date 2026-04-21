@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, MapPin, Receipt, Smile } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2 } from "lucide-react";
 import { useStoreSettings, type StoreSettings } from "@/lib/store-info";
 import { toast } from "sonner";
+
+const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 const EMOJI_OPTIONS = ["🧸", "🎮", "🛒", "🏪", "🎁", "🧩", "🎯", "🪀", "🎈", "⭐"];
 
@@ -29,6 +31,29 @@ export default function SettingsPage() {
     footerNote:  store.footerNote,
   });
   const [saved, setSaved] = useState(false);
+  const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
+  const [tgTesting, setTgTesting] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API}/telegram/status`)
+      .then((r) => r.json())
+      .then((d) => setTgConfigured(d.configured))
+      .catch(() => setTgConfigured(false));
+  }, []);
+
+  const handleTestTelegram = async () => {
+    setTgTesting(true);
+    try {
+      const r = await fetch(`${API}/telegram/test`, { method: "POST" });
+      const d = await r.json();
+      if (r.ok) toast.success("Test alert sent! Check your Telegram.");
+      else toast.error(d.error || "Failed to send test alert");
+    } catch {
+      toast.error("Could not reach server");
+    } finally {
+      setTgTesting(false);
+    }
+  };
 
   const set = (key: keyof StoreSettings, val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
@@ -165,6 +190,50 @@ export default function SettingsPage() {
               rows={2} placeholder="e.g. Goods once sold will not be returned or exchanged."
               className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
           </Field>
+        </Section>
+
+        {/* ── Telegram Notifications ── */}
+        <Section icon={Bell} title="Sale Notifications" color="text-sky-600 bg-sky-50 dark:bg-sky-950/30">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+              <div className="flex items-center gap-2.5">
+                {tgConfigured === null ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                ) : tgConfigured ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-amber-500" />
+                )}
+                <div>
+                  <p className="text-xs font-bold">
+                    {tgConfigured === null ? "Checking…" : tgConfigured ? "Telegram Connected" : "Telegram Not Configured"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {tgConfigured ? "Alerts fire on every new sale" : "Add secrets to enable alerts"}
+                  </p>
+                </div>
+              </div>
+              {tgConfigured && (
+                <button onClick={handleTestTelegram} disabled={tgTesting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition-colors disabled:opacity-60">
+                  {tgTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  {tgTesting ? "Sending…" : "Test Alert"}
+                </button>
+              )}
+            </div>
+
+            <div className="rounded-xl border bg-muted/10 p-3 space-y-2 text-[11px] text-muted-foreground">
+              <p className="font-bold text-xs text-foreground">Setup Instructions</p>
+              <ol className="space-y-1.5 list-decimal list-inside leading-relaxed">
+                <li>Open Telegram and search for <span className="font-mono bg-muted px-1 rounded">@BotFather</span></li>
+                <li>Send <span className="font-mono bg-muted px-1 rounded">/newbot</span> and follow the prompts to get a <b>Bot Token</b></li>
+                <li>Start a chat with your new bot, then visit:<br />
+                  <span className="font-mono bg-muted px-1 rounded break-all">api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span><br />
+                  to find your <b>Chat ID</b></li>
+                <li>Add <span className="font-mono bg-muted px-1 rounded">TELEGRAM_BOT_TOKEN</span> and <span className="font-mono bg-muted px-1 rounded">TELEGRAM_CHAT_ID</span> as secrets in Replit, then restart the app</li>
+              </ol>
+            </div>
+          </div>
         </Section>
 
         {isDirty && (
