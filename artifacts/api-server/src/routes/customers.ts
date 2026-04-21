@@ -86,16 +86,17 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
     .where(inArray(saleItemsTable.saleId, billIds))
     .orderBy(desc(saleItemsTable.createdAt));
 
-  /* Top 5 most-purchased products (by total quantity) */
+  /* Top 5 most-purchased products (by total quantity) grouped by productId */
   const topProductsRaw = await db
     .select({
-      productName: sql<string>`COALESCE(${productsTable.name}, 'Deleted Product')`.as("product_name"),
+      productId:   saleItemsTable.productId,
+      productName: productsTable.name,
       totalQty:    sql<number>`SUM(${saleItemsTable.quantity})`.as("total_qty"),
     })
     .from(saleItemsTable)
     .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
     .where(inArray(saleItemsTable.saleId, billIds))
-    .groupBy(sql`COALESCE(${productsTable.name}, 'Deleted Product')`)
+    .groupBy(saleItemsTable.productId, productsTable.name)
     .orderBy(desc(sql`SUM(${saleItemsTable.quantity})`))
     .limit(5);
 
@@ -111,7 +112,7 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
     totalSpent,
     visitCount: bills.length,
     topProducts: topProductsRaw.map((p) => ({
-      productName: p.productName,
+      productName: p.productName ?? "Deleted Product",
       totalQty:    Number(p.totalQty),
     })),
     bills: bills.map((b) => ({
