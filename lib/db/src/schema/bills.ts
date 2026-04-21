@@ -1,9 +1,10 @@
-import { pgTable, uuid, numeric, integer, timestamp, varchar } from "drizzle-orm/pg-core";
+import { pgTable, uuid, numeric, integer, timestamp, varchar, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export const billsTable = pgTable("bills", {
   id:            uuid("id").primaryKey().defaultRandom(),
+  billNumber:    serial("bill_number").notNull(),
   totalAmount:   numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
   itemsCount:    integer("items_count").notNull(),
   customerPhone: varchar("customer_phone", { length: 10 }),

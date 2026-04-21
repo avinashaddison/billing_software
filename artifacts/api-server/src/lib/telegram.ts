@@ -42,6 +42,7 @@ export interface SaleAlertItem {
 
 export interface SaleAlertBill {
   id:            string;
+  billNumber:    number;
   totalAmount:   number;
   itemsCount:    number;
   paymentMode:   string;
@@ -73,7 +74,8 @@ export function sendSaleAlert(bill: SaleAlertBill, items: SaleAlertItem[]): void
     `🧾 <b>SALE INVOICE — ${escapeHtml(STORE_NAME)}</b>`,
     DIVIDER,
     `📅 ${date}  •  ${time}`,
-    `🔖 <code>${escapeHtml(bill.id)}</code>`,
+    `🔖 Bill No: <b>#${bill.billNumber}</b>`,
+    `🆔 Ref: <code>${escapeHtml(bill.id)}</code>`,
     bill.customerPhone ? `📞 Customer: ${escapeHtml(bill.customerPhone)}` : "",
     DIVIDER,
     `<b>ITEMS</b>`,
