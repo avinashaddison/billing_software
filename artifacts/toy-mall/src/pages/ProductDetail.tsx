@@ -40,6 +40,7 @@ export default function ProductDetail() {
   const [barcodeVal, setBarcodeVal]         = useState("");
   const [barcodeSaving, setBarcodeSaving]   = useState(false);
   const [labelTab, setLabelTab]             = useState<"qr" | "barcode">("qr");
+  const [printing, setPrinting]             = useState(false);
 
   const { data: product, isLoading, isError } = useGetProductBySku(sku, {
     query: {
@@ -123,6 +124,11 @@ export default function ProductDetail() {
     finally { setBarcodeSaving(false); }
   };
 
+  const printLabel = () => {
+    setPrinting(true);
+    setTimeout(() => { window.print(); setPrinting(false); }, 300);
+  };
+
   const openEdit = () => {
     if (!product) return;
     setEditForm({
@@ -196,6 +202,52 @@ export default function ProductDetail() {
   const imageUrl      = "imageUrl" in product ? (product.imageUrl as string | null | undefined) : null;
 
   return (
+    <>
+      {/* ── Print CSS ── */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          .product-print-area, .product-print-area * { visibility: visible !important; }
+          .product-print-area {
+            position: fixed !important; top: 0 !important; left: 0 !important;
+            width: 100% !important; margin: 0 !important; padding: 20px !important;
+            background: white !important; display: flex !important;
+            flex-wrap: wrap !important; gap: 14px !important;
+          }
+        }
+      `}</style>
+
+      {/* ── Hidden print area ── */}
+      {printing && product && (
+        <div className="product-print-area hidden print:flex">
+          {labelTab === "barcode" ? (
+            <div style={{ background: "#fff", padding: "6px 4px" }}>
+              <BarcodeImage value={product.sku} height={60} fontSize={11} />
+            </div>
+          ) : qrData?.qrDataUrl ? (
+            <div style={{
+              border: "1px solid #d1d5db", borderRadius: 10, overflow: "hidden",
+              fontFamily: "'Segoe UI', Arial, sans-serif", background: "#fff",
+            }}>
+              <div style={{ background: hex.strip, padding: "5px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", letterSpacing: 0.5 }}>VishwaKarma Complex</span>
+                <span style={{ fontSize: 14 }}>{emoji}</span>
+              </div>
+              <div style={{ padding: "10px 10px 8px", textAlign: "center" }}>
+                <div style={{ display: "inline-block", background: hex.badge, color: hex.text, borderRadius: 20, fontSize: 9, fontWeight: 800, padding: "2px 8px", marginBottom: 8, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                  {product.category}
+                </div>
+                <img src={qrData.qrDataUrl} alt={product.sku} style={{ width: 110, height: 110, display: "block", margin: "0 auto 6px" }} />
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#111827", lineHeight: 1.3, marginBottom: 3 }}>{product.name}</div>
+                <div style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: "#6b7280", letterSpacing: 2, marginBottom: 6 }}>{product.sku}</div>
+                <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "6px 0" }} />
+                <div style={{ fontSize: 20, fontWeight: 900, color: "#111827" }}>₹{product.price.toLocaleString("en-IN")}</div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+
     <div className="flex flex-col h-full bg-background">
       {/* ── Header ── */}
       <div className="p-4 md:px-6 border-b flex items-center justify-between sticky top-0 bg-background z-10">
@@ -591,7 +643,7 @@ export default function ProductDetail() {
                         Download QR
                       </a>
                       <button
-                        onClick={() => setLocation("/labels")}
+                        onClick={printLabel}
                         className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white transition-colors active:scale-95"
                         style={{ background: hex.strip }}>
                         <Printer className="w-3.5 h-3.5" />
@@ -629,7 +681,7 @@ export default function ProductDetail() {
                       Download
                     </button>
                     <button
-                      onClick={() => setLocation("/labels")}
+                      onClick={printLabel}
                       className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white transition-colors active:scale-95"
                       style={{ background: hex.strip }}>
                       <Printer className="w-3.5 h-3.5" />
@@ -644,5 +696,6 @@ export default function ProductDetail() {
         </div>
       </div>
     </div>
+    </>
   );
 }
