@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
-import { sendSaleAlert } from "../lib/telegram";
+import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 
 const router: IRouter = Router();
 
@@ -52,6 +52,8 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         quantity:    number;
         price:       number;
         subtotal:    number;
+        newStock:    number;
+        threshold:   number;
       }[] = [];
 
       for (const item of items) {
@@ -87,6 +89,8 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           quantity:    item.quantity,
           price:       item.price,
           subtotal:    item.price * item.quantity,
+          newStock:    product.stock - item.quantity,
+          threshold:   product.lowStockThreshold,
         });
       }
 
@@ -132,8 +136,14 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
       createdAt:   result.bill.createdAt,
     });
 
-    // Fire-and-forget Telegram alert (never blocks the response)
+    // Fire-and-forget Telegram sale alert (never blocks the response)
     sendSaleAlert(result.bill, result.items);
+
+    // Fire low-stock Telegram alerts for any product that hit or crossed its threshold
+    const lowStockItems: LowStockAlertItem[] = result.items
+      .filter((i) => i.newStock <= i.threshold)
+      .map((i) => ({ productName: i.productName, stock: i.newStock, threshold: i.threshold }));
+    sendLowStockAlert(lowStockItems);
 
     res.status(201).json(result);
   } catch (err: any) {

@@ -167,3 +167,21 @@ export function sendTestAlert(): Promise<void> {
 
   return sendMessage(lines.join("\n"));
 }
+
+export interface LowStockAlertItem {
+  productName: string;
+  stock:       number;
+  threshold:   number;
+}
+
+export function sendLowStockAlert(items: LowStockAlertItem[]): void {
+  if (!isConfigured() || items.length === 0) return;
+
+  const lines = items
+    .map((i) => `⚠️ Low Stock: "${escapeHtml(i.productName)}" — only ${i.stock} unit${i.stock === 1 ? "" : "s"} left`)
+    .join("\n");
+
+  sendMessage(lines).catch((err) =>
+    logger.warn({ err }, "Telegram low-stock alert delivery error")
+  );
+}
