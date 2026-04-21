@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 interface Bill {
   id: string;
+  billNumber?: number;
   totalAmount: number;
   itemsCount: number;
   createdAt: string;
@@ -51,6 +52,7 @@ export default function Billing() {
   const q = search.trim().toLowerCase().replace(/^#/, "");
   const filtered = q
     ? timeFiltered.filter((b) =>
+        (b.billNumber != null && String(b.billNumber).includes(q)) ||
         b.id.toLowerCase().includes(q) ||
         b.totalAmount.toFixed(2).includes(q)
       )
@@ -147,7 +149,7 @@ export default function Billing() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by Bill ID or amount…"
+              placeholder="Search by Bill No, Bill ID or amount…"
               className="w-full h-10 pl-9 pr-10 rounded-xl border border-border bg-muted/50 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
             />
             {search && (
@@ -185,7 +187,7 @@ export default function Billing() {
               {search ? `No results for "${search.replace(/^#/, "#").toUpperCase()}"` : `No bills ${filter !== "all" ? `for ${filter === "today" ? "today" : "this week"}` : "yet"}`}
             </p>
             <p className="text-sm mt-1">
-              {search ? "Try a different bill ID or amount." : "Complete a checkout to generate a bill."}
+              {search ? "Try a different bill number, ID or amount." : "Complete a checkout to generate a bill."}
             </p>
           </div>
         ) : (
@@ -196,9 +198,14 @@ export default function Billing() {
                 <Link key={bill.id} href={`/bill/${bill.id}`}>
                   <div className="p-4 rounded-2xl border bg-card shadow-sm hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-mono font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
-                        #{bill.id.slice(0, 8).toUpperCase()}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-foreground">
+                          Bill #{bill.billNumber ?? bill.id.slice(0, 6).toUpperCase()}
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          {bill.id.slice(0, 8).toUpperCase()}
+                        </span>
+                      </div>
                       <span className="text-xs text-muted-foreground">
                         {format(new Date(bill.createdAt), "d MMM, h:mm a")}
                       </span>
@@ -233,7 +240,7 @@ export default function Billing() {
             <div className="hidden md:block px-6">
               <div className="rounded-2xl border overflow-hidden">
                 <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/40">
-                  <span>Bill ID</span>
+                  <span>Bill</span>
                   <span className="w-28 text-center">Items</span>
                   <span className="w-36 text-right">Total Amount</span>
                   <span className="w-44 text-right">Date & Time</span>
@@ -249,12 +256,12 @@ export default function Billing() {
                             <FileText className="w-4 h-4 text-green-600 dark:text-green-400" />
                           </div>
                           <div>
-                            <p className="font-bold font-mono text-sm">
-                              #{bill.id.slice(0, 8).toUpperCase()}
+                            <p className="font-black text-sm text-foreground">
+                              Bill #{bill.billNumber ?? bill.id.slice(0, 6).toUpperCase()}
                             </p>
-                            <span className="text-[10px] bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-400 font-black px-1.5 py-0.5 rounded-full">
-                              PAID
-                            </span>
+                            <p className="font-mono text-[10px] text-muted-foreground">
+                              {bill.id.slice(0, 8).toUpperCase()}
+                            </p>
                           </div>
                         </div>
                         <div className="w-28 text-center">
