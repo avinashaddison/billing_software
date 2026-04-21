@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2 } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight } from "lucide-react";
 import { useStoreSettings, type StoreSettings } from "@/lib/store-info";
 import { toast } from "sonner";
 
@@ -8,27 +8,31 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 const EMOJI_OPTIONS = ["🧸", "🎮", "🛒", "🏪", "🎁", "🧩", "🎯", "🪀", "🎈", "⭐"];
 
 const DEFAULTS: StoreSettings = {
-  name:        "VishwaKarma Complex",
-  tagline:     "The Complete Toy Store",
-  phone:       "+91 94318 01793",
-  address:     "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
-  gst:         "",
-  logoEmoji:   "🧸",
-  appSubtitle: "Billing Management",
-  footerNote:  "Goods once sold will not be returned or exchanged.",
+  name:          "VishwaKarma Complex",
+  tagline:       "The Complete Toy Store",
+  phone:         "+91 94318 01793",
+  address:       "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
+  gst:           "",
+  logoEmoji:     "🧸",
+  appSubtitle:   "Billing Management",
+  footerNote:    "Goods once sold will not be returned or exchanged.",
+  upiId:         "",
+  dynamicQrMode: false,
 };
 
 export default function SettingsPage() {
   const store = useStoreSettings();
   const [form, setForm] = useState<StoreSettings>({
-    name:        store.name,
-    tagline:     store.tagline,
-    phone:       store.phone,
-    address:     store.address,
-    gst:         store.gst,
-    logoEmoji:   store.logoEmoji,
-    appSubtitle: store.appSubtitle,
-    footerNote:  store.footerNote,
+    name:          store.name,
+    tagline:       store.tagline,
+    phone:         store.phone,
+    address:       store.address,
+    gst:           store.gst,
+    logoEmoji:     store.logoEmoji,
+    appSubtitle:   store.appSubtitle,
+    footerNote:    store.footerNote,
+    upiId:         store.upiId,
+    dynamicQrMode: store.dynamicQrMode,
   });
   const [saved, setSaved] = useState(false);
   const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
@@ -60,6 +64,9 @@ export default function SettingsPage() {
   const set = (key: keyof StoreSettings, val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
 
+  const toggle = (key: keyof StoreSettings) =>
+    setForm((f) => ({ ...f, [key]: !f[key] }));
+
   const handleSave = () => {
     store.update(form);
     setSaved(true);
@@ -77,6 +84,7 @@ export default function SettingsPage() {
     name: store.name, tagline: store.tagline, phone: store.phone,
     address: store.address, gst: store.gst, logoEmoji: store.logoEmoji,
     appSubtitle: store.appSubtitle, footerNote: store.footerNote,
+    upiId: store.upiId, dynamicQrMode: store.dynamicQrMode,
   });
 
   return (
@@ -192,6 +200,43 @@ export default function SettingsPage() {
               rows={2} placeholder="e.g. Goods once sold will not be returned or exchanged."
               className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
           </Field>
+        </Section>
+
+        {/* ── UPI / Dynamic QR ── */}
+        <Section icon={QrCode} title="UPI &amp; Dynamic QR" color="text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30">
+          <Field label="UPI ID" hint="e.g. yourname@upi — shown as QR code at checkout when Dynamic QR Mode is on">
+            <input
+              value={form.upiId}
+              onChange={(e) => set("upiId", e.target.value.trim())}
+              placeholder="yourname@okicici"
+              className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
+            />
+          </Field>
+
+          <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+            <div>
+              <p className="text-xs font-bold">Dynamic QR Mode</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                When on, selecting UPI at checkout shows a scannable QR code with the exact bill amount. Staff confirm payment manually.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggle("dynamicQrMode")}
+              className={`ml-4 shrink-0 transition-colors ${form.dynamicQrMode ? "text-indigo-600" : "text-muted-foreground"}`}
+              aria-label="Toggle Dynamic QR Mode"
+            >
+              {form.dynamicQrMode
+                ? <ToggleRight className="w-10 h-10" />
+                : <ToggleLeft  className="w-10 h-10" />}
+            </button>
+          </div>
+
+          {form.dynamicQrMode && !form.upiId && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1.5">
+              ⚠️ Enter a UPI ID above to activate QR generation.
+            </p>
+          )}
         </Section>
 
         {/* ── Telegram Notifications ── */}
