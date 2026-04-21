@@ -17,6 +17,7 @@ interface BillItem {
 interface BillData {
   bill: {
     id: string;
+    billNumber?: number;
     totalAmount: number;
     itemsCount: number;
     createdAt: string;
@@ -193,7 +194,7 @@ export default function Bill() {
   const dt = new Date(bill.createdAt);
   const dateStr = dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   const timeStr = dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
-  const billNo  = bill.id.slice(0, 8).toUpperCase();
+  const billNo  = bill.billNumber ? String(bill.billNumber) : bill.id.slice(0, 8).toUpperCase();
 
   const buildShareText = () => {
     const itemLines = items
@@ -422,7 +423,7 @@ export default function Bill() {
                 — {store.name} —
               </div>
               <div className="font-mono text-[10px] text-gray-400 mt-1">
-                #{bill.id.slice(0, 16).toUpperCase()}
+                Ref: {bill.id.slice(0, 8).toUpperCase()}
               </div>
             </div>
 
