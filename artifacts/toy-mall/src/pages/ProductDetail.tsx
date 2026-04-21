@@ -9,8 +9,9 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode, Pencil } from "lucide-react";
+import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode, Pencil, QrCode } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
+import { BarcodeImage, barcodeSvgDataUrl } from "@/components/ui/BarcodeImage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,6 +39,7 @@ export default function ProductDetail() {
   const [barcodeEditing, setBarcodeEditing] = useState(false);
   const [barcodeVal, setBarcodeVal]         = useState("");
   const [barcodeSaving, setBarcodeSaving]   = useState(false);
+  const [labelTab, setLabelTab]             = useState<"qr" | "barcode">("qr");
 
   const { data: product, isLoading, isError } = useGetProductBySku(sku, {
     query: {
@@ -515,7 +517,7 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {/* ══ Col 3: QR Code (redesigned) ══ */}
+          {/* ══ Col 3: QR + Barcode ══ */}
           <div className="bg-card border rounded-3xl shadow-sm overflow-hidden flex flex-col">
             {/* Coloured top strip */}
             <div
@@ -523,6 +525,30 @@ export default function ProductDetail() {
               style={{ background: hex.strip }}>
               <span className="text-xs font-black text-white tracking-tight">VishwaKarma Complex</span>
               <span className="text-lg">{emoji}</span>
+            </div>
+
+            {/* Tab toggle */}
+            <div className="flex gap-1 mx-5 mt-4 p-1 bg-muted rounded-xl shrink-0">
+              <button
+                onClick={() => setLabelTab("qr")}
+                className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-black transition-all ${
+                  labelTab === "qr"
+                    ? "bg-background shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <QrCode className="w-3.5 h-3.5" /> QR Code
+              </button>
+              <button
+                onClick={() => setLabelTab("barcode")}
+                className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-black transition-all ${
+                  labelTab === "barcode"
+                    ? "bg-background shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Barcode className="w-3.5 h-3.5" /> Barcode
+              </button>
             </div>
 
             <div className="flex flex-col items-center gap-3 p-5 flex-1 justify-center">
@@ -533,50 +559,84 @@ export default function ProductDetail() {
                 {product.category}
               </span>
 
-              {/* Label above QR */}
-              <p className="text-xs text-muted-foreground font-medium">Scan to open this product</p>
-
-              {/* QR image */}
-              {qrLoading ? (
-                <Skeleton className="w-48 h-48 rounded-2xl" />
-              ) : qrData?.qrDataUrl ? (
-                <img
-                  src={qrData.qrDataUrl}
-                  alt={`QR code for ${product.sku}`}
-                  className="w-48 h-48 rounded-2xl shadow-sm"
-                  style={{ border: `3px solid ${hex.strip}` }}
-                />
+              {labelTab === "qr" ? (
+                <>
+                  <p className="text-xs text-muted-foreground font-medium">Scan to open this product</p>
+                  {qrLoading ? (
+                    <Skeleton className="w-48 h-48 rounded-2xl" />
+                  ) : qrData?.qrDataUrl ? (
+                    <img
+                      src={qrData.qrDataUrl}
+                      alt={`QR code for ${product.sku}`}
+                      className="w-48 h-48 rounded-2xl shadow-sm"
+                      style={{ border: `3px solid ${hex.strip}` }}
+                    />
+                  ) : (
+                    <div className="w-48 h-48 rounded-2xl border-2 border-dashed border-muted flex items-center justify-center text-muted-foreground text-sm">
+                      QR unavailable
+                    </div>
+                  )}
+                  <div className="text-center space-y-0.5">
+                    <p className="font-mono font-black text-lg tracking-widest">{product.sku}</p>
+                    <p className="text-xs text-muted-foreground">{product.name}</p>
+                  </div>
+                  {qrData?.qrDataUrl && (
+                    <div className="flex gap-2 w-full mt-1">
+                      <a
+                        href={qrData.qrDataUrl}
+                        download={`${product.sku}-qr.png`}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download QR
+                      </a>
+                      <button
+                        onClick={() => setLocation("/labels")}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white transition-colors active:scale-95"
+                        style={{ background: hex.strip }}>
+                        <Printer className="w-3.5 h-3.5" />
+                        Print Label
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
-                <div className="w-48 h-48 rounded-2xl border-2 border-dashed border-muted flex items-center justify-center text-muted-foreground text-sm">
-                  QR unavailable
-                </div>
-              )}
-
-              {/* SKU + name */}
-              <div className="text-center space-y-0.5">
-                <p className="font-mono font-black text-lg tracking-widest">{product.sku}</p>
-                <p className="text-xs text-muted-foreground">{product.name}</p>
-              </div>
-
-              {/* Action buttons */}
-              {qrData?.qrDataUrl && (
-                <div className="flex gap-2 w-full mt-1">
-                  <a
-                    href={qrData.qrDataUrl}
-                    download={`${product.sku}-qr.png`}
-                    className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
+                <>
+                  <p className="text-xs text-muted-foreground font-medium">Scan to open this product</p>
+                  <div
+                    className="w-full rounded-2xl overflow-hidden shadow-sm flex items-center justify-center bg-white py-2 px-1"
+                    style={{ border: `3px solid ${hex.strip}` }}
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    Download QR
-                  </a>
-                  <button
-                    onClick={() => setLocation("/labels")}
-                    className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white transition-colors active:scale-95"
-                    style={{ background: hex.strip }}>
-                    <Printer className="w-3.5 h-3.5" />
-                    Print Label
-                  </button>
-                </div>
+                    <BarcodeImage value={product.sku} height={72} fontSize={13} className="w-full max-w-[220px]" />
+                  </div>
+                  <div className="text-center space-y-0.5">
+                    <p className="font-mono font-black text-lg tracking-widest">{product.sku}</p>
+                    <p className="text-xs text-muted-foreground">{product.name}</p>
+                  </div>
+                  <div className="flex gap-2 w-full mt-1">
+                    <button
+                      onClick={() => {
+                        const url = barcodeSvgDataUrl(product.sku, 80);
+                        if (!url) return;
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `${product.sku}-barcode.svg`;
+                        a.click();
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download
+                    </button>
+                    <button
+                      onClick={() => setLocation("/labels")}
+                      className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white transition-colors active:scale-95"
+                      style={{ background: hex.strip }}>
+                      <Printer className="w-3.5 h-3.5" />
+                      Print Label
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>

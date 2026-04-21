@@ -75,5 +75,8 @@
     "wouter": "^3.3.5",
     "zod": "catalog:",
     "zustand": "^4.5.7"
+  },
+  "dependencies": {
+    "jsbarcode": "^3.12.3"
   }
 }
