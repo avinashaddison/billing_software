@@ -13,8 +13,8 @@ export const saleItemsTable = pgTable("sale_items", {
     .notNull()
     .references(() => productsTable.id),
   quantity: integer("quantity").notNull(),
-  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
-  subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
+  price: numeric("price", { precision: 15, scale: 2 }).notNull(),
+  subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
