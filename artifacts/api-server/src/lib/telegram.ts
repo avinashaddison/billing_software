@@ -185,3 +185,83 @@ export function sendLowStockAlert(items: LowStockAlertItem[]): void {
     logger.warn({ err }, "Telegram low-stock alert delivery error")
   );
 }
+
+export interface DailySummaryTopProduct {
+  productName: string;
+  totalQty:    number;
+  totalRevenue: number;
+}
+
+export interface DailySummaryData {
+  date:        string;
+  totalAmount: number;
+  billCount:   number;
+  itemsSold:   number;
+  cashSales:   number;
+  upiSales:    number;
+  topProducts: DailySummaryTopProduct[];
+}
+
+export function sendDailySalesSummary(data: DailySummaryData): Promise<void> {
+  if (!isConfigured()) return Promise.resolve();
+
+  const { date, totalAmount, billCount, itemsSold, cashSales, upiSales, topProducts } = data;
+
+  const [year, month, day] = date.split("-");
+  const dateLabel = new Date(`${year}-${month}-${day}T12:00:00+05:30`).toLocaleDateString("en-IN", {
+    weekday: "long", day: "2-digit", month: "long", year: "numeric", timeZone: "Asia/Kolkata",
+  });
+
+  if (billCount === 0) {
+    const lines = [
+      `📊 <b>━━  DAILY SALES REPORT  ━━</b> 📊`,
+      `🏪  <b>${escapeHtml(STORE_NAME)}</b>`,
+      D_HEAVY,
+      ``,
+      row(`📅`, escapeHtml(dateLabel)),
+      ``,
+      `🔕  <i>No sales recorded today.</i>`,
+      ``,
+      D_HEAVY,
+    ];
+    return sendMessage(lines.join("\n"));
+  }
+
+  const topLines = topProducts.slice(0, 3).map((p, idx) => {
+    const medal = ["🥇", "🥈", "🥉"][idx] ?? `${idx + 1}.`;
+    return `${medal}  <b>${escapeHtml(p.productName)}</b>  —  ${p.totalQty} unit${p.totalQty !== 1 ? "s" : ""}  (${fmt(p.totalRevenue)})`;
+  });
+
+  const lines = [
+    `📊 <b>━━  DAILY SALES REPORT  ━━</b> 📊`,
+    `🏪  <b>${escapeHtml(STORE_NAME)}</b>`,
+    D_HEAVY,
+    ``,
+    row(`📅`, escapeHtml(dateLabel)),
+    ``,
+    D_THIN,
+    `💰  <b>REVENUE SUMMARY</b>`,
+    D_THIN,
+    ``,
+    row(`🧾  Total Revenue  :`, fmt(totalAmount)),
+    row(`🔖  Bills Raised   :`, String(billCount)),
+    row(`📦  Items Sold     :`, String(itemsSold)),
+    ``,
+    row(`💵  Cash           :`, fmt(cashSales)),
+    row(`📲  UPI            :`, fmt(upiSales)),
+    ``,
+    ...(topLines.length > 0 ? [
+      D_THIN,
+      `🏆  <b>TOP PRODUCTS</b>`,
+      D_THIN,
+      ``,
+      ...topLines,
+      ``,
+    ] : []),
+    D_HEAVY,
+    `       ✨  <i>End of Day — Great job today!</i>  ✨`,
+    D_HEAVY,
+  ];
+
+  return sendMessage(lines.join("\n"));
+}
