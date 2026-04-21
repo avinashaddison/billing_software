@@ -25,14 +25,23 @@ router.get("/reports/revenue", async (req, res): Promise<void> => {
     .groupBy(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`)
     .orderBy(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`);
 
-  res.json(
-    rows.map((r) => ({
-      day:         r.day,
-      totalAmount: Number(r.totalAmount),
-      billCount:   Number(r.billCount),
-      itemsCount:  Number(r.itemsCount),
-    }))
+  // Build a map of existing data
+  const dataMap = new Map(
+    rows.map((r) => [r.day, { totalAmount: Number(r.totalAmount), billCount: Number(r.billCount), itemsCount: Number(r.itemsCount) }])
   );
+
+  // Fill every day in the window with zeros if no data
+  const today = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) + "T00:00:00");
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dayStr = d.toLocaleDateString("en-CA");
+    const existing = dataMap.get(dayStr);
+    result.push({ day: dayStr, totalAmount: existing?.totalAmount ?? 0, billCount: existing?.billCount ?? 0, itemsCount: existing?.itemsCount ?? 0 });
+  }
+
+  res.json(result);
 });
 
 /**
