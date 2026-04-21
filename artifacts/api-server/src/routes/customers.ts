@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql, and, gte, isNotNull } from "drizzle-orm";
+import { eq, desc, sql, and, gte, isNotNull, inArray } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -71,7 +71,6 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
   }
 
   const billIds = bills.map((b) => b.id);
-  const billIdList = `ARRAY['${billIds.join("','")}'::uuid]`;
 
   const allItems = await db
     .select({
@@ -84,7 +83,7 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
     })
     .from(saleItemsTable)
     .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
-    .where(sql`${saleItemsTable.saleId} = ANY(${sql.raw(billIdList)})`)
+    .where(inArray(saleItemsTable.saleId, billIds))
     .orderBy(desc(saleItemsTable.createdAt));
 
   /* Top 5 most-purchased products (by total quantity) */
@@ -95,7 +94,7 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
     })
     .from(saleItemsTable)
     .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
-    .where(sql`${saleItemsTable.saleId} = ANY(${sql.raw(billIdList)})`)
+    .where(inArray(saleItemsTable.saleId, billIds))
     .groupBy(sql`COALESCE(${productsTable.name}, 'Deleted Product')`)
     .orderBy(desc(sql`SUM(${saleItemsTable.quantity})`))
     .limit(5);

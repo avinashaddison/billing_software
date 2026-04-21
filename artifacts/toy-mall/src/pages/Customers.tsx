@@ -343,9 +343,9 @@ export default function Customers() {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-sm">+91 {c.phone}</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full hidden sm:inline-block ${tier.bg} ${tier.text}`}>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${tier.bg} ${tier.text}`}>
                             {tier.emoji} {tier.label}
                           </span>
                         </div>
