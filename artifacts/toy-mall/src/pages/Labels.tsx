@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
-import { Tag, Printer, Loader2, Search, Check, Package, Eye } from "lucide-react";
+import { Tag, Printer, Loader2, Search, Check, Package, Eye, QrCode, Barcode } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
+import { BarcodeImage } from "@/components/ui/BarcodeImage";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 interface Product { id: string; name: string; sku: string; price: number; category: string; stock: number; }
 interface QrData   { sku: string; url: string; qrDataUrl: string; }
 
+type LabelType = "qr" | "barcode";
+
 /* ── Single printed label card ─────────────────────────────────── */
-function PrintLabel({ p, qr }: { p: Product; qr: QrData | undefined }) {
+function PrintLabel({ p, qr, labelType }: { p: Product; qr: QrData | undefined; labelType: LabelType }) {
   const hex = getCategoryHex(p.category);
   const emoji = getCategoryEmoji(p.category);
   return (
@@ -47,20 +50,28 @@ function PrintLabel({ p, qr }: { p: Product; qr: QrData | undefined }) {
           {p.category}
         </div>
 
-        {/* QR code */}
-        {qr
-          ? <img src={qr.qrDataUrl} alt={p.sku} style={{ width: 110, height: 110, display: "block", margin: "0 auto 6px" }} />
-          : <div style={{ width: 110, height: 110, background: "#f3f4f6", margin: "0 auto 6px", borderRadius: 6 }} />}
+        {/* QR or Barcode */}
+        {labelType === "qr" ? (
+          qr
+            ? <img src={qr.qrDataUrl} alt={p.sku} style={{ width: 110, height: 110, display: "block", margin: "0 auto 6px" }} />
+            : <div style={{ width: 110, height: 110, background: "#f3f4f6", margin: "0 auto 6px", borderRadius: 6 }} />
+        ) : (
+          <div style={{ margin: "0 auto 6px", background: "#fff" }}>
+            <BarcodeImage value={p.sku} height={60} fontSize={11} />
+          </div>
+        )}
 
         {/* Product name */}
         <div style={{ fontSize: 12, fontWeight: 800, color: "#111827", lineHeight: 1.3, marginBottom: 3, minHeight: 32 }}>
           {p.name.length > 30 ? p.name.slice(0, 28) + "…" : p.name}
         </div>
 
-        {/* SKU */}
-        <div style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: "#6b7280", letterSpacing: 2, marginBottom: 6 }}>
-          {p.sku}
-        </div>
+        {/* SKU (hide in barcode mode — already shown in barcode itself) */}
+        {labelType === "qr" && (
+          <div style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: "#6b7280", letterSpacing: 2, marginBottom: 6 }}>
+            {p.sku}
+          </div>
+        )}
 
         {/* Divider */}
         <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "6px 0" }} />
@@ -75,7 +86,7 @@ function PrintLabel({ p, qr }: { p: Product; qr: QrData | undefined }) {
 }
 
 /* ── On-screen label preview card ──────────────────────────────── */
-function PreviewCard({ p, qr }: { p: Product; qr: QrData | undefined }) {
+function PreviewCard({ p, qr, labelType }: { p: Product; qr: QrData | undefined; labelType: LabelType }) {
   const hex = getCategoryHex(p.category);
   const emoji = getCategoryEmoji(p.category);
   return (
@@ -90,13 +101,23 @@ function PreviewCard({ p, qr }: { p: Product; qr: QrData | undefined }) {
           style={{ background: hex.badge, color: hex.text }}>
           {p.category}
         </span>
-        {qr
-          ? <img src={qr.qrDataUrl} alt={p.sku} className="w-20 h-20 rounded-md" />
-          : <div className="w-20 h-20 bg-gray-100 rounded-md flex items-center justify-center">
-              <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-            </div>}
+
+        {labelType === "qr" ? (
+          qr
+            ? <img src={qr.qrDataUrl} alt={p.sku} className="w-20 h-20 rounded-md" />
+            : <div className="w-20 h-20 bg-gray-100 rounded-md flex items-center justify-center">
+                <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+              </div>
+        ) : (
+          <div className="w-full bg-white py-1">
+            <BarcodeImage value={p.sku} height={44} fontSize={9} className="w-full" />
+          </div>
+        )}
+
         <p className="text-[10px] font-bold text-gray-900 leading-tight line-clamp-2">{p.name}</p>
-        <p className="font-mono text-[8px] text-gray-400 tracking-widest">{p.sku}</p>
+        {labelType === "qr" && (
+          <p className="font-mono text-[8px] text-gray-400 tracking-widest">{p.sku}</p>
+        )}
         <div className="w-full border-t-2 my-0.5" style={{ borderColor: hex.strip }} />
         <p className="text-base font-black text-gray-900">₹{p.price.toLocaleString("en-IN")}</p>
       </div>
@@ -114,6 +135,7 @@ export default function Labels() {
   const [generating, setGenerating] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [labelType, setLabelType] = useState<LabelType>("qr");
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/products`)
@@ -137,7 +159,13 @@ export default function Labels() {
     setShowPreview(false);
   };
 
-  const generateQrs = async (andPrint = false) => {
+  const generateAndAct = async (andPrint = false) => {
+    setShowPreview(false);
+    if (labelType === "barcode") {
+      if (andPrint) { setShowPrint(true); setTimeout(() => window.print(), 300); }
+      else { setShowPreview(true); }
+      return;
+    }
     const toGenerate = products.filter((p) => selected.has(p.id));
     setGenerating(true);
     const results: Record<string, QrData> = { ...qrMap };
@@ -176,7 +204,7 @@ export default function Labels() {
         <div className="labels-print-area fixed inset-0 hidden print:block bg-white p-4">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}>
             {selectedProducts.map((p) => (
-              <PrintLabel key={p.id} p={p} qr={qrMap[p.id]} />
+              <PrintLabel key={p.id} p={p} qr={qrMap[p.id]} labelType={labelType} />
             ))}
           </div>
         </div>
@@ -190,16 +218,16 @@ export default function Labels() {
               <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
                 <Tag className="w-6 h-6 text-primary" /> Label Printer
               </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">Select products · preview · print colour QR shelf labels</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Select products · preview · print shelf labels</p>
             </div>
             {selected.size > 0 && (
               <div className="flex items-center gap-2">
-                <button onClick={() => generateQrs(false)} disabled={generating}
+                <button onClick={() => generateAndAct(false)} disabled={generating}
                   className="flex items-center gap-2 bg-muted border text-foreground px-3 py-2 rounded-full font-bold text-sm hover:bg-muted/70 active:scale-95 transition-all disabled:opacity-50">
                   {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                   Preview
                 </button>
-                <button onClick={() => generateQrs(true)} disabled={generating}
+                <button onClick={() => generateAndAct(true)} disabled={generating}
                   className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-full font-bold text-sm hover:bg-neutral-800 active:scale-95 transition-all disabled:opacity-50">
                   {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                   Print {selected.size}
@@ -207,6 +235,27 @@ export default function Labels() {
               </div>
             )}
           </div>
+
+          {/* Label type toggle */}
+          <div className="flex gap-1 p-1 bg-muted rounded-xl mb-3 w-fit">
+            <button
+              onClick={() => { setLabelType("qr"); setShowPreview(false); }}
+              className={`flex items-center gap-1.5 px-4 h-8 rounded-lg text-xs font-black transition-all ${
+                labelType === "qr" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <QrCode className="w-3.5 h-3.5" /> QR Code
+            </button>
+            <button
+              onClick={() => { setLabelType("barcode"); setShowPreview(false); }}
+              className={`flex items-center gap-1.5 px-4 h-8 rounded-lg text-xs font-black transition-all ${
+                labelType === "barcode" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Barcode className="w-3.5 h-3.5" /> Barcode
+            </button>
+          </div>
+
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -230,11 +279,11 @@ export default function Labels() {
             <div className="flex gap-3 overflow-x-auto pb-2">
               {selectedProducts.map((p) => (
                 <div key={p.id} className="shrink-0">
-                  <PreviewCard p={p} qr={qrMap[p.id]} />
+                  <PreviewCard p={p} qr={qrMap[p.id]} labelType={labelType} />
                 </div>
               ))}
             </div>
-            <button onClick={() => generateQrs(true)} disabled={generating}
+            <button onClick={() => generateAndAct(true)} disabled={generating}
               className="mt-3 flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-full font-bold text-sm hover:bg-neutral-800 active:scale-95 transition-all disabled:opacity-50">
               <Printer className="w-4 h-4" />
               Print {selected.size} Label{selected.size !== 1 ? "s" : ""}
