@@ -8,6 +8,7 @@ export const productsTable = pgTable(
     id:                uuid("id").primaryKey().defaultRandom(),
     name:              text("name").notNull(),
     sku:               text("sku").notNull().unique(),
+    barcode:           text("barcode").unique(),
     category:          text("category").notNull(),
     price:             numeric("price", { precision: 10, scale: 2 }).notNull(),
     stock:             integer("stock").notNull().default(0),
@@ -16,7 +17,10 @@ export const productsTable = pgTable(
     supplierId:        uuid("supplier_id"),
     createdAt:         timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("products_sku_idx").on(table.sku)]
+  (table) => [
+    index("products_sku_idx").on(table.sku),
+    index("products_barcode_idx").on(table.barcode),
+  ]
 );
 
 export const insertProductSchema = createInsertSchema(productsTable).omit({

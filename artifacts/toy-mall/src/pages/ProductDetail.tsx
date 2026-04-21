@@ -34,7 +34,7 @@ export default function ProductDetail() {
   const [savingImg, setSavingImg]       = useState(false);
   const [editOpen, setEditOpen]         = useState(false);
   const [editSaving, setEditSaving]     = useState(false);
-  const [editForm, setEditForm]         = useState({ name: "", price: "", category: "", lowStockThreshold: "" });
+  const [editForm, setEditForm]         = useState({ name: "", price: "", category: "", lowStockThreshold: "", barcode: "" });
 
   const { data: product, isLoading, isError } = useGetProductBySku(sku, {
     query: {
@@ -108,6 +108,7 @@ export default function ProductDetail() {
       price: String(product.price),
       category: product.category,
       lowStockThreshold: String(product.lowStockThreshold),
+      barcode: ("barcode" in product ? (product as any).barcode : "") ?? "",
     });
     setEditOpen(true);
   };
@@ -127,7 +128,7 @@ export default function ProductDetail() {
       const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, price, category, lowStockThreshold: threshold }),
+        body: JSON.stringify({ name, price, category, lowStockThreshold: threshold, barcode: editForm.barcode.trim() || null }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       toast.success("Product updated");
@@ -226,6 +227,17 @@ export default function ProductDetail() {
                 onChange={(e) => setEditForm((f) => ({ ...f, lowStockThreshold: e.target.value }))}
                 placeholder="5" className="h-11 rounded-xl" />
             </div>
+            <div className="md:col-span-2">
+              <p className="text-xs font-bold text-muted-foreground mb-1">
+                Barcode <span className="font-normal text-muted-foreground/60">(optional · EAN-13, UPC-A, Code 128…)</span>
+              </p>
+              <Input value={editForm.barcode}
+                onChange={(e) => setEditForm((f) => ({ ...f, barcode: e.target.value }))}
+                placeholder="e.g. 8901234567890" className="h-11 rounded-xl font-mono" />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Scan will match this barcode in addition to the SKU.
+              </p>
+            </div>
           </div>
           <button onClick={handleEditSave} disabled={editSaving}
             className="w-full h-12 bg-primary text-primary-foreground rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50">
@@ -277,6 +289,16 @@ export default function ProductDetail() {
                     ₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
+
+                {/* Barcode */}
+                {("barcode" in product && (product as any).barcode) && (
+                  <div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Barcode</p>
+                    <p className="font-mono text-sm font-semibold tracking-widest text-foreground bg-muted/50 px-3 py-1.5 rounded-lg inline-block">
+                      {(product as any).barcode}
+                    </p>
+                  </div>
+                )}
 
                 {/* Stock count + progress bar */}
                 <div>

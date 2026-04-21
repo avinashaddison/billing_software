@@ -45,6 +45,7 @@ export const ListProductsResponse = zod.array(ListProductsResponseItem);
 export const CreateProductBody = zod.object({
   name: zod.string(),
   sku: zod.string(),
+  barcode: zod.string().optional(),
   category: zod.string(),
   price: zod.number(),
   stock: zod.number().optional(),
@@ -99,6 +100,7 @@ export const UpdateProductParams = zod.object({
 export const UpdateProductBody = zod.object({
   name: zod.string().optional(),
   sku: zod.string().optional(),
+  barcode: zod.string().optional().nullable(),
   category: zod.string().optional(),
   price: zod.number().optional(),
   stock: zod.number().optional(),

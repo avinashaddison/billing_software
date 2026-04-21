@@ -70,13 +70,14 @@ router.post("/products", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, sku, category, price, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
+  const { name, sku, barcode, category, price, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
 
   const [product] = await db
     .insert(productsTable)
     .values({
       name,
       sku,
+      barcode: barcode?.trim() || null,
       category,
       price: String(price),
       stock: stock ?? 0,
@@ -137,6 +138,36 @@ router.get("/products/sku/:sku", async (req, res): Promise<void> => {
   res.json({ ...product, price: Number(product.price) });
 });
 
+/* Scan lookup — tries SKU first, then barcode. Used by the scanner. */
+router.get("/products/scan/:code", async (req, res): Promise<void> => {
+  const code = (req.params.code ?? "").trim().toUpperCase();
+  if (!code) {
+    res.status(400).json({ error: "code is required" });
+    return;
+  }
+
+  // Try exact SKU match first
+  let [product] = await db
+    .select()
+    .from(productsTable)
+    .where(eq(productsTable.sku, code));
+
+  // Fall back to barcode match (case-insensitive)
+  if (!product) {
+    [product] = await db
+      .select()
+      .from(productsTable)
+      .where(eq(productsTable.barcode, req.params.code.trim()));
+  }
+
+  if (!product) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  res.json({ ...product, price: Number(product.price) });
+});
+
 router.get("/products/:id", async (req, res): Promise<void> => {
   const params = GetProductParams.safeParse(req.params);
   if (!params.success) {
@@ -173,6 +204,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   const updates: Record<string, unknown> = {};
   if (parsed.data.name != null) updates.name = parsed.data.name;
   if (parsed.data.sku != null) updates.sku = parsed.data.sku;
+  if (parsed.data.barcode !== undefined) updates.barcode = parsed.data.barcode?.trim() || null;
   if (parsed.data.category != null) updates.category = parsed.data.category;
   if (parsed.data.price != null) updates.price = String(parsed.data.price);
   if (parsed.data.stock != null) updates.stock = parsed.data.stock;

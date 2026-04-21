@@ -28,7 +28,7 @@ interface ScannedProduct {
 
 /* ── API helpers ─────────────────────────────────────────────────── */
 async function lookupBySku(sku: string): Promise<ScannedProduct> {
-  const res = await fetch(`${BASE_URL}/api/products/sku/${encodeURIComponent(sku)}`);
+  const res = await fetch(`${BASE_URL}/api/products/scan/${encodeURIComponent(sku)}`);
   if (!res.ok) throw new Error("Product not found");
   return res.json();
 }
