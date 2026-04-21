@@ -145,7 +145,6 @@ export default function Checkout() {
   const [phoneError, setPhoneError] = useState("");
   const [loading, setLoading] = useState(false);
   const [successBillId, setSuccessBillId] = useState<string | null>(null);
-  const [showQrPanel, setShowQrPanel] = useState(false);
 
   const qrActive = dynamicQrMode && !!upiId && paymentMode === "upi";
 
@@ -159,7 +158,6 @@ export default function Checkout() {
   const selectPaymentMode = (pm: PaymentMode) => {
     paymentModeRef.current = pm;
     setPaymentMode(pm);
-    setShowQrPanel(false);
   };
 
   const handleQtyChange = useCallback(
@@ -379,51 +377,36 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* ── Dynamic UPI QR panel ── */}
+            {/* ── Dynamic UPI QR panel — auto-shows when UPI selected ── */}
             {qrActive && (
               <div className="px-4 pt-4">
-                {!showQrPanel ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowQrPanel(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-indigo-400 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold text-sm hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all active:scale-95"
-                  >
-                    <QrCode className="w-4 h-4" />
-                    Show UPI QR Code
-                  </button>
-                ) : (
-                  <div className="rounded-2xl border-2 border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <QrCode className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                        <span className="font-black text-sm text-indigo-700 dark:text-indigo-300">Scan &amp; Pay via UPI</span>
-                      </div>
-                      <button onClick={() => setShowQrPanel(false)} className="text-muted-foreground hover:text-foreground">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="flex flex-col items-center gap-3 py-5 px-4">
-                      <div className="bg-white dark:bg-white p-3 rounded-2xl shadow-md">
-                        <QRCodeSVG
-                          value={upiUrl}
-                          size={200}
-                          level="M"
-                          includeMargin={false}
-                        />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
-                          ₹{total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{upiId}</p>
-                      </div>
-                      <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
-                        Ask customer to scan with any UPI app.<br />
-                        Confirm receipt, then tap <b>Payment Received</b>.
-                      </p>
-                    </div>
+                <div className="rounded-2xl border-2 border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-indigo-200 dark:border-indigo-800 flex items-center gap-2">
+                    <QrCode className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <span className="font-black text-sm text-indigo-700 dark:text-indigo-300">Scan &amp; Pay via UPI</span>
                   </div>
-                )}
+                  <div className="flex flex-col items-center gap-3 py-5 px-4">
+                    <div className="bg-white p-3 rounded-2xl shadow-md">
+                      <QRCodeSVG
+                        value={upiUrl}
+                        size={210}
+                        level="M"
+                        fgColor="#000000"
+                        bgColor="#ffffff"
+                      />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-base font-black text-indigo-700 dark:text-indigo-300">
+                        ₹{total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{upiId}</p>
+                    </div>
+                    <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
+                      Ask customer to scan with any UPI app.<br />
+                      After they pay, tap <b>Payment Received</b> below.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -462,50 +445,33 @@ export default function Checkout() {
           </div>
 
           {/* ── Sticky checkout button ── */}
-          <div className="shrink-0 border-t px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3 bg-card space-y-2">
-            {/* QR mode: show Payment Received button when panel is open */}
-            {qrActive && showQrPanel ? (
-              <button
-                onClick={handleCheckout}
-                disabled={loading || (!!phone && !!validatePhone(phone))}
-                className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-base flex items-center justify-center gap-2.5 shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all disabled:opacity-50"
-                data-testid="btn-payment-received"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> Processing…
-                  </>
-                ) : (
-                  <>
-                    <BadgeCheck className="w-5 h-5" />
-                    Payment Received · Complete Sale
-                  </>
-                )}
-              </button>
-            ) : (
-              <button
-                onClick={qrActive ? () => setShowQrPanel(true) : handleCheckout}
-                disabled={loading || (!!phone && !!validatePhone(phone))}
-                className="w-full py-4 rounded-2xl bg-green-600 hover:bg-green-500 text-white font-black text-base flex items-center justify-center gap-2.5 shadow-lg shadow-green-500/20 active:scale-[0.98] transition-all disabled:opacity-50"
-                data-testid="btn-complete-sale"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> Processing…
-                  </>
-                ) : qrActive ? (
-                  <>
-                    <QrCode className="w-5 h-5" />
-                    Show QR &amp; Collect Payment
-                  </>
-                ) : (
-                  <>
-                    <Receipt className="w-5 h-5" />
-                    Complete Sale · {count} item{count !== 1 ? "s" : ""}
-                  </>
-                )}
-              </button>
-            )}
+          <div className="shrink-0 border-t px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3 bg-card">
+            <button
+              onClick={handleCheckout}
+              disabled={loading || (!!phone && !!validatePhone(phone))}
+              className={`w-full py-4 rounded-2xl font-black text-base text-white flex items-center justify-center gap-2.5 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 ${
+                qrActive
+                  ? "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20"
+                  : "bg-green-600 hover:bg-green-500 shadow-green-500/20"
+              }`}
+              data-testid="btn-complete-sale"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" /> Processing…
+                </>
+              ) : qrActive ? (
+                <>
+                  <BadgeCheck className="w-5 h-5" />
+                  Payment Received · Complete Sale
+                </>
+              ) : (
+                <>
+                  <Receipt className="w-5 h-5" />
+                  Complete Sale · {count} item{count !== 1 ? "s" : ""}
+                </>
+              )}
+            </button>
           </div>
         </>
       )}
