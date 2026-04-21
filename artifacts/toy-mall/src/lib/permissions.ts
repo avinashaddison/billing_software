@@ -10,6 +10,7 @@ export const RESOURCES = [
   { key: "labels",     label: "Labels",            description: "Print QR shelf labels" },
   { key: "suppliers",  label: "Suppliers",         description: "Manage supplier information" },
   { key: "staff",      label: "Staff Management",  description: "Manage staff & access control" },
+  { key: "settings",   label: "Settings",           description: "Configure shop settings" },
 ] as const;
 
 export type ResourceKey = typeof RESOURCES[number]["key"];
@@ -50,6 +51,7 @@ export function hasAccess(
 
 /** Map page path → resource key */
 export const PATH_RESOURCE: Record<string, ResourceKey> = {
+  "/settings":   "settings",
   "/":           "dashboard",
   "/products":   "products",
   "/products/new": "products",

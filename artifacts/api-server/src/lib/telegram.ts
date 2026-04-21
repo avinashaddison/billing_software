@@ -6,6 +6,10 @@ function isConfigured(): boolean {
   return !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
 }
 
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 async function sendMessage(text: string): Promise<void> {
   const token  = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -55,14 +59,14 @@ export function sendSaleAlert(bill: SaleAlertBill, items: SaleAlertItem[]): void
   });
 
   const itemLines = items
-    .map((i) => `  • ${i.productName} ×${i.quantity}  →  ₹${i.subtotal.toLocaleString("en-IN")}`)
+    .map((i) => `  • ${escapeHtml(i.productName)} ×${i.quantity}  →  ₹${i.subtotal.toLocaleString("en-IN")}`)
     .join("\n");
 
   const modeEmoji = bill.paymentMode === "upi" ? "📲" : "💵";
   const modeLabel = bill.paymentMode === "upi"  ? "UPI"  : "Cash";
 
   const text = [
-    `🛒 <b>New Sale</b>  —  Bill #${bill.id.slice(-6).toUpperCase()}`,
+    `🛒 <b>New Sale</b>  —  Bill #${escapeHtml(bill.id)}`,
     `─────────────────────`,
     itemLines,
     `─────────────────────`,

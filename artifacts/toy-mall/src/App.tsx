@@ -96,7 +96,7 @@ function Router() {
             <Route path="/categories"   component={() => <Protected resource="categories"><Categories /></Protected>} />
             <Route path="/staff"        component={() => <Protected resource="staff"><StaffManagement /></Protected>} />
             <Route path="/checkout"     component={() => <Protected resource="scan"><Checkout /></Protected>} />
-            <Route path="/settings"     component={SettingsPage} />
+            <Route path="/settings"     component={() => <Protected resource="settings"><SettingsPage /></Protected>} />
             <Route                      component={NotFound} />
           </Switch>
         </AppLayout>
