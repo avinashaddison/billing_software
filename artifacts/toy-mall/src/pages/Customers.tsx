@@ -37,7 +37,7 @@ const PODIUM_STYLES = [
 function getLoyaltyTier(totalSpent: number) {
   if (totalSpent >= 5000) return { label: "Gold",   emoji: "⭐", bg: "bg-yellow-100 dark:bg-yellow-900/30", text: "text-yellow-700 dark:text-yellow-300" };
   if (totalSpent >= 1000) return { label: "Silver", emoji: "🥈", bg: "bg-slate-100 dark:bg-slate-800/50",  text: "text-slate-600 dark:text-slate-300" };
-  return                         { label: "Bronze", emoji: "🥉", bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-300" };
+  return                         { label: "Bronze", emoji: "🔵", bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-300" };
 }
 
 function fmt(n: number) { return n.toLocaleString("en-IN", { maximumFractionDigits: 0 }); }
@@ -323,7 +323,7 @@ export default function Customers() {
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Others</p>
                 )}
                 {(search ? filtered : rest).map((c, idx) => {
-                  const rank = search ? filtered.indexOf(c) + 1 : idx + 4;
+                  const rank = search ? customers.indexOf(c) + 1 : idx + 4;
                   const tier = getLoyaltyTier(c.totalSpent);
                   const avg  = c.totalSpent / Math.max(1, c.visitCount);
                   return (
