@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
 import { ArrowLeft, ScanLine, Printer, RotateCcw, X, Minus, Plus, Check, Loader2, Share2 } from "lucide-react";
 import { toast } from "sonner";
-import { STORE_INFO } from "@/lib/store-info";
+import { useStoreSettings } from "@/lib/store-info";
 
 interface BillItem {
   id: string;
@@ -141,6 +141,7 @@ function ReturnModal({ billId, items, onClose }: { billId: string; items: BillIt
 /* ─── Component ──────────────────────────────────────────────────── */
 export default function Bill() {
   const { id: billId } = useParams<{ id: string }>();
+  const store = useStoreSettings();
   const [data, setData]       = useState<BillData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -199,7 +200,7 @@ export default function Bill() {
       .map((it) => `  • ${it.productName} × ${it.quantity} — ₹${it.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
       .join("\n");
     return [
-      `🛍️ ${STORE_INFO.name} — Receipt`,
+      `🛍️ ${store.name} — Receipt`,
       `Bill #${billNo}  |  ${dateStr} ${timeStr}`,
       ``,
       itemLines,
@@ -304,10 +305,11 @@ export default function Bill() {
 
             {/* ── STORE HEADER ── */}
             <div className="text-center mb-2">
-              <div className="text-xl font-black tracking-widest uppercase">{STORE_INFO.name}</div>
-              <div className="text-[11px] tracking-wide mt-0.5">{STORE_INFO.tagline}</div>
-              <div className="text-[11px] mt-0.5">📞 {STORE_INFO.phone}</div>
-              <div className="text-[11px]">{STORE_INFO.address}</div>
+              <div className="text-xl font-black tracking-widest uppercase">{store.name}</div>
+              <div className="text-[11px] tracking-wide mt-0.5">{store.tagline}</div>
+              <div className="text-[11px] mt-0.5">📞 {store.phone}</div>
+              <div className="text-[11px]">{store.address}</div>
+              {store.gst && <div className="text-[11px] font-bold mt-0.5">GST: {store.gst}</div>}
             </div>
 
             <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
@@ -414,10 +416,10 @@ export default function Bill() {
               <div className="font-black text-sm tracking-wide">** THANK YOU! **</div>
               <div>Please Visit Again!</div>
               <div className="text-gray-500 text-[10px] mt-1">
-                Goods once sold will not be<br />returned or exchanged.
+                {store.footerNote}
               </div>
               <div className="text-gray-400 text-[10px] mt-2">
-                — {STORE_INFO.name} —
+                — {store.name} —
               </div>
               <div className="font-mono text-[10px] text-gray-400 mt-1">
                 #{bill.id.slice(0, 16).toUpperCase()}

@@ -4,6 +4,7 @@ import { useAuth, type StaffRole } from "@/hooks/use-auth";
 import { type Permissions } from "@/lib/permissions";
 import { Loader2, Delete } from "lucide-react";
 import { toast } from "sonner";
+import { useStoreSettings } from "@/lib/store-info";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -18,6 +19,7 @@ function PinDot({ filled }: { filled: boolean }) {
 export default function Login() {
   const [, setLocation] = useLocation();
   const { login, isLoggedIn } = useAuth();
+  const store = useStoreSettings();
 
   const [staff, setStaff]           = useState<StaffMember[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -135,10 +137,10 @@ export default function Login() {
       {/* Logo */}
       <div className="mb-8 text-center">
         <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-primary/20">
-          <span className="text-2xl">🧸</span>
+          <span className="text-2xl">{store.logoEmoji}</span>
         </div>
-        <h1 className="text-2xl font-black text-foreground">VishwaKarma Complex</h1>
-        <p className="text-sm text-muted-foreground">Billing Management</p>
+        <h1 className="text-2xl font-black text-foreground">{store.name}</h1>
+        <p className="text-sm text-muted-foreground">{store.appSubtitle}</p>
       </div>
 
       {!selected ? (

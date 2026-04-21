@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { playTick, playStockIn, playStockOut, playError } from "@/lib/sounds";
 import { getCategoryStyle, getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
+import { useStoreSettings } from "@/lib/store-info";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -30,6 +31,7 @@ export default function ProductDetail() {
   const queryClient = useQueryClient();
   const { userId, role } = useAuth();
   const isOwner = role === "owner";
+  const store = useStoreSettings();
 
   const [quantity, setQuantity]         = useState<number>(1);
   const [savingImg, setSavingImg]       = useState(false);
@@ -209,7 +211,7 @@ export default function ProductDetail() {
               fontFamily: "'Segoe UI', Arial, sans-serif", background: "#fff",
             }}>
               <div style={{ background: hex.strip, padding: "5px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", letterSpacing: 0.5 }}>VishwaKarma Complex</span>
+                <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", letterSpacing: 0.5 }}>{store.name}</span>
                 <span style={{ fontSize: 14 }}>{emoji}</span>
               </div>
               <div style={{ padding: "10px 10px 8px", textAlign: "center" }}>
@@ -477,7 +479,7 @@ export default function ProductDetail() {
             <div
               className="flex items-center justify-between px-4 py-2.5 shrink-0"
               style={{ background: hex.strip }}>
-              <span className="text-xs font-black text-white tracking-tight">VishwaKarma Complex</span>
+              <span className="text-xs font-black text-white tracking-tight">{store.name}</span>
               <span className="text-lg">{emoji}</span>
             </div>
 

@@ -27,6 +27,7 @@ import Categories     from "@/pages/Categories";
 import Login          from "@/pages/Login";
 import StaffManagement from "@/pages/StaffManagement";
 import Checkout        from "@/pages/Checkout";
+import SettingsPage    from "@/pages/Settings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,6 +96,7 @@ function Router() {
             <Route path="/categories"   component={() => <Protected resource="categories"><Categories /></Protected>} />
             <Route path="/staff"        component={() => <Protected resource="staff"><StaffManagement /></Protected>} />
             <Route path="/checkout"     component={() => <Protected resource="scan"><Checkout /></Protected>} />
+            <Route path="/settings"     component={SettingsPage} />
             <Route                      component={NotFound} />
           </Switch>
         </AppLayout>

@@ -14,6 +14,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { getCategoryStyle, getCategoryEmoji } from "@/lib/category-colors";
+import { useStoreSettings } from "@/lib/store-info";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -180,6 +181,7 @@ const quickTiles = [
 
 /* ── Main ────────────────────────────────────────────────────────── */
 export default function Dashboard() {
+  const store = useStoreSettings();
   const { data: summary, isLoading: loadingSummary }       = useGetDashboardSummary({ query: { queryKey: getGetDashboardSummaryQueryKey() } });
   const { data: activity, isLoading: loadingActivity }     = useGetTodayActivity({ query: { queryKey: getGetTodayActivityQueryKey() } });
   const { data: lowStock, isLoading: loadingLowStock }     = useGetLowStockProducts({ query: { queryKey: getGetLowStockProductsQueryKey() } });
@@ -192,7 +194,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           {/* Mobile shows store name, desktop shows "Dashboard" */}
-          <h1 className="text-2xl font-black text-foreground tracking-tight md:hidden">VishwaKarma Complex</h1>
+          <h1 className="text-2xl font-black text-foreground tracking-tight md:hidden">{store.name}</h1>
           <h1 className="text-2xl font-black text-foreground tracking-tight hidden md:block">Dashboard</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Overview of your inventory · updates in real time</p>
         </div>

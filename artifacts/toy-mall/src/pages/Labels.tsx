@@ -3,6 +3,7 @@ import { Tag, Printer, Loader2, Search, Check, Package, Eye, QrCode, Barcode } f
 import { Input } from "@/components/ui/input";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 import { BarcodeImage } from "@/components/ui/BarcodeImage";
+import { useStoreSettings } from "@/lib/store-info";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -15,6 +16,7 @@ type LabelType = "qr" | "barcode";
 function PrintLabel({ p, qr, labelType }: { p: Product; qr: QrData | undefined; labelType: LabelType }) {
   const hex = getCategoryHex(p.category);
   const emoji = getCategoryEmoji(p.category);
+  const store = useStoreSettings();
 
   /* Barcode mode: just the barcode strip, nothing else */
   if (labelType === "barcode") {
@@ -37,7 +39,7 @@ function PrintLabel({ p, qr, labelType }: { p: Product; qr: QrData | undefined; 
       {/* Coloured top strip */}
       <div style={{ background: hex.strip, padding: "5px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", letterSpacing: 0.5 }}>
-          VishwaKarma Complex
+          {store.name}
         </span>
         <span style={{ fontSize: 14 }}>{emoji}</span>
       </div>
@@ -91,10 +93,11 @@ function PrintLabel({ p, qr, labelType }: { p: Product; qr: QrData | undefined; 
 function PreviewCard({ p, qr, labelType }: { p: Product; qr: QrData | undefined; labelType: LabelType }) {
   const hex = getCategoryHex(p.category);
   const emoji = getCategoryEmoji(p.category);
+  const store = useStoreSettings();
   return (
     <div className="rounded-2xl overflow-hidden border shadow-md bg-white" style={{ width: 160 }}>
       <div style={{ background: hex.strip }} className="flex items-center justify-between px-3 py-1.5">
-        <span className="text-[9px] font-black text-white tracking-tight">VishwaKarma</span>
+        <span className="text-[9px] font-black text-white tracking-tight">{store.name.split(" ")[0]}</span>
         <span className="text-sm">{emoji}</span>
       </div>
       <div className="p-2 text-center flex flex-col items-center gap-1">

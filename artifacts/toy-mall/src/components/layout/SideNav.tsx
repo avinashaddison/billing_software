@@ -1,11 +1,12 @@
 import { Fragment } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
 import { type Permissions } from "@/lib/permissions";
+import { useStoreSettings } from "@/lib/store-info";
 
 function getLevel(role: string | null, permissions: Permissions, resource: string): "none" | "read" | "write" {
   if (role === "owner") return "write";
@@ -19,6 +20,7 @@ export function SideNav() {
   const { role, permissions, staffName, logout } = useAuth();
 
   const handleLogout = () => { logout(); setLocation("/login"); };
+  const store = useStoreSettings();
 
   const perm    = (resource: string) => getLevel(role, permissions, resource);
   const visible = (resource: string) => perm(resource) !== "none";
@@ -33,12 +35,13 @@ export function SideNav() {
   ].filter((item) => !item.resource || visible(item.resource));
 
   const extraItems = [
-    { name: "Reports",    href: "/report",     icon: FileText, resource: "reports"   },
-    { name: "Customers",  href: "/customers",  icon: Users,    resource: "customers"  },
-    { name: "Categories", href: "/categories", icon: Layers,   resource: "categories" },
-    { name: "Labels",     href: "/labels",     icon: Tag,      resource: "labels"    },
-    { name: "Suppliers",  href: "/suppliers",  icon: Truck,    resource: "suppliers"  },
-    { name: "Staff",      href: "/staff",      icon: Users2,   resource: "staff"     },
+    { name: "Reports",    href: "/report",     icon: FileText,  resource: "reports"   },
+    { name: "Customers",  href: "/customers",  icon: Users,     resource: "customers"  },
+    { name: "Categories", href: "/categories", icon: Layers,    resource: "categories" },
+    { name: "Labels",     href: "/labels",     icon: Tag,       resource: "labels"    },
+    { name: "Suppliers",  href: "/suppliers",  icon: Truck,     resource: "suppliers"  },
+    { name: "Staff",      href: "/staff",      icon: Users2,    resource: "staff"     },
+    ...(role === "owner" ? [{ name: "Settings", href: "/settings", icon: Settings2, resource: "staff" as const }] : []),
   ].filter((item) => visible(item.resource));
 
   return (
@@ -46,11 +49,11 @@ export function SideNav() {
       <div className="px-4 py-4 border-b border-border">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-sm shadow-primary/30">
-            <span className="text-base leading-none">🧸</span>
+            <span className="text-base leading-none">{store.logoEmoji}</span>
           </div>
           <div className="min-w-0">
-            <h1 className="text-[13px] font-black tracking-tight text-foreground leading-tight whitespace-nowrap">VishwaKarma Complex</h1>
-            <p className="text-[10px] text-muted-foreground font-medium mt-px">Billing Management</p>
+            <h1 className="text-[13px] font-black tracking-tight text-foreground leading-tight whitespace-nowrap">{store.name}</h1>
+            <p className="text-[10px] text-muted-foreground font-medium mt-px">{store.appSubtitle}</p>
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { useLocation } from "wouter";
-import { Shield, LogOut, Sun, Moon, Users2, ChevronRight, Key, Volume2, VolumeX } from "lucide-react";
+import { Shield, LogOut, Sun, Moon, Users2, ChevronRight, Key, Volume2, VolumeX, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
@@ -115,6 +115,23 @@ export default function Profile() {
               <div className="flex-1">
                 <p className="font-bold">Staff Management</p>
                 <p className="text-xs text-muted-foreground">Manage staff accounts & permissions</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </button>
+          )}
+
+          {/* Settings (owner only) */}
+          {isOwner && (
+            <button
+              onClick={() => setLocation("/settings")}
+              className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 active:bg-muted transition-colors text-left border-b border-dashed border-muted"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <Settings2 className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold">Settings</p>
+                <p className="text-xs text-muted-foreground">Edit shop name, billing info & logo</p>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </button>
