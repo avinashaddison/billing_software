@@ -1,10 +1,10 @@
 import { Router, type IRouter } from "express";
-import { isConfigured, sendTestAlert } from "../lib/telegram";
+import { isConfigured, recipientCount, sendTestAlert } from "../lib/telegram";
 
 const router: IRouter = Router();
 
 router.get("/telegram/status", (_req, res): void => {
-  res.json({ configured: isConfigured() });
+  res.json({ configured: isConfigured(), recipients: recipientCount() });
 });
 
 router.post("/telegram/test", async (_req, res): Promise<void> => {

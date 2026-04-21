@@ -4,8 +4,17 @@ const API_BASE  = "https://api.telegram.org";
 const DIVIDER   = "━━━━━━━━━━━━━━━━━━━━━━";
 const STORE_NAME = process.env.STORE_NAME || "Toy Mall";
 
+function getChatIds(): string[] {
+  const raw = process.env.TELEGRAM_CHAT_ID ?? "";
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 export function isConfigured(): boolean {
-  return !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
+  return !!(process.env.TELEGRAM_BOT_TOKEN && getChatIds().length > 0);
+}
+
+export function recipientCount(): number {
+  return getChatIds().length;
 }
 
 function escapeHtml(str: string): string {
@@ -16,21 +25,23 @@ function fmt(n: number): string {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-async function sendMessage(text: string): Promise<void> {
-  const token  = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
-
+async function sendToOne(token: string, chatId: string, text: string): Promise<void> {
   const res = await fetch(`${API_BASE}/bot${token}/sendMessage`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
   });
-
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    logger.warn({ status: res.status, body }, "Telegram sendMessage failed");
+    logger.warn({ status: res.status, chatId, body }, "Telegram sendMessage failed");
   }
+}
+
+async function sendMessage(text: string): Promise<void> {
+  const token   = process.env.TELEGRAM_BOT_TOKEN;
+  const chatIds = getChatIds();
+  if (!token || chatIds.length === 0) return;
+  await Promise.all(chatIds.map((id) => sendToOne(token, id, text)));
 }
 
 export interface SaleAlertItem {

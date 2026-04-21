@@ -34,10 +34,12 @@ export default function SettingsPage() {
   const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
   const [tgTesting, setTgTesting] = useState(false);
 
+  const [tgRecipients, setTgRecipients] = useState(0);
+
   useEffect(() => {
     fetch(`${API}/telegram/status`)
       .then((r) => r.json())
-      .then((d) => setTgConfigured(d.configured))
+      .then((d) => { setTgConfigured(d.configured); setTgRecipients(d.recipients ?? 0); })
       .catch(() => setTgConfigured(false));
   }, []);
 
@@ -209,7 +211,9 @@ export default function SettingsPage() {
                     {tgConfigured === null ? "Checking…" : tgConfigured ? "Telegram Connected" : "Telegram Not Configured"}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    {tgConfigured ? "Alerts fire on every new sale" : "Add secrets to enable alerts"}
+                    {tgConfigured
+                      ? `${tgRecipients} recipient${tgRecipients !== 1 ? "s" : ""} — alerts fire on every new sale`
+                      : "Add secrets to enable alerts"}
                   </p>
                 </div>
               </div>
@@ -232,6 +236,12 @@ export default function SettingsPage() {
                   to find your <b>Chat ID</b></li>
                 <li>Add <span className="font-mono bg-muted px-1 rounded">TELEGRAM_BOT_TOKEN</span> and <span className="font-mono bg-muted px-1 rounded">TELEGRAM_CHAT_ID</span> as secrets in Replit, then restart the app</li>
               </ol>
+              <div className="mt-3 pt-3 border-t space-y-1">
+                <p className="font-bold text-xs text-foreground">Add Multiple Recipients</p>
+                <p>To send alerts to more than one person, edit the <span className="font-mono bg-muted px-1 rounded">TELEGRAM_CHAT_ID</span> secret and separate each Chat ID with a comma:</p>
+                <p className="font-mono bg-muted px-2 py-1 rounded break-all">123456789,987654321,555000111</p>
+                <p>Each person must first send a message to your bot so Telegram allows it to reach them.</p>
+              </div>
             </div>
           </div>
         </Section>
