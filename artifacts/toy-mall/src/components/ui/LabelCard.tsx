@@ -24,7 +24,7 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
   const store     = useStoreSettings();
   const showPrice = store.labelShowPrice ?? true;
 
-  /* ── Thermal print mode: 50mm × 25mm, two-column layout ── */
+  /* ── Thermal print mode: 50mm × 25mm, single-column Motoomal style ── */
   if (printMode) {
     return (
       <div style={{
@@ -34,107 +34,90 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
         background: "#fff",
         color: "#000",
         display: "flex",
-        flexDirection: "row",
+        flexDirection: "column",
         boxSizing: "border-box",
         overflow: "hidden",
-        border: "0.3mm solid #000",
       }}>
 
-        {/* ── LEFT: store name header + product info ── */}
+        {/* Store name — centred black banner */}
         <div style={{
-          width: "54%",
+          background: "#000",
+          color: "#fff",
+          textAlign: "center",
+          fontSize: 8, fontWeight: 900,
+          letterSpacing: 1.5,
+          textTransform: "uppercase",
+          padding: "0.7mm 2mm",
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}>
+          {store.name}
+        </div>
+
+        {/* Content */}
+        <div style={{
+          flex: 1,
           display: "flex",
           flexDirection: "column",
+          justifyContent: "space-between",
+          padding: "0.8mm 2mm 0.5mm",
           overflow: "hidden",
-          borderRight: "0.3mm solid #000",
         }}>
-          {/* Store name strip */}
-          <div style={{
-            background: "#000",
-            color: "#fff",
-            fontSize: 7, fontWeight: 900,
-            letterSpacing: 0.4,
-            padding: "0.6mm 1.5mm",
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-            flexShrink: 0,
-            textTransform: "uppercase",
-          }}>
-            {store.name}
-          </div>
 
-          {/* Product info body */}
-          <div style={{
-            flex: 1, display: "flex", flexDirection: "column",
-            justifyContent: "space-between",
-            padding: "1mm 1.5mm 1mm",
-            overflow: "hidden",
-          }}>
-            {/* Product name */}
+          {/* Product name + SKU */}
+          <div>
             <div style={{
-              fontSize: 8, fontWeight: 800, lineHeight: 1.2,
+              fontSize: 8, fontWeight: 700, lineHeight: 1.2,
               overflow: "hidden", textOverflow: "ellipsis",
-              display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+              whiteSpace: "nowrap",
             }}>
               {p.name}
             </div>
-
-            {/* SKU */}
             <div style={{
-              fontSize: 6.5, fontFamily: "monospace", color: "#333",
-              letterSpacing: 0.3, marginTop: "0.5mm",
+              fontSize: 6.5, fontFamily: "monospace", color: "#444",
+              letterSpacing: 0.3, lineHeight: 1.2,
             }}>
               {p.sku}
             </div>
+          </div>
 
-            {/* Price */}
-            {showPrice && (
-              <div style={{
-                marginTop: "0.8mm", paddingTop: "0.6mm",
-                borderTop: "0.3mm solid #000",
-              }}>
-                {p.salePrice != null ? (
-                  <>
-                    <div style={{ fontSize: 6.5, color: "#555", textDecoration: "line-through", lineHeight: 1.1 }}>
-                      MRP ₹{Number(p.price).toLocaleString("en-IN")}
-                    </div>
-                    <div style={{ fontSize: 11, fontWeight: 900, lineHeight: 1 }}>
-                      ₹{Number(p.salePrice).toLocaleString("en-IN")}
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ fontSize: 10, fontWeight: 900, lineHeight: 1 }}>
-                    ₹{Number(p.price).toLocaleString("en-IN")}
+          {/* Price */}
+          {showPrice && (
+            <div style={{ lineHeight: 1.15 }}>
+              {p.salePrice != null ? (
+                <>
+                  <div style={{
+                    fontSize: 8, fontWeight: 700,
+                    textDecoration: "line-through", color: "#222",
+                  }}>
+                    MRP: {Number(p.price).toLocaleString("en-IN")}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+                  <div style={{ fontSize: 10, fontWeight: 900 }}>
+                    SALE: {Number(p.salePrice).toLocaleString("en-IN")}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 9, fontWeight: 800 }}>
+                  MRP: ₹{Number(p.price).toLocaleString("en-IN")}
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* ── RIGHT: barcode ── */}
-        <div style={{
-          width: "46%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "1mm 1mm 0.5mm",
-          overflow: "hidden",
-        }}>
-          <div style={{
-            flex: 1, width: "100%", display: "flex",
-            alignItems: "center", justifyContent: "center", minHeight: 0,
-          }}>
+          {/* Barcode + number */}
+          <div style={{ overflow: "hidden" }}>
             <BarcodePngImage value={p.sku} className="w-full" />
+            <div style={{
+              fontSize: 6.5, textAlign: "center",
+              fontFamily: "monospace", letterSpacing: 0.5,
+            }}>
+              {p.sku}
+            </div>
           </div>
-          <div style={{
-            fontSize: 6, fontFamily: "monospace", textAlign: "center",
-            letterSpacing: 0.5, flexShrink: 0,
-          }}>
-            {p.sku}
-          </div>
-        </div>
 
+        </div>
       </div>
     );
   }
