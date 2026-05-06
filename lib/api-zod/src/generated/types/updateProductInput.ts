@@ -9,10 +9,16 @@
 export interface UpdateProductInput {
   name?: string;
   sku?: string;
+  /** @nullable */
+  barcode?: string | null;
   category?: string;
   price?: number;
   /** @nullable */
   salePrice?: number | null;
   stock?: number;
   lowStockThreshold?: number;
+  /** @nullable */
+  imageUrl?: string | null;
+  /** @nullable */
+  supplierId?: string | null;
 }

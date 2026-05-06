@@ -72,12 +72,7 @@ router.post("/products", async (req, res): Promise<void> => {
     return;
   }
 
-  const body = req.body as {
-    name: string; sku: string; barcode?: string; category: string;
-    price: number; salePrice?: number | null; stock?: number;
-    lowStockThreshold?: number; imageUrl?: string | null; supplierId?: string | null;
-  };
-  const { name, sku, barcode, category, price, salePrice, stock, lowStockThreshold, imageUrl, supplierId } = body;
+  const { name, sku, barcode, category, price, salePrice, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
 
   const [product] = await db
     .insert(productsTable)
@@ -209,19 +204,29 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const d = parsed.data;
   const updates: Record<string, unknown> = {};
-  if (parsed.data.name != null) updates.name = parsed.data.name;
-  if (parsed.data.sku != null) updates.sku = parsed.data.sku;
-  if (req.body.barcode !== undefined) updates.barcode = (req.body.barcode as string | undefined)?.trim() || null;
-  if (parsed.data.category != null) updates.category = parsed.data.category;
-  if (parsed.data.price != null) updates.price = String(parsed.data.price);
-  if (parsed.data.stock != null) updates.stock = parsed.data.stock;
-  if (parsed.data.lowStockThreshold != null)
-    updates.lowStockThreshold = parsed.data.lowStockThreshold;
-  if (req.body.imageUrl !== undefined) updates.imageUrl = req.body.imageUrl || null;
-  if (req.body.supplierId !== undefined) updates.supplierId = req.body.supplierId || null;
-  if (req.body.salePrice !== undefined)
-    updates.salePrice = req.body.salePrice != null ? String(Number(req.body.salePrice)) : null;
+  if (d.name != null) updates.name = d.name;
+  if (d.sku != null) updates.sku = d.sku;
+  if (d.barcode !== undefined) updates.barcode = d.barcode?.trim() || null;
+  if (d.category != null) updates.category = d.category;
+  if (d.price != null) updates.price = String(d.price);
+  if (d.salePrice !== undefined) {
+    if (d.salePrice != null) {
+      const sp = Number(d.salePrice);
+      if (isNaN(sp) || sp <= 0) {
+        res.status(400).json({ error: "salePrice must be a positive number" });
+        return;
+      }
+      updates.salePrice = String(sp);
+    } else {
+      updates.salePrice = null;
+    }
+  }
+  if (d.stock != null) updates.stock = d.stock;
+  if (d.lowStockThreshold != null) updates.lowStockThreshold = d.lowStockThreshold;
+  if (d.imageUrl !== undefined) updates.imageUrl = d.imageUrl || null;
+  if (d.supplierId !== undefined) updates.supplierId = d.supplierId || null;
 
   const [product] = await db
     .update(productsTable)
