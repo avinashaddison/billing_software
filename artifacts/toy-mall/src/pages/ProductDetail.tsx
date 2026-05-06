@@ -548,12 +548,20 @@ export default function ProductDetail() {
                   onClick={() => {
                     const dataUrl = barcodePngDataUrl(product.sku);
                     if (!dataUrl) return;
+                    // Use Blob URL — browsers treat it as a silent file save,
+                    // never triggering Windows "open with" / Microsoft Photos
+                    const binary = atob(dataUrl.split(",")[1]);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                    const blob = new Blob([bytes], { type: "image/png" });
+                    const blobUrl = URL.createObjectURL(blob);
                     const a = document.createElement("a");
-                    a.href = dataUrl;
+                    a.href = blobUrl;
                     a.download = `${product.sku}-barcode.png`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
                   }}
                   className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
                 >
