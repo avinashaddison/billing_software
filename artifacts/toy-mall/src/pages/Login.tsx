@@ -51,6 +51,18 @@ export default function Login() {
     if (pin.length === 4 && selected) handleLogin();
   }, [pin]);
 
+  /* Keyboard support for PIN entry */
+  useEffect(() => {
+    if (!selected) return;
+    const handler = (e: KeyboardEvent) => {
+      if (checking || !!lockedUntil) return;
+      if (e.key >= "0" && e.key <= "9") { addDigit(e.key); }
+      else if (e.key === "Backspace" || e.key === "Delete") { removeDigit(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selected, checking, lockedUntil, pin]);
+
   /* Lockout countdown ticker */
   useEffect(() => {
     if (!lockedUntil) { setLockCountdown(""); return; }
