@@ -1,6 +1,6 @@
-import { useState, useRef, memo } from "react";
+import { useState, useRef, memo, useCallback } from "react";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
-import { Link, useSearch } from "wouter";
+import { Link, useSearch, useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { getCategoryStyle, getCategoryEmoji } from "@/lib/category-colors";
+import { useUsbScanner } from "@/hooks/use-usb-scanner";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -356,6 +357,36 @@ export default function Products() {
   const { role }                    = useAuth();
   const isAdmin                     = role === "owner";
   const qc                          = useQueryClient();
+  const [, navigate]                = useLocation();
+  const searchInputRef              = useRef<HTMLInputElement>(null);
+
+  const handleUsbScan = useCallback(async (raw: string) => {
+    let sku = raw;
+    try {
+      if (raw.includes("product?sku=")) {
+        const u = new URL(raw.startsWith("http") ? raw : `http://x${raw}`);
+        sku = u.searchParams.get("sku") ?? raw;
+      }
+    } catch { /* use raw */ }
+
+    sku = sku.trim().toUpperCase();
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/products/scan/${encodeURIComponent(sku)}`);
+      if (!res.ok) {
+        toast.error(`Product not found: ${sku}`);
+        return;
+      }
+      const product = await res.json() as { sku: string };
+      navigate(`/product?sku=${encodeURIComponent(product.sku)}`);
+    } catch {
+      toast.error(`Product not found: ${sku}`);
+    }
+  }, [navigate]);
+
+  useUsbScanner(handleUsbScan, {
+    allowedInput: { ref: searchInputRef, onClear: () => setSearch("") },
+  });
 
   const { data: allProducts, isLoading } = useListProducts(
     { search: debouncedSearch || undefined },
@@ -428,7 +459,7 @@ export default function Products() {
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input placeholder="Search by name or SKU..." value={search}
+          <Input ref={searchInputRef} placeholder="Search by name or SKU..." value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-10 h-12 rounded-xl text-base bg-muted/50 border-transparent focus-visible:bg-background"
             data-testid="input-search" />
