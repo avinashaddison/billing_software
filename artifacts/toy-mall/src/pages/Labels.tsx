@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Tag, Printer, Loader2, Search, Check, Package, Eye, Barcode, Plus, Minus, LayoutGrid, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LabelCard, type LabelProduct as Product } from "@/components/ui/LabelCard";
@@ -59,7 +60,12 @@ export default function Labels() {
   const toggleAll  = () => { if (selected.size === filtered.length) { setSelected(new Set()); } else { setSelected(new Set(filtered.map((p) => p.id))); } setShowPreview(false); setPreviewPage(0); };
   const setCopiesFor = (id: string, val: number) => setCopies((c) => ({ ...c, [id]: Math.max(1, Math.min(99, val)) }));
 
-  const doPrint = useCallback(() => { setPrinting(true); setTimeout(() => window.print(), 300); }, []);
+  const doPrint = useCallback(() => {
+    setPrinting(true);
+    const cleanup = () => { setPrinting(false); window.removeEventListener("afterprint", cleanup); };
+    window.addEventListener("afterprint", cleanup);
+    setTimeout(() => window.print(), 300);
+  }, []);
 
   const selectedProducts = products.filter((p) => selected.has(p.id));
   const printItems = selectedProducts.flatMap((p) => Array.from({ length: getCopies(p.id) }, (_, i) => ({ ...p, _key: `${p.id}-${i}` })));
@@ -80,7 +86,7 @@ export default function Labels() {
 
   return (
     <>
-      {/* ── Print CSS ── */}
+      {/* ── Print CSS (injected into <head>) ── */}
       <style>{`
         @page { size: A4 portrait; margin: 10mm; }
         @media print {
@@ -111,18 +117,25 @@ export default function Labels() {
         }
       `}</style>
 
-      {/* ── Hidden print area ── */}
-      <div className="labels-print-area" style={{ display: "none" }}>
-        {printing && pages.map((page, pi) => (
-          <div key={pi} className="print-page">
-            {page.map((p) => (
-              <div key={p._key} className="print-cell">
-                <LabelCard p={p} printMode />
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+      {/* ── Print portal — rendered directly on <body> so CSS selector works ── */}
+      {printing && createPortal(
+        <div className="labels-print-area" style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "white", zIndex: 99999, overflow: "auto",
+          visibility: "hidden",
+        }}>
+          {pages.map((page, pi) => (
+            <div key={pi} className="print-page">
+              {page.map((p) => (
+                <div key={p._key} className="print-cell">
+                  <LabelCard p={p} printMode />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
 
       <div className="flex flex-col h-full bg-background">
 
