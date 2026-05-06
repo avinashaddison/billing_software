@@ -9,6 +9,7 @@ import {
   getGetProductQrQueryKey
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
 import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode, QrCode } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
@@ -33,6 +34,7 @@ export default function ProductDetail() {
   const { userId, role } = useAuth();
   const isOwner = role === "owner";
   const store = useStoreSettings();
+  const { addItem, count } = useCart();
 
   const [quantity, setQuantity]         = useState<number>(1);
   const [savingImg, setSavingImg]       = useState(false);
@@ -72,16 +74,27 @@ export default function ProductDetail() {
       const res = await fetch(`${BASE_URL}/api/products/scan/${encodeURIComponent(code)}`);
       if (!res.ok) { toast.error(`Product not found: ${code}`); return; }
       const found = await res.json();
+
+      /* Add to billing cart so the "Ongoing" strip appears */
+      addItem({
+        productId: found.id,
+        sku:       found.sku,
+        name:      found.name,
+        price:     Number(found.price),
+      });
+      toast.success(`Added to billing: ${found.name} (${count + 1} in cart)`, { duration: 1500 });
+
+      /* Refresh current page data if it's the same product */
       if (found.sku === sku) {
-        toast.success(`Scanned: ${found.name}`, { duration: 1200 });
         queryClient.invalidateQueries({ queryKey: getGetProductBySkuQueryKey(sku) });
       } else {
+        /* Navigate to the scanned product */
         setLocation(`/product?sku=${encodeURIComponent(found.sku)}`);
       }
     } catch {
       toast.error(`Lookup failed for ${code}`);
     }
-  }, [sku, setLocation, queryClient]);
+  }, [sku, setLocation, queryClient, addItem, count]);
 
   useUsbScanner(handleUsbScan);
 
