@@ -91,7 +91,7 @@ export default function Labels() {
           background: "white",
         }}>
           {printItems.map((p) => (
-            <div key={p._key} className="label-page">
+            <div key={p._key} className="label-page" style={{ width: "50mm", height: "25mm" }}>
               <LabelCard p={p} printMode />
             </div>
           ))}
