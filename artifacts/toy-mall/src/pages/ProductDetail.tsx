@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearch, useLocation, Link } from "wouter";
+import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import {
   useGetProductBySku, useUpdateStock, useGetProductQr,
   getGetProductBySkuQueryKey, getGetDashboardSummaryQueryKey,
@@ -64,6 +65,23 @@ export default function ProductDetail() {
       setLocation("/products");
     }
   }, [isError, setLocation]);
+
+  const handleUsbScan = useCallback(async (code: string) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/products/scan/${encodeURIComponent(code)}`);
+      if (!res.ok) { toast.error(`Product not found: ${code}`); return; }
+      const found = await res.json();
+      if (found.sku === sku) {
+        toast.success(`Scanned: ${found.name}`, { duration: 1200 });
+      } else {
+        setLocation(`/product?sku=${encodeURIComponent(found.sku)}`);
+      }
+    } catch {
+      toast.error(`Lookup failed for ${code}`);
+    }
+  }, [sku, setLocation]);
+
+  useUsbScanner(handleUsbScan);
 
   const handleStockAction = async (type: "IN" | "OUT") => {
     if (!product) return;

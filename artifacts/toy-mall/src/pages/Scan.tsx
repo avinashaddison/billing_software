@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 import { useLocation } from "wouter";
+import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import {
   ScanLine, ArrowRight, Trash2, Plus, Minus,
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
   Phone, Wallet, Banknote, Smartphone,
   PackagePlus, ShoppingBag, ArrowUpCircle, RotateCcw, Camera, CameraOff,
-  Volume2, VolumeX, QrCode, BadgeCheck,
+  Volume2, VolumeX, QrCode, BadgeCheck, Usb,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -546,6 +547,7 @@ export default function Scan() {
   const handleScan = useCallback((sku: string) => { setLookupSku(sku); }, []);
   const handleCameraError = useCallback((msg: string) => { setCameraError(msg); }, []);
   useScanner(showScanner, videoRef, handleScan, handleCameraError);
+  useUsbScanner(handleScan);
 
   useEffect(() => {
     if (!lookupSku) return;
@@ -816,7 +818,7 @@ export default function Scan() {
       <div className="px-4 pb-3 shrink-0">
         <form onSubmit={handleManual} className="flex gap-2">
           <Input value={manualSku} onChange={(e) => setManualSku(e.target.value)}
-            placeholder="Type SKU manually…"
+            placeholder="Type SKU or scan barcode…"
             className={`h-11 font-mono uppercase text-sm rounded-xl ${isStockIn ? "focus:border-blue-500" : "focus:border-green-500"}`}
             data-testid="input-sku-manual"
           />
@@ -826,6 +828,10 @@ export default function Scan() {
             <ArrowRight className="w-4 h-4" />
           </Button>
         </form>
+        <div className="flex items-center gap-1.5 mt-1.5">
+          <Usb className="w-3 h-3 text-muted-foreground/60" />
+          <span className="text-[10px] text-muted-foreground/60 font-medium">USB barcode scanner active — scan anytime</span>
+        </div>
       </div>
 
       {/* ══════════════════════════════════
