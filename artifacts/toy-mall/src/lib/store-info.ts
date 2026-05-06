@@ -12,6 +12,7 @@ export interface StoreSettings {
   footerNote: string;
   upiId: string;
   dynamicQrMode: boolean;
+  labelShowPrice: boolean;
 }
 
 interface StoreSettingsStore extends StoreSettings {
@@ -31,6 +32,7 @@ export const useStoreSettings = create<StoreSettingsStore>()(
       footerNote:    "Goods once sold will not be returned or exchanged.",
       upiId:         "",
       dynamicQrMode: false,
+      labelShowPrice: true,
       update: (patch) => set(patch),
     }),
     { name: "toy-mall-store-settings-v1" }
@@ -47,5 +49,6 @@ export const STORE_INFO = {
   get appSubtitle()   { return useStoreSettings.getState().appSubtitle; },
   get footerNote()    { return useStoreSettings.getState().footerNote; },
   get upiId()         { return useStoreSettings.getState().upiId; },
-  get dynamicQrMode() { return useStoreSettings.getState().dynamicQrMode; },
+  get dynamicQrMode()   { return useStoreSettings.getState().dynamicQrMode; },
+  get labelShowPrice()  { return useStoreSettings.getState().labelShowPrice; },
 };

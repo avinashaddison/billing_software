@@ -13,6 +13,7 @@ function LabelCard({ p, compact = false }: { p: Product; compact?: boolean }) {
   const hex   = getCategoryHex(p.category);
   const emoji = getCategoryEmoji(p.category);
   const store = useStoreSettings();
+  const showPrice = store.labelShowPrice ?? true;
 
   const cardStyle: React.CSSProperties = {
     border: "1px solid #d1d5db",
@@ -75,13 +76,15 @@ function LabelCard({ p, compact = false }: { p: Product; compact?: boolean }) {
           {p.name}
         </div>
 
-        {/* Divider */}
-        <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "5px 0" }} />
-
-        {/* Price */}
-        <div style={{ fontSize: compact ? 14 : 18, fontWeight: 900, color: "#111827" }}>
-          ₹{p.price.toLocaleString("en-IN")}
-        </div>
+        {/* Divider + Price — conditional on store setting */}
+        {showPrice && (
+          <>
+            <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "5px 0" }} />
+            <div style={{ fontSize: compact ? 14 : 18, fontWeight: 900, color: "#111827" }}>
+              ₹{p.price.toLocaleString("en-IN")}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

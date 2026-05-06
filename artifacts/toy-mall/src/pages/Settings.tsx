@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag } from "lucide-react";
 import { useStoreSettings, type StoreSettings } from "@/lib/store-info";
 import { toast } from "sonner";
 
@@ -8,31 +8,33 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 const EMOJI_OPTIONS = ["🧸", "🎮", "🛒", "🏪", "🎁", "🧩", "🎯", "🪀", "🎈", "⭐"];
 
 const DEFAULTS: StoreSettings = {
-  name:          "VishwaKarma Complex",
-  tagline:       "The Complete Toy Store",
-  phone:         "+91 94318 01793",
-  address:       "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
-  gst:           "",
-  logoEmoji:     "🧸",
-  appSubtitle:   "Billing Management",
-  footerNote:    "Goods once sold will not be returned or exchanged.",
-  upiId:         "",
-  dynamicQrMode: false,
+  name:           "VishwaKarma Complex",
+  tagline:        "The Complete Toy Store",
+  phone:          "+91 94318 01793",
+  address:        "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
+  gst:            "",
+  logoEmoji:      "🧸",
+  appSubtitle:    "Billing Management",
+  footerNote:     "Goods once sold will not be returned or exchanged.",
+  upiId:          "",
+  dynamicQrMode:  false,
+  labelShowPrice: true,
 };
 
 export default function SettingsPage() {
   const store = useStoreSettings();
   const [form, setForm] = useState<StoreSettings>({
-    name:          store.name,
-    tagline:       store.tagline,
-    phone:         store.phone,
-    address:       store.address,
-    gst:           store.gst,
-    logoEmoji:     store.logoEmoji,
-    appSubtitle:   store.appSubtitle,
-    footerNote:    store.footerNote,
-    upiId:         store.upiId,
-    dynamicQrMode: store.dynamicQrMode,
+    name:           store.name,
+    tagline:        store.tagline,
+    phone:          store.phone,
+    address:        store.address,
+    gst:            store.gst,
+    logoEmoji:      store.logoEmoji,
+    appSubtitle:    store.appSubtitle,
+    footerNote:     store.footerNote,
+    upiId:          store.upiId,
+    dynamicQrMode:  store.dynamicQrMode,
+    labelShowPrice: store.labelShowPrice ?? true,
   });
   const [saved, setSaved] = useState(false);
   const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
@@ -85,6 +87,7 @@ export default function SettingsPage() {
     address: store.address, gst: store.gst, logoEmoji: store.logoEmoji,
     appSubtitle: store.appSubtitle, footerNote: store.footerNote,
     upiId: store.upiId, dynamicQrMode: store.dynamicQrMode,
+    labelShowPrice: store.labelShowPrice ?? true,
   });
 
   return (
@@ -237,6 +240,28 @@ export default function SettingsPage() {
               ⚠️ Enter a UPI ID above to activate QR generation.
             </p>
           )}
+        </Section>
+
+        {/* ── Label Printing ── */}
+        <Section icon={Tag} title="Label Printing" color="text-amber-600 bg-amber-50 dark:bg-amber-950/30">
+          <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+            <div>
+              <p className="text-xs font-bold">Show Price on Labels</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                When on, the selling price is printed on every shelf label. Turn off to hide price from labels.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggle("labelShowPrice")}
+              className={`ml-4 shrink-0 transition-colors ${form.labelShowPrice ? "text-amber-600" : "text-muted-foreground"}`}
+              aria-label="Toggle price on labels"
+            >
+              {form.labelShowPrice
+                ? <ToggleRight className="w-10 h-10" />
+                : <ToggleLeft  className="w-10 h-10" />}
+            </button>
+          </div>
         </Section>
 
         {/* ── Telegram Notifications ── */}
