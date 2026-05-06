@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
-import { useScanFlash, ScanFlash } from "@/components/ui/ScanFlash";
+import { useScanFlash, ScanFlash, useLowStockFlash, LowStockFlash } from "@/components/ui/ScanFlash";
 import {
   ScanLine, ArrowRight, Trash2, Plus, Minus,
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
@@ -27,7 +27,7 @@ type PageMode    = "billing" | "stockin";
 type PaymentMode = "cash" | "upi";
 
 interface ScannedProduct {
-  id: string; name: string; sku: string; price: number; salePrice?: number | null; stock: number;
+  id: string; name: string; sku: string; price: number; salePrice?: number | null; stock: number; lowStockThreshold: number;
 }
 
 /* ── API helpers ─────────────────────────────────────────────────── */
@@ -522,6 +522,7 @@ export default function Scan() {
         price: Number(p.price),
         salePrice: "salePrice" in p ? (p.salePrice as number | null | undefined) : null,
         stock: p.stock,
+        lowStockThreshold: p.lowStockThreshold ?? 5,
       });
     });
     return map;
@@ -552,6 +553,7 @@ export default function Scan() {
   const isStockIn = mode === "stockin";
 
   const { flash, triggerFlash } = useScanFlash();
+  const { lowStockFlash, triggerLowStockFlash } = useLowStockFlash();
 
   const handleScan = useCallback((sku: string) => {
     triggerFlash(sku);
@@ -594,6 +596,9 @@ export default function Scan() {
         setStockProduct(cached);
         setStockSuccess(null);
       }
+      if (cached.stock <= cached.lowStockThreshold) {
+        triggerLowStockFlash(cached.name, cached.stock);
+      }
       setLookupSku(null);
       return;
     }
@@ -610,10 +615,13 @@ export default function Scan() {
           setStockProduct(product);
           setStockSuccess(null);
         }
+        if (product.stock <= product.lowStockThreshold) {
+          triggerLowStockFlash(product.name, product.stock);
+        }
       })
       .catch(() => { playError(); toast.error(`SKU "${lookupSku}" not found`); })
       .finally(() => setLookupSku(null));
-  }, [lookupSku, isBilling, addItem, skuCache]);
+  }, [lookupSku, isBilling, addItem, skuCache, triggerLowStockFlash]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -702,6 +710,7 @@ export default function Scan() {
 
       {/* ── Scan confirmation flash ── */}
       <ScanFlash flash={flash} />
+      <LowStockFlash lowStockFlash={lowStockFlash} />
 
       {/* ── Overlays ── */}
       {successBillId && <SuccessOverlay billId={successBillId} />}
@@ -973,7 +982,6 @@ export default function Scan() {
           )}
         </div>
       )}
-      <ScanFlash flash={flash} />
     </div>
   );
 }
