@@ -4,10 +4,9 @@ import { Input } from "@/components/ui/input";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 import { BarcodeImage } from "@/components/ui/BarcodeImage";
 import { useStoreSettings } from "@/lib/store-info";
+import { useListProducts } from "@workspace/api-client-react";
 
-const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-
-interface Product { id: string; name: string; sku: string; price: number; category: string; stock: number; }
+type Product = { id: string; name: string; sku: string; price: number; category: string; stock: number; };
 
 /* ── Single label — used both for preview and print ─────────────── */
 function LabelCard({ p, compact = false }: { p: Product; compact?: boolean }) {
@@ -90,20 +89,14 @@ function LabelCard({ p, compact = false }: { p: Product; compact?: boolean }) {
 
 /* ═══════════════════════════════════════════════════════════════ */
 export default function Labels() {
-  const [products, setProducts]     = useState<Product[]>([]);
-  const [search, setSearch]         = useState("");
-  const [selected, setSelected]     = useState<Set<string>>(new Set());
-  const [copies, setCopies]         = useState<Record<string, number>>({});
-  const [loading, setLoading]       = useState(true);
-  const [showPreview, setShowPreview] = useState(false);
-  const [printing, setPrinting]     = useState(false);
+  const { data: productsData, isLoading: loading } = useListProducts();
+  const products: Product[] = (productsData ?? []) as Product[];
 
-  useEffect(() => {
-    fetch(`${BASE_URL}/api/products`)
-      .then((r) => r.json())
-      .then(setProducts)
-      .finally(() => setLoading(false));
-  }, []);
+  const [search, setSearch]           = useState("");
+  const [selected, setSelected]       = useState<Set<string>>(new Set());
+  const [copies, setCopies]           = useState<Record<string, number>>({});
+  const [showPreview, setShowPreview] = useState(false);
+  const [printing, setPrinting]       = useState(false);
 
   /* Reset showPrint after browser print dialog closes */
   useEffect(() => {
