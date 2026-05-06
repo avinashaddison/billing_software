@@ -210,29 +210,40 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   }
 
   const d = parsed.data;
+
+  /* Fetch existing product upfront — needed for salePrice validation and 404 detection */
+  const [existing] = await db
+    .select()
+    .from(productsTable)
+    .where(eq(productsTable.id, params.data.id));
+
+  if (!existing) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  /* Validate salePrice against the effective price (incoming or persisted) */
+  if (d.salePrice != null) {
+    const sp = Number(d.salePrice);
+    if (isNaN(sp) || sp <= 0) {
+      res.status(400).json({ error: "salePrice must be a positive number" });
+      return;
+    }
+    const effectivePrice = d.price != null ? d.price : Number(existing.price);
+    if (sp >= effectivePrice) {
+      res.status(400).json({ error: "salePrice must be less than the regular price" });
+      return;
+    }
+  }
+
   const updates: Record<string, unknown> = {};
   if (d.name != null) updates.name = d.name;
   if (d.sku != null) updates.sku = d.sku;
   if (d.barcode !== undefined) updates.barcode = d.barcode?.trim() || null;
   if (d.category != null) updates.category = d.category;
   if (d.price != null) updates.price = String(d.price);
-  if (d.salePrice !== undefined) {
-    if (d.salePrice != null) {
-      const sp = Number(d.salePrice);
-      if (isNaN(sp) || sp <= 0) {
-        res.status(400).json({ error: "salePrice must be a positive number" });
-        return;
-      }
-      const effectivePrice = d.price != null ? d.price : null;
-      if (effectivePrice != null && sp >= effectivePrice) {
-        res.status(400).json({ error: "salePrice must be less than the regular price" });
-        return;
-      }
-      updates.salePrice = String(sp);
-    } else {
-      updates.salePrice = null;
-    }
-  }
+  if (d.salePrice !== undefined)
+    updates.salePrice = d.salePrice != null ? String(Number(d.salePrice)) : null;
   if (d.stock != null) updates.stock = d.stock;
   if (d.lowStockThreshold != null) updates.lowStockThreshold = d.lowStockThreshold;
   if (d.imageUrl !== undefined) updates.imageUrl = d.imageUrl || null;
