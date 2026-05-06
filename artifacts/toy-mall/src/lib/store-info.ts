@@ -41,6 +41,30 @@ export const useStoreSettings = create<StoreSettingsStore>()(
   )
 );
 
+export interface StaffScannerPref {
+  thresholdMs: number;
+  deviceName?: string;
+  confirmedAt: string;
+}
+
+interface PerStaffScannerStore {
+  prefs: Record<string, StaffScannerPref>;
+  setPref: (staffId: string, pref: StaffScannerPref) => void;
+  getPref: (staffId: string) => StaffScannerPref | null;
+}
+
+export const usePerStaffScannerPrefs = create<PerStaffScannerStore>()(
+  persist(
+    (set, get) => ({
+      prefs: {},
+      setPref: (staffId, pref) =>
+        set((s) => ({ prefs: { ...s.prefs, [staffId]: pref } })),
+      getPref: (staffId) => get().prefs[staffId] ?? null,
+    }),
+    { name: "toy-mall-scanner-prefs-v1" }
+  )
+);
+
 export const STORE_INFO = {
   get name()          { return useStoreSettings.getState().name; },
   get tagline()       { return useStoreSettings.getState().tagline; },

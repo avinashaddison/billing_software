@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle } from "lucide-react";
-import { useStoreSettings, type StoreSettings } from "@/lib/store-info";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star } from "lucide-react";
+import { useStoreSettings, usePerStaffScannerPrefs, type StoreSettings } from "@/lib/store-info";
+import { useAuth } from "@/hooks/use-auth";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import { useScanDebugLog } from "@/lib/scan-debug-log";
 import { toast } from "sonner";
@@ -32,6 +33,10 @@ const SCANNER_PRESETS = [
 
 export default function SettingsPage() {
   const store = useStoreSettings();
+  const { staffId, staffName } = useAuth();
+  const scannerPrefs = usePerStaffScannerPrefs();
+  const myPref = staffId ? scannerPrefs.getPref(staffId) : null;
+
   const [form, setForm] = useState<StoreSettings>({
     name:               store.name,
     tagline:            store.tagline,
@@ -278,22 +283,47 @@ export default function SettingsPage() {
         {/* ── Scanner Speed ── */}
         <Section icon={ScanLine} title="USB Scanner Speed" color="text-green-600 bg-green-50 dark:bg-green-950/30">
           <Field label="Inter-keystroke threshold" hint="How long to wait between characters before deciding the input isn't from a scanner. Increase if your scanner is being missed; decrease if normal typing is triggering false scans.">
+            {myPref && (
+              <div className="mb-2 flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400 font-medium">
+                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                {myPref.deviceName
+                  ? `${staffName || "You"} last used ${myPref.thresholdMs} ms with "${myPref.deviceName}"`
+                  : `${staffName || "You"} last confirmed ${myPref.thresholdMs} ms`}
+                {" "}— click the highlighted preset to apply it.
+              </div>
+            )}
             <div className="flex gap-2 mb-3">
-              {SCANNER_PRESETS.map((p) => (
-                <button
-                  key={p.ms}
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, scannerThresholdMs: p.ms }))}
-                  className={`flex-1 py-2 px-3 rounded-xl border-2 text-xs font-bold transition-all ${
-                    form.scannerThresholdMs === p.ms
-                      ? "border-green-500 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300"
-                      : "border-border hover:border-green-400 hover:bg-muted"
-                  }`}
-                >
-                  {p.label}
-                  <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">{p.ms} ms</span>
-                </button>
-              ))}
+              {SCANNER_PRESETS.map((p) => {
+                const isActive = form.scannerThresholdMs === p.ms;
+                const isMyPref = myPref?.thresholdMs === p.ms;
+                return (
+                  <button
+                    key={p.ms}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, scannerThresholdMs: p.ms }))}
+                    className={`flex-1 py-2 px-3 rounded-xl border-2 text-xs font-bold transition-all relative ${
+                      isActive
+                        ? "border-green-500 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300"
+                        : isMyPref
+                        ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300"
+                        : "border-border hover:border-green-400 hover:bg-muted"
+                    }`}
+                  >
+                    {p.label}
+                    <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">{p.ms} ms</span>
+                    {isMyPref && !isActive && (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full bg-amber-400 text-white text-[9px] font-black whitespace-nowrap leading-tight">
+                        ★ last worked
+                      </span>
+                    )}
+                    {isMyPref && isActive && (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full bg-green-500 text-white text-[9px] font-black whitespace-nowrap leading-tight">
+                        ★ your preset
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -317,7 +347,25 @@ export default function SettingsPage() {
             )}
           </Field>
 
-          <ScannerTestWidget thresholdMs={form.scannerThresholdMs} />
+          <ScannerTestWidget
+            thresholdMs={form.scannerThresholdMs}
+            staffId={staffId ?? undefined}
+            staffName={staffName}
+            onDetected={(thresholdMs, deviceName) => {
+              if (!staffId) return;
+              scannerPrefs.setPref(staffId, {
+                thresholdMs,
+                deviceName,
+                confirmedAt: new Date().toISOString(),
+              });
+            }}
+            onSuggest={(thresholdMs, deviceName) => {
+              setForm((f) => ({ ...f, scannerThresholdMs: thresholdMs }));
+              toast.info(
+                `Scanner "${deviceName}" detected — threshold set to ${thresholdMs} ms. Scan a barcode to confirm it works.`,
+              );
+            }}
+          />
           <RecentScanEvents />
         </Section>
 
@@ -387,17 +435,66 @@ export default function SettingsPage() {
   );
 }
 
-function ScannerTestWidget({ thresholdMs }: { thresholdMs: number }) {
+function ScannerTestWidget({
+  thresholdMs,
+  staffId,
+  staffName,
+  onDetected,
+  onSuggest,
+}: {
+  thresholdMs: number;
+  staffId?: string;
+  staffName?: string;
+  onDetected?: (thresholdMs: number, deviceName?: string) => void;
+  onSuggest?: (thresholdMs: number, deviceName: string) => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputVal, setInputVal] = useState("");
   const [lastCode, setLastCode] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hidStatus, setHidStatus] = useState<"idle" | "detecting" | "found" | "none">("idle");
+  const [hidDevice, setHidDevice] = useState<string | null>(null);
+
+  const hidAvailable = typeof navigator !== "undefined" && "hid" in navigator;
+
+  const handleDetectHid = async () => {
+    if (!hidAvailable) return;
+    setHidStatus("detecting");
+    try {
+      const devices = await (navigator as unknown as { hid: { requestDevice: (opts: unknown) => Promise<{ productName: string }[]> } }).hid.requestDevice({ filters: [] });
+      if (devices.length === 0) {
+        setHidStatus("none");
+        return;
+      }
+      const name = devices[0].productName || "Unknown HID device";
+      setHidDevice(name);
+      setHidStatus("found");
+      const lower = name.toLowerCase();
+      let suggestedMs: number;
+      if (lower.includes("honeywell") || lower.includes("symbol") || lower.includes("zebra")) {
+        suggestedMs = 40;
+      } else if (lower.includes("tvs") || lower.includes("opticon") || lower.includes("datalogic")) {
+        suggestedMs = 60;
+      } else {
+        suggestedMs = 60;
+      }
+      onSuggest?.(suggestedMs, name);
+    } catch {
+      setHidStatus("none");
+    }
+  };
 
   useUsbScanner(
     (code) => {
       if (clearTimer.current) clearTimeout(clearTimer.current);
       setLastCode(code);
       setInputVal("");
+      if (staffId && onDetected) {
+        onDetected(thresholdMs, hidDevice ?? undefined);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
       clearTimer.current = setTimeout(() => setLastCode(null), 4000);
     },
     {
@@ -415,7 +512,7 @@ function ScannerTestWidget({ thresholdMs }: { thresholdMs: number }) {
     <div className="space-y-2">
       <label className="text-xs font-bold text-foreground">Test your scanner</label>
       <p className="text-[11px] text-muted-foreground">
-        Point your scanner at any barcode and scan it. If detected, a green confirmation appears. If nothing happens, increase the threshold above then save.
+        Point your scanner at any barcode and scan it. If detected, a green confirmation appears and this threshold is remembered for you next visit. If nothing happens, increase the threshold above then save.
       </p>
       <input
         ref={inputRef}
@@ -428,6 +525,42 @@ function ScannerTestWidget({ thresholdMs }: { thresholdMs: number }) {
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
           <CheckCircle className="w-4 h-4 shrink-0" />
           Scanner detected! Code: <span className="font-mono ml-1">{lastCode}</span>
+          {saved && staffId && (
+            <span className="ml-auto text-[10px] font-black bg-green-600 text-white px-1.5 py-0.5 rounded-full">
+              ★ saved for you
+            </span>
+          )}
+        </div>
+      )}
+
+      {hidAvailable && (
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={handleDetectHid}
+            disabled={hidStatus === "detecting"}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold hover:bg-muted transition-colors disabled:opacity-60"
+          >
+            {hidStatus === "detecting" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Cpu className="w-3.5 h-3.5" />
+            )}
+            {hidStatus === "detecting" ? "Detecting…" : "Auto-detect scanner device"}
+          </button>
+          {hidStatus === "found" && hidDevice && (
+            <p className="mt-1.5 text-[11px] text-green-700 dark:text-green-400 font-medium">
+              ✓ Found: <span className="font-mono">{hidDevice}</span> — threshold pre-filled. Scan a barcode above to confirm.
+            </p>
+          )}
+          {hidStatus === "none" && (
+            <p className="mt-1.5 text-[11px] text-muted-foreground">No HID device selected. Grant permission and try again.</p>
+          )}
+          {hidStatus === "idle" && (
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Lets the browser identify your scanner model to prefill the best threshold.
+            </p>
+          )}
         </div>
       )}
     </div>
