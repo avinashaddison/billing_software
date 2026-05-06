@@ -2,16 +2,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearch, useLocation, Link } from "wouter";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import {
-  useGetProductBySku, useUpdateStock, useGetProductQr,
+  useGetProductBySku, useUpdateStock,
   getGetProductBySkuQueryKey, getGetDashboardSummaryQueryKey,
   getGetTodayActivityQueryKey, getListProductsQueryKey,
   getGetLowStockProductsQueryKey, getListStockLogsQueryKey,
-  getGetProductQrQueryKey
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode, QrCode } from "lucide-react";
+import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { BarcodeImage, barcodeSvgDataUrl } from "@/components/ui/BarcodeImage";
 import { Button } from "@/components/ui/button";
@@ -41,7 +40,6 @@ export default function ProductDetail() {
   const [editOpen, setEditOpen]         = useState(false);
   const [editSaving, setEditSaving]     = useState(false);
   const [editForm, setEditForm]         = useState({ name: "", price: "", category: "", lowStockThreshold: "" });
-  const [labelTab, setLabelTab]             = useState<"qr" | "barcode">("qr");
   const [printing, setPrinting]             = useState(false);
 
   const { data: product, isLoading, isError } = useGetProductBySku(sku, {
@@ -52,12 +50,6 @@ export default function ProductDetail() {
     }
   });
 
-  const { data: qrData, isLoading: qrLoading } = useGetProductQr(product?.id ?? "", {
-    query: {
-      enabled: !!product?.id,
-      queryKey: getGetProductQrQueryKey(product?.id ?? "")
-    }
-  });
 
   const updateStock = useUpdateStock();
 
@@ -239,31 +231,9 @@ export default function ProductDetail() {
       {/* ── Hidden print area ── */}
       {printing && product && (
         <div className="product-print-area hidden print:flex">
-          {labelTab === "barcode" ? (
-            <div style={{ background: "#fff", padding: "6px 4px" }}>
-              <BarcodeImage value={product.sku} height={60} fontSize={11} />
-            </div>
-          ) : qrData?.qrDataUrl ? (
-            <div style={{
-              border: "1px solid #d1d5db", borderRadius: 10, overflow: "hidden",
-              fontFamily: "'Segoe UI', Arial, sans-serif", background: "#fff",
-            }}>
-              <div style={{ background: hex.strip, padding: "5px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", letterSpacing: 0.5 }}>{store.name}</span>
-                <span style={{ fontSize: 14 }}>{emoji}</span>
-              </div>
-              <div style={{ padding: "10px 10px 8px", textAlign: "center" }}>
-                <div style={{ display: "inline-block", background: hex.badge, color: hex.text, borderRadius: 20, fontSize: 9, fontWeight: 800, padding: "2px 8px", marginBottom: 8, letterSpacing: 0.5, textTransform: "uppercase" }}>
-                  {product.category}
-                </div>
-                <img src={qrData.qrDataUrl} alt={product.sku} style={{ width: 110, height: 110, display: "block", margin: "0 auto 6px" }} />
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#111827", lineHeight: 1.3, marginBottom: 3 }}>{product.name}</div>
-                <div style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: "#6b7280", letterSpacing: 2, marginBottom: 6 }}>{product.sku}</div>
-                <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "6px 0" }} />
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#111827" }}>₹{product.price.toLocaleString("en-IN")}</div>
-              </div>
-            </div>
-          ) : null}
+          <div style={{ background: "#fff", padding: "6px 4px" }}>
+            <BarcodeImage value={product.sku} height={60} fontSize={11} />
+          </div>
         </div>
       )}
 
@@ -511,7 +481,7 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {/* ══ Col 3: QR + Barcode ══ */}
+          {/* ══ Col 3: Barcode ══ */}
           <div className="bg-card border rounded-3xl shadow-sm overflow-hidden flex flex-col">
             {/* Coloured top strip */}
             <div
@@ -519,30 +489,6 @@ export default function ProductDetail() {
               style={{ background: hex.strip }}>
               <span className="text-xs font-black text-white tracking-tight">{store.name}</span>
               <span className="text-lg">{emoji}</span>
-            </div>
-
-            {/* Tab toggle */}
-            <div className="flex gap-1 mx-5 mt-4 p-1 bg-muted rounded-xl shrink-0">
-              <button
-                onClick={() => setLabelTab("qr")}
-                className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-black transition-all ${
-                  labelTab === "qr"
-                    ? "bg-background shadow-sm text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <QrCode className="w-3.5 h-3.5" /> QR Code
-              </button>
-              <button
-                onClick={() => setLabelTab("barcode")}
-                className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-black transition-all ${
-                  labelTab === "barcode"
-                    ? "bg-background shadow-sm text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Barcode className="w-3.5 h-3.5" /> Barcode
-              </button>
             </div>
 
             <div className="flex flex-col items-center gap-3 p-5 flex-1 justify-center">
@@ -553,85 +499,40 @@ export default function ProductDetail() {
                 {product.category}
               </span>
 
-              {labelTab === "qr" ? (
-                <>
-                  <p className="text-xs text-muted-foreground font-medium">Scan to open this product</p>
-                  {qrLoading ? (
-                    <Skeleton className="w-48 h-48 rounded-2xl" />
-                  ) : qrData?.qrDataUrl ? (
-                    <img
-                      src={qrData.qrDataUrl}
-                      alt={`QR code for ${product.sku}`}
-                      className="w-48 h-48 rounded-2xl shadow-sm"
-                      style={{ border: `3px solid ${hex.strip}` }}
-                    />
-                  ) : (
-                    <div className="w-48 h-48 rounded-2xl border-2 border-dashed border-muted flex items-center justify-center text-muted-foreground text-sm">
-                      QR unavailable
-                    </div>
-                  )}
-                  <div className="text-center space-y-0.5">
-                    <p className="font-mono font-black text-lg tracking-widest">{product.sku}</p>
-                    <p className="text-xs text-muted-foreground">{product.name}</p>
-                  </div>
-                  {qrData?.qrDataUrl && (
-                    <div className="flex gap-2 w-full mt-1">
-                      <a
-                        href={qrData.qrDataUrl}
-                        download={`${product.sku}-qr.png`}
-                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        Download QR
-                      </a>
-                      <button
-                        onClick={printLabel}
-                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white transition-colors active:scale-95"
-                        style={{ background: hex.strip }}>
-                        <Printer className="w-3.5 h-3.5" />
-                        Print Label
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <p className="text-xs text-muted-foreground font-medium">Scan to open this product</p>
-                  <div
-                    className="w-full rounded-2xl overflow-hidden shadow-sm flex items-center justify-center bg-white py-2 px-1"
-                    style={{ border: `3px solid ${hex.strip}` }}
-                  >
-                    <BarcodeImage value={product.sku} height={72} fontSize={13} className="w-full max-w-[220px]" />
-                  </div>
-                  <div className="text-center space-y-0.5">
-                    <p className="font-mono font-black text-lg tracking-widest">{product.sku}</p>
-                    <p className="text-xs text-muted-foreground">{product.name}</p>
-                  </div>
-                  <div className="flex gap-2 w-full mt-1">
-                    <button
-                      onClick={() => {
-                        const url = barcodeSvgDataUrl(product.sku, 80);
-                        if (!url) return;
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `${product.sku}-barcode.svg`;
-                        a.click();
-                      }}
-                      className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      Download
-                    </button>
-                    <button
-                      onClick={printLabel}
-                      className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white transition-colors active:scale-95"
-                      style={{ background: hex.strip }}>
-                      <Printer className="w-3.5 h-3.5" />
-                      Print Label
-                    </button>
-                  </div>
-                </>
-              )}
+              <p className="text-xs text-muted-foreground font-medium">Scan to open this product</p>
+              <div
+                className="w-full rounded-2xl overflow-hidden shadow-sm flex items-center justify-center bg-white py-2 px-1"
+                style={{ border: `3px solid ${hex.strip}` }}
+              >
+                <BarcodeImage value={product.sku} height={72} fontSize={13} className="w-full max-w-[220px]" />
+              </div>
+              <div className="text-center space-y-0.5">
+                <p className="font-mono font-black text-lg tracking-widest">{product.sku}</p>
+                <p className="text-xs text-muted-foreground">{product.name}</p>
+              </div>
+              <div className="flex gap-2 w-full mt-1">
+                <button
+                  onClick={() => {
+                    const url = barcodeSvgDataUrl(product.sku, 80);
+                    if (!url) return;
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `${product.sku}-barcode.svg`;
+                    a.click();
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download
+                </button>
+                <button
+                  onClick={printLabel}
+                  className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white transition-colors active:scale-95"
+                  style={{ background: hex.strip }}>
+                  <Printer className="w-3.5 h-3.5" />
+                  Print Label
+                </button>
+              </div>
             </div>
           </div>
 

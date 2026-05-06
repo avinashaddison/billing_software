@@ -177,7 +177,7 @@ function StatCard({
 const quickTiles = [
   { href: "/report",    icon: FileText, label: "Reports",   desc: "EOD & trends",     iconBg: "bg-blue-500",    gradient: "from-blue-500/8"   },
   { href: "/customers", icon: Users,    label: "Customers", desc: "Purchase history", iconBg: "bg-purple-500",  gradient: "from-purple-500/8" },
-  { href: "/labels",    icon: Tag,      label: "Labels",    desc: "QR shelf tags",    iconBg: "bg-amber-500",   gradient: "from-amber-500/8"  },
+  { href: "/labels",    icon: Tag,      label: "Labels",    desc: "Barcode shelf labels",    iconBg: "bg-amber-500",   gradient: "from-amber-500/8"  },
   { href: "/suppliers", icon: Truck,    label: "Suppliers", desc: "Manage vendors",   iconBg: "bg-emerald-500", gradient: "from-emerald-500/8" },
 ] as const;
 
