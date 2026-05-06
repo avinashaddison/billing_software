@@ -539,7 +539,11 @@ export default function Scan() {
   const [stockSuccess, setStockSuccess]   = useState<{ name: string; added: number; newStock: number } | null>(null);
   const [cameraError, setCameraError]     = useState<string | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef     = useRef<HTMLVideoElement>(null);
+  const manualInputRef = useRef<HTMLInputElement>(null);
+
+  /* Auto-focus the SKU input so the USB scanner can type into it directly */
+  useEffect(() => { manualInputRef.current?.focus(); }, []);
 
   const isBilling = mode === "billing";
   const isStockIn = mode === "stockin";
@@ -547,7 +551,15 @@ export default function Scan() {
   const handleScan = useCallback((sku: string) => { setLookupSku(sku); }, []);
   const handleCameraError = useCallback((msg: string) => { setCameraError(msg); }, []);
   useScanner(showScanner, videoRef, handleScan, handleCameraError);
-  useUsbScanner(handleScan);
+
+  /* USB scanner: fires handleScan + shows an immediate scan-received toast */
+  const handleUsbScan = useCallback((sku: string) => {
+    toast(`Scanning ${sku}…`, { duration: 800, icon: "📡" });
+    handleScan(sku);
+  }, [handleScan]);
+  useUsbScanner(handleUsbScan, {
+    allowedInput: { ref: manualInputRef, onClear: () => setManualSku("") },
+  });
 
   useEffect(() => {
     if (!lookupSku) return;
@@ -817,7 +829,7 @@ export default function Scan() {
       {/* ── Manual SKU Entry ── */}
       <div className="px-4 pb-3 shrink-0">
         <form onSubmit={handleManual} className="flex gap-2">
-          <Input value={manualSku} onChange={(e) => setManualSku(e.target.value)}
+          <Input ref={manualInputRef} value={manualSku} onChange={(e) => setManualSku(e.target.value)}
             placeholder="Type SKU or scan barcode…"
             className={`h-11 font-mono uppercase text-sm rounded-xl ${isStockIn ? "focus:border-blue-500" : "focus:border-green-500"}`}
             data-testid="input-sku-manual"

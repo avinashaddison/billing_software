@@ -67,19 +67,21 @@ export default function ProductDetail() {
   }, [isError, setLocation]);
 
   const handleUsbScan = useCallback(async (code: string) => {
+    toast(`Scanning ${code}…`, { duration: 800, icon: "📡" });
     try {
       const res = await fetch(`${BASE_URL}/api/products/scan/${encodeURIComponent(code)}`);
       if (!res.ok) { toast.error(`Product not found: ${code}`); return; }
       const found = await res.json();
       if (found.sku === sku) {
         toast.success(`Scanned: ${found.name}`, { duration: 1200 });
+        queryClient.invalidateQueries({ queryKey: getGetProductBySkuQueryKey(sku) });
       } else {
         setLocation(`/product?sku=${encodeURIComponent(found.sku)}`);
       }
     } catch {
       toast.error(`Lookup failed for ${code}`);
     }
-  }, [sku, setLocation]);
+  }, [sku, setLocation, queryClient]);
 
   useUsbScanner(handleUsbScan);
 
