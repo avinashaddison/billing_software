@@ -85,7 +85,7 @@ export function barcodePngDataUrl(value: string): string {
  * fits the label card width without heavy downscaling.  pixelated rendering
  * prevents anti-aliasing from blurring bars when any scaling does occur.
  */
-function barcodeLabelPngDataUrl(value: string): string {
+export function barcodeLabelPngDataUrl(value: string): string {
   const canvas = document.createElement("canvas");
   try {
     JsBarcode(canvas, value, {

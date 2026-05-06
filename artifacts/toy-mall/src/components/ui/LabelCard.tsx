@@ -1,5 +1,6 @@
+import { useMemo } from "react";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
-import { BarcodePngImage } from "@/components/ui/BarcodeImage";
+import { BarcodePngImage, barcodeLabelPngDataUrl } from "@/components/ui/BarcodeImage";
 import { useStoreSettings } from "@/lib/store-info";
 
 export type LabelProduct = {
@@ -27,11 +28,22 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
   const mrp       = Number(p.price).toLocaleString("en-IN");
   const sale      = hasSale ? Number(p.salePrice!).toLocaleString("en-IN") : null;
 
+  /* Barcode PNG — memoised so it renders once */
+  const barcodeSrc = useMemo(() => barcodeLabelPngDataUrl(p.sku), [p.sku]);
+
   /* ── Print mode: 50mm × 25mm compact thermal label ── */
   if (printMode) {
+    /*
+     * Layout (fixed mm heights so nothing can overflow):
+     *   Banner:      3.5mm  — black strip with store name
+     *   Middle row:  9mm    — product name (left) + price (right)
+     *   Barcode:     12.5mm — fills the rest (25 - 3.5 - 9)
+     *     img:       7.5mm  — barcode bars (objectFit:fill keeps aspect intact)
+     *     sku text:  rest   — tiny mono text
+     */
     return (
       <div style={{
-        width: "100%", height: "100%",
+        width: "50mm", height: "25mm",
         fontFamily: "Arial, 'Helvetica Neue', sans-serif",
         background: "#fff", color: "#000",
         display: "flex", flexDirection: "column",
@@ -39,37 +51,37 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
         overflow: "hidden",
       }}>
 
-        {/* Store name — solid black banner */}
+        {/* ── Banner: 3.5mm ── */}
         <div style={{
+          height: "3.5mm", flexShrink: 0,
           background: "#000", color: "#fff",
-          textAlign: "center",
+          display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: "6.5pt", fontWeight: 900,
           letterSpacing: "0.8pt", textTransform: "uppercase",
-          padding: "0.6mm 1mm",
-          flexShrink: 0,
           overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
+          padding: "0 1mm",
           printColorAdjust: "exact",
           WebkitPrintColorAdjust: "exact",
         } as React.CSSProperties}>
           {store.name}
         </div>
 
-        {/* Middle row: product info left + price right */}
+        {/* ── Middle row: 9mm ── */}
         <div style={{
+          height: "9mm", flexShrink: 0,
           display: "flex", flexDirection: "row",
-          flex: 1, minHeight: 0,
           overflow: "hidden",
         }}>
           {/* Product name + SKU */}
           <div style={{
             flex: showPrice ? "0 0 58%" : 1,
-            padding: "0.8mm 1.5mm 0.5mm",
+            padding: "0.5mm 1.5mm 0.5mm",
             display: "flex", flexDirection: "column",
             justifyContent: "center",
             overflow: "hidden",
           }}>
             <div style={{
-              fontSize: "7pt", fontWeight: 800, lineHeight: 1.2,
+              fontSize: "6.5pt", fontWeight: 800, lineHeight: 1.2,
               overflow: "hidden", textOverflow: "ellipsis",
               display: "-webkit-box",
               WebkitLineClamp: 2,
@@ -78,19 +90,19 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
               {p.name}
             </div>
             <div style={{
-              fontSize: "5.5pt", fontFamily: "monospace",
+              fontSize: "5pt", fontFamily: "monospace",
               color: "#555", marginTop: "0.4mm", lineHeight: 1,
             }}>
               {p.sku}
             </div>
           </div>
 
-          {/* Price column */}
+          {/* Price */}
           {showPrice && (
             <div style={{
               flex: "0 0 42%",
               borderLeft: "0.3mm solid #ccc",
-              padding: "0.8mm 1.5mm 0.5mm 1.2mm",
+              padding: "0.5mm 1mm 0.5mm 1.2mm",
               display: "flex", flexDirection: "column",
               justifyContent: "center",
               overflow: "hidden",
@@ -98,40 +110,30 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
               {hasSale ? (
                 <>
                   <div style={{
-                    fontSize: "5pt", fontWeight: 700,
-                    color: "#555", lineHeight: 1.1,
-                    textDecoration: "line-through",
+                    fontSize: "5pt", fontWeight: 700, color: "#555",
+                    lineHeight: 1.1, textDecoration: "line-through",
                     whiteSpace: "nowrap",
                   }}>
                     MRP ₹{mrp}
                   </div>
                   <div style={{
-                    fontSize: "8.5pt", fontWeight: 900,
-                    lineHeight: 1.1, whiteSpace: "nowrap",
-                    overflow: "hidden", textOverflow: "ellipsis",
+                    fontSize: "8.5pt", fontWeight: 900, lineHeight: 1.1,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   }}>
                     ₹{sale}
                   </div>
-                  <div style={{
-                    fontSize: "4.5pt", color: "#555",
-                    lineHeight: 1, marginTop: "0.3mm",
-                  }}>
+                  <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1, marginTop: "0.2mm" }}>
                     SALE PRICE
                   </div>
                 </>
               ) : (
                 <>
-                  <div style={{
-                    fontSize: "5pt", fontWeight: 600,
-                    color: "#555", lineHeight: 1,
-                    letterSpacing: "0.3pt",
-                  }}>
+                  <div style={{ fontSize: "5pt", fontWeight: 600, color: "#555", lineHeight: 1, letterSpacing: "0.3pt" }}>
                     MRP
                   </div>
                   <div style={{
-                    fontSize: "9pt", fontWeight: 900,
-                    lineHeight: 1.1, whiteSpace: "nowrap",
-                    overflow: "hidden", textOverflow: "ellipsis",
+                    fontSize: "9pt", fontWeight: 900, lineHeight: 1.1,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   }}>
                     ₹{mrp}
                   </div>
@@ -141,17 +143,30 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
           )}
         </div>
 
-        {/* Barcode + SKU text */}
+        {/* ── Barcode zone: fills remaining 12.5mm ── */}
         <div style={{
-          padding: "0 1.5mm 0.5mm",
-          flexShrink: 0,
+          flex: 1, minHeight: 0,
+          padding: "0.5mm 1mm 0.8mm",
+          display: "flex", flexDirection: "column",
+          justifyContent: "center",
           overflow: "hidden",
         }}>
-          <BarcodePngImage value={p.sku} className="w-full" />
+          {/* Barcode image — explicit 7.5mm height prevents it from expanding */}
+          <img
+            src={barcodeSrc}
+            alt={p.sku}
+            style={{
+              display: "block",
+              width: "100%",
+              height: "7.5mm",
+              objectFit: "fill",   /* stretch to fill — bars get wider, still scannable */
+              imageRendering: "pixelated",
+            }}
+          />
           <div style={{
             fontSize: "5pt", textAlign: "center",
             fontFamily: "monospace", letterSpacing: "0.4pt",
-            lineHeight: 1, marginTop: "0.2mm",
+            lineHeight: 1, marginTop: "0.3mm", color: "#000",
           }}>
             {p.sku}
           </div>
