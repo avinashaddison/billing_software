@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Tag, Printer, Loader2, Search, Check, Package, Eye, Barcode } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Tag, Printer, Loader2, Search, Check, Package, Eye, Barcode, Plus, Minus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 import { BarcodeImage } from "@/components/ui/BarcodeImage";
@@ -9,38 +9,80 @@ const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 interface Product { id: string; name: string; sku: string; price: number; category: string; stock: number; }
 
-/* ── Single printed label card ─────────────────────────────────── */
-function PrintLabel({ p }: { p: Product }) {
-  return (
-    <div style={{ background: "#ffffff", pageBreakInside: "avoid", padding: "6px 4px" }}>
-      <BarcodeImage value={p.sku} height={60} fontSize={11} />
-    </div>
-  );
-}
-
-/* ── On-screen label preview card ──────────────────────────────── */
-function PreviewCard({ p }: { p: Product }) {
-  const hex = getCategoryHex(p.category);
+/* ── Single label — used both for preview and print ─────────────── */
+function LabelCard({ p, compact = false }: { p: Product; compact?: boolean }) {
+  const hex   = getCategoryHex(p.category);
   const emoji = getCategoryEmoji(p.category);
   const store = useStoreSettings();
+
+  const cardStyle: React.CSSProperties = {
+    border: "1px solid #d1d5db",
+    borderRadius: 10,
+    overflow: "hidden",
+    fontFamily: "'Segoe UI', Arial, sans-serif",
+    background: "#ffffff",
+    pageBreakInside: "avoid",
+    breakInside: "avoid",
+    width: compact ? 160 : undefined,
+  };
+  const stripStyle: React.CSSProperties = {
+    background: hex.strip,
+    padding: compact ? "4px 10px" : "5px 10px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  };
+  const bodyStyle: React.CSSProperties = {
+    padding: compact ? "6px 8px" : "10px 10px 8px",
+    textAlign: "center",
+  };
+
   return (
-    <div className="rounded-2xl overflow-hidden border shadow-md bg-white" style={{ width: 160 }}>
-      <div style={{ background: hex.strip }} className="flex items-center justify-between px-3 py-1.5">
-        <span className="text-[9px] font-black text-white tracking-tight">{store.name.split(" ")[0]}</span>
-        <span className="text-sm">{emoji}</span>
-      </div>
-      <div className="p-2 text-center flex flex-col items-center gap-1">
-        <span
-          className="text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide"
-          style={{ background: hex.badge, color: hex.text }}>
-          {p.category}
+    <div style={cardStyle}>
+      <div style={stripStyle}>
+        <span style={{ fontSize: compact ? 9 : 11, fontWeight: 800, color: "#fff", letterSpacing: 0.5 }}>
+          {compact ? store.name.split(" ")[0] : store.name}
         </span>
-        <div className="w-full bg-white py-1">
-          <BarcodeImage value={p.sku} height={44} fontSize={9} className="w-full" />
+        <span style={{ fontSize: compact ? 12 : 14 }}>{emoji}</span>
+      </div>
+      <div style={bodyStyle}>
+        {/* Category badge */}
+        <div style={{
+          display: "inline-block",
+          background: hex.badge, color: hex.text,
+          borderRadius: 20, fontSize: compact ? 8 : 9, fontWeight: 800,
+          padding: "2px 8px", marginBottom: compact ? 4 : 8,
+          letterSpacing: 0.5, textTransform: "uppercase",
+        }}>
+          {p.category}
         </div>
-        <p className="text-[10px] font-bold text-gray-900 leading-tight line-clamp-2">{p.name}</p>
-        <div className="w-full border-t-2 my-0.5" style={{ borderColor: hex.strip }} />
-        <p className="text-base font-black text-gray-900">₹{p.price.toLocaleString("en-IN")}</p>
+
+        {/* Barcode */}
+        <BarcodeImage
+          value={p.sku}
+          height={compact ? 40 : 56}
+          fontSize={compact ? 9 : 11}
+          className="w-full"
+        />
+
+        {/* Product name */}
+        <div style={{
+          fontSize: compact ? 10 : 12, fontWeight: 800, color: "#111827",
+          lineHeight: 1.3, marginTop: compact ? 3 : 5,
+          marginBottom: 3, minHeight: compact ? undefined : 30,
+          overflow: "hidden", textOverflow: "ellipsis",
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+        }}>
+          {p.name}
+        </div>
+
+        {/* Divider */}
+        <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "5px 0" }} />
+
+        {/* Price */}
+        <div style={{ fontSize: compact ? 14 : 18, fontWeight: 900, color: "#111827" }}>
+          ₹{p.price.toLocaleString("en-IN")}
+        </div>
       </div>
     </div>
   );
@@ -48,12 +90,13 @@ function PreviewCard({ p }: { p: Product }) {
 
 /* ═══════════════════════════════════════════════════════════════ */
 export default function Labels() {
-  const [products, setProducts]   = useState<Product[]>([]);
-  const [search, setSearch]       = useState("");
-  const [selected, setSelected]   = useState<Set<string>>(new Set());
-  const [loading, setLoading]     = useState(true);
-  const [showPrint, setShowPrint] = useState(false);
+  const [products, setProducts]     = useState<Product[]>([]);
+  const [search, setSearch]         = useState("");
+  const [selected, setSelected]     = useState<Set<string>>(new Set());
+  const [copies, setCopies]         = useState<Record<string, number>>({});
+  const [loading, setLoading]       = useState(true);
   const [showPreview, setShowPreview] = useState(false);
+  const [printing, setPrinting]     = useState(false);
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/products`)
@@ -62,9 +105,18 @@ export default function Labels() {
       .finally(() => setLoading(false));
   }, []);
 
+  /* Reset showPrint after browser print dialog closes */
+  useEffect(() => {
+    const onAfterPrint = () => setPrinting(false);
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => window.removeEventListener("afterprint", onAfterPrint);
+  }, []);
+
   const filtered = products.filter(
     (p) => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())
   );
+
+  const getCopies = (id: string) => copies[id] ?? 1;
 
   const toggle = (id: string) => {
     setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -77,35 +129,51 @@ export default function Labels() {
     setShowPreview(false);
   };
 
-  const generateAndAct = (andPrint = false) => {
-    setShowPreview(false);
-    if (andPrint) { setShowPrint(true); setTimeout(() => window.print(), 300); }
-    else { setShowPreview(true); }
+  const setCopiesFor = (id: string, val: number) => {
+    setCopies((c) => ({ ...c, [id]: Math.max(1, Math.min(99, val)) }));
   };
 
+  const doPrint = useCallback(() => {
+    setPrinting(true);
+    setTimeout(() => window.print(), 300);
+  }, []);
+
   const selectedProducts = products.filter((p) => selected.has(p.id));
+
+  /* Expand by copies for print */
+  const printItems = selectedProducts.flatMap((p) =>
+    Array.from({ length: getCopies(p.id) }, (_, i) => ({ ...p, _key: `${p.id}-${i}` }))
+  );
+
+  const totalLabels = selectedProducts.reduce((s, p) => s + getCopies(p.id), 0);
 
   return (
     <>
       {/* Print-only CSS */}
       <style>{`
+        @page { margin: 10mm; }
         @media print {
           body * { visibility: hidden !important; }
           .labels-print-area, .labels-print-area * { visibility: visible !important; }
           .labels-print-area {
             position: fixed !important; top: 0 !important; left: 0 !important;
-            width: 100% !important; margin: 0 !important; padding: 16px !important;
+            width: 100% !important; margin: 0 !important; padding: 0 !important;
             background: white !important;
           }
         }
       `}</style>
 
       {/* Hidden print area */}
-      {showPrint && (
-        <div className="labels-print-area fixed inset-0 hidden print:block bg-white p-4">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}>
-            {selectedProducts.map((p) => (
-              <PrintLabel key={p.id} p={p} />
+      {printing && (
+        <div className="labels-print-area fixed inset-0 hidden print:block bg-white">
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "10px",
+            padding: "0",
+          }}>
+            {printItems.map((p) => (
+              <LabelCard key={p._key} p={p} />
             ))}
           </div>
         </div>
@@ -119,19 +187,19 @@ export default function Labels() {
               <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
                 <Tag className="w-6 h-6 text-primary" /> Label Printer
               </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">Select products · preview · print barcode shelf labels</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Select products · set copies · preview · print</p>
             </div>
             {selected.size > 0 && (
               <div className="flex items-center gap-2">
-                <button onClick={() => generateAndAct(false)}
+                <button onClick={() => { setShowPreview((v) => !v); }}
                   className="flex items-center gap-2 bg-muted border text-foreground px-3 py-2 rounded-full font-bold text-sm hover:bg-muted/70 active:scale-95 transition-all">
                   <Eye className="w-4 h-4" />
                   Preview
                 </button>
-                <button onClick={() => generateAndAct(true)}
+                <button onClick={doPrint}
                   className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-full font-bold text-sm hover:bg-neutral-800 active:scale-95 transition-all">
                   <Printer className="w-4 h-4" />
-                  Print {selected.size}
+                  Print {totalLabels}
                 </button>
               </div>
             )}
@@ -149,7 +217,9 @@ export default function Labels() {
             </button>
           </div>
           {selected.size > 0 && (
-            <p className="text-xs text-primary font-bold mt-2">{selected.size} product{selected.size !== 1 ? "s" : ""} selected</p>
+            <p className="text-xs text-primary font-bold mt-2">
+              {selected.size} product{selected.size !== 1 ? "s" : ""} · {totalLabels} label{totalLabels !== 1 ? "s" : ""} total
+            </p>
           )}
         </div>
 
@@ -157,19 +227,22 @@ export default function Labels() {
         {showPreview && selectedProducts.length > 0 && (
           <div className="border-b bg-muted/30 px-4 py-4">
             <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3">
-              <Barcode className="inline w-3.5 h-3.5 mr-1" />Label Preview
+              <Barcode className="inline w-3.5 h-3.5 mr-1" />Print Preview — {totalLabels} label{totalLabels !== 1 ? "s" : ""}
             </p>
             <div className="flex gap-3 overflow-x-auto pb-2">
               {selectedProducts.map((p) => (
                 <div key={p.id} className="shrink-0">
-                  <PreviewCard p={p} />
+                  <LabelCard p={p} compact />
+                  {getCopies(p.id) > 1 && (
+                    <p className="text-center text-[10px] font-bold text-primary mt-1">×{getCopies(p.id)}</p>
+                  )}
                 </div>
               ))}
             </div>
-            <button onClick={() => generateAndAct(true)}
+            <button onClick={doPrint}
               className="mt-3 flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-full font-bold text-sm hover:bg-neutral-800 active:scale-95 transition-all">
               <Printer className="w-4 h-4" />
-              Print {selected.size} Label{selected.size !== 1 ? "s" : ""}
+              Print {totalLabels} Label{totalLabels !== 1 ? "s" : ""}
             </button>
           </div>
         )}
@@ -189,13 +262,18 @@ export default function Labels() {
                 const isSelected = selected.has(p.id);
                 const hex = getCategoryHex(p.category);
                 const emoji = getCategoryEmoji(p.category);
+                const n = getCopies(p.id);
                 return (
-                  <button key={p.id} onClick={() => toggle(p.id)}
-                    className={`w-full flex items-center gap-4 p-4 md:px-6 transition-colors text-left ${isSelected ? "bg-primary/5" : "hover:bg-muted/50"}`}>
-                    <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isSelected ? "bg-primary border-primary" : "border-muted-foreground/30"}`}>
+                  <div key={p.id}
+                    className={`flex items-center gap-3 p-4 md:px-6 transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted/50"}`}>
+                    {/* Checkbox area */}
+                    <button onClick={() => toggle(p.id)}
+                      className={`w-10 h-10 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isSelected ? "bg-primary border-primary" : "border-muted-foreground/30"}`}>
                       {isSelected ? <Check className="w-5 h-5 text-primary-foreground" /> : <Tag className="w-4 h-4 text-muted-foreground" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
+                    </button>
+
+                    {/* Product info */}
+                    <button onClick={() => toggle(p.id)} className="flex-1 min-w-0 text-left">
                       <p className={`font-bold truncate ${isSelected ? "text-primary" : ""}`}>{p.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs font-mono text-muted-foreground">{p.sku}</span>
@@ -205,12 +283,34 @@ export default function Labels() {
                           {emoji} {p.category}
                         </span>
                       </div>
-                    </div>
-                    <div className="text-right shrink-0">
+                    </button>
+
+                    {/* Price + copies */}
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
                       <p className="font-black text-sm">₹{p.price.toLocaleString("en-IN")}</p>
-                      <p className="text-xs text-muted-foreground">Stock: {p.stock}</p>
+                      {isSelected && (
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => setCopiesFor(p.id, n - 1)}
+                            className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70 active:scale-90 transition-all">
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <input
+                            type="number"
+                            min={1} max={99}
+                            value={n}
+                            onChange={(e) => setCopiesFor(p.id, parseInt(e.target.value) || 1)}
+                            className="w-9 text-center text-xs font-black border rounded-lg h-6 bg-background [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            onClick={() => setCopiesFor(p.id, n + 1)}
+                            className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70 active:scale-90 transition-all">
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
