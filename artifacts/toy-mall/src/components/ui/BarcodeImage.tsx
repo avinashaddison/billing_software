@@ -53,3 +53,29 @@ export function barcodeSvgDataUrl(value: string, height = 80): string {
   const serialized = new XMLSerializer().serializeToString(svg);
   return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(serialized)));
 }
+
+/**
+ * Renders barcode to a canvas and returns a PNG data URL.
+ * PNG is preferred for download/print — no scaling artefacts, bars stay crisp.
+ * width=4 (px per bar) + margin=40 ensures generous quiet zones at any print size.
+ */
+export function barcodePngDataUrl(value: string): string {
+  const canvas = document.createElement("canvas");
+  try {
+    JsBarcode(canvas, value, {
+      format:       "CODE128",
+      width:        4,
+      height:       120,
+      fontSize:     20,
+      fontOptions:  "bold",
+      textMargin:   10,
+      margin:       40,
+      displayValue: true,
+      lineColor:    "#000000",
+      background:   "#ffffff",
+    });
+  } catch {
+    return "";
+  }
+  return canvas.toDataURL("image/png");
+}

@@ -12,7 +12,7 @@ import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
 import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
-import { BarcodeImage, barcodeSvgDataUrl } from "@/components/ui/BarcodeImage";
+import { BarcodeImage, barcodePngDataUrl } from "@/components/ui/BarcodeImage";
 import { LabelCard } from "@/components/ui/LabelCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -540,11 +540,11 @@ export default function ProductDetail() {
               <div className="flex gap-2 w-full mt-1">
                 <button
                   onClick={() => {
-                    const url = barcodeSvgDataUrl(product.sku, 80);
+                    const url = barcodePngDataUrl(product.sku);
                     if (!url) return;
                     const a = document.createElement("a");
                     a.href = url;
-                    a.download = `${product.sku}-barcode.svg`;
+                    a.download = `${product.sku}-barcode.png`;
                     a.click();
                   }}
                   className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
