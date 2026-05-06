@@ -74,6 +74,11 @@ router.post("/products", async (req, res): Promise<void> => {
 
   const { name, sku, barcode, category, price, salePrice, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
 
+  if (salePrice != null && salePrice >= price) {
+    res.status(400).json({ error: "salePrice must be less than the regular price" });
+    return;
+  }
+
   const [product] = await db
     .insert(productsTable)
     .values({
@@ -216,6 +221,11 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
       const sp = Number(d.salePrice);
       if (isNaN(sp) || sp <= 0) {
         res.status(400).json({ error: "salePrice must be a positive number" });
+        return;
+      }
+      const effectivePrice = d.price != null ? d.price : null;
+      if (effectivePrice != null && sp >= effectivePrice) {
+        res.status(400).json({ error: "salePrice must be less than the regular price" });
         return;
       }
       updates.salePrice = String(sp);
@@ -445,12 +455,20 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
         continue;
       }
 
+      const salePriceCreate = item.salePrice != null && !isNaN(Number(item.salePrice))
+        ? Number(item.salePrice) : null;
+      if (salePriceCreate != null && salePriceCreate >= price) {
+        results.skipped++;
+        results.errors.push(`${sku}: salePrice (${salePriceCreate}) must be less than price (${price})`);
+        continue;
+      }
+
       await db.insert(productsTable).values({
         name,
         sku,
         category,
         price:             String(price),
-        salePrice:         item.salePrice != null && !isNaN(Number(item.salePrice)) ? String(Number(item.salePrice)) : null,
+        salePrice:         salePriceCreate != null ? String(salePriceCreate) : null,
         stock:             item.stock != null && !isNaN(Number(item.stock)) ? Number(item.stock) : 0,
         lowStockThreshold: item.lowStockThreshold != null && !isNaN(Number(item.lowStockThreshold)) ? Number(item.lowStockThreshold) : 5,
         imageUrl:          item.imageUrl ? String(item.imageUrl).trim() : null,
@@ -463,8 +481,15 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
     const updates: Record<string, unknown> = {};
     if (item.stock != null && !isNaN(Number(item.stock))) updates.stock = Number(item.stock);
     if (item.price != null && !isNaN(Number(item.price))) updates.price = String(Number(item.price));
-    if (item.salePrice !== undefined)
-      updates.salePrice = item.salePrice != null && !isNaN(Number(item.salePrice)) ? String(Number(item.salePrice)) : null;
+    if (item.salePrice !== undefined) {
+      const salePriceUpd = item.salePrice != null && !isNaN(Number(item.salePrice)) ? Number(item.salePrice) : null;
+      const priceUpd = updates.price != null ? Number(updates.price) : (existing ? Number(existing.price) : null);
+      if (salePriceUpd != null && priceUpd != null && salePriceUpd >= priceUpd) {
+        results.errors.push(`${sku}: salePrice (${salePriceUpd}) must be less than price (${priceUpd})`);
+      } else {
+        updates.salePrice = salePriceUpd != null ? String(salePriceUpd) : null;
+      }
+    }
     if (item.name != null) updates.name = String(item.name).trim();
     if (item.category != null) updates.category = String(item.category).trim();
     if (item.lowStockThreshold != null && !isNaN(Number(item.lowStockThreshold)))
