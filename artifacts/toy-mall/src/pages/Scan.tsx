@@ -551,15 +551,18 @@ export default function Scan() {
   const isBilling = mode === "billing";
   const isStockIn = mode === "stockin";
 
-  const handleScan = useCallback((sku: string) => { setLookupSku(sku); }, []);
+  const { flash, triggerFlash } = useScanFlash();
+
+  const handleScan = useCallback((sku: string) => {
+    triggerFlash(sku);
+    setLookupSku(sku);
+  }, [triggerFlash]);
   const handleCameraError = useCallback((msg: string) => { setCameraError(msg); }, []);
   useScanner(showScanner, videoRef, handleScan, handleCameraError);
 
-  const { flash, triggerFlash } = useScanFlash();
-
   /* USB scanner: parse URL-format QR values the same way the camera does,
-     then forward the clean SKU and flash a "Detected" banner so the user can
-     confirm the scan was actually received by the page.                     */
+     then forward the clean SKU. The flash is triggered inside handleScan so
+     both camera and USB scans show the same visual feedback.                */
   const handleUsbScan = useCallback((raw: string) => {
     let sku = raw;
     try {
@@ -569,9 +572,8 @@ export default function Scan() {
       }
     } catch { /* use raw */ }
 
-    triggerFlash(sku);
     handleScan(sku);
-  }, [handleScan, triggerFlash]);
+  }, [handleScan]);
   useUsbScanner(handleUsbScan, {
     allowedInput: { ref: manualInputRef, onClear: () => setManualSku("") },
   });
