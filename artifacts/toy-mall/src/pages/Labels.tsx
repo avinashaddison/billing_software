@@ -45,11 +45,19 @@ export default function Labels() {
   const [showTip, setShowTip]         = useState(true);
   const [previewPage, setPreviewPage] = useState(0);
 
+  /* Trigger window.print() only after the portal is committed + painted */
   useEffect(() => {
+    if (!printing) return;
+    const raf = requestAnimationFrame(() => {
+      window.print();
+    });
     const onAfterPrint = () => setPrinting(false);
     window.addEventListener("afterprint", onAfterPrint);
-    return () => window.removeEventListener("afterprint", onAfterPrint);
-  }, []);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("afterprint", onAfterPrint);
+    };
+  }, [printing]);
 
   const filtered = products.filter(
     (p) => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())
@@ -60,12 +68,7 @@ export default function Labels() {
   const toggleAll  = () => { if (selected.size === filtered.length) { setSelected(new Set()); } else { setSelected(new Set(filtered.map((p) => p.id))); } setShowPreview(false); setPreviewPage(0); };
   const setCopiesFor = (id: string, val: number) => setCopies((c) => ({ ...c, [id]: Math.max(1, Math.min(99, val)) }));
 
-  const doPrint = useCallback(() => {
-    setPrinting(true);
-    const cleanup = () => { setPrinting(false); window.removeEventListener("afterprint", cleanup); };
-    window.addEventListener("afterprint", cleanup);
-    setTimeout(() => window.print(), 300);
-  }, []);
+  const doPrint = useCallback(() => setPrinting(true), []);
 
   const selectedProducts = products.filter((p) => selected.has(p.id));
   const printItems = selectedProducts.flatMap((p) => Array.from({ length: getCopies(p.id) }, (_, i) => ({ ...p, _key: `${p.id}-${i}` })));
@@ -95,7 +98,12 @@ export default function Labels() {
           .labels-print-area {
             display: block !important;
             position: static !important;
+            top: auto !important;
+            left: auto !important;
             width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+            visibility: visible !important;
             margin: 0 !important; padding: 0 !important;
             background: white !important;
           }
@@ -120,9 +128,8 @@ export default function Labels() {
       {/* ── Print portal — rendered directly on <body> so CSS selector works ── */}
       {printing && createPortal(
         <div className="labels-print-area" style={{
-          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-          background: "white", zIndex: 99999, overflow: "auto",
-          visibility: "hidden",
+          position: "fixed", top: "-200vh", left: 0, width: "210mm",
+          background: "white", overflow: "hidden",
         }}>
           {pages.map((page, pi) => (
             <div key={pi} className="print-page">
