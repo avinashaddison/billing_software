@@ -20,8 +20,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
-        name: "VishwaKarma Complex",
-        short_name: "VishwaKarma",
+        name: "Hira & Sons Gift Shop",
+        short_name: "Hira & Sons",
         description: "Toy Mall Inventory Management",
         theme_color: "#2563EB",
         background_color: "#ffffff",

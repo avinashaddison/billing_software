@@ -8,7 +8,7 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 const EMOJI_OPTIONS = ["🧸", "🎮", "🛒", "🏪", "🎁", "🧩", "🎯", "🪀", "🎈", "⭐"];
 
 const DEFAULTS: StoreSettings = {
-  name:           "VishwaKarma Complex",
+  name:           "Hira & Sons Gift Shop",
   tagline:        "The Complete Toy Store",
   phone:          "+91 94318 01793",
   address:        "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
@@ -142,7 +142,7 @@ export default function SettingsPage() {
         <Section icon={Store} title="Store Identity" color="text-primary bg-primary/10">
           <Field label="Shop Name" hint="Shown on bills, login screen & sidebar">
             <input value={form.name} onChange={(e) => set("name", e.target.value)}
-              placeholder="e.g. VishwaKarma Complex"
+              placeholder="e.g. Hira & Sons Gift Shop"
               className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-bold" />
           </Field>
           <Field label="Tagline" hint="One-line description shown on bills">

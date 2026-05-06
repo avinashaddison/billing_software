@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 
 const BASE_URL   = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-const STORAGE_KEY = "vishwakarma-offline-queue-v1";
+const STORAGE_KEY = "hira-sons-offline-queue-v1";
 
 export interface QueuedBill {
   localId:      string;

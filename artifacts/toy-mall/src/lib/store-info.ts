@@ -22,7 +22,7 @@ interface StoreSettingsStore extends StoreSettings {
 export const useStoreSettings = create<StoreSettingsStore>()(
   persist(
     (set) => ({
-      name:          "VishwaKarma Complex",
+      name:          "Hira & Sons Gift Shop",
       tagline:       "The Complete Toy Store",
       phone:         "+91 94318 01793",
       address:       "Near Old Bus Stand, Ranchi, Jharkhand - 834001",

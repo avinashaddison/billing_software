@@ -41,7 +41,7 @@ router.post(
         (resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             {
-              folder:         "vishwakarma-complex/products",
+              folder:         "hira-sons/products",
               resource_type:  "image",
               transformation: [
                 { width: 800, height: 800, crop: "limit", quality: "auto:good", fetch_format: "auto" },
