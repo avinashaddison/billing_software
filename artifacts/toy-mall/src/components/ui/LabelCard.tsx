@@ -52,7 +52,9 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
-        }}>
+          printColorAdjust: "exact",
+          WebkitPrintColorAdjust: "exact",
+        } as React.CSSProperties}>
           {store.name}
         </div>
 

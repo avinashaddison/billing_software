@@ -72,6 +72,8 @@ export default function Labels() {
             width: 50mm !important; height: 25mm !important;
             page-break-after: always !important; break-after: page !important;
             overflow: hidden !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
           }
           .label-page:last-child {
             page-break-after: avoid !important; break-after: avoid !important;
@@ -130,7 +132,7 @@ export default function Labels() {
             <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3 text-xs text-amber-800 dark:text-amber-300">
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span className="flex-1">
-                <b>Print settings:</b> set <b>Margins → None</b>, uncheck <b>Headers and footers</b>, and turn off <b>Background graphics</b>.
+                <b>Print settings:</b> set <b>Margins → None</b>, uncheck <b>Headers and footers</b>, and keep <b>Background graphics ON</b> (so the black store name banner prints).
                 Each label prints on its own 50×25mm sticker.
               </span>
               <button onClick={() => setShowTip(false)} className="font-black text-amber-600 hover:text-amber-800 ml-1">✕</button>
