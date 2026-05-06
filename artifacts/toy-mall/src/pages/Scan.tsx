@@ -27,7 +27,7 @@ type PageMode    = "billing" | "stockin";
 type PaymentMode = "cash" | "upi";
 
 interface ScannedProduct {
-  id: string; name: string; sku: string; price: number; stock: number;
+  id: string; name: string; sku: string; price: number; salePrice?: number | null; stock: number;
 }
 
 /* ── API helpers ─────────────────────────────────────────────────── */
@@ -519,7 +519,9 @@ export default function Scan() {
     (allProducts ?? []).forEach((p) => {
       map.set(p.sku.toLowerCase(), {
         id: p.id, name: p.name, sku: p.sku,
-        price: Number(p.price), stock: p.stock,
+        price: Number(p.price),
+        salePrice: "salePrice" in p ? (p.salePrice as number | null | undefined) : null,
+        stock: p.stock,
       });
     });
     return map;
@@ -582,7 +584,7 @@ export default function Scan() {
     const cached = skuCache.get(lookupSku.toLowerCase());
     if (cached) {
       if (isBilling) {
-        addItem({ productId: cached.id, sku: cached.sku, name: cached.name, price: cached.price });
+        addItem({ productId: cached.id, sku: cached.sku, name: cached.name, price: cached.salePrice != null ? cached.salePrice : cached.price });
         setLastAddedId(cached.id);
         setTimeout(() => setLastAddedId(null), 700);
         toast.success(`Added: ${cached.name}`, { duration: 1500 });
@@ -598,7 +600,7 @@ export default function Scan() {
     lookupBySku(lookupSku)
       .then((product) => {
         if (isBilling) {
-          addItem({ productId: product.id, sku: product.sku, name: product.name, price: product.price });
+          addItem({ productId: product.id, sku: product.sku, name: product.name, price: product.salePrice != null ? product.salePrice : product.price });
           setLastAddedId(product.id);
           setTimeout(() => setLastAddedId(null), 700);
           toast.success(`Added: ${product.name}`, { duration: 1500 });
