@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { BarcodeImage, barcodeSvgDataUrl } from "@/components/ui/BarcodeImage";
+import { LabelCard } from "@/components/ui/LabelCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -223,17 +224,23 @@ export default function ProductDetail() {
             position: fixed !important; top: 0 !important; left: 0 !important;
             width: 100% !important; margin: 0 !important; padding: 20px !important;
             background: white !important; display: flex !important;
-            flex-wrap: wrap !important; gap: 14px !important;
+            justify-content: center !important; align-items: flex-start !important;
           }
+          .product-print-area > div { width: 220px !important; }
         }
       `}</style>
 
-      {/* ── Hidden print area ── */}
+      {/* ── Hidden print area — renders the same LabelCard as Labels page ── */}
       {printing && product && (
         <div className="product-print-area hidden print:flex">
-          <div style={{ background: "#fff", padding: "6px 4px" }}>
-            <BarcodeImage value={product.sku} height={60} fontSize={11} />
-          </div>
+          <LabelCard p={{
+            id:       String(product.id),
+            name:     product.name,
+            sku:      product.sku,
+            price:    product.price,
+            category: product.category,
+            stock:    product.stock,
+          }} />
         </div>
       )}
 
