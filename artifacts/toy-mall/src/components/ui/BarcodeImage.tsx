@@ -81,18 +81,49 @@ export function barcodePngDataUrl(value: string): string {
 }
 
 /**
+ * Generates a label-sized barcode PNG — bars are narrow enough that the image
+ * fits the label card width without heavy downscaling.  pixelated rendering
+ * prevents anti-aliasing from blurring bars when any scaling does occur.
+ */
+function barcodeLabelPngDataUrl(value: string): string {
+  const canvas = document.createElement("canvas");
+  try {
+    JsBarcode(canvas, value, {
+      format:       "CODE128",
+      width:        2,      // 2 px per bar — fits ~200 px label without scaling
+      height:       56,
+      fontSize:     11,
+      fontOptions:  "bold",
+      textMargin:   4,
+      margin:       10,
+      displayValue: true,
+      lineColor:    "#000000",
+      background:   "#ffffff",
+    });
+  } catch {
+    return "";
+  }
+  return canvas.toDataURL("image/png");
+}
+
+/**
  * Renders barcode as a PNG <img> element — guaranteed crisp on screen AND print.
  * Use this inside LabelCard and any print layout instead of <BarcodeImage>.
  */
 export function BarcodePngImage({ value, className }: { value: string; className?: string }) {
-  const src = useMemo(() => barcodePngDataUrl(value), [value]);
+  const src = useMemo(() => barcodeLabelPngDataUrl(value), [value]);
   if (!src) return null;
   return (
     <img
       src={src}
       alt={value}
       className={className}
-      style={{ width: "100%", height: "auto", display: "block" }}
+      style={{
+        width: "100%",
+        height: "auto",
+        display: "block",
+        imageRendering: "pixelated",   // no anti-aliasing blur when scaling
+      }}
     />
   );
 }
