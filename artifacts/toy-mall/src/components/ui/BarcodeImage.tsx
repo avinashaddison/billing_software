@@ -90,12 +90,12 @@ export function barcodeLabelPngDataUrl(value: string): string {
   try {
     JsBarcode(canvas, value, {
       format:       "CODE128",
-      width:        2,      // 2 px per bar — fits ~200 px label without scaling
-      height:       56,
-      fontSize:     11,
+      width:        4,      // 4 px per bar → high-res; scales DOWN to label width = crisp bars
+      height:       100,
+      fontSize:     18,
       fontOptions:  "bold",
-      textMargin:   4,
-      margin:       10,
+      textMargin:   6,
+      margin:       12,
       displayValue: true,
       lineColor:    "#000000",
       background:   "#ffffff",
