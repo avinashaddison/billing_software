@@ -1,7 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 
-const SCANNER_THRESHOLD_MS = 60;
-const IDLE_FIRE_MS = 200;
+const SCANNER_THRESHOLD_MS = 100; // accept scanners sending chars up to 100 ms apart
+const IDLE_FIRE_MS = 50;          // fire just 50 ms after the last char — nearly instant
 const MIN_CODE_LENGTH = 2;
 
 export interface UsbScannerOptions {

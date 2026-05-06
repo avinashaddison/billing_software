@@ -554,7 +554,6 @@ export default function Scan() {
 
   /* USB scanner: fires handleScan + shows an immediate scan-received toast */
   const handleUsbScan = useCallback((sku: string) => {
-    toast(`Scanning ${sku}…`, { duration: 800, icon: "📡" });
     handleScan(sku);
   }, [handleScan]);
   useUsbScanner(handleUsbScan, {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearch, useLocation, Link } from "wouter";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import {
@@ -68,13 +68,18 @@ export default function ProductDetail() {
     }
   }, [isError, setLocation]);
 
-  const handleUsbScan = useCallback(async (code: string) => {
-    toast(`Scanning ${code}…`, { duration: 800, icon: "📡" });
-    try {
-      const res = await fetch(`${BASE_URL}/api/products/scan/${encodeURIComponent(code)}`);
-      if (!res.ok) { toast.error(`Product not found: ${code}`); return; }
-      const found = await res.json();
+  const scanCacheRef = useRef<Map<string, { id: string; sku: string; name: string; price: number }>>(new Map());
 
+  const handleUsbScan = useCallback(async (code: string) => {
+    try {
+      const cached = scanCacheRef.current.get(code);
+      const found = cached ?? await (async () => {
+        const res = await fetch(`${BASE_URL}/api/products/scan/${encodeURIComponent(code)}`);
+        if (!res.ok) throw new Error("not_found");
+        const data = await res.json();
+        scanCacheRef.current.set(code, data);
+        return data;
+      })();
       /* Add to billing cart so the "Ongoing" strip appears */
       addItem({
         productId: found.id,
