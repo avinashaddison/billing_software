@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { STORE_INFO } from "@/lib/store-info";
+import { addScanEvent } from "@/lib/scan-debug-log";
 
 const IDLE_FIRE_MS = 50;          // fire just 50 ms after the last char — nearly instant
 const MIN_CODE_LENGTH = 2;
@@ -22,6 +23,11 @@ export interface UsbScannerOptions {
     ref: RefObject<HTMLInputElement | null>;
     onClear: () => void;
   };
+  /**
+   * When true, scan events are NOT recorded in the debug log.
+   * Use this for test widgets to keep the log clean for real scans.
+   */
+  skipDebugLog?: boolean;
 }
 
 /**
@@ -53,8 +59,9 @@ export function useUsbScanner(
   useEffect(() => {
     if (!enabled) return;
 
-    let buffer   = "";
-    let lastTime = 0;
+    let buffer     = "";
+    let lastTime   = 0;
+    let maxElapsed = 0;   // track worst inter-key gap within the current burst
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const clearTimer = () => {
@@ -63,17 +70,19 @@ export function useUsbScanner(
 
     const reset = () => {
       clearTimer();
-      buffer   = "";
-      lastTime = 0;
+      buffer     = "";
+      lastTime   = 0;
+      maxElapsed = 0;
     };
 
-    const fire = (raw: string, fromAllowedInput: boolean) => {
-      const code = raw.trim().toUpperCase();
-      if (code.length < MIN_CODE_LENGTH) return;
+    const dispatchScan = (upperCode: string, capturedMax: number, fromAllowedInput: boolean) => {
+      if (!optionsRef.current?.skipDebugLog) {
+        addScanEvent({ timestamp: new Date(), type: "detected", code: upperCode, maxElapsedMs: capturedMax });
+      }
       if (fromAllowedInput) {
         optionsRef.current?.allowedInput?.onClear();
       }
-      onScanRef.current(code);
+      onScanRef.current(upperCode);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -96,17 +105,18 @@ export function useUsbScanner(
       }
 
       const now     = Date.now();
-      const elapsed = lastTime ? now - lastTime : Infinity;
+      const elapsed = lastTime ? now - lastTime : 0;
       lastTime = now;
 
       if (e.key === "Enter") {
         const code = buffer.trim();
         const fromAllowed = isAllowedInput;
+        const capturedMax = maxElapsed;
         reset();
         if (code.length >= MIN_CODE_LENGTH) {
           e.stopPropagation();
           e.preventDefault();
-          fire(code, fromAllowed);
+          dispatchScan(code.toUpperCase(), capturedMax, fromAllowed);
         }
         return;
       }
@@ -114,7 +124,9 @@ export function useUsbScanner(
       if (e.key.length !== 1) return;
 
       const threshold = optionsRef.current?.thresholdMs ?? STORE_INFO.scannerThresholdMs;
+
       if (buffer.length === 0 || elapsed < threshold) {
+        if (elapsed > maxElapsed) maxElapsed = elapsed;
         buffer += e.key;
         // Stop ALL other keydown listeners from the very first char so that
         // single-key shortcuts (b/s mode-switch) can never fire mid-burst.
@@ -122,12 +134,20 @@ export function useUsbScanner(
 
         clearTimer();
         timer = setTimeout(() => {
-          const code = buffer;
+          const code = buffer.trim().toUpperCase();
+          const capturedMax = maxElapsed;
+          const fromAllowed = isAllowedInput;
           reset();
-          fire(code, isAllowedInput);
+          if (code.length >= MIN_CODE_LENGTH) {
+            dispatchScan(code, capturedMax, fromAllowed);
+          }
         }, IDLE_FIRE_MS);
       } else {
-        // Too slow for a scanner — discard old buffer and start fresh
+        // Too slow for a scanner — record as missed if buffer had enough chars
+        if (buffer.length >= MIN_CODE_LENGTH && !optionsRef.current?.skipDebugLog) {
+          addScanEvent({ timestamp: new Date(), type: "missed", maxElapsedMs: elapsed });
+        }
+        // Discard old buffer and start fresh
         reset();
         buffer   = e.key;
         lastTime = now;

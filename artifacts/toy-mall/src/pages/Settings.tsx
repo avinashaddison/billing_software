@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle } from "lucide-react";
 import { useStoreSettings, type StoreSettings } from "@/lib/store-info";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
+import { useScanDebugLog } from "@/lib/scan-debug-log";
 import { toast } from "sonner";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
@@ -317,6 +318,7 @@ export default function SettingsPage() {
           </Field>
 
           <ScannerTestWidget thresholdMs={form.scannerThresholdMs} />
+          <RecentScanEvents />
         </Section>
 
         {/* ── Telegram Notifications ── */}
@@ -401,6 +403,7 @@ function ScannerTestWidget({ thresholdMs }: { thresholdMs: number }) {
     {
       enabled: true,
       thresholdMs,
+      skipDebugLog: true,
       allowedInput: {
         ref: inputRef,
         onClear: () => setInputVal(""),
@@ -425,6 +428,100 @@ function ScannerTestWidget({ thresholdMs }: { thresholdMs: number }) {
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
           <CheckCircle className="w-4 h-4 shrink-0" />
           Scanner detected! Code: <span className="font-mono ml-1">{lastCode}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecentScanEvents() {
+  const events = useScanDebugLog();
+  const [open, setOpen] = useState(false);
+
+  const exportCsv = () => {
+    const rows = [
+      ["Timestamp", "Type", "Code", "Max elapsed (ms)"],
+      ...events.map((e) => [
+        e.timestamp.toISOString(),
+        e.type,
+        e.code ?? "",
+        String(e.maxElapsedMs),
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `scanner-events-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  function fmtTime(d: Date) {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
+  return (
+    <div className="rounded-xl border bg-muted/20 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2.5 hover:bg-muted/40 transition-colors">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1.5 text-xs font-bold flex-1 text-left"
+        >
+          {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          Recent scan events
+          {events.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono text-[10px]">
+              {events.length}
+            </span>
+          )}
+        </button>
+        {open && events.length > 0 && (
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-500 text-white text-[10px] font-bold hover:bg-green-600 transition-colors shrink-0"
+          >
+            <Download className="w-3 h-3" /> Export CSV
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="border-t">
+          {events.length === 0 ? (
+            <p className="px-3 py-4 text-center text-[11px] text-muted-foreground">
+              No scan events yet. Scan a barcode to see events here.
+            </p>
+          ) : (
+            <div className="divide-y max-h-64 overflow-y-auto">
+              {events.map((ev) => (
+                <div key={ev.id} className="flex items-center gap-2.5 px-3 py-2">
+                  {ev.type === "detected" ? (
+                    <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                  ) : (
+                    <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                  )}
+                  <span className="font-mono text-[10px] text-muted-foreground w-20 shrink-0">
+                    {fmtTime(ev.timestamp)}
+                  </span>
+                  <span className={`text-[11px] font-bold flex-1 truncate ${ev.type === "detected" ? "text-green-700 dark:text-green-400" : "text-red-500"}`}>
+                    {ev.type === "detected"
+                      ? (ev.code ?? "—")
+                      : "missed"}
+                  </span>
+                  <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                    {ev.maxElapsedMs > 0 ? `${ev.maxElapsedMs} ms` : "—"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="px-3 py-2 text-[10px] text-muted-foreground border-t">
+            Last {events.length} event{events.length !== 1 ? "s" : ""} · ring buffer resets on page reload
+          </p>
         </div>
       )}
     </div>
