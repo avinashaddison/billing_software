@@ -41,7 +41,7 @@ export default function ProductDetail() {
   const [savingImg, setSavingImg]       = useState(false);
   const [editOpen, setEditOpen]         = useState(false);
   const [editSaving, setEditSaving]     = useState(false);
-  const [editForm, setEditForm]         = useState({ name: "", price: "", category: "", lowStockThreshold: "" });
+  const [editForm, setEditForm]         = useState({ name: "", price: "", salePrice: "", category: "", lowStockThreshold: "" });
   const [printing, setPrinting]             = useState(false);
   const [printCopies, setPrintCopies]       = useState(1);
 
@@ -82,7 +82,7 @@ export default function ProductDetail() {
         productId: found.id,
         sku:       found.sku,
         name:      found.name,
-        price:     Number(found.price),
+        price:     found.salePrice != null ? Number(found.salePrice) : Number(found.price),
       });
       toast.success(`Added to billing: ${found.name} (${count + 1} in cart)`, { duration: 1500 });
 
@@ -148,9 +148,11 @@ export default function ProductDetail() {
 
   const openEdit = () => {
     if (!product) return;
+    const sp = "salePrice" in product ? (product.salePrice as number | null | undefined) : null;
     setEditForm({
       name: product.name,
       price: String(product.price),
+      salePrice: sp != null ? String(sp) : "",
       category: product.category,
       lowStockThreshold: String(product.lowStockThreshold),
     });
@@ -161,10 +163,14 @@ export default function ProductDetail() {
     if (!product) return;
     const name = editForm.name.trim();
     const price = parseFloat(editForm.price);
+    const salePriceRaw = editForm.salePrice.trim();
+    const salePrice = salePriceRaw ? parseFloat(salePriceRaw) : null;
     const threshold = parseInt(editForm.lowStockThreshold, 10);
     const category = editForm.category.trim();
     if (!name)                          { toast.error("Name is required"); return; }
     if (isNaN(price) || price <= 0)     { toast.error("Enter a valid price"); return; }
+    if (salePrice !== null && (isNaN(salePrice) || salePrice <= 0)) { toast.error("Sale price must be greater than 0"); return; }
+    if (salePrice !== null && salePrice >= price) { toast.error("Sale price must be less than the regular price"); return; }
     if (isNaN(threshold) || threshold < 0) { toast.error("Enter a valid threshold"); return; }
     if (!category)                      { toast.error("Category is required"); return; }
     setEditSaving(true);
@@ -172,7 +178,7 @@ export default function ProductDetail() {
       const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, price, category, lowStockThreshold: threshold }),
+        body: JSON.stringify({ name, price, salePrice, category, lowStockThreshold: threshold }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       toast.success("Product updated");
@@ -243,12 +249,13 @@ export default function ProductDetail() {
         <div className="product-print-area hidden print:grid">
           {Array.from({ length: printCopies }).map((_, i) => (
             <LabelCard key={i} p={{
-              id:       String(product.id),
-              name:     product.name,
-              sku:      product.sku,
-              price:    product.price,
-              category: product.category,
-              stock:    product.stock,
+              id:        String(product.id),
+              name:      product.name,
+              sku:       product.sku,
+              price:     product.price,
+              salePrice: "salePrice" in product ? (product.salePrice as number | null | undefined) : null,
+              category:  product.category,
+              stock:     product.stock,
             }} />
           ))}
         </div>
@@ -296,10 +303,16 @@ export default function ProductDetail() {
                 placeholder="e.g. Plush Toys" className="h-11 rounded-xl" />
             </div>
             <div>
-              <p className="text-xs font-bold text-muted-foreground mb-1">Price (₹)</p>
+              <p className="text-xs font-bold text-muted-foreground mb-1">MRP / Regular Price (₹)</p>
               <Input type="number" min={0.01} step={0.01} value={editForm.price}
                 onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
                 placeholder="0.00" className="h-11 rounded-xl" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground mb-1">Sale Price (₹) — optional</p>
+              <Input type="number" min={0.01} step={0.01} value={editForm.salePrice}
+                onChange={(e) => setEditForm((f) => ({ ...f, salePrice: e.target.value }))}
+                placeholder="Leave blank to clear" className="h-11 rounded-xl" />
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground mb-1">Low Stock Threshold</p>
@@ -353,10 +366,24 @@ export default function ProductDetail() {
               <div className="space-y-4 border-t pt-4">
                 {/* Price */}
                 <div>
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Price</p>
-                  <p className="text-2xl font-bold">
-                    ₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
+                  {"salePrice" in product && (product.salePrice as number | null) != null ? (
+                    <>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Sale Price</p>
+                      <p className="text-2xl font-bold text-red-600">
+                        ₹{(product.salePrice as number).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-sm text-muted-foreground line-through">
+                        MRP ₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Price</p>
+                      <p className="text-2xl font-bold">
+                        ₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </>
+                  )}
                 </div>
 
 

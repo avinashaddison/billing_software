@@ -405,6 +405,8 @@ components:
           type: string
         price:
           type: number
+        salePrice:
+          type: ["number", "null"]
         stock:
           type: integer
         lowStockThreshold:
@@ -432,6 +434,8 @@ components:
           type: string
         price:
           type: number
+        salePrice:
+          type: ["number", "null"]
         stock:
           type: integer
         lowStockThreshold:
@@ -453,6 +457,8 @@ components:
           type: string
         price:
           type: number
+        salePrice:
+          type: ["number", "null"]
         stock:
           type: integer
         lowStockThreshold:

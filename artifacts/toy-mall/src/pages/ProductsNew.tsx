@@ -123,10 +123,16 @@ const createProductSchema = z.object({
   category:          z.string().min(1, "Please select a category"),
   customCategory:    z.string().optional(),
   price:             z.coerce.number().min(0.01, "Price must be greater than 0"),
+  salePrice:         z.union([z.coerce.number().min(0.01, "Sale price must be greater than 0"), z.literal("")]).optional(),
   stock:             z.coerce.number().int().min(0, "Stock cannot be negative").optional().default(0),
   lowStockThreshold: z.coerce.number().int().min(0).optional().default(5),
   imageUrl:          z.string().optional().or(z.literal("")),
-});
+}).refine((d) => {
+  if (d.salePrice && typeof d.salePrice === "number") {
+    return d.salePrice < d.price;
+  }
+  return true;
+}, { message: "Sale price must be less than the regular price", path: ["salePrice"] });
 
 type FormValues = z.infer<typeof createProductSchema>;
 
@@ -219,8 +225,9 @@ export default function CreateProduct() {
     if (!autoSku) { toast.error("Please select a category to generate the SKU first"); return; }
     const finalCategory = isCustom ? (data.customCategory?.trim() || "") : data.category;
     if (!finalCategory) { toast.error("Please enter a custom category name"); return; }
+    const salePriceVal = data.salePrice && typeof data.salePrice === "number" ? data.salePrice : undefined;
     createProduct.mutate(
-      { data: { name: data.name, category: finalCategory, price: data.price, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || undefined } as any },
+      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || undefined } as any },
       {
         onSuccess: (product) => {
           toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
@@ -385,9 +392,22 @@ export default function CreateProduct() {
             <div className="p-5 bg-card border rounded-2xl space-y-5">
               <FormField control={form.control} name="price" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="font-bold text-muted-foreground">Price (₹)</FormLabel>
+                  <FormLabel className="font-bold text-muted-foreground">MRP / Regular Price (₹)</FormLabel>
                   <FormControl>
                     <Input type="number" step="0.01" placeholder="0.00" className="h-14 text-lg rounded-xl font-mono" {...field} data-testid="input-price" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="salePrice" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold text-muted-foreground">Sale Price (₹) — optional</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" placeholder="Leave blank if no sale" className="h-14 text-lg rounded-xl font-mono"
+                      value={field.value === "" || field.value == null ? "" : String(field.value)}
+                      onChange={(e) => field.onChange(e.target.value === "" ? "" : e.target.value)}
+                      data-testid="input-sale-price" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

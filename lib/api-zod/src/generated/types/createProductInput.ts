@@ -11,8 +11,8 @@ export interface CreateProductInput {
   sku: string;
   category: string;
   price: number;
+  /** @nullable */
+  salePrice?: number | null;
   stock?: number;
   lowStockThreshold?: number;
-  imageUrl?: string;
-  supplierId?: string;
 }

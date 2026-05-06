@@ -33,6 +33,7 @@ export const ListProductsResponseItem = zod.object({
   sku: zod.string(),
   category: zod.string(),
   price: zod.number(),
+  salePrice: zod.number().nullish(),
   stock: zod.number(),
   lowStockThreshold: zod.number(),
   createdAt: zod.string(),
@@ -45,13 +46,11 @@ export const ListProductsResponse = zod.array(ListProductsResponseItem);
 export const CreateProductBody = zod.object({
   name: zod.string(),
   sku: zod.string(),
-  barcode: zod.string().optional(),
   category: zod.string(),
   price: zod.number(),
+  salePrice: zod.number().nullish(),
   stock: zod.number().optional(),
   lowStockThreshold: zod.number().optional(),
-  imageUrl: zod.string().optional(),
-  supplierId: zod.string().optional(),
 });
 
 /**
@@ -67,6 +66,7 @@ export const GetProductBySkuResponse = zod.object({
   sku: zod.string(),
   category: zod.string(),
   price: zod.number(),
+  salePrice: zod.number().nullish(),
   stock: zod.number(),
   lowStockThreshold: zod.number(),
   createdAt: zod.string(),
@@ -85,6 +85,7 @@ export const GetProductResponse = zod.object({
   sku: zod.string(),
   category: zod.string(),
   price: zod.number(),
+  salePrice: zod.number().nullish(),
   stock: zod.number(),
   lowStockThreshold: zod.number(),
   createdAt: zod.string(),
@@ -100,9 +101,9 @@ export const UpdateProductParams = zod.object({
 export const UpdateProductBody = zod.object({
   name: zod.string().optional(),
   sku: zod.string().optional(),
-  barcode: zod.string().optional().nullable(),
   category: zod.string().optional(),
   price: zod.number().optional(),
+  salePrice: zod.number().nullish(),
   stock: zod.number().optional(),
   lowStockThreshold: zod.number().optional(),
 });
@@ -113,6 +114,7 @@ export const UpdateProductResponse = zod.object({
   sku: zod.string(),
   category: zod.string(),
   price: zod.number(),
+  salePrice: zod.number().nullish(),
   stock: zod.number(),
   lowStockThreshold: zod.number(),
   createdAt: zod.string(),
@@ -145,6 +147,7 @@ export const UpdateStockResponse = zod.object({
     sku: zod.string(),
     category: zod.string(),
     price: zod.number(),
+    salePrice: zod.number().nullish(),
     stock: zod.number(),
     lowStockThreshold: zod.number(),
     createdAt: zod.string(),
@@ -263,6 +266,7 @@ export const GetLowStockProductsResponseItem = zod.object({
   sku: zod.string(),
   category: zod.string(),
   price: zod.number(),
+  salePrice: zod.number().nullish(),
   stock: zod.number(),
   lowStockThreshold: zod.number(),
   createdAt: zod.string(),

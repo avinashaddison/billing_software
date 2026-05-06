@@ -11,6 +11,7 @@ export const productsTable = pgTable(
     barcode:           text("barcode").unique(),
     category:          text("category").notNull(),
     price:             numeric("price", { precision: 10, scale: 2 }).notNull(),
+    salePrice:         numeric("sale_price", { precision: 10, scale: 2 }),
     stock:             integer("stock").notNull().default(0),
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
     imageUrl:          text("image_url"),

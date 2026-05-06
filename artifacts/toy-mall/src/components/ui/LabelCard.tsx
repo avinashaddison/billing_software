@@ -7,6 +7,7 @@ export type LabelProduct = {
   name: string;
   sku: string;
   price: number;
+  salePrice?: number | null;
   category: string;
   stock: number;
 };
@@ -73,9 +74,20 @@ export function LabelCard({ p, compact = false }: { p: LabelProduct; compact?: b
         {showPrice && (
           <>
             <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "5px 0" }} />
-            <div style={{ fontSize: compact ? 14 : 18, fontWeight: 900, color: "#111827" }}>
-              ₹{p.price.toLocaleString("en-IN")}
-            </div>
+            {p.salePrice != null ? (
+              <div>
+                <div style={{ fontSize: compact ? 10 : 12, color: "#6b7280", textDecoration: "line-through" }}>
+                  MRP ₹{p.price.toLocaleString("en-IN")}
+                </div>
+                <div style={{ fontSize: compact ? 14 : 18, fontWeight: 900, color: "#dc2626" }}>
+                  ₹{p.salePrice.toLocaleString("en-IN")}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: compact ? 14 : 18, fontWeight: 900, color: "#111827" }}>
+                ₹{p.price.toLocaleString("en-IN")}
+              </div>
+            )}
           </>
         )}
       </div>

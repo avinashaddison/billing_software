@@ -12,6 +12,8 @@ export interface Product {
   sku: string;
   category: string;
   price: number;
+  /** @nullable */
+  salePrice?: number | null;
   stock: number;
   lowStockThreshold: number;
   createdAt: string;

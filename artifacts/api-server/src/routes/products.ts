@@ -18,6 +18,14 @@ import QRCode from "qrcode";
 
 const router: IRouter = Router();
 
+function mapProduct(p: typeof productsTable.$inferSelect) {
+  return {
+    ...p,
+    price:     Number(p.price),
+    salePrice: p.salePrice != null ? Number(p.salePrice) : null,
+  };
+}
+
 router.get("/products", async (req, res): Promise<void> => {
   const parsed = ListProductsQueryParams.safeParse(req.query);
   if (!parsed.success) {
@@ -54,13 +62,7 @@ router.get("/products", async (req, res): Promise<void> => {
 
   const products = await query.orderBy(productsTable.name);
 
-  res.json(
-    products.map((p) => ({
-      ...p,
-      price: Number(p.price),
-      lowStockThreshold: p.lowStockThreshold,
-    }))
-  );
+  res.json(products.map(mapProduct));
 });
 
 router.post("/products", async (req, res): Promise<void> => {
@@ -70,7 +72,12 @@ router.post("/products", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, sku, barcode, category, price, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
+  const body = req.body as {
+    name: string; sku: string; barcode?: string; category: string;
+    price: number; salePrice?: number | null; stock?: number;
+    lowStockThreshold?: number; imageUrl?: string | null; supplierId?: string | null;
+  };
+  const { name, sku, barcode, category, price, salePrice, stock, lowStockThreshold, imageUrl, supplierId } = body;
 
   const [product] = await db
     .insert(productsTable)
@@ -80,6 +87,7 @@ router.post("/products", async (req, res): Promise<void> => {
       barcode: barcode?.trim() || null,
       category,
       price: String(price),
+      salePrice: salePrice != null ? String(salePrice) : null,
       stock: stock ?? 0,
       lowStockThreshold: lowStockThreshold ?? 5,
       imageUrl: imageUrl ?? null,
@@ -89,7 +97,7 @@ router.post("/products", async (req, res): Promise<void> => {
 
   broadcast("product_created", { productId: product.id, name: product.name, sku: product.sku });
 
-  res.status(201).json({ ...product, price: Number(product.price) });
+  res.status(201).json(mapProduct(product));
 });
 
 router.get("/products/next-sku", async (req, res): Promise<void> => {
@@ -135,7 +143,7 @@ router.get("/products/sku/:sku", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json({ ...product, price: Number(product.price) });
+  res.json(mapProduct(product));
 });
 
 /* Scan lookup — tries SKU first, then barcode. Used by the scanner. */
@@ -165,7 +173,7 @@ router.get("/products/scan/:code", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json({ ...product, price: Number(product.price) });
+  res.json(mapProduct(product));
 });
 
 router.get("/products/:id", async (req, res): Promise<void> => {
@@ -185,7 +193,7 @@ router.get("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json({ ...product, price: Number(product.price) });
+  res.json(mapProduct(product));
 });
 
 router.patch("/products/:id", async (req, res): Promise<void> => {
@@ -204,7 +212,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   const updates: Record<string, unknown> = {};
   if (parsed.data.name != null) updates.name = parsed.data.name;
   if (parsed.data.sku != null) updates.sku = parsed.data.sku;
-  if (parsed.data.barcode !== undefined) updates.barcode = parsed.data.barcode?.trim() || null;
+  if (req.body.barcode !== undefined) updates.barcode = (req.body.barcode as string | undefined)?.trim() || null;
   if (parsed.data.category != null) updates.category = parsed.data.category;
   if (parsed.data.price != null) updates.price = String(parsed.data.price);
   if (parsed.data.stock != null) updates.stock = parsed.data.stock;
@@ -212,6 +220,8 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     updates.lowStockThreshold = parsed.data.lowStockThreshold;
   if (req.body.imageUrl !== undefined) updates.imageUrl = req.body.imageUrl || null;
   if (req.body.supplierId !== undefined) updates.supplierId = req.body.supplierId || null;
+  if (req.body.salePrice !== undefined)
+    updates.salePrice = req.body.salePrice != null ? String(Number(req.body.salePrice)) : null;
 
   const [product] = await db
     .update(productsTable)
@@ -226,7 +236,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
 
   broadcast("product_updated", { productId: product.id, name: product.name, sku: product.sku });
 
-  res.json({ ...product, price: Number(product.price) });
+  res.json(mapProduct(product));
 });
 
 router.delete("/products/:id", async (req, res): Promise<void> => {
@@ -320,12 +330,13 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
 
   let sale = null;
   if (type === "OUT") {
+    const effectivePrice = product.salePrice != null ? Number(product.salePrice) : Number(product.price);
     const [saleRecord] = await db
       .insert(salesTable)
       .values({
         productId: params.data.id,
         quantity,
-        totalPrice: String(Number(product.price) * quantity),
+        totalPrice: String(effectivePrice * quantity),
       })
       .returning();
     sale = {
@@ -357,7 +368,7 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
   }
 
   res.json({
-    product: { ...updatedProduct, price: Number(updatedProduct.price) },
+    product: mapProduct(updatedProduct),
     log: {
       ...log,
       productName: product.name,
@@ -396,8 +407,9 @@ router.get("/products/:id/qr", async (req, res): Promise<void> => {
 
 /**
  * POST /api/products/bulk-import
- * Body: { items: Array<{ sku, stock?, price?, name?, category?, lowStockThreshold? }> }
- * Matches by SKU — updates existing products. Skips unknown SKUs.
+ * Body: { items: Array<{ sku, stock?, price?, salePrice?, name?, category?, lowStockThreshold? }> }
+ * Matches by SKU — updates existing products.
+ * If SKU is unknown but name + category + price are provided → creates a new product.
  */
 router.post("/products/bulk-import", async (req, res): Promise<void> => {
   const { items } = req.body;
@@ -406,7 +418,7 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
     return;
   }
 
-  const results = { updated: 0, skipped: 0, errors: [] as string[] };
+  const results = { updated: 0, created: 0, skipped: 0, errors: [] as string[] };
 
   for (const item of items) {
     if (!item.sku) { results.skipped++; continue; }
@@ -417,11 +429,37 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
       .from(productsTable)
       .where(eq(productsTable.sku, sku));
 
-    if (!existing) { results.skipped++; continue; }
+    if (!existing) {
+      /* Try to create if name + category + price are present */
+      const name     = item.name     ? String(item.name).trim()     : null;
+      const category = item.category ? String(item.category).trim() : null;
+      const price    = item.price != null && !isNaN(Number(item.price)) ? Number(item.price) : null;
+
+      if (!name || !category || !price) {
+        results.skipped++;
+        continue;
+      }
+
+      await db.insert(productsTable).values({
+        name,
+        sku,
+        category,
+        price:             String(price),
+        salePrice:         item.salePrice != null && !isNaN(Number(item.salePrice)) ? String(Number(item.salePrice)) : null,
+        stock:             item.stock != null && !isNaN(Number(item.stock)) ? Number(item.stock) : 0,
+        lowStockThreshold: item.lowStockThreshold != null && !isNaN(Number(item.lowStockThreshold)) ? Number(item.lowStockThreshold) : 5,
+        imageUrl:          item.imageUrl ? String(item.imageUrl).trim() : null,
+        supplierId:        null,
+      });
+      results.created++;
+      continue;
+    }
 
     const updates: Record<string, unknown> = {};
     if (item.stock != null && !isNaN(Number(item.stock))) updates.stock = Number(item.stock);
     if (item.price != null && !isNaN(Number(item.price))) updates.price = String(Number(item.price));
+    if (item.salePrice !== undefined)
+      updates.salePrice = item.salePrice != null && !isNaN(Number(item.salePrice)) ? String(Number(item.salePrice)) : null;
     if (item.name != null) updates.name = String(item.name).trim();
     if (item.category != null) updates.category = String(item.category).trim();
     if (item.lowStockThreshold != null && !isNaN(Number(item.lowStockThreshold)))
@@ -433,7 +471,7 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
     results.updated++;
   }
 
-  broadcast("product_updated", { bulk: true, updated: results.updated });
+  broadcast("product_updated", { bulk: true, updated: results.updated, created: results.created });
   res.json(results);
 });
 

@@ -80,7 +80,7 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
   const [parsed, setParsed]     = useState<{ headers: string[]; rows: ImportRow[] } | null>(null);
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
-  const [result, setResult]     = useState<{ updated: number; skipped: number } | null>(null);
+  const [result, setResult]     = useState<{ updated: number; created: number; skipped: number } | null>(null);
 
   const handleFile = (file: File) => {
     setFileName(file.name);
@@ -107,6 +107,7 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
         name:              row.name || row.Name,
         category:          row.category || row.Category,
         price:             row.price || row.Price,
+        salePrice:         row.salePrice || row.sale_price || row.SalePrice || undefined,
         stock:             row.stock || row.Stock,
         lowStockThreshold: row.lowStockThreshold || row.low_stock_threshold,
       }));
@@ -118,7 +119,7 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
       const data = await r.json();
       setResult(data);
       qc.invalidateQueries({ queryKey: getListProductsQueryKey() });
-      toast.success(`Import done: ${data.updated} updated, ${data.skipped} skipped`);
+      toast.success(`Import done: ${data.updated} updated, ${data.created ?? 0} created, ${data.skipped} skipped`);
     } catch {
       toast.error("Import failed");
     } finally { setImporting(false); }
@@ -139,8 +140,8 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
           {!parsed ? (
             <>
               <div className="bg-muted/50 rounded-xl p-3 text-xs space-y-1">
-                <p className="font-bold text-muted-foreground flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> CSV must have a <code className="bg-muted px-1 rounded">sku</code> column. Optional: name, category, price, stock, lowStockThreshold</p>
-                <p className="text-muted-foreground">Only existing SKUs are updated. New SKUs are skipped.</p>
+                <p className="font-bold text-muted-foreground flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> CSV must have a <code className="bg-muted px-1 rounded">sku</code> column. Optional: name, category, price, salePrice, stock, lowStockThreshold</p>
+                <p className="text-muted-foreground">Existing SKUs are updated. New SKUs with name + category + price are created automatically.</p>
               </div>
 
               <div
@@ -202,6 +203,12 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
                     <p className="text-2xl font-black text-green-700 dark:text-green-400">{result.updated}</p>
                     <p className="text-xs font-bold text-green-600 dark:text-green-400">Updated</p>
                   </div>
+                  {(result.created ?? 0) > 0 && (
+                    <div className="flex-1 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 text-center">
+                      <p className="text-2xl font-black text-blue-700 dark:text-blue-400">{result.created}</p>
+                      <p className="text-xs font-bold text-blue-600 dark:text-blue-400">Created</p>
+                    </div>
+                  )}
                   <div className="flex-1 p-3 rounded-xl bg-muted border text-center">
                     <p className="text-2xl font-black">{result.skipped}</p>
                     <p className="text-xs font-bold text-muted-foreground">Skipped</p>
@@ -232,7 +239,7 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
 
 /* ── Memoized product rows ── */
 interface ProductRowProps {
-  product: { id: string; name: string; sku: string; category: string; price: number; stock: number; lowStockThreshold: number; imageUrl?: string | null };
+  product: { id: string; name: string; sku: string; category: string; price: number; salePrice?: number | null; stock: number; lowStockThreshold: number; imageUrl?: string | null };
   isAdmin?: boolean;
   onDelete?: (product: { id: string; name: string; sku: string }) => void;
 }
@@ -262,7 +269,14 @@ const ProductMobileCard = memo(function ProductMobileCard({ product, isAdmin, on
               {product.stock}
             </div>
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Left</span>
-            <span className="text-[10px] text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
+            {product.salePrice != null ? (
+              <span className="text-[10px]">
+                <span className="line-through text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
+                {" "}<span className="text-red-600 font-bold">₹{product.salePrice.toLocaleString("en-IN")}</span>
+              </span>
+            ) : (
+              <span className="text-[10px] text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
+            )}
           </div>
           {isAdmin && onDelete && (
             <button
@@ -301,7 +315,14 @@ const ProductDesktopRow = memo(function ProductDesktopRow({ product, isAdmin, on
           <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${cs.badge}`}>{product.category}</span>
         </div>
         <div className="w-24 text-right">
-          <p className="font-semibold">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          {product.salePrice != null ? (
+            <div>
+              <p className="text-xs line-through text-muted-foreground">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="font-bold text-red-600">₹{product.salePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            </div>
+          ) : (
+            <p className="font-semibold">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          )}
         </div>
         <div className="w-20 text-right flex items-center justify-end gap-1.5">
           {isLow && <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />}
