@@ -42,6 +42,7 @@ export default function ProductDetail() {
   const [editSaving, setEditSaving]     = useState(false);
   const [editForm, setEditForm]         = useState({ name: "", price: "", category: "", lowStockThreshold: "" });
   const [printing, setPrinting]             = useState(false);
+  const [printCopies, setPrintCopies]       = useState(1);
 
   const { data: product, isLoading, isError } = useGetProductBySku(sku, {
     query: {
@@ -222,25 +223,28 @@ export default function ProductDetail() {
           .product-print-area, .product-print-area * { visibility: visible !important; }
           .product-print-area {
             position: fixed !important; top: 0 !important; left: 0 !important;
-            width: 100% !important; margin: 0 !important; padding: 20px !important;
-            background: white !important; display: flex !important;
-            justify-content: center !important; align-items: flex-start !important;
+            width: 100% !important; margin: 0 !important; padding: 16px !important;
+            background: white !important;
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 10px !important;
           }
-          .product-print-area > div { width: 220px !important; }
         }
       `}</style>
 
-      {/* ── Hidden print area — renders the same LabelCard as Labels page ── */}
+      {/* ── Hidden print area — N copies of LabelCard in a 3-column grid ── */}
       {printing && product && (
-        <div className="product-print-area hidden print:flex">
-          <LabelCard p={{
-            id:       String(product.id),
-            name:     product.name,
-            sku:      product.sku,
-            price:    product.price,
-            category: product.category,
-            stock:    product.stock,
-          }} />
+        <div className="product-print-area hidden print:grid">
+          {Array.from({ length: printCopies }).map((_, i) => (
+            <LabelCard key={i} p={{
+              id:       String(product.id),
+              name:     product.name,
+              sku:      product.sku,
+              price:    product.price,
+              category: product.category,
+              stock:    product.stock,
+            }} />
+          ))}
         </div>
       )}
 
@@ -517,6 +521,22 @@ export default function ProductDetail() {
                 <p className="font-mono font-black text-lg tracking-widest">{product.sku}</p>
                 <p className="text-xs text-muted-foreground">{product.name}</p>
               </div>
+              {/* Copies counter */}
+              <div className="flex items-center justify-between w-full px-1">
+                <span className="text-xs font-bold text-muted-foreground">Copies</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPrintCopies((c) => Math.max(1, c - 1))}
+                    className="w-7 h-7 rounded-lg border flex items-center justify-center text-base font-black hover:bg-muted transition-colors active:scale-90"
+                  >−</button>
+                  <span className="w-8 text-center text-sm font-black tabular-nums">{printCopies}</span>
+                  <button
+                    onClick={() => setPrintCopies((c) => Math.min(99, c + 1))}
+                    className="w-7 h-7 rounded-lg border flex items-center justify-center text-base font-black hover:bg-muted transition-colors active:scale-90"
+                  >+</button>
+                </div>
+              </div>
+
               <div className="flex gap-2 w-full mt-1">
                 <button
                   onClick={() => {
@@ -537,7 +557,7 @@ export default function ProductDetail() {
                   className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white transition-colors active:scale-95"
                   style={{ background: hex.strip }}>
                   <Printer className="w-3.5 h-3.5" />
-                  Print Label
+                  Print {printCopies > 1 ? `${printCopies} Labels` : "Label"}
                 </button>
               </div>
             </div>

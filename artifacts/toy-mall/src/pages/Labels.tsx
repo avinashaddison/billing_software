@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Tag, Printer, Loader2, Search, Check, Package, Eye, Barcode, Plus, Minus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LabelCard, type LabelProduct as Product } from "@/components/ui/LabelCard";
+import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 import { useListProducts } from "@workspace/api-client-react";
 
 /* ═══════════════════════════════════════════════════════════════ */
