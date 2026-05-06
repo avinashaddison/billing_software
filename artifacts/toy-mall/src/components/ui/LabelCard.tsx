@@ -52,10 +52,18 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
         <div style={{
           fontSize: 7.5, fontWeight: 700, lineHeight: 1.15,
           overflow: "hidden", textOverflow: "ellipsis",
-          display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical",
-          flexShrink: 0, marginBottom: "0.3mm",
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+          flexShrink: 0, marginBottom: "0.2mm",
         }}>
           {p.name}
+        </div>
+
+        {/* SKU */}
+        <div style={{
+          fontSize: 6.5, fontFamily: "monospace", color: "#444",
+          flexShrink: 0, marginBottom: "0.3mm", letterSpacing: 0.3,
+        }}>
+          {p.sku}
         </div>
 
         {/* Price */}

@@ -169,7 +169,7 @@ export default function Labels() {
             <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-1.5">
               Preview — actual label size
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 max-h-64 overflow-y-auto">
               {printItems.map((p) => (
                 <div
                   key={p._key}
