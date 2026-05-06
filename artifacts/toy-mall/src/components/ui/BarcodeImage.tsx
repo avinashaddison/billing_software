@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import JsBarcode from "jsbarcode";
 
 interface BarcodeImageProps {
@@ -78,4 +78,21 @@ export function barcodePngDataUrl(value: string): string {
     return "";
   }
   return canvas.toDataURL("image/png");
+}
+
+/**
+ * Renders barcode as a PNG <img> element — guaranteed crisp on screen AND print.
+ * Use this inside LabelCard and any print layout instead of <BarcodeImage>.
+ */
+export function BarcodePngImage({ value, className }: { value: string; className?: string }) {
+  const src = useMemo(() => barcodePngDataUrl(value), [value]);
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt={value}
+      className={className}
+      style={{ width: "100%", height: "auto", display: "block" }}
+    />
+  );
 }

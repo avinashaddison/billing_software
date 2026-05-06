@@ -1,5 +1,5 @@
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
-import { BarcodeImage } from "@/components/ui/BarcodeImage";
+import { BarcodePngImage } from "@/components/ui/BarcodeImage";
 import { useStoreSettings } from "@/lib/store-info";
 
 export type LabelProduct = {
@@ -58,12 +58,7 @@ export function LabelCard({ p, compact = false }: { p: LabelProduct; compact?: b
           {p.category}
         </div>
 
-        <BarcodeImage
-          value={p.sku}
-          height={compact ? 40 : 56}
-          fontSize={compact ? 9 : 11}
-          className="w-full"
-        />
+        <BarcodePngImage value={p.sku} className="w-full" />
 
         <div style={{
           fontSize: compact ? 10 : 12, fontWeight: 800, color: "#111827",
