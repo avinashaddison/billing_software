@@ -23,7 +23,9 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
   const hex       = getCategoryHex(p.category);
   const emoji     = getCategoryEmoji(p.category);
   const store     = useStoreSettings();
-  const showPrice = store.labelShowPrice ?? true;
+  const showPriceScreen = store.labelShowPrice ?? true;
+  /* In print mode price is ALWAYS shown — the store toggle only affects the on-screen preview */
+  const showPrice = printMode ? true : showPriceScreen;
   const hasSale   = showPrice && p.salePrice != null;
   const mrp       = Number(p.price).toLocaleString("en-IN");
   const sale      = hasSale ? Number(p.salePrice!).toLocaleString("en-IN") : null;
