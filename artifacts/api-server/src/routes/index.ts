@@ -15,6 +15,7 @@ import staffRouter       from "./staff";
 import uploadRouter      from "./upload";
 import sharedCartRouter  from "./shared-cart";
 import telegramRouter    from "./telegram";
+import adminCleanupRouter from "./admin-cleanup";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(staffRouter);
 router.use(uploadRouter);
 router.use(sharedCartRouter);
 router.use(telegramRouter);
+router.use(adminCleanupRouter);
 
 export default router;
