@@ -1,18 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Tag, Printer, Loader2, Search, Check, Package, Eye, Plus, Minus, Info } from "lucide-react";
+import { Tag, Printer, Loader2, Search, Check, Package, Eye, Plus, Minus, Info, DollarSign } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LabelCard, type LabelProduct as Product } from "@/components/ui/LabelCard";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 import { useListProducts } from "@workspace/api-client-react";
+import { useStoreSettings } from "@/lib/store-info";
 
-/* 100×70mm at 96dpi (1mm ≈ 3.78px) — used for on-screen preview */
-const LABEL_W_PX = Math.round(100 * 3.78);
-const LABEL_H_PX = Math.round(70 * 3.78);
+/* 50×25mm at 96dpi (1mm ≈ 3.78px) — used for on-screen preview */
+const LABEL_W_PX = Math.round(50 * 3.78);
+const LABEL_H_PX = Math.round(25 * 3.78);
 
 export default function Labels() {
   const { data: productsData, isLoading: loading } = useListProducts();
   const products: Product[] = (productsData ?? []) as Product[];
+  const store = useStoreSettings();
 
   const [search, setSearch]           = useState("");
   const [selected, setSelected]       = useState<Set<string>>(new Set());
@@ -51,12 +53,13 @@ export default function Labels() {
     Array.from({ length: getCopies(p.id) }, (_, i) => ({ ...p, _key: `${p.id}-${i}` }))
   );
   const totalLabels = selectedProducts.reduce((s, p) => s + getCopies(p.id), 0);
+  const showPrice   = store.labelShowPrice ?? true;
 
   return (
     <>
       {/* ── Print CSS ── */}
       <style>{`
-        @page { size: 100mm 70mm; margin: 0; }
+        @page { size: 50mm 25mm; margin: 0; }
         @media print {
           html, body { height: auto !important; overflow: visible !important; }
           body > *:not(.labels-print-area) { display: none !important; }
@@ -69,7 +72,7 @@ export default function Labels() {
           }
           .label-page {
             display: block !important;
-            width: 100mm !important; height: 70mm !important;
+            width: 50mm !important; height: 25mm !important;
             page-break-after: always !important; break-after: page !important;
             overflow: hidden !important;
             print-color-adjust: exact !important;
@@ -84,7 +87,7 @@ export default function Labels() {
       {/* ── Print portal — direct child of <body> so the CSS selector works ── */}
       {printing && createPortal(
         <div className="labels-print-area" style={{
-          position: "fixed", top: "-200vh", left: 0, width: "100mm",
+          position: "fixed", top: "-200vh", left: 0, width: "50mm",
           background: "white",
         }}>
           {printItems.map((p) => (
@@ -105,26 +108,42 @@ export default function Labels() {
               <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
                 <Tag className="w-6 h-6 text-primary" /> Label Printer
               </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">100×70mm price tag labels · one per product</p>
+              <p className="text-xs text-muted-foreground mt-0.5">50×25mm sticker labels · one per product</p>
             </div>
-            {selected.size > 0 && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowPreview((v) => !v)}
-                  className="flex items-center gap-2 bg-muted border text-foreground px-3 py-2 rounded-full font-bold text-sm hover:bg-muted/70 active:scale-95 transition-all"
-                >
-                  <Eye className="w-4 h-4" />
-                  {showPreview ? "Hide" : "Preview"}
-                </button>
-                <button
-                  onClick={doPrint}
-                  className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-full font-bold text-sm hover:bg-neutral-800 active:scale-95 transition-all"
-                >
-                  <Printer className="w-4 h-4" />
-                  Print {totalLabels}
-                </button>
-              </div>
-            )}
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {/* Price toggle — quick access without going to Settings */}
+              <button
+                onClick={() => store.update({ labelShowPrice: !showPrice })}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-full border font-bold text-sm transition-all ${
+                  showPrice
+                    ? "bg-green-50 border-green-300 text-green-700 dark:bg-green-950/30 dark:border-green-700 dark:text-green-400"
+                    : "bg-muted border-muted-foreground/20 text-muted-foreground"
+                }`}
+                title={showPrice ? "Price visible on labels — click to hide" : "Price hidden — click to show"}
+              >
+                <DollarSign className="w-3.5 h-3.5" />
+                {showPrice ? "Price ON" : "Price OFF"}
+              </button>
+
+              {selected.size > 0 && (
+                <>
+                  <button
+                    onClick={() => setShowPreview((v) => !v)}
+                    className="flex items-center gap-2 bg-muted border text-foreground px-3 py-2 rounded-full font-bold text-sm hover:bg-muted/70 active:scale-95 transition-all"
+                  >
+                    <Eye className="w-4 h-4" />
+                    {showPreview ? "Hide" : "Preview"}
+                  </button>
+                  <button
+                    onClick={doPrint}
+                    className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-full font-bold text-sm hover:bg-neutral-800 active:scale-95 transition-all"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Print {totalLabels}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Print tip */}
@@ -133,7 +152,7 @@ export default function Labels() {
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span className="flex-1">
                 <b>Print settings:</b> set <b>Margins → None</b> and uncheck <b>Headers and footers</b>.
-                Each label prints on its own 100×70mm sticker.
+                Each label prints on its own 50×25mm sticker.
               </span>
               <button onClick={() => setShowTip(false)} className="font-black text-amber-600 hover:text-amber-800 ml-1">✕</button>
             </div>
