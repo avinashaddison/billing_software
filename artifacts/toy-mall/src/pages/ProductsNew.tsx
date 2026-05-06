@@ -227,7 +227,7 @@ export default function CreateProduct() {
     if (!finalCategory) { toast.error("Please enter a custom category name"); return; }
     const salePriceVal = data.salePrice && typeof data.salePrice === "number" ? data.salePrice : undefined;
     createProduct.mutate(
-      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || undefined } as any },
+      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || null } },
       {
         onSuccess: (product) => {
           toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });

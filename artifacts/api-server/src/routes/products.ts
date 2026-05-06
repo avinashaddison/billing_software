@@ -222,18 +222,28 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  /* Validate salePrice against the effective price (incoming or persisted) */
-  if (d.salePrice != null) {
-    const sp = Number(d.salePrice);
-    if (isNaN(sp) || sp <= 0) {
+  /* Validate and enforce salePrice < price invariant across all update combos */
+  const incomingPrice  = d.price    != null ? d.price    : null;
+  const incomingSp     = d.salePrice != null ? Number(d.salePrice) : null;
+  const persistedPrice = Number(existing.price);
+  const persistedSp    = existing.salePrice != null ? Number(existing.salePrice) : null;
+
+  if (incomingSp != null) {
+    if (isNaN(incomingSp) || incomingSp <= 0) {
       res.status(400).json({ error: "salePrice must be a positive number" });
       return;
     }
-    const effectivePrice = d.price != null ? d.price : Number(existing.price);
-    if (sp >= effectivePrice) {
+    const effectivePrice = incomingPrice ?? persistedPrice;
+    if (incomingSp >= effectivePrice) {
       res.status(400).json({ error: "salePrice must be less than the regular price" });
       return;
     }
+  }
+
+  /* When only price changes, clear salePrice if it would become >= new price */
+  let clearSalePrice = false;
+  if (d.salePrice === undefined && incomingPrice != null && persistedSp != null && persistedSp >= incomingPrice) {
+    clearSalePrice = true;
   }
 
   const updates: Record<string, unknown> = {};
@@ -242,7 +252,8 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   if (d.barcode !== undefined) updates.barcode = d.barcode?.trim() || null;
   if (d.category != null) updates.category = d.category;
   if (d.price != null) updates.price = String(d.price);
-  if (d.salePrice !== undefined)
+  if (clearSalePrice) updates.salePrice = null;
+  else if (d.salePrice !== undefined)
     updates.salePrice = d.salePrice != null ? String(Number(d.salePrice)) : null;
   if (d.stock != null) updates.stock = d.stock;
   if (d.lowStockThreshold != null) updates.lowStockThreshold = d.lowStockThreshold;
@@ -491,14 +502,22 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
 
     const updates: Record<string, unknown> = {};
     if (item.stock != null && !isNaN(Number(item.stock))) updates.stock = Number(item.stock);
-    if (item.price != null && !isNaN(Number(item.price))) updates.price = String(Number(item.price));
+    const updatedPrice = item.price != null && !isNaN(Number(item.price)) ? Number(item.price) : null;
+    if (updatedPrice != null) updates.price = String(updatedPrice);
     if (item.salePrice !== undefined) {
       const salePriceUpd = item.salePrice != null && !isNaN(Number(item.salePrice)) ? Number(item.salePrice) : null;
-      const priceUpd = updates.price != null ? Number(updates.price) : (existing ? Number(existing.price) : null);
-      if (salePriceUpd != null && priceUpd != null && salePriceUpd >= priceUpd) {
-        results.errors.push(`${sku}: salePrice (${salePriceUpd}) must be less than price (${priceUpd})`);
+      const effectivePrice = updatedPrice ?? (existing ? Number(existing.price) : null);
+      if (salePriceUpd != null && effectivePrice != null && salePriceUpd >= effectivePrice) {
+        results.errors.push(`${sku}: salePrice (${salePriceUpd}) must be less than price (${effectivePrice})`);
       } else {
         updates.salePrice = salePriceUpd != null ? String(salePriceUpd) : null;
+      }
+    } else if (updatedPrice != null && existing) {
+      /* price-only update: clear salePrice if it would become >= new price */
+      const existingSp = existing.salePrice != null ? Number(existing.salePrice) : null;
+      if (existingSp != null && existingSp >= updatedPrice) {
+        updates.salePrice = null;
+        results.errors.push(`${sku}: existing salePrice (${existingSp}) >= new price (${updatedPrice}); sale price cleared`);
       }
     }
     if (item.name != null) updates.name = String(item.name).trim();
