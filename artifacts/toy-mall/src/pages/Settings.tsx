@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle } from "lucide-react";
 import { useStoreSettings, type StoreSettings } from "@/lib/store-info";
+import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import { toast } from "sonner";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
@@ -8,33 +9,41 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 const EMOJI_OPTIONS = ["🧸", "🎮", "🛒", "🏪", "🎁", "🧩", "🎯", "🪀", "🎈", "⭐"];
 
 const DEFAULTS: StoreSettings = {
-  name:           "Hira & Sons Gift Shop",
-  tagline:        "The Complete Toy Store",
-  phone:          "+91 94318 01793",
-  address:        "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
-  gst:            "",
-  logoEmoji:      "🧸",
-  appSubtitle:    "Billing Management",
-  footerNote:     "Goods once sold will not be returned or exchanged.",
-  upiId:          "",
-  dynamicQrMode:  false,
-  labelShowPrice: true,
+  name:               "Hira & Sons Gift Shop",
+  tagline:            "The Complete Toy Store",
+  phone:              "+91 94318 01793",
+  address:            "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
+  gst:                "",
+  logoEmoji:          "🧸",
+  appSubtitle:        "Billing Management",
+  footerNote:         "Goods once sold will not be returned or exchanged.",
+  upiId:              "",
+  dynamicQrMode:      false,
+  labelShowPrice:     true,
+  scannerThresholdMs: 100,
 };
+
+const SCANNER_PRESETS = [
+  { label: "Fast",    ms: 40,  hint: "Honeywell, Symbol — very quick bursts" },
+  { label: "Normal",  ms: 60,  hint: "Most scanners (TVS BS-C101, generic HID)" },
+  { label: "Slow",    ms: 100, hint: "Budget or older USB scanners" },
+];
 
 export default function SettingsPage() {
   const store = useStoreSettings();
   const [form, setForm] = useState<StoreSettings>({
-    name:           store.name,
-    tagline:        store.tagline,
-    phone:          store.phone,
-    address:        store.address,
-    gst:            store.gst,
-    logoEmoji:      store.logoEmoji,
-    appSubtitle:    store.appSubtitle,
-    footerNote:     store.footerNote,
-    upiId:          store.upiId,
-    dynamicQrMode:  store.dynamicQrMode,
-    labelShowPrice: store.labelShowPrice ?? true,
+    name:               store.name,
+    tagline:            store.tagline,
+    phone:              store.phone,
+    address:            store.address,
+    gst:                store.gst,
+    logoEmoji:          store.logoEmoji,
+    appSubtitle:        store.appSubtitle,
+    footerNote:         store.footerNote,
+    upiId:              store.upiId,
+    dynamicQrMode:      store.dynamicQrMode,
+    labelShowPrice:     store.labelShowPrice ?? true,
+    scannerThresholdMs: store.scannerThresholdMs ?? 100,
   });
   const [saved, setSaved] = useState(false);
   const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
@@ -88,6 +97,7 @@ export default function SettingsPage() {
     appSubtitle: store.appSubtitle, footerNote: store.footerNote,
     upiId: store.upiId, dynamicQrMode: store.dynamicQrMode,
     labelShowPrice: store.labelShowPrice ?? true,
+    scannerThresholdMs: store.scannerThresholdMs ?? 100,
   });
 
   return (
@@ -264,6 +274,51 @@ export default function SettingsPage() {
           </div>
         </Section>
 
+        {/* ── Scanner Speed ── */}
+        <Section icon={ScanLine} title="USB Scanner Speed" color="text-green-600 bg-green-50 dark:bg-green-950/30">
+          <Field label="Inter-keystroke threshold" hint="How long to wait between characters before deciding the input isn't from a scanner. Increase if your scanner is being missed; decrease if normal typing is triggering false scans.">
+            <div className="flex gap-2 mb-3">
+              {SCANNER_PRESETS.map((p) => (
+                <button
+                  key={p.ms}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, scannerThresholdMs: p.ms }))}
+                  className={`flex-1 py-2 px-3 rounded-xl border-2 text-xs font-bold transition-all ${
+                    form.scannerThresholdMs === p.ms
+                      ? "border-green-500 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300"
+                      : "border-border hover:border-green-400 hover:bg-muted"
+                  }`}
+                >
+                  {p.label}
+                  <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">{p.ms} ms</span>
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground">Custom: {form.scannerThresholdMs} ms</span>
+                <span className="text-[11px] text-muted-foreground">40 ms — 200 ms</span>
+              </div>
+              <input
+                type="range"
+                min={40}
+                max={200}
+                step={5}
+                value={form.scannerThresholdMs}
+                onChange={(e) => setForm((f) => ({ ...f, scannerThresholdMs: Number(e.target.value) }))}
+                className="w-full accent-green-500"
+              />
+            </div>
+            {SCANNER_PRESETS.find((p) => p.ms === form.scannerThresholdMs) && (
+              <p className="text-[11px] text-green-700 dark:text-green-400 font-medium">
+                ✓ {SCANNER_PRESETS.find((p) => p.ms === form.scannerThresholdMs)?.hint}
+              </p>
+            )}
+          </Field>
+
+          <ScannerTestWidget thresholdMs={form.scannerThresholdMs} />
+        </Section>
+
         {/* ── Telegram Notifications ── */}
         <Section icon={Bell} title="Sale Notifications" color="text-sky-600 bg-sky-50 dark:bg-sky-950/30">
           <div className="space-y-4">
@@ -326,6 +381,52 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ScannerTestWidget({ thresholdMs }: { thresholdMs: number }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [inputVal, setInputVal] = useState("");
+  const [lastCode, setLastCode] = useState<string | null>(null);
+  const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useUsbScanner(
+    (code) => {
+      if (clearTimer.current) clearTimeout(clearTimer.current);
+      setLastCode(code);
+      setInputVal("");
+      clearTimer.current = setTimeout(() => setLastCode(null), 4000);
+    },
+    {
+      enabled: true,
+      thresholdMs,
+      allowedInput: {
+        ref: inputRef,
+        onClear: () => setInputVal(""),
+      },
+    },
+  );
+
+  return (
+    <div className="space-y-2">
+      <label className="text-xs font-bold text-foreground">Test your scanner</label>
+      <p className="text-[11px] text-muted-foreground">
+        Point your scanner at any barcode and scan it. If detected, a green confirmation appears. If nothing happens, increase the threshold above then save.
+      </p>
+      <input
+        ref={inputRef}
+        value={inputVal}
+        onChange={(e) => setInputVal(e.target.value)}
+        placeholder="Click here then scan a barcode…"
+        className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 font-mono"
+      />
+      {lastCode && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
+          <CheckCircle className="w-4 h-4 shrink-0" />
+          Scanner detected! Code: <span className="font-mono ml-1">{lastCode}</span>
+        </div>
+      )}
     </div>
   );
 }

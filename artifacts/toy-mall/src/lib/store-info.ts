@@ -13,6 +13,7 @@ export interface StoreSettings {
   upiId: string;
   dynamicQrMode: boolean;
   labelShowPrice: boolean;
+  scannerThresholdMs: number;
 }
 
 interface StoreSettingsStore extends StoreSettings {
@@ -33,6 +34,7 @@ export const useStoreSettings = create<StoreSettingsStore>()(
       upiId:         "",
       dynamicQrMode: false,
       labelShowPrice: true,
+      scannerThresholdMs: 100,
       update: (patch) => set(patch),
     }),
     { name: "toy-mall-store-settings-v1" }
@@ -49,6 +51,7 @@ export const STORE_INFO = {
   get appSubtitle()   { return useStoreSettings.getState().appSubtitle; },
   get footerNote()    { return useStoreSettings.getState().footerNote; },
   get upiId()         { return useStoreSettings.getState().upiId; },
-  get dynamicQrMode()   { return useStoreSettings.getState().dynamicQrMode; },
-  get labelShowPrice()  { return useStoreSettings.getState().labelShowPrice; },
+  get dynamicQrMode()      { return useStoreSettings.getState().dynamicQrMode; },
+  get labelShowPrice()     { return useStoreSettings.getState().labelShowPrice; },
+  get scannerThresholdMs() { return useStoreSettings.getState().scannerThresholdMs ?? 100; },
 };

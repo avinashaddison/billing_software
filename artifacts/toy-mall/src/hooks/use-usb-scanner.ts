@@ -1,11 +1,17 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { STORE_INFO } from "@/lib/store-info";
 
-const SCANNER_THRESHOLD_MS = 100; // accept scanners sending chars up to 100 ms apart
 const IDLE_FIRE_MS = 50;          // fire just 50 ms after the last char — nearly instant
 const MIN_CODE_LENGTH = 2;
 
 export interface UsbScannerOptions {
   enabled?: boolean;
+  /**
+   * Override the inter-keystroke threshold (ms). When omitted the hook reads
+   * the value from the persisted store setting (scannerThresholdMs).
+   * Pass this explicitly to test a threshold before saving it.
+   */
+  thresholdMs?: number;
   /**
    * When the focused element is this input, the hook still captures the
    * scanner burst instead of falling back to the form.  On Enter the hook
@@ -107,7 +113,8 @@ export function useUsbScanner(
 
       if (e.key.length !== 1) return;
 
-      if (buffer.length === 0 || elapsed < SCANNER_THRESHOLD_MS) {
+      const threshold = optionsRef.current?.thresholdMs ?? STORE_INFO.scannerThresholdMs;
+      if (buffer.length === 0 || elapsed < threshold) {
         buffer += e.key;
         // Stop ALL other keydown listeners from the very first char so that
         // single-key shortcuts (b/s mode-switch) can never fire mid-burst.
