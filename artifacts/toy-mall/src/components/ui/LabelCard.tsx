@@ -24,83 +24,74 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
   const store     = useStoreSettings();
   const showPrice = store.labelShowPrice ?? true;
 
+  /* ── Thermal print mode: 50mm × 25mm, plain black on white ── */
   if (printMode) {
     return (
       <div style={{
-        border: "1px solid #d1d5db",
-        borderRadius: 8,
-        overflow: "hidden",
-        fontFamily: "'Segoe UI', Arial, sans-serif",
-        background: "#ffffff",
         width: "100%",
         height: "100%",
+        fontFamily: "Arial, 'Helvetica Neue', sans-serif",
+        background: "#fff",
+        color: "#000",
         display: "flex",
         flexDirection: "column",
+        padding: "1.2mm 2mm 0.8mm",
         boxSizing: "border-box",
+        overflow: "hidden",
       }}>
-        {/* Colour strip */}
+        {/* Store name */}
         <div style={{
-          background: hex.strip,
-          padding: "4px 8px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexShrink: 0,
+          fontSize: 8, fontWeight: 900, lineHeight: 1.1,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          flexShrink: 0, marginBottom: "0.3mm",
         }}>
-          <span style={{ fontSize: 9, fontWeight: 800, color: "#fff", letterSpacing: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {store.name}
-          </span>
-          <span style={{ fontSize: 13, flexShrink: 0, marginLeft: 4 }}>{emoji}</span>
+          {store.name}
         </div>
 
-        {/* Body */}
-        <div style={{ padding: "6px 8px 5px", textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-          {/* Category badge */}
-          <div style={{
-            display: "inline-block",
-            background: hex.badge, color: hex.text,
-            borderRadius: 20, fontSize: 8, fontWeight: 800,
-            padding: "1px 6px", marginBottom: 3,
-            letterSpacing: 0.5, textTransform: "uppercase",
-          }}>
-            {p.category}
-          </div>
+        {/* Product name */}
+        <div style={{
+          fontSize: 7.5, fontWeight: 700, lineHeight: 1.15,
+          overflow: "hidden", textOverflow: "ellipsis",
+          display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical",
+          flexShrink: 0, marginBottom: "0.3mm",
+        }}>
+          {p.name}
+        </div>
 
-          {/* Barcode */}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
-            <BarcodePngImage value={p.sku} className="w-full" />
+        {/* Price */}
+        {showPrice && (
+          <div style={{ flexShrink: 0, marginBottom: "0.5mm" }}>
+            {p.salePrice != null ? (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+                <span style={{ fontSize: 6.5, textDecoration: "line-through", color: "#555" }}>
+                  MRP ₹{Number(p.price).toLocaleString("en-IN")}
+                </span>
+                <span style={{ fontSize: 9, fontWeight: 900 }}>
+                  ₹{Number(p.salePrice).toLocaleString("en-IN")}
+                </span>
+              </div>
+            ) : (
+              <div style={{ fontSize: 8, fontWeight: 800 }}>
+                MRP: ₹{Number(p.price).toLocaleString("en-IN")}
+              </div>
+            )}
           </div>
+        )}
 
-          {/* Product name */}
-          <div style={{
-            fontSize: 10, fontWeight: 800, color: "#111827",
-            lineHeight: 1.25, marginTop: 3, marginBottom: 3,
-            overflow: "hidden", textOverflow: "ellipsis",
-            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-          }}>
-            {p.name}
-          </div>
+        {/* Barcode — fills remaining space */}
+        <div style={{
+          flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+          minHeight: 0, overflow: "hidden",
+        }}>
+          <BarcodePngImage value={p.sku} className="w-full" />
+        </div>
 
-          {/* Price */}
-          {showPrice && (
-            <>
-              <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "4px 0 3px" }} />
-              {p.salePrice != null ? (
-                <div>
-                  <div style={{ fontSize: 9, color: "#6b7280", textDecoration: "line-through" }}>
-                    MRP ₹{Number(p.price).toLocaleString("en-IN")}
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 900, color: "#dc2626", lineHeight: 1 }}>
-                    ₹{Number(p.salePrice).toLocaleString("en-IN")}
-                  </div>
-                </div>
-              ) : (
-                <div style={{ fontSize: 16, fontWeight: 900, color: "#111827", lineHeight: 1 }}>
-                  ₹{Number(p.price).toLocaleString("en-IN")}
-                </div>
-              )}
-            </>
-          )}
+        {/* SKU number below barcode */}
+        <div style={{
+          fontSize: 6, fontFamily: "monospace", textAlign: "center",
+          flexShrink: 0, letterSpacing: 0.5, marginTop: "0.2mm",
+        }}>
+          {p.sku}
         </div>
       </div>
     );
