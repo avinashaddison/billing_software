@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearch, useLocation, Link } from "wouter";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
+import { useScanFlash, ScanFlash } from "@/components/ui/ScanFlash";
 import {
   useGetProductBySku, useUpdateStock,
   getGetProductBySkuQueryKey, getGetDashboardSummaryQueryKey,
@@ -62,9 +63,11 @@ export default function ProductDetail() {
     }
   }, [isError, setLocation]);
 
+  const { flash, triggerFlash } = useScanFlash();
   const scanCacheRef = useRef<Map<string, { id: string; sku: string; name: string; price: number }>>(new Map());
 
   const handleUsbScan = useCallback(async (code: string) => {
+    triggerFlash(code);
     try {
       const cached = scanCacheRef.current.get(code);
       const found = cached ?? await (async () => {
@@ -93,7 +96,7 @@ export default function ProductDetail() {
     } catch {
       toast.error(`Lookup failed for ${code}`);
     }
-  }, [sku, setLocation, queryClient, addItem, count]);
+  }, [sku, setLocation, queryClient, addItem, count, triggerFlash]);
 
   useUsbScanner(handleUsbScan);
 
@@ -216,6 +219,9 @@ export default function ProductDetail() {
 
   return (
     <>
+      {/* ── Scan confirmation flash ── */}
+      <ScanFlash flash={flash} />
+
       {/* ── Print CSS ── */}
       <style>{`
         @media print {

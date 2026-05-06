@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
+import { useScanFlash, ScanFlash } from "@/components/ui/ScanFlash";
 import {
   ScanLine, ArrowRight, Trash2, Plus, Minus,
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
@@ -552,8 +553,10 @@ export default function Scan() {
   const handleCameraError = useCallback((msg: string) => { setCameraError(msg); }, []);
   useScanner(showScanner, videoRef, handleScan, handleCameraError);
 
+  const { flash, triggerFlash } = useScanFlash();
+
   /* USB scanner: parse URL-format QR values the same way the camera does,
-     then forward the clean SKU and flash a "Detected" toast so the user can
+     then forward the clean SKU and flash a "Detected" banner so the user can
      confirm the scan was actually received by the page.                     */
   const handleUsbScan = useCallback((raw: string) => {
     let sku = raw;
@@ -563,9 +566,10 @@ export default function Scan() {
         sku = u.searchParams.get("sku") ?? raw;
       }
     } catch { /* use raw */ }
-    toast(`Scanning: ${sku}`, { duration: 800 });
+
+    triggerFlash(sku);
     handleScan(sku);
-  }, [handleScan]);
+  }, [handleScan, triggerFlash]);
   useUsbScanner(handleUsbScan, {
     allowedInput: { ref: manualInputRef, onClear: () => setManualSku("") },
   });
@@ -691,6 +695,9 @@ export default function Scan() {
 
   return (
     <div className="relative flex flex-col h-full bg-background text-foreground overflow-hidden">
+
+      {/* ── Scan confirmation flash ── */}
+      <ScanFlash flash={flash} />
 
       {/* ── Overlays ── */}
       {successBillId && <SuccessOverlay billId={successBillId} />}
@@ -962,6 +969,7 @@ export default function Scan() {
           )}
         </div>
       )}
+      <ScanFlash flash={flash} />
     </div>
   );
 }
