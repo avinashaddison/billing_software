@@ -18,108 +18,281 @@ interface LabelCardProps {
   printMode?: boolean;
 }
 
+const S = {
+  root: {
+    width: "100%", height: "100%",
+    fontFamily: "Arial, 'Helvetica Neue', sans-serif",
+    background: "#fff", color: "#000",
+    display: "flex", flexDirection: "column" as const,
+    boxSizing: "border-box" as const,
+    overflow: "hidden",
+    border: "0.4mm solid #ccc",
+    borderRadius: "1.5mm",
+  },
+  hr: {
+    borderTop: "0.3mm solid #d1d5db",
+    margin: 0, flexShrink: 0,
+  },
+  vr: {
+    borderLeft: "0.3mm solid #d1d5db",
+    alignSelf: "stretch", flexShrink: 0,
+  },
+};
+
 export function LabelCard({ p, compact = false, printMode = false }: LabelCardProps) {
   const hex       = getCategoryHex(p.category);
   const emoji     = getCategoryEmoji(p.category);
   const store     = useStoreSettings();
   const showPrice = store.labelShowPrice ?? true;
+  const hasSale   = p.salePrice != null && showPrice;
+  const mrp       = Number(p.price).toLocaleString("en-IN");
+  const sale      = hasSale ? Number(p.salePrice).toLocaleString("en-IN") : null;
 
-  /* ── Thermal print mode: 50mm × 25mm, single-column Motoomal style ── */
+  /* ── Thermal print mode: 80mm × 50mm, premium 3-row retail label ── */
   if (printMode) {
     return (
-      <div style={{
-        width: "100%",
-        height: "100%",
-        fontFamily: "Arial, 'Helvetica Neue', sans-serif",
-        background: "#fff",
-        color: "#000",
-        display: "flex",
-        flexDirection: "column",
-        boxSizing: "border-box",
-        overflow: "hidden",
-      }}>
+      <div style={S.root}>
 
-        {/* Store name — centred black banner */}
+        {/* ══ ROW 1: Store branding + Price ══ */}
         <div style={{
-          background: "#000",
-          color: "#fff",
-          textAlign: "center",
-          fontSize: 8, fontWeight: 900,
-          letterSpacing: 1.5,
-          textTransform: "uppercase",
-          padding: "0.7mm 2mm",
-          flexShrink: 0,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          printColorAdjust: "exact",
-          WebkitPrintColorAdjust: "exact",
-        } as React.CSSProperties}>
-          {store.name}
-        </div>
-
-        {/* Content */}
-        <div style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
-          padding: "0.8mm 2mm 0.5mm",
-          overflow: "hidden",
+          display: "flex", flexDirection: "row",
+          alignItems: "stretch", flexShrink: 0,
+          minHeight: "16mm",
         }}>
-
-          {/* Product name + SKU */}
-          <div>
+          {/* Store identity */}
+          <div style={{
+            flex: 1, display: "flex", alignItems: "center",
+            gap: "2mm", padding: "1.5mm 2mm",
+            overflow: "hidden",
+          }}>
+            {/* Emoji icon box */}
             <div style={{
-              fontSize: 8, fontWeight: 700, lineHeight: 1.2,
-              overflow: "hidden", textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              width: "8mm", height: "8mm", flexShrink: 0,
+              border: "0.4mm solid #000",
+              borderRadius: "1mm",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "5mm", lineHeight: 1,
             }}>
-              {p.name}
+              {store.logoEmoji}
             </div>
-            <div style={{
-              fontSize: 6.5, fontFamily: "monospace", color: "#444",
-              letterSpacing: 0.3, lineHeight: 1.2,
-            }}>
-              {p.sku}
+            {/* Vertical rule */}
+            <div style={{ ...S.vr, height: "8mm" }} />
+            {/* Name + tagline */}
+            <div style={{ overflow: "hidden", minWidth: 0 }}>
+              <div style={{
+                fontSize: "4.2mm", fontWeight: 900,
+                lineHeight: 1.15, letterSpacing: "0.3mm",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                textTransform: "uppercase",
+              }}>
+                {store.name}
+              </div>
+              <div style={{
+                fontSize: "2.8mm", fontWeight: 500, color: "#555",
+                letterSpacing: "0.4mm", textTransform: "uppercase",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }}>
+                {store.tagline}
+              </div>
             </div>
           </div>
 
-          {/* Price */}
+          {/* Price section */}
           {showPrice && (
-            <div style={{ lineHeight: 1.15 }}>
-              {p.salePrice != null ? (
-                <>
+            <>
+              <div style={S.vr} />
+              {hasSale ? (
+                /* MRP strikethrough + Sale price black box */
+                <div style={{
+                  display: "flex", alignItems: "stretch", flexShrink: 0,
+                }}>
+                  {/* MRP column */}
                   <div style={{
-                    fontSize: 8, fontWeight: 700,
-                    textDecoration: "line-through", color: "#222",
+                    display: "flex", flexDirection: "column",
+                    alignItems: "center", justifyContent: "center",
+                    padding: "1.5mm 2.5mm",
                   }}>
-                    MRP: {Number(p.price).toLocaleString("en-IN")}
+                    <div style={{
+                      fontSize: "2.5mm", fontWeight: 700, color: "#555",
+                      letterSpacing: "0.3mm", textTransform: "uppercase",
+                    }}>
+                      MRP
+                    </div>
+                    <div style={{
+                      fontSize: "5mm", fontWeight: 800, color: "#333",
+                      textDecoration: "line-through", lineHeight: 1.1,
+                      whiteSpace: "nowrap",
+                    }}>
+                      ₹{mrp}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 10, fontWeight: 900 }}>
-                    SALE: {Number(p.salePrice).toLocaleString("en-IN")}
+                  <div style={S.vr} />
+                  {/* Sale price box */}
+                  <div style={{
+                    background: "#000", color: "#fff",
+                    display: "flex", flexDirection: "column",
+                    alignItems: "center", justifyContent: "center",
+                    padding: "1.5mm 3mm",
+                    borderRadius: "0 1.5mm 0 0",
+                    printColorAdjust: "exact",
+                    WebkitPrintColorAdjust: "exact",
+                    minWidth: "22mm",
+                  } as React.CSSProperties}>
+                    <div style={{
+                      fontSize: "2.5mm", fontWeight: 700,
+                      letterSpacing: "0.4mm", textTransform: "uppercase",
+                      marginBottom: "0.3mm",
+                    }}>
+                      SALE PRICE
+                    </div>
+                    <div style={{
+                      fontSize: "7mm", fontWeight: 900, lineHeight: 1,
+                      whiteSpace: "nowrap",
+                    }}>
+                      ₹ {sale}
+                    </div>
+                    <div style={{
+                      fontSize: "2mm", marginTop: "0.5mm",
+                      color: "#ccc", whiteSpace: "nowrap",
+                    }}>
+                      (Incl. of all taxes)
+                    </div>
                   </div>
-                </>
+                </div>
               ) : (
-                <div style={{ fontSize: 9, fontWeight: 800 }}>
-                  MRP: ₹{Number(p.price).toLocaleString("en-IN")}
+                /* MRP only */
+                <div style={{
+                  display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center",
+                  padding: "1.5mm 3.5mm", flexShrink: 0,
+                }}>
+                  <div style={{
+                    fontSize: "2.5mm", fontWeight: 700, color: "#555",
+                    letterSpacing: "0.3mm", textTransform: "uppercase",
+                  }}>
+                    MRP
+                  </div>
+                  <div style={{
+                    fontSize: "6.5mm", fontWeight: 900, lineHeight: 1,
+                    whiteSpace: "nowrap",
+                  }}>
+                    ₹{mrp}
+                  </div>
                 </div>
               )}
-            </div>
+            </>
           )}
+        </div>
 
-          {/* Barcode + number */}
-          <div style={{ overflow: "hidden" }}>
-            <BarcodePngImage value={p.sku} className="w-full" />
+        <hr style={S.hr} />
+
+        {/* ══ ROW 2: Product name + Category ══ */}
+        <div style={{
+          display: "flex", flexDirection: "row",
+          alignItems: "stretch", flex: 1, overflow: "hidden",
+          minHeight: "18mm",
+        }}>
+          {/* Product name */}
+          <div style={{
+            flex: "0 0 62%", padding: "1.5mm 2.5mm",
+            display: "flex", flexDirection: "column", justifyContent: "center",
+            overflow: "hidden",
+          }}>
             <div style={{
-              fontSize: 6.5, textAlign: "center",
-              fontFamily: "monospace", letterSpacing: 0.5,
+              fontSize: "5.8mm", fontWeight: 900, lineHeight: 1.2,
+              overflow: "hidden", textOverflow: "ellipsis",
+              display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+              letterSpacing: "-0.1mm",
+            } as React.CSSProperties}>
+              {p.name}
+            </div>
+          </div>
+
+          <div style={S.vr} />
+
+          {/* Category */}
+          <div style={{
+            flex: 1, padding: "1.5mm 2mm",
+            display: "flex", flexDirection: "column",
+            alignItems: "flex-start", justifyContent: "center",
+            overflow: "hidden",
+          }}>
+            <div style={{
+              width: "7mm", height: "7mm",
+              borderRadius: "50%",
+              border: "0.4mm solid #000",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "3.8mm", marginBottom: "1mm", flexShrink: 0,
+            }}>
+              {emoji}
+            </div>
+            <div style={{
+              fontSize: "2.8mm", fontWeight: 800,
+              letterSpacing: "0.3mm", textTransform: "uppercase",
+              lineHeight: 1.2,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              maxWidth: "100%",
+            }}>
+              {p.category}
+            </div>
+            <div style={{
+              fontSize: "2.3mm", color: "#666", marginTop: "0.5mm",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}>
+              {store.tagline}
+            </div>
+          </div>
+        </div>
+
+        <hr style={S.hr} />
+
+        {/* ══ ROW 3: SKU + Barcode ══ */}
+        <div style={{
+          display: "flex", flexDirection: "row",
+          alignItems: "stretch", flexShrink: 0,
+          minHeight: "14mm",
+        }}>
+          {/* SKU */}
+          <div style={{
+            padding: "1.5mm 2mm", flexShrink: 0,
+            display: "flex", flexDirection: "column",
+            justifyContent: "center", minWidth: "14mm",
+          }}>
+            <div style={{
+              fontSize: "2.5mm", color: "#888", fontWeight: 600,
+              letterSpacing: "0.3mm", textTransform: "uppercase", lineHeight: 1,
+            }}>
+              SKU
+            </div>
+            <div style={{
+              fontSize: "4mm", fontWeight: 900, lineHeight: 1.2,
+              fontFamily: "monospace", letterSpacing: "0.2mm",
+              whiteSpace: "nowrap",
             }}>
               {p.sku}
             </div>
           </div>
 
+          <div style={S.vr} />
+
+          {/* Barcode */}
+          <div style={{
+            flex: 1, padding: "1mm 2mm 0.5mm",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            overflow: "hidden",
+          }}>
+            <BarcodePngImage value={p.sku} className="w-full" />
+            <div style={{
+              fontSize: "2.5mm", textAlign: "center",
+              fontFamily: "monospace", letterSpacing: "0.5mm",
+              marginTop: "0.3mm", lineHeight: 1,
+            }}>
+              {p.sku}
+            </div>
+          </div>
         </div>
+
       </div>
     );
   }

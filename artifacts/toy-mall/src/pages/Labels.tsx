@@ -6,9 +6,9 @@ import { LabelCard, type LabelProduct as Product } from "@/components/ui/LabelCa
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 import { useListProducts } from "@workspace/api-client-react";
 
-/* 50×25mm at 96dpi (1mm ≈ 3.78px) — used for on-screen preview */
-const LABEL_W_PX = Math.round(50 * 3.78);
-const LABEL_H_PX = Math.round(25 * 3.78);
+/* 80×50mm at 96dpi (1mm ≈ 3.78px) — used for on-screen preview */
+const LABEL_W_PX = Math.round(80 * 3.78);
+const LABEL_H_PX = Math.round(50 * 3.78);
 
 export default function Labels() {
   const { data: productsData, isLoading: loading } = useListProducts();
@@ -56,7 +56,7 @@ export default function Labels() {
     <>
       {/* ── Print CSS ── */}
       <style>{`
-        @page { size: 50mm 25mm; margin: 0; }
+        @page { size: 80mm 50mm; margin: 0; }
         @media print {
           html, body { height: auto !important; overflow: visible !important; }
           body > *:not(.labels-print-area) { display: none !important; }
@@ -69,7 +69,7 @@ export default function Labels() {
           }
           .label-page {
             display: block !important;
-            width: 50mm !important; height: 25mm !important;
+            width: 80mm !important; height: 50mm !important;
             page-break-after: always !important; break-after: page !important;
             overflow: hidden !important;
             print-color-adjust: exact !important;
@@ -84,7 +84,7 @@ export default function Labels() {
       {/* ── Print portal — direct child of <body> so the CSS selector works ── */}
       {printing && createPortal(
         <div className="labels-print-area" style={{
-          position: "fixed", top: "-200vh", left: 0, width: "50mm",
+          position: "fixed", top: "-200vh", left: 0, width: "80mm",
           background: "white",
         }}>
           {printItems.map((p) => (
@@ -105,7 +105,7 @@ export default function Labels() {
               <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
                 <Tag className="w-6 h-6 text-primary" /> Label Printer
               </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">50×25mm sticker labels · one per product</p>
+              <p className="text-xs text-muted-foreground mt-0.5">80×50mm price tag labels · one per product</p>
             </div>
             {selected.size > 0 && (
               <div className="flex items-center gap-2">
@@ -132,8 +132,8 @@ export default function Labels() {
             <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3 text-xs text-amber-800 dark:text-amber-300">
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span className="flex-1">
-                <b>Print settings:</b> set <b>Margins → None</b>, uncheck <b>Headers and footers</b>, and keep <b>Background graphics ON</b> (so the black store name banner prints).
-                Each label prints on its own 50×25mm sticker.
+                <b>Print settings:</b> set <b>Margins → None</b>, uncheck <b>Headers and footers</b>, keep <b>Background graphics ON</b> (for the black sale price box).
+                Each label prints on its own 80×50mm sticker.
               </span>
               <button onClick={() => setShowTip(false)} className="font-black text-amber-600 hover:text-amber-800 ml-1">✕</button>
             </div>
