@@ -132,7 +132,7 @@ export default function Labels() {
             <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3 text-xs text-amber-800 dark:text-amber-300">
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span className="flex-1">
-                <b>Print settings:</b> set <b>Margins → None</b>, uncheck <b>Headers and footers</b>, keep <b>Background graphics ON</b> (for the black sale price box).
+                <b>Print settings:</b> set <b>Margins → None</b> and uncheck <b>Headers and footers</b>.
                 Each label prints on its own 80×50mm sticker.
               </span>
               <button onClick={() => setShowTip(false)} className="font-black text-amber-600 hover:text-amber-800 ml-1">✕</button>
