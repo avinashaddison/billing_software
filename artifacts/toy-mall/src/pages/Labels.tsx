@@ -1,9 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { Tag, Printer, Loader2, Search, Check, Package, Eye, Barcode, Plus, Minus } from "lucide-react";
+import { Tag, Printer, Loader2, Search, Check, Package, Eye, Barcode, Plus, Minus, LayoutGrid, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LabelCard, type LabelProduct as Product } from "@/components/ui/LabelCard";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 import { useListProducts } from "@workspace/api-client-react";
+
+type Columns = 3 | 4;
+type LabelSize = "sm" | "md" | "lg";
+
+const SIZE_LABELS: Record<LabelSize, string> = { sm: "Small", md: "Medium", lg: "Large" };
 
 /* ═══════════════════════════════════════════════════════════════ */
 export default function Labels() {
@@ -15,8 +20,10 @@ export default function Labels() {
   const [copies, setCopies]           = useState<Record<string, number>>({});
   const [showPreview, setShowPreview] = useState(false);
   const [printing, setPrinting]       = useState(false);
+  const [columns, setColumns]         = useState<Columns>(3);
+  const [labelSize, setLabelSize]     = useState<LabelSize>("md");
+  const [showTip, setShowTip]         = useState(true);
 
-  /* Reset showPrint after browser print dialog closes */
   useEffect(() => {
     const onAfterPrint = () => setPrinting(false);
     window.addEventListener("afterprint", onAfterPrint);
@@ -51,18 +58,23 @@ export default function Labels() {
 
   const selectedProducts = products.filter((p) => selected.has(p.id));
 
-  /* Expand by copies for print */
   const printItems = selectedProducts.flatMap((p) =>
     Array.from({ length: getCopies(p.id) }, (_, i) => ({ ...p, _key: `${p.id}-${i}` }))
   );
 
   const totalLabels = selectedProducts.reduce((s, p) => s + getCopies(p.id), 0);
 
+  /* Label card size → scale the card */
+  const sizeScale: Record<LabelSize, number> = { sm: 0.78, md: 1, lg: 1.18 };
+
   return (
     <>
-      {/* Print-only CSS */}
+      {/* Print CSS — A4, no browser chrome */}
       <style>{`
-        @page { margin: 10mm; }
+        @page {
+          size: A4 portrait;
+          margin: 8mm;
+        }
         @media print {
           body * { visibility: hidden !important; }
           .labels-print-area, .labels-print-area * { visibility: visible !important; }
@@ -79,12 +91,14 @@ export default function Labels() {
         <div className="labels-print-area fixed inset-0 hidden print:block bg-white">
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "10px",
+            gridTemplateColumns: `repeat(${columns}, 1fr)`,
+            gap: "6px",
             padding: "0",
           }}>
             {printItems.map((p) => (
-              <LabelCard key={p._key} p={p} />
+              <div key={p._key} style={{ transform: `scale(${sizeScale[labelSize]})`, transformOrigin: "top center" }}>
+                <LabelCard p={p} />
+              </div>
             ))}
           </div>
         </div>
@@ -114,6 +128,41 @@ export default function Labels() {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Print tip */}
+          {showTip && (
+            <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3 text-xs text-amber-800 dark:text-amber-300">
+              <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span className="flex-1">
+                <b>Print tip:</b> In the print dialog → uncheck <b>"Headers and footers"</b> and set <b>Margins → None</b> for clean labels without the URL/date.
+              </span>
+              <button onClick={() => setShowTip(false)} className="font-black text-amber-600 hover:text-amber-800 ml-1">✕</button>
+            </div>
+          )}
+
+          {/* Layout controls */}
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            {/* Columns */}
+            <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
+              <LayoutGrid className="w-3.5 h-3.5 text-muted-foreground ml-1" />
+              {([3, 4] as Columns[]).map((c) => (
+                <button key={c} onClick={() => setColumns(c)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${columns === c ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                  {c} col
+                </button>
+              ))}
+            </div>
+
+            {/* Size */}
+            <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
+              {(["sm", "md", "lg"] as LabelSize[]).map((s) => (
+                <button key={s} onClick={() => setLabelSize(s)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${labelSize === s ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                  {SIZE_LABELS[s]}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
