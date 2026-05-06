@@ -12,12 +12,101 @@ export type LabelProduct = {
   stock: number;
 };
 
-export function LabelCard({ p, compact = false }: { p: LabelProduct; compact?: boolean }) {
+interface LabelCardProps {
+  p: LabelProduct;
+  compact?: boolean;
+  printMode?: boolean;
+}
+
+export function LabelCard({ p, compact = false, printMode = false }: LabelCardProps) {
   const hex       = getCategoryHex(p.category);
   const emoji     = getCategoryEmoji(p.category);
   const store     = useStoreSettings();
   const showPrice = store.labelShowPrice ?? true;
 
+  if (printMode) {
+    return (
+      <div style={{
+        border: "1px solid #d1d5db",
+        borderRadius: 8,
+        overflow: "hidden",
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        background: "#ffffff",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        boxSizing: "border-box",
+      }}>
+        {/* Colour strip */}
+        <div style={{
+          background: hex.strip,
+          padding: "4px 8px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 9, fontWeight: 800, color: "#fff", letterSpacing: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {store.name}
+          </span>
+          <span style={{ fontSize: 13, flexShrink: 0, marginLeft: 4 }}>{emoji}</span>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "6px 8px 5px", textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          {/* Category badge */}
+          <div style={{
+            display: "inline-block",
+            background: hex.badge, color: hex.text,
+            borderRadius: 20, fontSize: 8, fontWeight: 800,
+            padding: "1px 6px", marginBottom: 3,
+            letterSpacing: 0.5, textTransform: "uppercase",
+          }}>
+            {p.category}
+          </div>
+
+          {/* Barcode */}
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
+            <BarcodePngImage value={p.sku} className="w-full" />
+          </div>
+
+          {/* Product name */}
+          <div style={{
+            fontSize: 10, fontWeight: 800, color: "#111827",
+            lineHeight: 1.25, marginTop: 3, marginBottom: 3,
+            overflow: "hidden", textOverflow: "ellipsis",
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+          }}>
+            {p.name}
+          </div>
+
+          {/* Price */}
+          {showPrice && (
+            <>
+              <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "4px 0 3px" }} />
+              {p.salePrice != null ? (
+                <div>
+                  <div style={{ fontSize: 9, color: "#6b7280", textDecoration: "line-through" }}>
+                    MRP ₹{Number(p.price).toLocaleString("en-IN")}
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#dc2626", lineHeight: 1 }}>
+                    ₹{Number(p.salePrice).toLocaleString("en-IN")}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 16, fontWeight: 900, color: "#111827", lineHeight: 1 }}>
+                  ₹{Number(p.price).toLocaleString("en-IN")}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Screen / compact mode ── */
   const cardStyle: React.CSSProperties = {
     border: "1px solid #d1d5db",
     borderRadius: 10,
@@ -58,9 +147,7 @@ export function LabelCard({ p, compact = false }: { p: LabelProduct; compact?: b
         }}>
           {p.category}
         </div>
-
         <BarcodePngImage value={p.sku} className="w-full" />
-
         <div style={{
           fontSize: compact ? 10 : 12, fontWeight: 800, color: "#111827",
           lineHeight: 1.3, marginTop: compact ? 3 : 5,
@@ -70,22 +157,21 @@ export function LabelCard({ p, compact = false }: { p: LabelProduct; compact?: b
         }}>
           {p.name}
         </div>
-
         {showPrice && (
           <>
             <div style={{ borderTop: `2px solid ${hex.strip}`, margin: "5px 0" }} />
             {p.salePrice != null ? (
               <div>
                 <div style={{ fontSize: compact ? 10 : 12, color: "#6b7280", textDecoration: "line-through" }}>
-                  MRP ₹{p.price.toLocaleString("en-IN")}
+                  MRP ₹{Number(p.price).toLocaleString("en-IN")}
                 </div>
                 <div style={{ fontSize: compact ? 14 : 18, fontWeight: 900, color: "#dc2626" }}>
-                  ₹{p.salePrice.toLocaleString("en-IN")}
+                  ₹{Number(p.salePrice).toLocaleString("en-IN")}
                 </div>
               </div>
             ) : (
               <div style={{ fontSize: compact ? 14 : 18, fontWeight: 900, color: "#111827" }}>
-                ₹{p.price.toLocaleString("en-IN")}
+                ₹{Number(p.price).toLocaleString("en-IN")}
               </div>
             )}
           </>
