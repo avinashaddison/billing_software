@@ -540,12 +540,14 @@ export default function ProductDetail() {
               <div className="flex gap-2 w-full mt-1">
                 <button
                   onClick={() => {
-                    const url = barcodePngDataUrl(product.sku);
-                    if (!url) return;
+                    const dataUrl = barcodePngDataUrl(product.sku);
+                    if (!dataUrl) return;
                     const a = document.createElement("a");
-                    a.href = url;
+                    a.href = dataUrl;
                     a.download = `${product.sku}-barcode.png`;
+                    document.body.appendChild(a);
                     a.click();
+                    document.body.removeChild(a);
                   }}
                   className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
                 >

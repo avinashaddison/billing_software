@@ -552,8 +552,18 @@ export default function Scan() {
   const handleCameraError = useCallback((msg: string) => { setCameraError(msg); }, []);
   useScanner(showScanner, videoRef, handleScan, handleCameraError);
 
-  /* USB scanner: fires handleScan + shows an immediate scan-received toast */
-  const handleUsbScan = useCallback((sku: string) => {
+  /* USB scanner: parse URL-format QR values the same way the camera does,
+     then forward the clean SKU and flash a "Detected" toast so the user can
+     confirm the scan was actually received by the page.                     */
+  const handleUsbScan = useCallback((raw: string) => {
+    let sku = raw;
+    try {
+      if (raw.includes("product?sku=")) {
+        const u = new URL(raw.startsWith("http") ? raw : `http://x${raw}`);
+        sku = u.searchParams.get("sku") ?? raw;
+      }
+    } catch { /* use raw */ }
+    toast(`Scanning: ${sku}`, { duration: 800 });
     handleScan(sku);
   }, [handleScan]);
   useUsbScanner(handleUsbScan, {
