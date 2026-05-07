@@ -48,10 +48,15 @@ function playTone(
   osc.stop(ac.currentTime + duration);
 }
 
-/** Short double-beep — QR scan success */
+/** Short double-beep — QR scan success (USB scanner) */
 export function playScanBeep() {
   playTone(1046, 0.08, "square", 0.3); // C6
   setTimeout(() => playTone(1318, 0.12, "square", 0.3), 90); // E6
+}
+
+/** Single sharp blip — instant camera decode feedback */
+export function playCameraDetect() {
+  playTone(1760, 0.05, "square", 0.28); // A6 — distinct from the USB double-beep
 }
 
 /** Soft tick — quantity +/- adjust */

@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
-import { playScanBeep, playError, playCheckoutSuccess, playTick, playStockIn, isSoundMuted, toggleSoundMute } from "@/lib/sounds";
+import { playScanBeep, playCameraDetect, playError, playCheckoutSuccess, playTick, playStockIn, isSoundMuted, toggleSoundMute } from "@/lib/sounds";
 import { useCart } from "@/contexts/cart-context";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
@@ -555,12 +555,25 @@ export default function Scan() {
   const { flash, triggerFlash } = useScanFlash();
   const { lowStockFlash, triggerLowStockFlash } = useLowStockFlash();
 
+  /* Track whether the pending lookup came from camera or USB so the
+     lookupSku effect can skip the duplicate playScanBeep for camera scans
+     (camera scans play playCameraDetect immediately instead).              */
+  const scanSourceRef = useRef<"camera" | "usb">("usb");
+
   const handleScan = useCallback((sku: string) => {
     triggerFlash(sku);
     setLookupSku(sku);
   }, [triggerFlash]);
+
+  /* Camera path — plays an immediate distinct blip at decode time */
+  const handleCameraScan = useCallback((sku: string) => {
+    scanSourceRef.current = "camera";
+    playCameraDetect();
+    handleScan(sku);
+  }, [handleScan]);
+
   const handleCameraError = useCallback((msg: string) => { setCameraError(msg); }, []);
-  useScanner(showScanner, videoRef, handleScan, handleCameraError);
+  useScanner(showScanner, videoRef, handleCameraScan, handleCameraError);
 
   /* USB scanner: parse URL-format QR values the same way the camera does,
      then forward the clean SKU. The flash is triggered inside handleScan so
@@ -574,6 +587,7 @@ export default function Scan() {
       }
     } catch { /* use raw */ }
 
+    scanSourceRef.current = "usb";
     handleScan(sku);
   }, [handleScan]);
   useUsbScanner(handleUsbScan, {
@@ -582,7 +596,9 @@ export default function Scan() {
 
   useEffect(() => {
     if (!lookupSku) return;
-    playScanBeep();
+    /* Camera scans already played playCameraDetect() immediately at decode
+       time — only play the USB double-beep for USB/manual entries.         */
+    if (scanSourceRef.current === "usb") playScanBeep();
 
     /* Try in-memory cache first (instant ~0ms), fall back to API */
     const cached = skuCache.get(lookupSku.toLowerCase());
@@ -642,6 +658,7 @@ export default function Scan() {
     const sku = manualSku.trim().toUpperCase();
     if (!sku) return;
     setManualSku("");
+    scanSourceRef.current = "usb";
     setLookupSku(sku);
   };
 
