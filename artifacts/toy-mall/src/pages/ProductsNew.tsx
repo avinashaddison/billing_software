@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useCreateProduct, getListProductsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Tag, PenLine, FolderOpen, Eye, TrendingUp, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Tag, PenLine, FolderOpen, Eye, TrendingUp, AlertTriangle, Truck } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,7 @@ async function fetchNextSku(categoryCode: string): Promise<string> {
 
 /* ── Types ───────────────────────────────────────────────────────── */
 interface ApiCategory { id: string; name: string; emoji: string; skuCode: string }
+interface ApiSupplier { id: string; name: string }
 
 /* ── Margin colour helper ─────────────────────────────────────────── */
 function marginColour(pct: number) {
@@ -100,6 +101,19 @@ export default function CreateProduct() {
     },
     staleTime: 1000 * 60,
   });
+
+  /* Load suppliers */
+  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<ApiSupplier[]>({
+    queryKey: ["suppliers"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE_URL}/api/suppliers`);
+      if (!r.ok) return [];
+      return r.json();
+    },
+    staleTime: 1000 * 60,
+  });
+
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
 
   const [autoSku, setAutoSku]         = useState<string>("");
   const [skuLoading, setSkuLoading]   = useState(false);
@@ -189,7 +203,7 @@ export default function CreateProduct() {
     const salePriceUntilVal = data.salePriceUntil ? new Date(data.salePriceUntil).toISOString() : null;
     const purchasePriceVal  = data.purchasePrice && typeof data.purchasePrice === "number" ? data.purchasePrice : undefined;
     createProduct.mutate(
-      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, salePriceUntil: salePriceUntilVal, purchasePrice: purchasePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || null } },
+      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, salePriceUntil: salePriceUntilVal, purchasePrice: purchasePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || null, supplierId: selectedSupplierId || null } },
       {
         onSuccess: (product) => {
           toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
@@ -292,6 +306,40 @@ export default function CreateProduct() {
                       </FormItem>
                     )} />
                   )}
+
+                  {/* Supplier dropdown */}
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-bold text-muted-foreground">
+                      <Truck className="w-3.5 h-3.5 inline mr-1.5" />Supplier — optional
+                    </p>
+                    <Select
+                      value={selectedSupplierId}
+                      onValueChange={(v) => setSelectedSupplierId(v === "__none__" ? "" : v)}
+                    >
+                      <SelectTrigger className="h-12 rounded-xl">
+                        <SelectValue placeholder={suppliersLoading ? "Loading suppliers…" : "Select a supplier…"} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {!suppliersLoading && suppliers.length === 0 ? (
+                          <div className="px-4 py-3 text-sm text-muted-foreground text-center">
+                            No suppliers yet —{" "}
+                            <Link href="/suppliers" className="font-bold underline">add one in Suppliers</Link>
+                          </div>
+                        ) : (
+                          <>
+                            <SelectItem value="__none__">
+                              <span className="text-muted-foreground">None</span>
+                            </SelectItem>
+                            {suppliers.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                <span className="font-semibold">{s.name}</span>
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   {/* Product name */}
                   <FormField control={form.control} name="name" render={({ field }) => (

@@ -8,10 +8,13 @@ import {
   getGetTodayActivityQueryKey, getListProductsQueryKey,
   getGetLowStockProductsQueryKey, getListStockLogsQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode } from "lucide-react";
+import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode, Truck } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { BarcodeImage, barcodePngDataUrl } from "@/components/ui/BarcodeImage";
 import { LabelCard } from "@/components/ui/LabelCard";
@@ -27,6 +30,8 @@ const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 const PRESET_QTYS = [1, 5, 10, 25, 50];
 
+interface ApiSupplier { id: string; name: string }
+
 export default function ProductDetail() {
   const searchParams = new URLSearchParams(useSearch());
   const sku = searchParams.get("sku") || "";
@@ -41,9 +46,20 @@ export default function ProductDetail() {
   const [savingImg, setSavingImg]       = useState(false);
   const [editOpen, setEditOpen]         = useState(false);
   const [editSaving, setEditSaving]     = useState(false);
-  const [editForm, setEditForm]         = useState({ name: "", price: "", salePrice: "", salePriceUntil: "", purchasePrice: "", category: "", lowStockThreshold: "" });
+  const [editForm, setEditForm]         = useState({ name: "", price: "", salePrice: "", salePriceUntil: "", purchasePrice: "", category: "", lowStockThreshold: "", supplierId: "" });
   const [printing, setPrinting]             = useState(false);
   const [printCopies, setPrintCopies]       = useState(1);
+
+  /* Load suppliers for the edit panel */
+  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<ApiSupplier[]>({
+    queryKey: ["suppliers"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE_URL}/api/suppliers`);
+      if (!r.ok) return [];
+      return r.json();
+    },
+    staleTime: 1000 * 60,
+  });
 
   const { data: product, isLoading, isError } = useGetProductBySku(sku, {
     query: {
@@ -152,6 +168,7 @@ export default function ProductDetail() {
     const sp  = "salePrice"      in product ? (product.salePrice      as number | null | undefined) : null;
     const pp  = "purchasePrice"  in product ? (product.purchasePrice  as number | null | undefined) : null;
     const spu = "salePriceUntil" in product ? (product.salePriceUntil as string | null | undefined) : null;
+    const sid = "supplierId"     in product ? (product.supplierId     as string | null | undefined) : null;
     setEditForm({
       name:              product.name,
       price:             String(product.price),
@@ -160,6 +177,7 @@ export default function ProductDetail() {
       salePriceUntil:    spu != null ? spu.slice(0, 10) : "",
       category:          product.category,
       lowStockThreshold: String(product.lowStockThreshold),
+      supplierId:        sid ?? "",
     });
     setEditOpen(true);
   };
@@ -190,7 +208,7 @@ export default function ProductDetail() {
       const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, price, salePrice, salePriceUntil, purchasePrice, category, lowStockThreshold: threshold }),
+        body: JSON.stringify({ name, price, salePrice, salePriceUntil, purchasePrice, category, lowStockThreshold: threshold, supplierId: editForm.supplierId || null }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       toast.success("Product updated");
@@ -345,6 +363,34 @@ export default function ProductDetail() {
                 onChange={(e) => setEditForm((f) => ({ ...f, lowStockThreshold: e.target.value }))}
                 placeholder="5" className="h-11 rounded-xl" />
             </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground mb-1 flex items-center gap-1">
+                <Truck className="w-3 h-3" /> Supplier — optional
+              </p>
+              <Select
+                value={editForm.supplierId || "__none__"}
+                onValueChange={(v) => setEditForm((f) => ({ ...f, supplierId: v === "__none__" ? "" : v }))}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder={suppliersLoading ? "Loading…" : "Select a supplier…"} />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="__none__">
+                    <span className="text-muted-foreground">None</span>
+                  </SelectItem>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                  {!suppliersLoading && suppliers.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground text-center">
+                      No suppliers yet
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <button onClick={handleEditSave} disabled={editSaving}
             className="w-full h-12 bg-primary text-primary-foreground rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50">
@@ -483,6 +529,27 @@ export default function ProductDetail() {
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Low Stock Threshold</p>
                   <p className="text-sm font-semibold">{product.lowStockThreshold} units</p>
                 </div>
+
+                {/* Supplier */}
+                {(() => {
+                  const sid = "supplierId" in product ? (product.supplierId as string | null | undefined) : null;
+                  const supplier = sid ? suppliers.find((s) => s.id === sid) : null;
+                  return (
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Supplier</p>
+                      {supplier ? (
+                        <div className="flex items-center gap-1.5">
+                          <Truck className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <p className="text-sm font-semibold">{supplier.name}</p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          {isOwner ? "Not set — add in edit panel" : "Not specified"}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Image upload */}
