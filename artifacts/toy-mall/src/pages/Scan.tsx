@@ -474,10 +474,19 @@ function useScanner(
 interface CartItemRowProps {
   item: { productId: string; name: string; sku: string; price: number; quantity: number };
   isNew: boolean;
+  stock?: number;
+  lowStockThreshold?: number;
   onQtyChange: (productId: string, qty: number) => void;
   onRemove: (productId: string) => void;
 }
-const CartItemRow = memo(function CartItemRow({ item, isNew, onQtyChange, onRemove }: CartItemRowProps) {
+const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThreshold, onQtyChange, onRemove }: CartItemRowProps) {
+  const hasStockInfo   = stock !== undefined && lowStockThreshold !== undefined;
+  const remaining      = hasStockInfo ? stock - item.quantity : null;
+  const willBeZero     = remaining !== null && remaining <= 0;
+  const isLow          = hasStockInfo && stock <= lowStockThreshold!;
+  const showRed        = willBeZero;
+  const showAmber      = !showRed && isLow;
+
   return (
     <div
       className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-all duration-300 ${
@@ -487,7 +496,19 @@ const CartItemRow = memo(function CartItemRow({ item, isNew, onQtyChange, onRemo
       }`}>
       <div className={`shrink-0 w-2 h-2 rounded-full transition-all duration-300 ${isNew ? "bg-green-500" : "bg-muted-foreground/20"}`} />
       <div className="flex-1 min-w-0">
-        <p className={`font-bold text-sm truncate ${isNew ? "text-green-700 dark:text-green-300" : "text-foreground"}`}>{item.name}</p>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className={`font-bold text-sm truncate ${isNew ? "text-green-700 dark:text-green-300" : "text-foreground"}`}>{item.name}</p>
+          {showRed && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 shrink-0">
+              ⚠ Out after checkout
+            </span>
+          )}
+          {showAmber && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 shrink-0">
+              ⚠ Low stock
+            </span>
+          )}
+        </div>
         <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
         <p className="text-xs text-muted-foreground mt-0.5">
           ₹{item.price.toLocaleString("en-IN")} × {item.quantity} ={" "}
@@ -543,6 +564,11 @@ export default function Scan() {
     });
     return map;
   }, [allProducts]);
+
+  /* Fallback cache — populated when a product is fetched via the API (cache
+     miss on skuCache). Ensures badges render even for products added to the
+     cart before the full product list finishes loading.                      */
+  const [fallbackCache, setFallbackCache] = useState<Map<string, ScannedProduct>>(() => new Map());
 
   const [muted, setMuted]             = useState(() => isSoundMuted());
   const [mode, setMode]               = useState<PageMode>("billing");
@@ -638,6 +664,12 @@ export default function Scan() {
     /* Cache miss — fetch from API (new product added after page load) */
     lookupBySku(lookupSku)
       .then((product) => {
+        /* Store in fallback cache so badge rendering works for this item */
+        setFallbackCache((prev) => {
+          const next = new Map(prev);
+          next.set(product.sku.toLowerCase(), product);
+          return next;
+        });
         if (isBilling) {
           addItem({ productId: product.id, sku: product.sku, name: product.name, price: product.salePrice != null ? product.salePrice : product.price, mrp: product.salePrice != null ? product.price : undefined });
           setLastAddedId(product.id);
@@ -926,15 +958,21 @@ export default function Scan() {
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
                 Cart · {count} item{count !== 1 ? "s" : ""}
               </p>
-              {items.map((item) => (
-                <CartItemRow
-                  key={item.productId}
-                  item={item}
-                  isNew={item.productId === lastAddedId}
-                  onQtyChange={handleQtyChange}
-                  onRemove={removeItem}
-                />
-              ))}
+              {items.map((item) => {
+                const skuKey = item.sku.toLowerCase();
+                const cached = skuCache.get(skuKey) ?? fallbackCache.get(skuKey);
+                return (
+                  <CartItemRow
+                    key={item.productId}
+                    item={item}
+                    isNew={item.productId === lastAddedId}
+                    stock={cached?.stock}
+                    lowStockThreshold={cached?.lowStockThreshold}
+                    onQtyChange={handleQtyChange}
+                    onRemove={removeItem}
+                  />
+                );
+              })}
             </>
           )}
         </div>
