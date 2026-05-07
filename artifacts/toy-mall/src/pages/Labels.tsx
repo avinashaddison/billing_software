@@ -59,7 +59,7 @@ export default function Labels() {
     <>
       {/* ── Print CSS ── */}
       <style>{`
-        @page { size: 50mm 25mm; margin: 0; }
+        @page { size: 50mm 25mm; margin: 1mm 0 0 0; }
         @media print {
           html, body { height: auto !important; overflow: visible !important; }
           body > *:not(.labels-print-area) { display: none !important; }
@@ -72,7 +72,7 @@ export default function Labels() {
           }
           .label-page {
             display: block !important;
-            width: 50mm !important; height: 25mm !important;
+            width: 50mm !important; height: 24mm !important;
             page-break-after: always !important; break-after: page !important;
             overflow: hidden !important;
             print-color-adjust: exact !important;
@@ -91,7 +91,7 @@ export default function Labels() {
           background: "white",
         }}>
           {printItems.map((p) => (
-            <div key={p._key} className="label-page" style={{ width: "50mm", height: "25mm" }}>
+            <div key={p._key} className="label-page" style={{ width: "50mm", height: "24mm" }}>
               <LabelCard p={p} printMode />
             </div>
           ))}

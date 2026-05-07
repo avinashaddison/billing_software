@@ -45,7 +45,7 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
      */
     return (
       <div style={{
-        width: "50mm", height: "25mm",
+        width: "50mm", height: "24mm",
         fontFamily: "Arial, 'Helvetica Neue', sans-serif",
         background: "#fff", color: "#000",
         display: "flex", flexDirection: "column",
