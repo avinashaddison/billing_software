@@ -118,7 +118,7 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
                   }}>
                     ₹{sale}
                   </div>
-                  <div style={{ fontSize: "4pt", fontWeight: 900, color: "#000", lineHeight: 1, marginTop: "0.2mm" }}>
+                  <div style={{ fontSize: "6pt", fontWeight: 900, color: "#000", lineHeight: 1, marginTop: "0.2mm" }}>
                     SALE PRICE
                   </div>
                 </>
