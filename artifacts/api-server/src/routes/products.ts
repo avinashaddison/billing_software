@@ -409,7 +409,6 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
         productId: params.data.id,
         quantity,
         totalPrice: String(price * quantity),
-        purchasePrice: product.purchasePrice, // Track cost at time of sale
       })
       .returning();
     sale = {
