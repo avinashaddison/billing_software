@@ -147,18 +147,30 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
           justifyContent: "center",
           overflow: "hidden",
         }}>
-          {/* Barcode image — explicit height prevents expansion; displayValue:true already prints SKU inside */}
+          {/* Barcode bars only — text rendered separately as sharp HTML below */}
           <img
             src={barcodeSrc}
             alt={p.sku}
             style={{
               display: "block",
               width: "100%",
-              height: "9mm",
+              height: "7mm",
               objectFit: "fill",
               imageRendering: "pixelated",
             }}
           />
+          <div style={{
+            textAlign: "center",
+            fontFamily: "Arial, sans-serif",
+            fontSize: "7pt",
+            fontWeight: 900,
+            letterSpacing: "1pt",
+            color: "#000",
+            lineHeight: 1,
+            marginTop: "0.5mm",
+          }}>
+            {p.sku}
+          </div>
         </div>
 
       </div>

@@ -92,11 +92,11 @@ export function barcodeLabelPngDataUrl(value: string): string {
       format:       "CODE128",
       width:        4,      // 4 px per bar → high-res; scales DOWN to label width = crisp bars
       height:       100,
-      fontSize:     40,
+      fontSize:     14,
       fontOptions:  "bold",
-      textMargin:   10,
-      margin:       12,
-      displayValue: true,
+      textMargin:   0,
+      margin:       8,
+      displayValue: false,
       lineColor:    "#000000",
       background:   "#ffffff",
     });
