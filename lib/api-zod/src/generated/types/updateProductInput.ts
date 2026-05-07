@@ -15,6 +15,8 @@ export interface UpdateProductInput {
   price?: number;
   /** @nullable */
   salePrice?: number | null;
+  /** @nullable */
+  purchasePrice?: number | null;
   stock?: number;
   lowStockThreshold?: number;
   /** @nullable */

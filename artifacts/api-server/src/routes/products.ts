@@ -21,8 +21,9 @@ const router: IRouter = Router();
 function mapProduct(p: typeof productsTable.$inferSelect) {
   return {
     ...p,
-    price:     Number(p.price),
-    salePrice: p.salePrice != null ? Number(p.salePrice) : null,
+    price:         Number(p.price),
+    salePrice:     p.salePrice     != null ? Number(p.salePrice)     : null,
+    purchasePrice: p.purchasePrice != null ? Number(p.purchasePrice) : null,
   };
 }
 
@@ -72,7 +73,7 @@ router.post("/products", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, sku, barcode, category, price, salePrice, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
+  const { name, sku, barcode, category, price, salePrice, purchasePrice, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
 
   if (salePrice != null && salePrice >= price) {
     res.status(400).json({ error: "salePrice must be less than the regular price" });
@@ -88,6 +89,7 @@ router.post("/products", async (req, res): Promise<void> => {
       category,
       price: String(price),
       salePrice: salePrice != null ? String(salePrice) : null,
+      purchasePrice: purchasePrice != null ? String(purchasePrice) : null,
       stock: stock ?? 0,
       lowStockThreshold: lowStockThreshold ?? 5,
       imageUrl: imageUrl ?? null,
@@ -259,6 +261,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   if (d.lowStockThreshold != null) updates.lowStockThreshold = d.lowStockThreshold;
   if (d.imageUrl !== undefined) updates.imageUrl = d.imageUrl || null;
   if (d.supplierId !== undefined) updates.supplierId = d.supplierId || null;
+  if (d.purchasePrice !== undefined) updates.purchasePrice = d.purchasePrice != null ? String(d.purchasePrice) : null;
 
   const [product] = await db
     .update(productsTable)

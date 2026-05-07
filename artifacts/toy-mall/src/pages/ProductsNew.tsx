@@ -51,6 +51,7 @@ const createProductSchema = z.object({
   customCategory:    z.string().optional(),
   price:             z.coerce.number().min(0.01, "Price must be greater than 0"),
   salePrice:         z.union([z.coerce.number().min(0.01, "Sale price must be greater than 0"), z.literal("")]).optional(),
+  purchasePrice:     z.union([z.coerce.number().min(0.01, "Purchase price must be greater than 0"), z.literal("")]).optional(),
   stock:             z.coerce.number().int().min(0, "Stock cannot be negative").optional().default(0),
   lowStockThreshold: z.coerce.number().int().min(0).optional().default(5),
   imageUrl:          z.string().optional().or(z.literal("")),
@@ -135,8 +136,9 @@ export default function CreateProduct() {
     const finalCategory = isCustom ? (data.customCategory?.trim() || "") : data.category;
     if (!finalCategory) { toast.error("Please enter a custom category name"); return; }
     const salePriceVal = data.salePrice && typeof data.salePrice === "number" ? data.salePrice : undefined;
+    const purchasePriceVal = data.purchasePrice && typeof data.purchasePrice === "number" ? data.purchasePrice : undefined;
     createProduct.mutate(
-      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || null } },
+      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, purchasePrice: purchasePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || null } },
       {
         onSuccess: (product) => {
           toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
@@ -297,6 +299,19 @@ export default function CreateProduct() {
                       value={field.value === "" || field.value == null ? "" : String(field.value)}
                       onChange={(e) => field.onChange(e.target.value === "" ? "" : e.target.value)} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="purchasePrice" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold text-muted-foreground">Purchase / Cost Price (₹) — optional</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" placeholder="Your cost from supplier" className="h-14 text-lg rounded-xl font-mono"
+                      value={field.value === "" || field.value == null ? "" : String(field.value)}
+                      onChange={(e) => field.onChange(e.target.value === "" ? "" : e.target.value)} />
+                  </FormControl>
+                  <p className="text-[11px] text-muted-foreground">Used for profit margin reports. Not shown on receipts.</p>
                   <FormMessage />
                 </FormItem>
               )} />

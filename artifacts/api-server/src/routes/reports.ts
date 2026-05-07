@@ -67,19 +67,32 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
   // Top-selling products for the day
   const topProducts = await db
     .select({
-      productId:   saleItemsTable.productId,
-      productName: productsTable.name,
-      productSku:  productsTable.sku,
-      totalQty:    sql<number>`SUM(${saleItemsTable.quantity})`.as("total_qty"),
-      totalRevenue: sql<string>`SUM(${saleItemsTable.subtotal})`.as("total_revenue"),
+      productId:     saleItemsTable.productId,
+      productName:   productsTable.name,
+      productSku:    productsTable.sku,
+      purchasePrice: productsTable.purchasePrice,
+      totalQty:      sql<number>`SUM(${saleItemsTable.quantity})`.as("total_qty"),
+      totalRevenue:  sql<string>`SUM(${saleItemsTable.subtotal})`.as("total_revenue"),
+      totalCost:     sql<string>`COALESCE(${productsTable.purchasePrice}, 0) * SUM(${saleItemsTable.quantity})`.as("total_cost"),
     })
     .from(saleItemsTable)
     .innerJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
     .innerJoin(billsTable, sql`${saleItemsTable.saleId} = ${billsTable.id}`)
     .where(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`)
-    .groupBy(saleItemsTable.productId, productsTable.name, productsTable.sku)
+    .groupBy(saleItemsTable.productId, productsTable.name, productsTable.sku, productsTable.purchasePrice)
     .orderBy(desc(sql`SUM(${saleItemsTable.quantity})`))
     .limit(10);
+
+  // Aggregate profit for the day (only products with purchasePrice set)
+  const [profitSummary] = await db
+    .select({
+      totalCost:   sql<string>`COALESCE(SUM(${productsTable.purchasePrice} * ${saleItemsTable.quantity}), 0)`.as("total_cost"),
+      coveredItems: sql<number>`COUNT(DISTINCT CASE WHEN ${productsTable.purchasePrice} IS NOT NULL THEN ${saleItemsTable.productId} END)`.as("covered_items"),
+    })
+    .from(saleItemsTable)
+    .innerJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
+    .innerJoin(billsTable, sql`${saleItemsTable.saleId} = ${billsTable.id}`)
+    .where(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`);
 
   // Stock IN for the day
   const [stockIn] = await db
@@ -92,19 +105,37 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
       sql`${stockLogsTable.type} = 'IN' AND DATE(${stockLogsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`
     );
 
+  const totalRevenue = Number(salesSummary.totalAmount);
+  const totalCost    = Number(profitSummary.totalCost);
+  const grossProfit  = totalRevenue - totalCost;
+
   res.json({
     date:        targetDate,
-    totalAmount: Number(salesSummary.totalAmount),
+    totalAmount: totalRevenue,
     billCount:   Number(salesSummary.billCount),
     itemsSold:   Number(salesSummary.itemsSold),
     cashSales:   Number(salesSummary.cashSales),
     upiSales:    Number(salesSummary.upiSales),
+    grossProfit,
+    totalCost,
+    profitCoverage: Number(profitSummary.coveredItems),
     stockIn:     { totalUnits: Number(stockIn.totalIn), txCount: Number(stockIn.txCount) },
-    topProducts: topProducts.map((p) => ({
-      ...p,
-      totalQty:     Number(p.totalQty),
-      totalRevenue: Number(p.totalRevenue),
-    })),
+    topProducts: topProducts.map((p) => {
+      const qty      = Number(p.totalQty);
+      const revenue  = Number(p.totalRevenue);
+      const cost     = p.purchasePrice != null ? Number(p.purchasePrice) * qty : null;
+      const profit   = cost != null ? revenue - cost : null;
+      const margin   = profit != null && revenue > 0 ? (profit / revenue) * 100 : null;
+      return {
+        productId:   p.productId,
+        productName: p.productName,
+        productSku:  p.productSku,
+        totalQty:    qty,
+        totalRevenue: revenue,
+        profit,
+        margin,
+      };
+    }),
   });
 });
 

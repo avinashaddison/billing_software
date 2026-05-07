@@ -407,6 +407,8 @@ components:
           type: number
         salePrice:
           type: ["number", "null"]
+        purchasePrice:
+          type: ["number", "null"]
         stock:
           type: integer
         lowStockThreshold:
@@ -438,6 +440,8 @@ components:
           type: number
         salePrice:
           type: ["number", "null"]
+        purchasePrice:
+          type: ["number", "null"]
         stock:
           type: integer
         lowStockThreshold:
@@ -466,6 +470,8 @@ components:
         price:
           type: number
         salePrice:
+          type: ["number", "null"]
+        purchasePrice:
           type: ["number", "null"]
         stock:
           type: integer

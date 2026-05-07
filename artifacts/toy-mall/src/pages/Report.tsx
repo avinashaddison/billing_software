@@ -4,16 +4,17 @@ import {
 } from "recharts";
 import {
   FileText, Printer, ChevronLeft, ChevronRight, TrendingUp,
-  IndianRupee, ShoppingBag, Package, Banknote, Smartphone, Loader2,
+  IndianRupee, ShoppingBag, Package, Banknote, Smartphone, Loader2, TrendingDown,
 } from "lucide-react";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 interface DayRevenue { day: string; totalAmount: number; billCount: number; itemsCount: number; }
-interface TopProduct  { productName: string; productSku: string; totalQty: number; totalRevenue: number; }
+interface TopProduct  { productName: string; productSku: string; totalQty: number; totalRevenue: number; profit: number | null; margin: number | null; }
 interface EodReport {
   date: string; totalAmount: number; billCount: number; itemsSold: number;
   cashSales: number; upiSales: number;
+  grossProfit: number; totalCost: number; profitCoverage: number;
   stockIn: { totalUnits: number; txCount: number };
   topProducts: TopProduct[];
 }
@@ -145,6 +146,26 @@ export default function Report() {
                 ))}
               </div>
 
+              {/* Gross Profit card — shown when any purchase price data exists */}
+              {eod.profitCoverage > 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border flex items-center gap-3">
+                    <TrendingUp className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="font-black text-emerald-700 dark:text-emerald-400">{fmt(eod.grossProfit)}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase">Gross Profit</p>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border flex items-center gap-3">
+                    <TrendingDown className="w-5 h-5 text-rose-600 shrink-0" />
+                    <div>
+                      <p className="font-black text-rose-700 dark:text-rose-400">{fmt(eod.totalCost)}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase">Total Cost</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Payment split */}
               {eod.billCount > 0 && (
                 <div className="grid grid-cols-2 gap-3">
@@ -182,6 +203,11 @@ export default function Report() {
                         <div className="text-right shrink-0">
                           <p className="font-black text-sm">{p.totalQty} units</p>
                           <p className="text-xs text-muted-foreground">{fmt(p.totalRevenue)}</p>
+                          {p.margin != null && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${p.margin >= 30 ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-400" : p.margin >= 15 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                              {p.margin.toFixed(0)}% margin
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}

@@ -41,7 +41,7 @@ export default function ProductDetail() {
   const [savingImg, setSavingImg]       = useState(false);
   const [editOpen, setEditOpen]         = useState(false);
   const [editSaving, setEditSaving]     = useState(false);
-  const [editForm, setEditForm]         = useState({ name: "", price: "", salePrice: "", category: "", lowStockThreshold: "" });
+  const [editForm, setEditForm]         = useState({ name: "", price: "", salePrice: "", purchasePrice: "", category: "", lowStockThreshold: "" });
   const [printing, setPrinting]             = useState(false);
   const [printCopies, setPrintCopies]       = useState(1);
 
@@ -150,10 +150,12 @@ export default function ProductDetail() {
   const openEdit = () => {
     if (!product) return;
     const sp = "salePrice" in product ? (product.salePrice as number | null | undefined) : null;
+    const pp = "purchasePrice" in product ? (product.purchasePrice as number | null | undefined) : null;
     setEditForm({
       name: product.name,
       price: String(product.price),
       salePrice: sp != null ? String(sp) : "",
+      purchasePrice: pp != null ? String(pp) : "",
       category: product.category,
       lowStockThreshold: String(product.lowStockThreshold),
     });
@@ -166,12 +168,15 @@ export default function ProductDetail() {
     const price = parseFloat(editForm.price);
     const salePriceRaw = editForm.salePrice.trim();
     const salePrice = salePriceRaw ? parseFloat(salePriceRaw) : null;
+    const purchasePriceRaw = (editForm.purchasePrice ?? "").trim();
+    const purchasePrice = purchasePriceRaw ? parseFloat(purchasePriceRaw) : null;
     const threshold = parseInt(editForm.lowStockThreshold, 10);
     const category = editForm.category.trim();
     if (!name)                          { toast.error("Name is required"); return; }
     if (isNaN(price) || price <= 0)     { toast.error("Enter a valid price"); return; }
     if (salePrice !== null && (isNaN(salePrice) || salePrice <= 0)) { toast.error("Sale price must be greater than 0"); return; }
     if (salePrice !== null && salePrice >= price) { toast.error("Sale price must be less than the regular price"); return; }
+    if (purchasePrice !== null && (isNaN(purchasePrice) || purchasePrice <= 0)) { toast.error("Purchase price must be greater than 0"); return; }
     if (isNaN(threshold) || threshold < 0) { toast.error("Enter a valid threshold"); return; }
     if (!category)                      { toast.error("Category is required"); return; }
     setEditSaving(true);
@@ -179,7 +184,7 @@ export default function ProductDetail() {
       const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, price, salePrice, category, lowStockThreshold: threshold }),
+        body: JSON.stringify({ name, price, salePrice, purchasePrice, category, lowStockThreshold: threshold }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       toast.success("Product updated");
@@ -316,6 +321,12 @@ export default function ProductDetail() {
                 placeholder="Leave blank to clear" className="h-11 rounded-xl" />
             </div>
             <div>
+              <p className="text-xs font-bold text-muted-foreground mb-1">Purchase / Cost Price (₹) — optional</p>
+              <Input type="number" min={0.01} step={0.01} value={editForm.purchasePrice}
+                onChange={(e) => setEditForm((f) => ({ ...f, purchasePrice: e.target.value }))}
+                placeholder="Your cost from supplier" className="h-11 rounded-xl" />
+            </div>
+            <div>
               <p className="text-xs font-bold text-muted-foreground mb-1">Low Stock Threshold</p>
               <Input type="number" min={0} step={1} value={editForm.lowStockThreshold}
                 onChange={(e) => setEditForm((f) => ({ ...f, lowStockThreshold: e.target.value }))}
@@ -420,6 +431,32 @@ export default function ProductDetail() {
                     <p className="text-xs font-bold text-red-700 dark:text-red-400">
                       Low stock! Threshold: {product.lowStockThreshold} units
                     </p>
+                  </div>
+                )}
+
+                {/* Purchase price — owner only */}
+                {isOwner && (
+                  <div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Cost Price (Owner)</p>
+                    {(() => {
+                      const pp = "purchasePrice" in product ? (product.purchasePrice as number | null | undefined) : null;
+                      const sellingPrice = "salePrice" in product && (product.salePrice as number | null) != null
+                        ? (product.salePrice as number)
+                        : product.price;
+                      const margin = pp != null ? ((sellingPrice - pp) / sellingPrice * 100) : null;
+                      return pp != null ? (
+                        <div className="flex items-center gap-3">
+                          <p className="text-sm font-semibold">₹{pp.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                          {margin != null && (
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${margin >= 30 ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-400" : margin >= 15 ? "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400" : "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-400"}`}>
+                              {margin.toFixed(1)}% margin
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Not set — add in edit panel</p>
+                      );
+                    })()}
                   </div>
                 )}
 

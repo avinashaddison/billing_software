@@ -21,6 +21,8 @@ export interface Product {
   price: number;
   /** @nullable */
   salePrice?: number | null;
+  /** @nullable */
+  purchasePrice?: number | null;
   stock: number;
   lowStockThreshold: number;
   createdAt: string;
@@ -35,6 +37,8 @@ export interface CreateProductInput {
   price: number;
   /** @nullable */
   salePrice?: number | null;
+  /** @nullable */
+  purchasePrice?: number | null;
   stock?: number;
   lowStockThreshold?: number;
   /** @nullable */
@@ -52,6 +56,8 @@ export interface UpdateProductInput {
   price?: number;
   /** @nullable */
   salePrice?: number | null;
+  /** @nullable */
+  purchasePrice?: number | null;
   stock?: number;
   lowStockThreshold?: number;
   /** @nullable */

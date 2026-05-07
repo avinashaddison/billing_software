@@ -14,6 +14,7 @@ export const productsTable = pgTable(
     salePrice:         numeric("sale_price", { precision: 10, scale: 2 }),
     stock:             integer("stock").notNull().default(0),
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
+    purchasePrice:     numeric("purchase_price", { precision: 10, scale: 2 }),
     imageUrl:          text("image_url"),
     supplierId:        uuid("supplier_id"),
     createdAt:         timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
