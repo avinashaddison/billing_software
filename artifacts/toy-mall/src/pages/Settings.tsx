@@ -626,8 +626,42 @@ function RecentScanEvents() {
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   }
 
+  const detectedCount = events.filter((e) => e.type === "detected").length;
+  const missedCount = events.filter((e) => e.type === "missed").length;
+  const total = events.length;
+  const missRate = total > 0 ? missedCount / total : 0;
+  const healthColor =
+    total === 0
+      ? "bg-muted text-muted-foreground"
+      : missRate === 0
+      ? "bg-green-500 text-white"
+      : missRate < 0.5
+      ? "bg-amber-400 text-amber-900"
+      : "bg-red-500 text-white";
+  const healthLabel =
+    total === 0 ? "No data" : missRate === 0 ? "All good" : missRate < 0.5 ? "Some misses" : "Mostly missed";
+
   return (
     <div className="rounded-xl border bg-muted/20 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/10">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${healthColor}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0" />
+          {healthLabel}
+        </span>
+        {total > 0 ? (
+          <span className="text-[11px] text-muted-foreground">
+            <span className="text-green-600 dark:text-green-400 font-semibold">{detectedCount} detected</span>
+            {" / "}
+            <span className="text-red-500 font-semibold">{missedCount} missed</span>
+            {" in the last "}
+            <span className="font-semibold">{total}</span>
+            {" scan"}
+            {total !== 1 ? "s" : ""}
+          </span>
+        ) : (
+          <span className="text-[11px] text-muted-foreground">Scan a barcode to see health data</span>
+        )}
+      </div>
       <div className="flex items-center justify-between px-3 py-2.5 hover:bg-muted/40 transition-colors">
         <button
           type="button"
