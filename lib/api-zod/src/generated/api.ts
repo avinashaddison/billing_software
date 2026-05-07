@@ -35,6 +35,12 @@ export const ListProductsResponseItem = zod.object({
   price: zod.number(),
   salePrice: zod.number().nullish(),
   purchasePrice: zod.number().nullish(),
+  salePriceUntil: zod
+    .string()
+    .nullish()
+    .describe(
+      "ISO datetime string after which the sale price is no longer valid",
+    ),
   stock: zod.number(),
   lowStockThreshold: zod.number(),
   createdAt: zod.string(),
@@ -52,6 +58,12 @@ export const CreateProductBody = zod.object({
   price: zod.number(),
   salePrice: zod.number().nullish(),
   purchasePrice: zod.number().nullish(),
+  salePriceUntil: zod
+    .string()
+    .nullish()
+    .describe(
+      "ISO datetime string after which the sale price is no longer valid",
+    ),
   stock: zod.number().optional(),
   lowStockThreshold: zod.number().optional(),
   imageUrl: zod.string().nullish(),
@@ -73,6 +85,12 @@ export const GetProductBySkuResponse = zod.object({
   price: zod.number(),
   salePrice: zod.number().nullish(),
   purchasePrice: zod.number().nullish(),
+  salePriceUntil: zod
+    .string()
+    .nullish()
+    .describe(
+      "ISO datetime string after which the sale price is no longer valid",
+    ),
   stock: zod.number(),
   lowStockThreshold: zod.number(),
   createdAt: zod.string(),
@@ -93,6 +111,12 @@ export const GetProductResponse = zod.object({
   price: zod.number(),
   salePrice: zod.number().nullish(),
   purchasePrice: zod.number().nullish(),
+  salePriceUntil: zod
+    .string()
+    .nullish()
+    .describe(
+      "ISO datetime string after which the sale price is no longer valid",
+    ),
   stock: zod.number(),
   lowStockThreshold: zod.number(),
   createdAt: zod.string(),
@@ -113,6 +137,12 @@ export const UpdateProductBody = zod.object({
   price: zod.number().optional(),
   salePrice: zod.number().nullish(),
   purchasePrice: zod.number().nullish(),
+  salePriceUntil: zod
+    .string()
+    .nullish()
+    .describe(
+      "ISO datetime string after which the sale price is no longer valid",
+    ),
   stock: zod.number().optional(),
   lowStockThreshold: zod.number().optional(),
   imageUrl: zod.string().nullish(),
@@ -127,6 +157,12 @@ export const UpdateProductResponse = zod.object({
   price: zod.number(),
   salePrice: zod.number().nullish(),
   purchasePrice: zod.number().nullish(),
+  salePriceUntil: zod
+    .string()
+    .nullish()
+    .describe(
+      "ISO datetime string after which the sale price is no longer valid",
+    ),
   stock: zod.number(),
   lowStockThreshold: zod.number(),
   createdAt: zod.string(),
@@ -161,6 +197,12 @@ export const UpdateStockResponse = zod.object({
     price: zod.number(),
     salePrice: zod.number().nullish(),
     purchasePrice: zod.number().nullish(),
+    salePriceUntil: zod
+      .string()
+      .nullish()
+      .describe(
+        "ISO datetime string after which the sale price is no longer valid",
+      ),
     stock: zod.number(),
     lowStockThreshold: zod.number(),
     createdAt: zod.string(),
@@ -281,6 +323,12 @@ export const GetLowStockProductsResponseItem = zod.object({
   price: zod.number(),
   salePrice: zod.number().nullish(),
   purchasePrice: zod.number().nullish(),
+  salePriceUntil: zod
+    .string()
+    .nullish()
+    .describe(
+      "ISO datetime string after which the sale price is no longer valid",
+    ),
   stock: zod.number(),
   lowStockThreshold: zod.number(),
   createdAt: zod.string(),

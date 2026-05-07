@@ -41,7 +41,7 @@ export default function ProductDetail() {
   const [savingImg, setSavingImg]       = useState(false);
   const [editOpen, setEditOpen]         = useState(false);
   const [editSaving, setEditSaving]     = useState(false);
-  const [editForm, setEditForm]         = useState({ name: "", price: "", salePrice: "", purchasePrice: "", category: "", lowStockThreshold: "" });
+  const [editForm, setEditForm]         = useState({ name: "", price: "", salePrice: "", salePriceUntil: "", purchasePrice: "", category: "", lowStockThreshold: "" });
   const [printing, setPrinting]             = useState(false);
   const [printCopies, setPrintCopies]       = useState(1);
 
@@ -149,14 +149,16 @@ export default function ProductDetail() {
 
   const openEdit = () => {
     if (!product) return;
-    const sp = "salePrice" in product ? (product.salePrice as number | null | undefined) : null;
-    const pp = "purchasePrice" in product ? (product.purchasePrice as number | null | undefined) : null;
+    const sp  = "salePrice"      in product ? (product.salePrice      as number | null | undefined) : null;
+    const pp  = "purchasePrice"  in product ? (product.purchasePrice  as number | null | undefined) : null;
+    const spu = "salePriceUntil" in product ? (product.salePriceUntil as string | null | undefined) : null;
     setEditForm({
-      name: product.name,
-      price: String(product.price),
-      salePrice: sp != null ? String(sp) : "",
-      purchasePrice: pp != null ? String(pp) : "",
-      category: product.category,
+      name:              product.name,
+      price:             String(product.price),
+      salePrice:         sp  != null ? String(sp)  : "",
+      purchasePrice:     pp  != null ? String(pp)  : "",
+      salePriceUntil:    spu != null ? spu.slice(0, 10) : "",
+      category:          product.category,
       lowStockThreshold: String(product.lowStockThreshold),
     });
     setEditOpen(true);
@@ -168,6 +170,10 @@ export default function ProductDetail() {
     const price = parseFloat(editForm.price);
     const salePriceRaw = editForm.salePrice.trim();
     const salePrice = salePriceRaw ? parseFloat(salePriceRaw) : null;
+    const salePriceUntilRaw = editForm.salePriceUntil.trim();
+    const salePriceUntil = salePriceUntilRaw
+      ? new Date(salePriceUntilRaw).toISOString()
+      : null;
     const purchasePriceRaw = (editForm.purchasePrice ?? "").trim();
     const purchasePrice = purchasePriceRaw ? parseFloat(purchasePriceRaw) : null;
     const threshold = parseInt(editForm.lowStockThreshold, 10);
@@ -184,7 +190,7 @@ export default function ProductDetail() {
       const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, price, salePrice, purchasePrice, category, lowStockThreshold: threshold }),
+        body: JSON.stringify({ name, price, salePrice, salePriceUntil, purchasePrice, category, lowStockThreshold: threshold }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       toast.success("Product updated");
@@ -327,6 +333,13 @@ export default function ProductDetail() {
                 placeholder="Your cost from supplier" className="h-11 rounded-xl" />
             </div>
             <div>
+              <p className="text-xs font-bold text-muted-foreground mb-1">Sale Ends On — optional</p>
+              <Input type="date" value={editForm.salePriceUntil}
+                onChange={(e) => setEditForm((f) => ({ ...f, salePriceUntil: e.target.value }))}
+                className="h-11 rounded-xl" />
+              <p className="text-[10px] text-muted-foreground mt-1">Sale price clears automatically after this date</p>
+            </div>
+            <div>
               <p className="text-xs font-bold text-muted-foreground mb-1">Low Stock Threshold</p>
               <Input type="number" min={0} step={1} value={editForm.lowStockThreshold}
                 onChange={(e) => setEditForm((f) => ({ ...f, lowStockThreshold: e.target.value }))}
@@ -387,6 +400,11 @@ export default function ProductDetail() {
                       <p className="text-sm text-muted-foreground line-through">
                         MRP ₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
+                      {"salePriceUntil" in product && (product.salePriceUntil as string | null) != null && (
+                        <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-1">
+                          Sale ends {new Date(product.salePriceUntil as string).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        </p>
+                      )}
                     </>
                   ) : (
                     <>

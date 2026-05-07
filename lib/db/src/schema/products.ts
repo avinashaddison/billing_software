@@ -12,6 +12,7 @@ export const productsTable = pgTable(
     category:          text("category").notNull(),
     price:             numeric("price", { precision: 10, scale: 2 }).notNull(),
     salePrice:         numeric("sale_price", { precision: 10, scale: 2 }),
+    salePriceUntil:    timestamp("sale_price_until", { withTimezone: true }),
     stock:             integer("stock").notNull().default(0),
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
     purchasePrice:     numeric("purchase_price", { precision: 10, scale: 2 }),

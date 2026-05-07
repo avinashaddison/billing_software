@@ -409,6 +409,9 @@ components:
           type: ["number", "null"]
         purchasePrice:
           type: ["number", "null"]
+        salePriceUntil:
+          type: ["string", "null"]
+          description: ISO datetime string after which the sale price is no longer valid
         stock:
           type: integer
         lowStockThreshold:
@@ -442,6 +445,9 @@ components:
           type: ["number", "null"]
         purchasePrice:
           type: ["number", "null"]
+        salePriceUntil:
+          type: ["string", "null"]
+          description: ISO datetime string after which the sale price is no longer valid
         stock:
           type: integer
         lowStockThreshold:
@@ -473,6 +479,9 @@ components:
           type: ["number", "null"]
         purchasePrice:
           type: ["number", "null"]
+        salePriceUntil:
+          type: ["string", "null"]
+          description: ISO datetime string after which the sale price is no longer valid
         stock:
           type: integer
         lowStockThreshold:

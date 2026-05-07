@@ -16,6 +16,11 @@ export interface Product {
   salePrice?: number | null;
   /** @nullable */
   purchasePrice?: number | null;
+  /**
+   * ISO datetime string after which the sale price is no longer valid
+   * @nullable
+   */
+  salePriceUntil?: string | null;
   stock: number;
   lowStockThreshold: number;
   createdAt: string;

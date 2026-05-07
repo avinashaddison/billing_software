@@ -52,6 +52,7 @@ const createProductSchema = z.object({
   price:             z.coerce.number().min(0.01, "Price must be greater than 0"),
   salePrice:         z.union([z.coerce.number().min(0.01, "Sale price must be greater than 0"), z.literal("")]).optional(),
   purchasePrice:     z.union([z.coerce.number().min(0.01, "Purchase price must be greater than 0"), z.literal("")]).optional(),
+  salePriceUntil:    z.string().optional().or(z.literal("")),
   stock:             z.coerce.number().int().min(0, "Stock cannot be negative").optional().default(0),
   lowStockThreshold: z.coerce.number().int().min(0).optional().default(5),
   imageUrl:          z.string().optional().or(z.literal("")),
@@ -136,9 +137,10 @@ export default function CreateProduct() {
     const finalCategory = isCustom ? (data.customCategory?.trim() || "") : data.category;
     if (!finalCategory) { toast.error("Please enter a custom category name"); return; }
     const salePriceVal = data.salePrice && typeof data.salePrice === "number" ? data.salePrice : undefined;
+    const salePriceUntilVal = data.salePriceUntil ? new Date(data.salePriceUntil).toISOString() : null;
     const purchasePriceVal = data.purchasePrice && typeof data.purchasePrice === "number" ? data.purchasePrice : undefined;
     createProduct.mutate(
-      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, purchasePrice: purchasePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || null } },
+      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, salePriceUntil: salePriceUntilVal, purchasePrice: purchasePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || null } },
       {
         onSuccess: (product) => {
           toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
@@ -312,6 +314,17 @@ export default function CreateProduct() {
                       onChange={(e) => field.onChange(e.target.value === "" ? "" : e.target.value)} />
                   </FormControl>
                   <p className="text-[11px] text-muted-foreground">Used for profit margin reports. Not shown on receipts.</p>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="salePriceUntil" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold text-muted-foreground">Sale Ends On — optional</FormLabel>
+                  <FormControl>
+                    <Input type="date" className="h-14 text-base rounded-xl" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <p className="text-[11px] text-muted-foreground">Sale price reverts to regular price automatically after this date.</p>
                   <FormMessage />
                 </FormItem>
               )} />

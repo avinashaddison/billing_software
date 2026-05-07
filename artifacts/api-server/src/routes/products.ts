@@ -18,11 +18,26 @@ import QRCode from "qrcode";
 
 const router: IRouter = Router();
 
+function isSaleExpired(p: { salePriceUntil: Date | null }) {
+  if (!p.salePriceUntil) return false;
+  // Sale is active all day on the expiry date, expires only AFTER that day ends (UTC)
+  const endOfDay = new Date(p.salePriceUntil);
+  endOfDay.setUTCHours(23, 59, 59, 999);
+  return new Date() > endOfDay;
+}
+
+function effectiveSalePrice(p: typeof productsTable.$inferSelect): number | null {
+  if (p.salePrice == null || isSaleExpired(p)) return null;
+  return Number(p.salePrice);
+}
+
 function mapProduct(p: typeof productsTable.$inferSelect) {
+  const expired = isSaleExpired(p);
   return {
     ...p,
-    price:         Number(p.price),
-    salePrice:     p.salePrice     != null ? Number(p.salePrice)     : null,
+    price: Number(p.price),
+    salePrice: expired ? null : (p.salePrice != null ? Number(p.salePrice) : null),
+    salePriceUntil: expired ? null : (p.salePriceUntil ? p.salePriceUntil.toISOString() : null),
     purchasePrice: p.purchasePrice != null ? Number(p.purchasePrice) : null,
   };
 }
@@ -73,12 +88,19 @@ router.post("/products", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, sku, barcode, category, price, salePrice, purchasePrice, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
+  const { name, sku, barcode, category, price, salePrice, salePriceUntil, purchasePrice, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
 
   if (salePrice != null && salePrice >= price) {
     res.status(400).json({ error: "salePrice must be less than the regular price" });
     return;
   }
+
+  const parsedSalePriceUntil = (() => {
+    if (!salePriceUntil) return null;
+    const d = new Date(salePriceUntil);
+    if (isNaN(d.getTime())) return null;
+    return d;
+  })();
 
   const [product] = await db
     .insert(productsTable)
@@ -90,6 +112,7 @@ router.post("/products", async (req, res): Promise<void> => {
       price: String(price),
       salePrice: salePrice != null ? String(salePrice) : null,
       purchasePrice: purchasePrice != null ? String(purchasePrice) : null,
+      salePriceUntil: parsedSalePriceUntil,
       stock: stock ?? 0,
       lowStockThreshold: lowStockThreshold ?? 5,
       imageUrl: imageUrl ?? null,
@@ -262,6 +285,14 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   if (d.imageUrl !== undefined) updates.imageUrl = d.imageUrl || null;
   if (d.supplierId !== undefined) updates.supplierId = d.supplierId || null;
   if (d.purchasePrice !== undefined) updates.purchasePrice = d.purchasePrice != null ? String(d.purchasePrice) : null;
+  if (d.salePriceUntil !== undefined) {
+    if (d.salePriceUntil) {
+      const parsed = new Date(d.salePriceUntil);
+      updates.salePriceUntil = isNaN(parsed.getTime()) ? null : parsed;
+    } else {
+      updates.salePriceUntil = null;
+    }
+  }
 
   const [product] = await db
     .update(productsTable)
@@ -370,13 +401,15 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
 
   let sale = null;
   if (type === "OUT") {
-    const effectivePrice = product.salePrice != null ? Number(product.salePrice) : Number(product.price);
+    const salePrice = effectiveSalePrice(product);
+    const price = salePrice ?? Number(product.price);
     const [saleRecord] = await db
       .insert(salesTable)
       .values({
         productId: params.data.id,
         quantity,
-        totalPrice: String(effectivePrice * quantity),
+        totalPrice: String(price * quantity),
+        purchasePrice: product.purchasePrice, // Track cost at time of sale
       })
       .returning();
     sale = {

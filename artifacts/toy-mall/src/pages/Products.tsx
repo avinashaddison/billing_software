@@ -241,7 +241,7 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
 
 /* ── Memoized product rows ── */
 interface ProductRowProps {
-  product: { id: string; name: string; sku: string; category: string; price: number; salePrice?: number | null; stock: number; lowStockThreshold: number; imageUrl?: string | null };
+  product: { id: string; name: string; sku: string; category: string; price: number; salePrice?: number | null; salePriceUntil?: string | null; stock: number; lowStockThreshold: number; imageUrl?: string | null };
   isAdmin?: boolean;
   onDelete?: (product: { id: string; name: string; sku: string }) => void;
 }
@@ -275,6 +275,11 @@ const ProductMobileCard = memo(function ProductMobileCard({ product, isAdmin, on
               <span className="text-[10px]">
                 <span className="line-through text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
                 {" "}<span className="text-red-600 font-bold">₹{product.salePrice.toLocaleString("en-IN")}</span>
+                {product.salePriceUntil && (
+                  <span className="block text-amber-600 dark:text-amber-400">
+                    Sale ends {new Date(product.salePriceUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                  </span>
+                )}
               </span>
             ) : (
               <span className="text-[10px] text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
@@ -321,6 +326,11 @@ const ProductDesktopRow = memo(function ProductDesktopRow({ product, isAdmin, on
             <div>
               <p className="text-xs line-through text-muted-foreground">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               <p className="font-bold text-red-600">₹{product.salePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              {product.salePriceUntil && (
+                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                  Sale ends {new Date(product.salePriceUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                </p>
+              )}
             </div>
           ) : (
             <p className="font-semibold">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
