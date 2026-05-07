@@ -18,7 +18,7 @@ const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 type PaymentMode = "cash" | "upi";
 
 async function postCheckout(payload: {
-  items: { productId: string; quantity: number; price: number }[];
+  items: { productId: string; quantity: number; price: number; mrp?: number }[];
   paymentMode: PaymentMode;
   customerPhone?: string;
 }) {
@@ -87,22 +87,42 @@ function SuccessOverlay({ billId }: { billId: string }) {
 
 /* ── Memoized cart item row ─────────────────────────────────────── */
 interface CartItemRowProps {
-  item: { productId: string; name: string; sku: string; price: number; quantity: number };
+  item: { productId: string; name: string; sku: string; price: number; mrp?: number; quantity: number };
   onQtyChange: (productId: string, qty: number) => void;
   onRemove: (productId: string) => void;
 }
 const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove }: CartItemRowProps) {
+  const onSale = item.mrp != null && item.mrp > item.price;
   return (
-    <div className="flex items-center gap-3 rounded-2xl px-4 py-3 border bg-card border-border transition-all">
+    <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 border bg-card transition-all ${onSale ? "border-red-200 dark:border-red-800" : "border-border"}`}>
       <div className="flex-1 min-w-0">
-        <p className="font-bold text-sm truncate text-foreground">{item.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-bold text-sm truncate text-foreground">{item.name}</p>
+          {onSale && (
+            <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 leading-none">
+              SALE
+            </span>
+          )}
+        </div>
         <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          ₹{item.price.toLocaleString("en-IN")} × {item.quantity} ={" "}
-          <span className="font-bold text-foreground">
-            ₹{(item.price * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </span>
-        </p>
+        {onSale ? (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            <span className="line-through">MRP ₹{item.mrp!.toLocaleString("en-IN")}</span>
+            {" → "}
+            <span className="text-red-600 dark:text-red-400 font-bold">₹{item.price.toLocaleString("en-IN")}</span>
+            {" × "}{item.quantity} ={" "}
+            <span className="font-bold text-foreground">
+              ₹{(item.price * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </span>
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            ₹{item.price.toLocaleString("en-IN")} × {item.quantity} ={" "}
+            <span className="font-bold text-foreground">
+              ₹{(item.price * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </span>
+          </p>
+        )}
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <button
@@ -135,6 +155,13 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove }: C
 export default function Checkout() {
   const [, setLocation] = useLocation();
   const { items, count, total, removeItem, updateQty, clearCart } = useCart();
+
+  const totalSavings = items.reduce((sum, i) => {
+    if (i.mrp != null && i.mrp > i.price) {
+      return sum + (i.mrp - i.price) * i.quantity;
+    }
+    return sum;
+  }, 0);
   const isOnline = useOnline();
   const { pendingCount, enqueue, syncAll } = useOfflineQueue();
   const { upiId, dynamicQrMode } = useStoreSettings();
@@ -175,7 +202,7 @@ export default function Checkout() {
 
     if (!isOnline) {
       enqueue({
-        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price, mrp: i.mrp })),
         paymentMode: paymentModeRef.current,
         customerPhone: phone || undefined,
         total,
@@ -189,7 +216,7 @@ export default function Checkout() {
     setLoading(true);
     try {
       const result = await postCheckout({
-        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price, mrp: i.mrp })),
         paymentMode: paymentModeRef.current,
         customerPhone: phone || undefined,
       });
@@ -313,6 +340,11 @@ export default function Checkout() {
                   <p className="text-xs text-muted-foreground mt-1">
                     {items.length} product{items.length !== 1 ? "s" : ""} · {count} unit{count !== 1 ? "s" : ""}
                   </p>
+                  {totalSavings > 0 && (
+                    <p className="text-xs font-bold text-red-600 dark:text-red-400 mt-0.5">
+                      You save ₹{totalSavings.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 🎉
+                    </p>
+                  )}
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
                   <Receipt className="w-6 h-6 text-green-600 dark:text-green-400" />

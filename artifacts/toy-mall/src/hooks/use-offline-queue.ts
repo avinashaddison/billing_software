@@ -10,7 +10,7 @@ const STORAGE_KEY = "hira-sons-offline-queue-v1";
 
 export interface QueuedBill {
   localId:      string;
-  items:        { productId: string; quantity: number; price: number }[];
+  items:        { productId: string; quantity: number; price: number; mrp?: number }[];
   paymentMode:  string;
   customerPhone?: string;
   total:        number;

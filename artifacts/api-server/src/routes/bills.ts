@@ -9,7 +9,7 @@ const router: IRouter = Router();
 type PaymentMode = "cash" | "upi";
 
 function isValidCheckoutBody(body: unknown): body is {
-  items: Array<{ productId: string; quantity: number; price: number }>;
+  items: Array<{ productId: string; quantity: number; price: number; mrp?: number }>;
   paymentMode: PaymentMode;
   customerPhone?: string;
 } {
@@ -21,16 +21,17 @@ function isValidCheckoutBody(body: unknown): body is {
     if (typeof b.customerPhone !== "string") return false;
     if (!/^\d{10}$/.test(b.customerPhone)) return false;
   }
-  return b.items.every(
-    (item) =>
-      item &&
-      typeof item === "object" &&
-      typeof (item as Record<string, unknown>).productId === "string" &&
-      typeof (item as Record<string, unknown>).quantity === "number" &&
-      ((item as Record<string, unknown>).quantity as number) > 0 &&
-      typeof (item as Record<string, unknown>).price === "number" &&
-      ((item as Record<string, unknown>).price as number) > 0
-  );
+  return b.items.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const it = item as Record<string, unknown>;
+    if (typeof it.productId !== "string") return false;
+    if (typeof it.quantity !== "number" || (it.quantity as number) <= 0) return false;
+    if (typeof it.price !== "number" || (it.price as number) <= 0) return false;
+    if (it.mrp !== undefined && it.mrp !== null) {
+      if (typeof it.mrp !== "number" || (it.mrp as number) <= 0) return false;
+    }
+    return true;
+  });
 }
 
 router.post("/bills/checkout", async (req, res): Promise<void> => {
@@ -51,6 +52,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         productSku:  string;
         quantity:    number;
         price:       number;
+        mrp?:        number;
         subtotal:    number;
         newStock:    number;
         threshold:   number;
@@ -88,6 +90,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           productSku:  product.sku,
           quantity:    item.quantity,
           price:       item.price,
+          mrp:         item.mrp,
           subtotal:    item.price * item.quantity,
           newStock:    product.stock - item.quantity,
           threshold:   product.lowStockThreshold,
@@ -115,6 +118,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
             productId: i.productId,
             quantity:  i.quantity,
             price:     String(i.price),
+            mrp:       i.mrp != null ? String(i.mrp) : null,
             subtotal:  String(i.subtotal),
           }))
         )
@@ -179,6 +183,7 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
       productSku:  productsTable.sku,
       quantity:    saleItemsTable.quantity,
       price:       saleItemsTable.price,
+      mrp:         saleItemsTable.mrp,
       subtotal:    saleItemsTable.subtotal,
     })
     .from(saleItemsTable)
@@ -192,6 +197,7 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
       productName: i.productName ?? "Deleted Product",
       productSku:  i.productSku  ?? "—",
       price:    Number(i.price),
+      mrp:      i.mrp != null ? Number(i.mrp) : null,
       subtotal: Number(i.subtotal),
     })),
   });

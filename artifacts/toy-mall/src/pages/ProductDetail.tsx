@@ -83,6 +83,7 @@ export default function ProductDetail() {
         sku:       found.sku,
         name:      found.name,
         price:     found.salePrice != null ? Number(found.salePrice) : Number(found.price),
+        mrp:       found.salePrice != null ? Number(found.price) : undefined,
       });
       toast.success(`Added to billing: ${found.name} (${count + 1} in cart)`, { duration: 1500 });
 

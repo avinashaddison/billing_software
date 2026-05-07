@@ -8,6 +8,7 @@ export interface SharedCartItem {
   name:      string;
   sku:       string;
   price:     number;
+  mrp?:      number;
   quantity:  number;
 }
 

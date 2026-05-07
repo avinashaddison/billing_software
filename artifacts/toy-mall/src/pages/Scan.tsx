@@ -588,7 +588,7 @@ export default function Scan() {
     const cached = skuCache.get(lookupSku.toLowerCase());
     if (cached) {
       if (isBilling) {
-        addItem({ productId: cached.id, sku: cached.sku, name: cached.name, price: cached.salePrice != null ? cached.salePrice : cached.price });
+        addItem({ productId: cached.id, sku: cached.sku, name: cached.name, price: cached.salePrice != null ? cached.salePrice : cached.price, mrp: cached.salePrice != null ? cached.price : undefined });
         setLastAddedId(cached.id);
         setTimeout(() => setLastAddedId(null), 700);
         toast.success(`Added: ${cached.name}`, { duration: 1500 });
@@ -607,7 +607,7 @@ export default function Scan() {
     lookupBySku(lookupSku)
       .then((product) => {
         if (isBilling) {
-          addItem({ productId: product.id, sku: product.sku, name: product.name, price: product.salePrice != null ? product.salePrice : product.price });
+          addItem({ productId: product.id, sku: product.sku, name: product.name, price: product.salePrice != null ? product.salePrice : product.price, mrp: product.salePrice != null ? product.price : undefined });
           setLastAddedId(product.id);
           setTimeout(() => setLastAddedId(null), 700);
           toast.success(`Added: ${product.name}`, { duration: 1500 });

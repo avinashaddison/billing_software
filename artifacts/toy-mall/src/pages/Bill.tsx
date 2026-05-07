@@ -11,6 +11,7 @@ interface BillItem {
   productSku: string;
   quantity: number;
   price: number;
+  mrp: number | null;
   subtotal: number;
 }
 
@@ -348,16 +349,27 @@ export default function Bill() {
                   ? item.productName.slice(0, 20) + ".."
                   : item.productName;
                 const subtotal = `₹${item.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                const rate     = `@ ₹${item.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })} each`;
+                const onSale = item.mrp != null && item.mrp > item.price;
 
                 return (
                   <div key={item.id}>
                     <div className="flex justify-between items-start text-[12px]">
-                      <span className="flex-1 font-semibold">{name}</span>
+                      <span className="flex-1 font-semibold">
+                        {name}{onSale ? " *" : ""}
+                      </span>
                       <span className="w-8 text-center">{item.quantity}</span>
                       <span className="w-20 text-right font-bold">{subtotal}</span>
                     </div>
-                    <div className="text-[10px] text-gray-500 pl-0">{rate}</div>
+                    {onSale ? (
+                      <div className="text-[10px] text-gray-500 pl-0">
+                        <span style={{ textDecoration: "line-through" }}>MRP ₹{item.mrp!.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                        {" → Sale ₹"}{item.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })} each
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-gray-500 pl-0">
+                        @ ₹{item.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })} each
+                      </div>
+                    )}
                     {i < items.length - 1 && (
                       <div className="text-[10px] text-gray-200 mt-1">{"· ".repeat(18).trimEnd()}</div>
                     )}
@@ -369,20 +381,32 @@ export default function Bill() {
             <div className="text-[11px] text-gray-400">{DASH}</div>
 
             {/* ── SUMMARY ── */}
-            <div className="text-[12px] space-y-0.5 my-2">
-              <div className="flex justify-between">
-                <span>Total Items :</span>
-                <span>{bill.itemsCount}</span>
-              </div>
-              <div className="flex justify-between font-bold text-[13px]">
-                <span>Sub Total   :</span>
-                <span>₹{bill.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between text-[11px] text-gray-500">
-                <span>Tax (GST)   :</span>
-                <span>Incl.</span>
-              </div>
-            </div>
+            {(() => {
+              const totalSavings = items.reduce((sum, i) =>
+                i.mrp != null && i.mrp > i.price ? sum + (i.mrp - i.price) * i.quantity : sum, 0);
+              return (
+                <div className="text-[12px] space-y-0.5 my-2">
+                  <div className="flex justify-between">
+                    <span>Total Items :</span>
+                    <span>{bill.itemsCount}</span>
+                  </div>
+                  {totalSavings > 0 && (
+                    <div className="flex justify-between text-[11px] text-gray-600">
+                      <span>You Saved   :</span>
+                      <span>₹{totalSavings.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-[13px]">
+                    <span>Sub Total   :</span>
+                    <span>₹{bill.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-gray-500">
+                    <span>Tax (GST)   :</span>
+                    <span>Incl.</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
 

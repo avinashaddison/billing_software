@@ -11,7 +11,7 @@ router.get("/shared-cart", (_req, res) => {
 
 /* POST /api/shared-cart/add — add / increment one item */
 router.post("/shared-cart/add", (req, res) => {
-  const { productId, name, sku, price } = req.body as Record<string, unknown>;
+  const { productId, name, sku, price, mrp } = req.body as Record<string, unknown>;
   if (
     typeof productId !== "string" ||
     typeof name !== "string" ||
@@ -21,7 +21,7 @@ router.post("/shared-cart/add", (req, res) => {
     res.status(400).json({ error: "Invalid item data" });
     return;
   }
-  const summary = sharedCart.addOrIncrement({ productId, name, sku, price });
+  const summary = sharedCart.addOrIncrement({ productId, name, sku, price, mrp: typeof mrp === "number" ? mrp : undefined });
   broadcast("cart_updated", summary);
   res.json(summary);
 });

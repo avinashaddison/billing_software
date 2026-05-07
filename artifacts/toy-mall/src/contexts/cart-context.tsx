@@ -6,6 +6,7 @@ export interface CartItem {
   name:      string;
   quantity:  number;
   price:     number;
+  mrp?:      number;
 }
 
 interface CartContextType {
@@ -131,6 +132,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       name:      incoming.name,
       sku:       incoming.sku,
       price:     incoming.price,
+      mrp:       incoming.mrp,
     });
   }, []);
 
