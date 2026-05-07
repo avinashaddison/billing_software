@@ -112,7 +112,7 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
               {hasSale ? (
                 <>
                   <div style={{
-                    fontSize: "8pt", fontWeight: 900, color: "#555",
+                    fontSize: "8pt", fontWeight: 900, color: "#000",
                     lineHeight: 1.1, textDecoration: "line-through",
                     whiteSpace: "nowrap",
                   }}>
