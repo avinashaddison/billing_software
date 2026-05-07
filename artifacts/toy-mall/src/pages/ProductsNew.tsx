@@ -456,8 +456,8 @@ export default function CreateProduct() {
           </div>
 
           {/* ─── RIGHT: Live preview panel (desktop only) ────────────── */}
-          <div className="hidden md:block">
-            <div className="sticky top-4 space-y-4">
+          <div className="hidden md:sticky md:top-0 md:block md:h-screen md:overflow-y-auto md:py-6">
+            <div className="space-y-4">
 
               {/* Panel header */}
               <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground px-1">
@@ -465,7 +465,7 @@ export default function CreateProduct() {
                 <span>Live Preview</span>
               </div>
 
-              {/* ── Product card preview ── */}
+              {/* ── Product card preview — mirrors ProductMobileCard from Products.tsx ── */}
               <div className="border rounded-2xl overflow-hidden bg-card shadow-sm">
                 <div className="px-4 py-2.5 border-b bg-muted/40 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
                   Product Card
@@ -477,62 +477,33 @@ export default function CreateProduct() {
                       <p className="text-sm font-medium text-muted-foreground">Fill in a name and price<br/>to see a live preview</p>
                     </div>
                   ) : (
-                    <div className="rounded-xl border bg-background overflow-hidden">
-                      {/* Image */}
-                      {watchedImageUrl ? (
-                        <div className="h-36 overflow-hidden bg-muted">
-                          <img src={watchedImageUrl} alt={previewName} className="w-full h-full object-cover" />
+                    /* Exact structure of ProductMobileCard */
+                    <div className="p-4 rounded-xl border bg-card flex items-center justify-between relative overflow-hidden">
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${cs?.dot ?? "bg-muted"}`} />
+                      <div className="flex-1 min-w-0 pr-4 pl-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-base">{catEmoji}</span>
+                          <h3 className="font-bold text-base truncate">{previewName}</h3>
                         </div>
-                      ) : (
-                        <div className="h-36 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center text-5xl">
-                          {catEmoji}
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md text-xs">{previewSku}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cs?.badge ?? "bg-muted text-muted-foreground"}`}>{previewCategory || "Category"}</span>
                         </div>
-                      )}
-                      {/* Card body */}
-                      <div className="p-3 space-y-2">
-                        {/* Name + SKU */}
-                        <div>
-                          <p className="font-bold text-sm leading-snug line-clamp-2">{previewName}</p>
-                          <p className="font-mono text-xs text-muted-foreground mt-0.5">{previewSku}</p>
+                      </div>
+                      <div className="flex flex-col items-end flex-shrink-0">
+                        <div className={`text-2xl font-black leading-none flex items-center gap-1 ${isLowStock ? "text-red-600 dark:text-red-400" : ""}`}>
+                          {isLowStock && <AlertTriangle className="w-4 h-4" />}
+                          {previewStock}
                         </div>
-                        {/* Category badge + stock */}
-                        <div className="flex items-center justify-between gap-2">
-                          {cs ? (
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cs.badge}`}>
-                              {previewCategory}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                              {previewCategory || "Category"}
-                            </span>
-                          )}
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                            isLowStock ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                          }`}>
-                            {isLowStock && <AlertTriangle className="w-2.5 h-2.5" />}
-                            {previewStock} in stock
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Left</span>
+                        {previewSale > 0 ? (
+                          <span className="text-[10px]">
+                            <span className="line-through text-muted-foreground">₹{previewMrp.toLocaleString("en-IN")}</span>
+                            {" "}<span className="text-red-600 font-bold">₹{previewSale.toLocaleString("en-IN")}</span>
                           </span>
-                        </div>
-                        {/* Price */}
-                        <div className="pt-1 border-t">
-                          {previewSale > 0 ? (
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-base font-black text-red-600 dark:text-red-400">
-                                ₹{previewSale.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                              <span className="text-xs line-through text-muted-foreground">
-                                ₹{previewMrp.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                              <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-950/40 px-1.5 py-0.5 rounded-full ml-auto">
-                                SALE
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-base font-black">
-                              ₹{previewMrp.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          )}
-                        </div>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">₹{previewMrp.toLocaleString("en-IN")}</span>
+                        )}
                       </div>
                     </div>
                   )}
@@ -549,7 +520,6 @@ export default function CreateProduct() {
                       Margin Breakdown
                     </div>
                     <div className="p-4 space-y-3">
-                      {/* Rows */}
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Cost price</span>
@@ -570,7 +540,6 @@ export default function CreateProduct() {
                           </span>
                         </div>
                       </div>
-                      {/* Big margin badge */}
                       <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${mc.bg}`}>
                         <span className={`text-xs font-bold ${mc.text}`}>Margin</span>
                         <span className={`text-3xl font-black ${mc.text}`}>{liveMargin.pct.toFixed(1)}%</span>
@@ -586,22 +555,14 @@ export default function CreateProduct() {
                 );
               })()}
 
-              {/* ── Label preview ── */}
+              {/* ── Label preview — compact screen-mode card (160px wide, no transforms) ── */}
               {hasPreviewData && (
                 <div className="border rounded-2xl overflow-hidden bg-card shadow-sm">
                   <div className="px-4 py-2.5 border-b bg-muted/40 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
                     Shelf Label Preview
                   </div>
-                  <div className="p-4">
-                    <div className="flex justify-center">
-                      {/* Scale up the print-mode label (50mm×24mm → visible on screen) */}
-                      <div style={{ transform: "scale(3)", transformOrigin: "top center", marginBottom: "calc((24mm * 3) - 24mm + 8px)", marginTop: 4 }}>
-                        <LabelCard p={labelProduct} printMode={true} />
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-center text-muted-foreground mt-3">
-                      50mm × 24mm thermal label
-                    </p>
+                  <div className="p-4 flex justify-center">
+                    <LabelCard p={labelProduct} compact={true} />
                   </div>
                 </div>
               )}
