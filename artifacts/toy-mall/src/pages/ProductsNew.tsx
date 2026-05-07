@@ -109,11 +109,11 @@ export default function CreateProduct() {
   const watchedPurchasePrice = form.watch("purchasePrice");
 
   const liveMargin = (() => {
-    const cost    = watchedPurchasePrice && typeof watchedPurchasePrice === "number" ? watchedPurchasePrice : null;
-    const selling = watchedSalePrice    && typeof watchedSalePrice    === "number" ? watchedSalePrice
-                  : watchedPrice        && typeof watchedPrice        === "number" ? watchedPrice
-                  : null;
-    if (cost == null || selling == null || selling <= 0 || cost <= 0) return null;
+    const cost    = parseFloat(String(watchedPurchasePrice ?? ""));
+    const sp      = parseFloat(String(watchedSalePrice     ?? ""));
+    const mrp     = parseFloat(String(watchedPrice         ?? ""));
+    const selling = sp > 0 ? sp : mrp > 0 ? mrp : NaN;
+    if (isNaN(cost) || isNaN(selling) || cost <= 0 || selling <= 0) return null;
     const profit = selling - cost;
     const pct    = (profit / selling) * 100;
     return { cost, selling, profit, pct };
