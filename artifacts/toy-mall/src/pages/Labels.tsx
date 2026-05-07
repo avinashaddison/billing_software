@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Tag, Printer, Loader2, Search, Check, Package, Eye, Plus, Minus, Info, DollarSign, Ruler } from "lucide-react";
+import { Tag, Printer, Loader2, Search, Check, Package, Eye, Plus, Minus, Info, DollarSign, Ruler, X, ZoomIn } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LabelCard, type LabelProduct as Product } from "@/components/ui/LabelCard";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
@@ -52,6 +52,7 @@ export default function Labels() {
   const [showPreview, setShowPreview] = useState(false);
   const [showTip, setShowTip]         = useState(true);
   const [showSizePicker, setShowSizePicker] = useState(false);
+  const [zoomedProduct, setZoomedProduct] = useState<(Product & { _key: string }) | null>(null);
 
   const [labelSize, setLabelSizeState]   = useState<LabelSize>(loadLabelSize);
   const [customW, setCustomW]            = useState(String(labelSize.w));
@@ -321,12 +322,15 @@ export default function Labels() {
         {showPreview && printItems.length > 0 && (
           <div className="border-b bg-slate-100 dark:bg-slate-900 px-4 py-4">
             <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              Preview — actual label size ({currentPresetLabel})
+              <ZoomIn className="w-3 h-3" />
+              Preview — tap a label to zoom ({currentPresetLabel})
             </p>
             <div className="flex flex-wrap gap-3 max-h-64 overflow-y-auto">
               {printItems.map((p) => (
-                <div
+                <button
                   key={p._key}
+                  onClick={() => setZoomedProduct(p)}
+                  title="Tap to zoom"
                   style={{
                     width: labelWpx,
                     height: labelHpx,
@@ -335,10 +339,14 @@ export default function Labels() {
                     overflow: "hidden",
                     background: "#fff",
                     border: "1px solid #e5e7eb",
+                    padding: 0,
+                    cursor: "pointer",
+                    flexShrink: 0,
                   }}
+                  className="hover:ring-2 hover:ring-primary hover:ring-offset-1 transition-all"
                 >
                   <LabelCard p={p} printMode widthMm={labelSize.w} heightMm={labelSize.h} />
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -427,6 +435,96 @@ export default function Labels() {
           className="fixed inset-0 z-40"
           onClick={() => setShowSizePicker(false)}
         />
+      )}
+
+      {/* ── Zoomed label preview modal ── */}
+      {zoomedProduct && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setZoomedProduct(null)}
+        >
+          <div
+            className="bg-background rounded-2xl shadow-2xl flex flex-col w-full max-w-sm"
+            style={{ maxHeight: "90vh" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
+              <div className="min-w-0">
+                <p className="font-black text-sm truncate">{zoomedProduct.name}</p>
+                <p className="text-xs font-mono text-muted-foreground">{zoomedProduct.sku}</p>
+              </div>
+              <button
+                onClick={() => setZoomedProduct(null)}
+                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70 transition-colors ml-3 shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Scaled label — scrollable so nothing clips on narrow screens */}
+            <div
+              className="overflow-auto bg-slate-100 dark:bg-slate-900"
+              style={{ WebkitOverflowScrolling: "touch" as React.CSSProperties["WebkitOverflowScrolling"] }}
+            >
+              {/* This wrapper has the actual scaled dimensions so the scroll
+                  container knows the true extent of the content */}
+              <div style={{
+                width: labelWpx * 2.5 + 48,
+                height: labelHpx * 2.5 + 48,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}>
+                {/* Transform origin top-left on a positioned box avoids any
+                    clipping — the wrapper above provides layout space */}
+                <div style={{ position: "relative", width: labelWpx * 2.5, height: labelHpx * 2.5 }}>
+                  <div style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    transformOrigin: "top left",
+                    transform: "scale(2.5)",
+                    width: labelWpx,
+                    height: labelHpx,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    background: "#fff",
+                    border: "1px solid #e5e7eb",
+                  }}>
+                    <LabelCard p={zoomedProduct} printMode widthMm={labelSize.w} heightMm={labelSize.h} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Size badge */}
+            <div className="flex items-center justify-center gap-2 py-2 border-t border-b bg-muted/30 shrink-0">
+              <span className="text-xs text-muted-foreground font-bold">
+                {currentPresetLabel} · 2.5× zoom · scroll to see full label
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 p-4 shrink-0">
+              <button
+                onClick={() => setZoomedProduct(null)}
+                className="flex-1 py-2.5 rounded-xl bg-muted text-sm font-bold hover:bg-muted/70 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => { setZoomedProduct(null); doPrint(); }}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-black text-white text-sm font-bold hover:bg-neutral-800 active:scale-95 transition-all"
+              >
+                <Printer className="w-4 h-4" />
+                Print {totalLabels}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </>
   );
