@@ -68,9 +68,9 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
           {store.name}
         </div>
 
-        {/* ── Middle row: 9mm ── */}
+        {/* ── Middle row: 11mm ── */}
         <div style={{
-          height: "9mm", flexShrink: 0,
+          height: "11mm", flexShrink: 0,
           display: "flex", flexDirection: "row",
           overflow: "hidden",
         }}>
