@@ -17,35 +17,36 @@ interface LabelCardProps {
   p: LabelProduct;
   compact?: boolean;
   printMode?: boolean;
+  widthMm?: number;
+  heightMm?: number;
 }
 
-export function LabelCard({ p, compact = false, printMode = false }: LabelCardProps) {
+export function LabelCard({ p, compact = false, printMode = false, widthMm = 50, heightMm = 25 }: LabelCardProps) {
   const hex       = getCategoryHex(p.category);
   const emoji     = getCategoryEmoji(p.category);
   const store     = useStoreSettings();
   const showPriceScreen = store.labelShowPrice ?? true;
-  /* In print mode price is ALWAYS shown — the store toggle only affects the on-screen preview */
   const showPrice = printMode ? true : showPriceScreen;
   const hasSale   = showPrice && p.salePrice != null;
   const mrp       = Number(p.price).toLocaleString("en-IN");
   const sale      = hasSale ? Number(p.salePrice!).toLocaleString("en-IN") : null;
 
-  /* Barcode PNG — memoised so it renders once */
   const barcodeSrc = useMemo(() => barcodeLabelPngDataUrl(p.sku), [p.sku]);
 
-  /* ── Print mode: 50mm × 25mm compact thermal label ── */
   if (printMode) {
-    /*
-     * Layout (fixed mm heights so nothing can overflow):
-     *   Banner:      3.5mm  — black strip with store name
-     *   Middle row:  9mm    — product name (left) + price (right)
-     *   Barcode:     12.5mm — fills the rest (25 - 3.5 - 9)
-     *     img:       7.5mm  — barcode bars (objectFit:fill keeps aspect intact)
-     *     sku text:  rest   — tiny mono text
-     */
+    const sx = widthMm / 50;
+    const sy = heightMm / 25;
+    const sf = Math.min(sx, sy);
+
+    const safeHeight = Math.max(heightMm, 10);
+    const bannerH   = `${(3.5 * sy).toFixed(2)}mm`;
+    const middleH   = `${(11 * sy).toFixed(2)}mm`;
+    const barcodeH  = `${(7 * sy).toFixed(2)}mm`;
+    const innerH    = `${(safeHeight - 1).toFixed(2)}mm`;
+
     return (
       <div style={{
-        width: "50mm", height: "24mm",
+        width: `${widthMm}mm`, height: innerH,
         fontFamily: "Arial, 'Helvetica Neue', sans-serif",
         background: "#fff", color: "#000",
         display: "flex", flexDirection: "column",
@@ -53,37 +54,37 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
         overflow: "hidden",
       }}>
 
-        {/* ── Banner: 3.5mm ── */}
+        {/* ── Banner ── */}
         <div style={{
-          height: "3.5mm", flexShrink: 0,
+          height: bannerH, flexShrink: 0,
           background: "#000", color: "#fff",
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "6.5pt", fontWeight: 900,
+          fontSize: `${(6.5 * sf).toFixed(1)}pt`, fontWeight: 900,
           letterSpacing: "0.8pt", textTransform: "uppercase",
           overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
-          padding: "0 1mm",
+          padding: `0 ${(1 * sx).toFixed(1)}mm`,
           printColorAdjust: "exact",
           WebkitPrintColorAdjust: "exact",
         } as React.CSSProperties}>
           {store.name}
         </div>
 
-        {/* ── Middle row: 11mm ── */}
+        {/* ── Middle row ── */}
         <div style={{
-          height: "11mm", flexShrink: 0,
+          height: middleH, flexShrink: 0,
           display: "flex", flexDirection: "row",
           overflow: "hidden",
         }}>
-          {/* Product name + SKU */}
+          {/* Product name */}
           <div style={{
             flex: showPrice ? "0 0 58%" : 1,
-            padding: "0.5mm 1.5mm 0.5mm",
+            padding: `${(0.5 * sy).toFixed(1)}mm ${(1.5 * sx).toFixed(1)}mm`,
             display: "flex", flexDirection: "column",
             justifyContent: "center",
             overflow: "hidden",
           }}>
             <div style={{
-              fontSize: "6.5pt", fontWeight: 800, lineHeight: 1.2,
+              fontSize: `${(6.5 * sf).toFixed(1)}pt`, fontWeight: 800, lineHeight: 1.2,
               overflow: "hidden", textOverflow: "ellipsis",
               display: "-webkit-box",
               WebkitLineClamp: 2,
@@ -98,7 +99,7 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
             <div style={{
               flex: "0 0 42%",
               borderLeft: "0.3mm solid #ccc",
-              padding: "0.5mm 1mm 0.5mm 1.2mm",
+              padding: `${(0.5 * sy).toFixed(1)}mm ${(1 * sx).toFixed(1)}mm ${(0.5 * sy).toFixed(1)}mm ${(1.2 * sx).toFixed(1)}mm`,
               display: "flex", flexDirection: "column",
               justifyContent: "center",
               overflow: "hidden",
@@ -106,29 +107,29 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
               {hasSale ? (
                 <>
                   <div style={{
-                    fontSize: "8pt", fontWeight: 900, color: "#000",
+                    fontSize: `${(8 * sf).toFixed(1)}pt`, fontWeight: 900, color: "#000",
                     lineHeight: 1.1, textDecoration: "line-through",
                     whiteSpace: "nowrap",
                   }}>
                     MRP ₹{mrp}
                   </div>
                   <div style={{
-                    fontSize: "10pt", fontWeight: 900, lineHeight: 1.1,
+                    fontSize: `${(10 * sf).toFixed(1)}pt`, fontWeight: 900, lineHeight: 1.1,
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   }}>
                     ₹{sale}
                   </div>
-                  <div style={{ fontSize: "6pt", fontWeight: 900, color: "#000", lineHeight: 1, marginTop: "0.2mm" }}>
+                  <div style={{ fontSize: `${(6 * sf).toFixed(1)}pt`, fontWeight: 900, color: "#000", lineHeight: 1, marginTop: "0.2mm" }}>
                     SALE PRICE
                   </div>
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: "5pt", fontWeight: 600, color: "#555", lineHeight: 1, letterSpacing: "0.3pt" }}>
+                  <div style={{ fontSize: `${(5 * sf).toFixed(1)}pt`, fontWeight: 600, color: "#555", lineHeight: 1, letterSpacing: "0.3pt" }}>
                     MRP
                   </div>
                   <div style={{
-                    fontSize: "9pt", fontWeight: 900, lineHeight: 1.1,
+                    fontSize: `${(9 * sf).toFixed(1)}pt`, fontWeight: 900, lineHeight: 1.1,
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   }}>
                     ₹{mrp}
@@ -139,22 +140,21 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
           )}
         </div>
 
-        {/* ── Barcode zone: fills remaining space ── */}
+        {/* ── Barcode zone ── */}
         <div style={{
           flex: 1, minHeight: 0,
-          padding: "0.5mm 1mm 2mm",
+          padding: `${(0.5 * sy).toFixed(1)}mm ${(1 * sx).toFixed(1)}mm ${(2 * sy).toFixed(1)}mm`,
           display: "flex", flexDirection: "column",
           justifyContent: "center",
           overflow: "hidden",
         }}>
-          {/* Barcode bars only — text rendered separately as sharp HTML below */}
           <img
             src={barcodeSrc}
             alt={p.sku}
             style={{
               display: "block",
               width: "100%",
-              height: "7mm",
+              height: barcodeH,
               objectFit: "fill",
               imageRendering: "pixelated",
             }}
@@ -162,12 +162,12 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
           <div style={{
             textAlign: "center",
             fontFamily: "Arial, sans-serif",
-            fontSize: "7pt",
+            fontSize: `${(7 * sf).toFixed(1)}pt`,
             fontWeight: 900,
             letterSpacing: "1pt",
             color: "#000",
             lineHeight: 1,
-            marginTop: "0.5mm",
+            marginTop: `${(0.5 * sy).toFixed(1)}mm`,
           }}>
             {p.sku}
           </div>

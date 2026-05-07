@@ -1,15 +1,44 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Tag, Printer, Loader2, Search, Check, Package, Eye, Plus, Minus, Info, DollarSign } from "lucide-react";
+import { Tag, Printer, Loader2, Search, Check, Package, Eye, Plus, Minus, Info, DollarSign, Ruler } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LabelCard, type LabelProduct as Product } from "@/components/ui/LabelCard";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 import { useListProducts } from "@workspace/api-client-react";
 import { useStoreSettings } from "@/lib/store-info";
 
-/* 50×25mm at 96dpi (1mm ≈ 3.78px) — used for on-screen preview */
-const LABEL_W_PX = Math.round(50 * 3.78);
-const LABEL_H_PX = Math.round(25 * 3.78);
+const MM_TO_PX = 3.7795275591; // 1mm at 96dpi
+
+const LABEL_PRESETS = [
+  { label: "50×25mm", w: 50, h: 25 },
+  { label: "40×20mm", w: 40, h: 20 },
+  { label: "60×30mm", w: 60, h: 30 },
+] as const;
+
+type LabelSize = { w: number; h: number };
+
+const LS_KEY = "toy-mall-label-size";
+
+function loadLabelSize(): LabelSize {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.w === "number" && typeof parsed.h === "number" && parsed.w > 0 && parsed.h > 0) {
+        return parsed;
+      }
+    }
+  } catch { /* ignore */ }
+  return { w: 50, h: 25 };
+}
+
+function saveLabelSize(size: LabelSize) {
+  localStorage.setItem(LS_KEY, JSON.stringify(size));
+}
+
+function isPreset(size: LabelSize) {
+  return LABEL_PRESETS.some((p) => p.w === size.w && p.h === size.h);
+}
 
 export default function Labels() {
   const { data: productsData, isLoading: loading } = useListProducts();
@@ -22,8 +51,28 @@ export default function Labels() {
   const [printing, setPrinting]       = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showTip, setShowTip]         = useState(true);
+  const [showSizePicker, setShowSizePicker] = useState(false);
 
-  /* Trigger window.print() only after the portal is committed + painted */
+  const [labelSize, setLabelSizeState]   = useState<LabelSize>(loadLabelSize);
+  const [customW, setCustomW]            = useState(String(labelSize.w));
+  const [customH, setCustomH]            = useState(String(labelSize.h));
+
+  const setLabelSize = useCallback((size: LabelSize) => {
+    setLabelSizeState(size);
+    saveLabelSize(size);
+    setCustomW(String(size.w));
+    setCustomH(String(size.h));
+  }, []);
+
+  const applyCustom = useCallback(() => {
+    const w = Math.min(200, Math.max(10, parseFloat(customW) || 0));
+    const h = Math.min(200, Math.max(10, parseFloat(customH) || 0));
+    if (w >= 10 && h >= 10) setLabelSize({ w, h });
+  }, [customW, customH, setLabelSize]);
+
+  const labelWpx = Math.round(labelSize.w * MM_TO_PX);
+  const labelHpx = Math.round(labelSize.h * MM_TO_PX);
+
   useEffect(() => {
     if (!printing) return;
     const raf = requestAnimationFrame(() => { window.print(); });
@@ -55,11 +104,14 @@ export default function Labels() {
   const totalLabels = selectedProducts.reduce((s, p) => s + getCopies(p.id), 0);
   const showPrice   = store.labelShowPrice ?? true;
 
+  const currentPresetLabel = LABEL_PRESETS.find((p) => p.w === labelSize.w && p.h === labelSize.h)?.label
+    ?? `${labelSize.w}×${labelSize.h}mm`;
+
   return (
     <>
       {/* ── Print CSS ── */}
       <style>{`
-        @page { size: 50mm 25mm; margin: 1mm 0 0 0; }
+        @page { size: ${labelSize.w}mm ${labelSize.h}mm; margin: 1mm 0 0 0; }
         @media print {
           html, body { height: auto !important; overflow: visible !important; }
           body > *:not(.labels-print-area) { display: none !important; }
@@ -72,7 +124,7 @@ export default function Labels() {
           }
           .label-page {
             display: block !important;
-            width: 50mm !important; height: 24mm !important;
+            width: ${labelSize.w}mm !important; height: ${labelSize.h - 1}mm !important;
             page-break-after: always !important; break-after: page !important;
             overflow: hidden !important;
             print-color-adjust: exact !important;
@@ -84,15 +136,15 @@ export default function Labels() {
         }
       `}</style>
 
-      {/* ── Print portal — direct child of <body> so the CSS selector works ── */}
+      {/* ── Print portal ── */}
       {printing && createPortal(
         <div className="labels-print-area" style={{
-          position: "fixed", top: "-200vh", left: 0, width: "50mm",
+          position: "fixed", top: "-200vh", left: 0, width: `${labelSize.w}mm`,
           background: "white",
         }}>
           {printItems.map((p) => (
-            <div key={p._key} className="label-page" style={{ width: "50mm", height: "24mm" }}>
-              <LabelCard p={p} printMode />
+            <div key={p._key} className="label-page" style={{ width: `${labelSize.w}mm`, height: `${labelSize.h - 1}mm` }}>
+              <LabelCard p={p} printMode widthMm={labelSize.w} heightMm={labelSize.h} />
             </div>
           ))}
         </div>,
@@ -108,10 +160,91 @@ export default function Labels() {
               <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
                 <Tag className="w-6 h-6 text-primary" /> Label Printer
               </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">50×25mm sticker labels · one per product</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{currentPresetLabel} sticker labels · one per product</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              {/* Price toggle — quick access without going to Settings */}
+              {/* Label size picker */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowSizePicker((v) => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-full border font-bold text-sm transition-all ${
+                    showSizePicker
+                      ? "bg-primary/10 border-primary text-primary"
+                      : "bg-muted border-muted-foreground/20 text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Choose label size"
+                >
+                  <Ruler className="w-3.5 h-3.5" />
+                  {currentPresetLabel}
+                </button>
+
+                {showSizePicker && (
+                  <div className="absolute right-0 top-full mt-2 z-50 bg-popover border border-border rounded-2xl shadow-xl p-4 w-64">
+                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-3">Label Size</p>
+
+                    {/* Preset buttons */}
+                    <div className="flex flex-col gap-1.5 mb-4">
+                      {LABEL_PRESETS.map((preset) => {
+                        const active = labelSize.w === preset.w && labelSize.h === preset.h;
+                        return (
+                          <button
+                            key={preset.label}
+                            onClick={() => { setLabelSize({ w: preset.w, h: preset.h }); setShowSizePicker(false); }}
+                            className={`flex items-center justify-between px-3 py-2 rounded-xl border font-bold text-sm transition-all ${
+                              active
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border hover:bg-muted"
+                            }`}
+                          >
+                            <span>{preset.label}</span>
+                            {active && <Check className="w-4 h-4" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Custom size inputs */}
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground mb-2">Custom size (mm)</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <label className="text-[10px] text-muted-foreground font-bold block mb-0.5">Width</label>
+                          <Input
+                            type="number"
+                            min={10} max={200}
+                            value={customW}
+                            onChange={(e) => { setCustomW(e.target.value); }}
+                            onBlur={applyCustom}
+                            className="h-9 text-sm font-bold rounded-xl [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder="50"
+                          />
+                        </div>
+                        <span className="text-muted-foreground font-bold mt-4">×</span>
+                        <div className="flex-1">
+                          <label className="text-[10px] text-muted-foreground font-bold block mb-0.5">Height</label>
+                          <Input
+                            type="number"
+                            min={10} max={200}
+                            value={customH}
+                            onChange={(e) => { setCustomH(e.target.value); }}
+                            onBlur={applyCustom}
+                            className="h-9 text-sm font-bold rounded-xl [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder="25"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { applyCustom(); setShowSizePicker(false); }}
+                        className="w-full mt-2 py-2 rounded-xl bg-muted hover:bg-muted/70 font-bold text-sm transition-colors"
+                      >
+                        Apply custom size
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Price toggle */}
               <button
                 onClick={() => store.update({ labelShowPrice: !showPrice })}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-full border font-bold text-sm transition-all ${
@@ -152,7 +285,7 @@ export default function Labels() {
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span className="flex-1">
                 <b>Print settings:</b> set <b>Margins → None</b> and uncheck <b>Headers and footers</b>.
-                Each label prints on its own 50×25mm sticker.
+                Each label prints on its own {currentPresetLabel} sticker.
               </span>
               <button onClick={() => setShowTip(false)} className="font-black text-amber-600 hover:text-amber-800 ml-1">✕</button>
             </div>
@@ -184,19 +317,19 @@ export default function Labels() {
           )}
         </div>
 
-        {/* ── Label preview (actual 50×25mm size on screen) ── */}
+        {/* ── Label preview (actual size on screen) ── */}
         {showPreview && printItems.length > 0 && (
           <div className="border-b bg-slate-100 dark:bg-slate-900 px-4 py-4">
             <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              Preview — actual label size
+              Preview — actual label size ({currentPresetLabel})
             </p>
             <div className="flex flex-wrap gap-3 max-h-64 overflow-y-auto">
               {printItems.map((p) => (
                 <div
                   key={p._key}
                   style={{
-                    width: LABEL_W_PX,
-                    height: LABEL_H_PX,
+                    width: labelWpx,
+                    height: labelHpx,
                     boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
                     borderRadius: 3,
                     overflow: "hidden",
@@ -204,7 +337,7 @@ export default function Labels() {
                     border: "1px solid #e5e7eb",
                   }}
                 >
-                  <LabelCard p={p} printMode />
+                  <LabelCard p={p} printMode widthMm={labelSize.w} heightMm={labelSize.h} />
                 </div>
               ))}
             </div>
@@ -287,6 +420,14 @@ export default function Labels() {
           )}
         </div>
       </div>
+
+      {/* ── Close size picker on outside click ── */}
+      {showSizePicker && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowSizePicker(false)}
+        />
+      )}
     </>
   );
 }
