@@ -18,6 +18,8 @@ tags:
     description: Sales operations
   - name: dashboard
     description: Dashboard summary operations
+  - name: bills
+    description: Billing and checkout operations
 
 paths:
   /healthz:
@@ -374,6 +376,71 @@ paths:
                 items:
                   $ref: "#/components/schemas/CategoryStat"
 
+  /bills/checkout:
+    post:
+      operationId: checkout
+      tags: [bills]
+      summary: Create a new bill at checkout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
+      responses:
+        "201":
+          description: Bill created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bills:
+    get:
+      operationId: listBills
+      tags: [bills]
+      summary: List all bills
+      responses:
+        "200":
+          description: List of bills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bill"
+
+  /bills/{id}:
+    get:
+      operationId: getBill
+      tags: [bills]
+      summary: Get a single bill with its items
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bill detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillDetail"
+        "404":
+          description: Bill not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -643,3 +710,124 @@ components:
         - productCount
         - totalStock
         - stockValue
+
+    CheckoutItem:
+      type: object
+      properties:
+        productId:
+          type: string
+        quantity:
+          type: integer
+        price:
+          type: number
+        mrp:
+          type: number
+      required:
+        - productId
+        - quantity
+        - price
+
+    CheckoutInput:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CheckoutItem"
+        paymentMode:
+          type: string
+          enum: [cash, upi]
+        customerPhone:
+          type: string
+        discount:
+          type: number
+          description: Raw discount value (e.g. 10 for 10% or 200 for ₹200)
+        discountType:
+          type: string
+          enum: [percent, amount]
+          description: How to interpret the discount value
+      required:
+        - items
+        - paymentMode
+
+    Bill:
+      type: object
+      properties:
+        id:
+          type: string
+        billNumber:
+          type: integer
+        totalAmount:
+          type: number
+        itemsCount:
+          type: integer
+        paymentMode:
+          type: string
+        customerPhone:
+          type: ["string", "null"]
+        discount:
+          type: ["number", "null"]
+        discountType:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - totalAmount
+        - itemsCount
+        - paymentMode
+        - createdAt
+
+    BillItem:
+      type: object
+      properties:
+        id:
+          type: string
+        productId:
+          type: string
+        productName:
+          type: string
+        productSku:
+          type: string
+        quantity:
+          type: integer
+        price:
+          type: number
+        mrp:
+          type: ["number", "null"]
+        subtotal:
+          type: number
+      required:
+        - id
+        - productId
+        - productName
+        - productSku
+        - quantity
+        - price
+        - subtotal
+
+    BillDetail:
+      type: object
+      properties:
+        bill:
+          $ref: "#/components/schemas/Bill"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BillItem"
+      required:
+        - bill
+        - items
+
+    CheckoutResponse:
+      type: object
+      properties:
+        bill:
+          $ref: "#/components/schemas/Bill"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BillItem"
+      required:
+        - bill
+        - items

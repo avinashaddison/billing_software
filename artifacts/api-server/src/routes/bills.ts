@@ -126,7 +126,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           paymentMode,
           customerPhone: customerPhone || null,
           discount:      discount && discount > 0 ? String(discount) : null,
-          discountType:  discountType || null,
+          discountType:  discount && discount > 0 && discountType ? discountType : null,
         })
         .returning();
 

@@ -17,7 +17,11 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  Bill,
+  BillDetail,
   CategoryStat,
+  CheckoutInput,
+  CheckoutResponse,
   CreateProductInput,
   DashboardSummary,
   ErrorResponse,
@@ -1299,6 +1303,234 @@ export function useGetCategoryBreakdown<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetCategoryBreakdownQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new bill at checkout
+ */
+export const getCheckoutUrl = () => {
+  return `/api/bills/checkout`;
+};
+
+export const checkout = async (
+  checkoutInput: CheckoutInput,
+  options?: RequestInit,
+): Promise<CheckoutResponse> => {
+  return customFetch<CheckoutResponse>(getCheckoutUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(checkoutInput),
+  });
+};
+
+export const getCheckoutMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof checkout>>,
+    TError,
+    { data: BodyType<CheckoutInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof checkout>>,
+  TError,
+  { data: BodyType<CheckoutInput> },
+  TContext
+> => {
+  const mutationKey = ["checkout"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof checkout>>,
+    { data: BodyType<CheckoutInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return checkout(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CheckoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof checkout>>
+>;
+export type CheckoutMutationBody = BodyType<CheckoutInput>;
+export type CheckoutMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Create a new bill at checkout
+ */
+export const useCheckout = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof checkout>>,
+    TError,
+    { data: BodyType<CheckoutInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof checkout>>,
+  TError,
+  { data: BodyType<CheckoutInput> },
+  TContext
+> => {
+  return useMutation(getCheckoutMutationOptions(options));
+};
+
+/**
+ * @summary List all bills
+ */
+export const getListBillsUrl = () => {
+  return `/api/bills`;
+};
+
+export const listBills = async (options?: RequestInit): Promise<Bill[]> => {
+  return customFetch<Bill[]>(getListBillsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListBillsQueryKey = () => {
+  return [`/api/bills`] as const;
+};
+
+export const getListBillsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBills>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listBills>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListBillsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listBills>>> = ({
+    signal,
+  }) => listBills({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listBills>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListBillsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBills>>
+>;
+export type ListBillsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all bills
+ */
+
+export function useListBills<
+  TData = Awaited<ReturnType<typeof listBills>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listBills>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBillsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a single bill with its items
+ */
+export const getGetBillUrl = (id: string) => {
+  return `/api/bills/${id}`;
+};
+
+export const getBill = async (
+  id: string,
+  options?: RequestInit,
+): Promise<BillDetail> => {
+  return customFetch<BillDetail>(getGetBillUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBillQueryKey = (id: string) => {
+  return [`/api/bills/${id}`] as const;
+};
+
+export const getGetBillQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBill>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getBill>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBillQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getBill>>> = ({
+    signal,
+  }) => getBill(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getBill>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetBillQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBill>>
+>;
+export type GetBillQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get a single bill with its items
+ */
+
+export function useGetBill<
+  TData = Awaited<ReturnType<typeof getBill>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getBill>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBillQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

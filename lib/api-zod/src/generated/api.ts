@@ -359,3 +359,76 @@ export const GetCategoryBreakdownResponseItem = zod.object({
 export const GetCategoryBreakdownResponse = zod.array(
   GetCategoryBreakdownResponseItem,
 );
+
+/**
+ * @summary Create a new bill at checkout
+ */
+export const CheckoutBody = zod.object({
+  items: zod.array(
+    zod.object({
+      productId: zod.string(),
+      quantity: zod.number(),
+      price: zod.number(),
+      mrp: zod.number().optional(),
+    }),
+  ),
+  paymentMode: zod.enum(["cash", "upi"]),
+  customerPhone: zod.string().optional(),
+  discount: zod
+    .number()
+    .optional()
+    .describe("Raw discount value (e.g. 10 for 10% or 200 for ₹200)"),
+  discountType: zod
+    .enum(["percent", "amount"])
+    .optional()
+    .describe("How to interpret the discount value"),
+});
+
+/**
+ * @summary List all bills
+ */
+export const ListBillsResponseItem = zod.object({
+  id: zod.string(),
+  billNumber: zod.number().optional(),
+  totalAmount: zod.number(),
+  itemsCount: zod.number(),
+  paymentMode: zod.string(),
+  customerPhone: zod.string().nullish(),
+  discount: zod.number().nullish(),
+  discountType: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+export const ListBillsResponse = zod.array(ListBillsResponseItem);
+
+/**
+ * @summary Get a single bill with its items
+ */
+export const GetBillParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const GetBillResponse = zod.object({
+  bill: zod.object({
+    id: zod.string(),
+    billNumber: zod.number().optional(),
+    totalAmount: zod.number(),
+    itemsCount: zod.number(),
+    paymentMode: zod.string(),
+    customerPhone: zod.string().nullish(),
+    discount: zod.number().nullish(),
+    discountType: zod.string().nullish(),
+    createdAt: zod.string(),
+  }),
+  items: zod.array(
+    zod.object({
+      id: zod.string(),
+      productId: zod.string(),
+      productName: zod.string(),
+      productSku: zod.string(),
+      quantity: zod.number(),
+      price: zod.number(),
+      mrp: zod.number().nullish(),
+      subtotal: zod.number(),
+    }),
+  ),
+});

@@ -13,6 +13,8 @@ export interface QueuedBill {
   items:        { productId: string; quantity: number; price: number; mrp?: number }[];
   paymentMode:  string;
   customerPhone?: string;
+  discount?:    number;
+  discountType?: "percent" | "amount";
   total:        number;
   itemsCount:   number;
   queuedAt:     string;
@@ -72,6 +74,8 @@ export function useOfflineQueue() {
             items:         bill.items,
             paymentMode:   bill.paymentMode,
             customerPhone: bill.customerPhone,
+            discount:      bill.discount,
+            discountType:  bill.discountType,
           }),
         });
         if (res.ok) { synced++; } else { remaining.push(bill); failed++; }

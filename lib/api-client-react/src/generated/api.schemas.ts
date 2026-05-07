@@ -161,6 +161,79 @@ export interface CategoryStat {
   stockValue: number;
 }
 
+export interface CheckoutItem {
+  productId: string;
+  quantity: number;
+  price: number;
+  mrp?: number;
+}
+
+export type CheckoutInputPaymentMode =
+  (typeof CheckoutInputPaymentMode)[keyof typeof CheckoutInputPaymentMode];
+
+export const CheckoutInputPaymentMode = {
+  cash: "cash",
+  upi: "upi",
+} as const;
+
+/**
+ * How to interpret the discount value
+ */
+export type CheckoutInputDiscountType =
+  (typeof CheckoutInputDiscountType)[keyof typeof CheckoutInputDiscountType];
+
+export const CheckoutInputDiscountType = {
+  percent: "percent",
+  amount: "amount",
+} as const;
+
+export interface CheckoutInput {
+  items: CheckoutItem[];
+  paymentMode: CheckoutInputPaymentMode;
+  customerPhone?: string;
+  /** Raw discount value (e.g. 10 for 10% or 200 for ₹200) */
+  discount?: number;
+  /** How to interpret the discount value */
+  discountType?: CheckoutInputDiscountType;
+}
+
+export interface Bill {
+  id: string;
+  billNumber?: number;
+  totalAmount: number;
+  itemsCount: number;
+  paymentMode: string;
+  /** @nullable */
+  customerPhone?: string | null;
+  /** @nullable */
+  discount?: number | null;
+  /** @nullable */
+  discountType?: string | null;
+  createdAt: string;
+}
+
+export interface BillItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  quantity: number;
+  price: number;
+  /** @nullable */
+  mrp?: number | null;
+  subtotal: number;
+}
+
+export interface BillDetail {
+  bill: Bill;
+  items: BillItem[];
+}
+
+export interface CheckoutResponse {
+  bill: Bill;
+  items: BillItem[];
+}
+
 export type ListProductsParams = {
   /**
    * Search by name or SKU

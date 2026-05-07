@@ -218,7 +218,9 @@ export default function Checkout() {
         items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price, mrp: i.mrp })),
         paymentMode: paymentModeRef.current,
         customerPhone: phone || undefined,
-        total,
+        discount:     discountNum > 0 ? discountNum : undefined,
+        discountType: discountNum > 0 ? discountType : undefined,
+        total: finalTotal,
         itemsCount: count,
       });
       playCheckoutSuccess();
