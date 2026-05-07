@@ -4,7 +4,7 @@ import { useAuth, type StaffRole } from "@/hooks/use-auth";
 import { type Permissions } from "@/lib/permissions";
 import { Loader2, Delete } from "lucide-react";
 import { toast } from "sonner";
-import { useStoreSettings } from "@/lib/store-info";
+import { useStoreSettings, usePerStaffScannerPrefs } from "@/lib/store-info";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -119,6 +119,14 @@ export default function Login() {
       setAttemptsLeft(null);
       setLockedUntil(null);
       login({ id: data.id, name: data.name, role: data.role as StaffRole, permissions: data.permissions as Permissions });
+
+      /* Auto-apply saved scanner threshold for this staff member */
+      const pref = usePerStaffScannerPrefs.getState().getPref(data.id);
+      if (pref) {
+        useStoreSettings.getState().update({ scannerThresholdMs: pref.thresholdMs });
+        toast.success(`Scanner set to ${pref.thresholdMs} ms (your saved preference)`);
+      }
+
       setLocation("/");
     } catch {
       toast.error("Login failed. Check connection.");

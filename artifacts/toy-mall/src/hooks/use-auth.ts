@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { OWNER_PERMISSIONS, type Permissions } from "@/lib/permissions";
+import { useStoreSettings } from "@/lib/store-info";
 
 export type StaffRole = "owner" | "staff";
 
@@ -10,6 +11,7 @@ interface AuthState {
   staffName:   string;
   role:        StaffRole | null;
   permissions: Permissions;
+  priorScannerThresholdMs: number | null;
 
   login:  (data: { id: string; name: string; role: StaffRole; permissions: Permissions }) => void;
   logout: () => void;
@@ -21,16 +23,18 @@ interface AuthState {
 
 export const useAuth = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       isLoggedIn:  false,
       staffId:     null,
       staffName:   "",
       role:        null,
       permissions: {},
+      priorScannerThresholdMs: null,
       userId:      "user-1",
       setRole:     () => {},
 
-      login: ({ id, name, role, permissions }) =>
+      login: ({ id, name, role, permissions }) => {
+        const currentThreshold = useStoreSettings.getState().scannerThresholdMs;
         set({
           isLoggedIn:  true,
           staffId:     id,
@@ -38,17 +42,25 @@ export const useAuth = create<AuthState>()(
           role,
           userId:      id,
           permissions: role === "owner" ? OWNER_PERMISSIONS : permissions,
-        }),
+          priorScannerThresholdMs: currentThreshold,
+        });
+      },
 
-      logout: () =>
+      logout: () => {
+        const { priorScannerThresholdMs } = get();
+        if (priorScannerThresholdMs !== null) {
+          useStoreSettings.getState().update({ scannerThresholdMs: priorScannerThresholdMs });
+        }
         set({
           isLoggedIn:  false,
           staffId:     null,
           staffName:   "",
           role:        null,
           permissions: {},
+          priorScannerThresholdMs: null,
           userId:      "user-1",
-        }),
+        });
+      },
     }),
     { name: "toy-mall-auth-v2" }
   )
