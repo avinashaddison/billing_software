@@ -116,8 +116,11 @@ interface CheckoutModalProps {
   onCancel: () => void;
   onConfirm: (pm: PaymentMode, phone: string) => void;
   loading: boolean;
+  items: { name: string; sku: string; quantity: number }[];
+  stockMap: Map<string, number>;
+  stockDataLoaded: boolean;
 }
-function CheckoutModal({ total, count, onCancel, onConfirm, loading }: CheckoutModalProps) {
+function CheckoutModal({ total, count, onCancel, onConfirm, loading, items, stockMap, stockDataLoaded }: CheckoutModalProps) {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
   /* Ref mirrors state so handleSubmit always reads the *latest* value
      even when the UPI button and Confirm are tapped almost simultaneously
@@ -141,6 +144,25 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading }: CheckoutM
     paymentModeRef.current = pm;   // synchronous — safe to read immediately
     setPaymentMode(pm);            // triggers visual re-render
   };
+
+  const overdraftItems = useMemo(
+    () => items.filter((item) => {
+      const stock = stockMap.get(item.sku.toLowerCase());
+      return stock !== undefined && item.quantity > stock;
+    }),
+    [items, stockMap],
+  );
+  const hasStockIssues = overdraftItems.length > 0;
+
+  /* Items whose stock is not yet in the cache — only matters when the product
+     list hasn't finished loading (e.g. cold-start with a persisted cart).    */
+  const unknownStockItems = useMemo(
+    () => !stockDataLoaded
+      ? items.filter((item) => !stockMap.has(item.sku.toLowerCase()))
+      : [],
+    [items, stockMap, stockDataLoaded],
+  );
+  const stockPending = unknownStockItems.length > 0;
 
   const handleSubmit = () => {
     const err = validatePhone(phone);
@@ -169,6 +191,44 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading }: CheckoutM
         </div>
 
         <div className="px-5 py-4 space-y-5">
+          {/* Stock loading notice */}
+          {stockPending && (
+            <div className="rounded-2xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 flex items-center gap-3">
+              <Loader2 className="w-4 h-4 shrink-0 animate-spin text-amber-600 dark:text-amber-400" />
+              <div>
+                <p className="text-xs font-black text-amber-700 dark:text-amber-300">Checking stock availability…</p>
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+                  Please wait while inventory levels load.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Stock warning */}
+          {hasStockIssues && (
+            <div className="rounded-2xl border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 overflow-hidden">
+              <div className="px-3 py-2 border-b border-red-200 dark:border-red-800 flex items-center gap-2">
+                <span className="text-red-600 dark:text-red-400 text-sm font-black">⚠ Insufficient Stock</span>
+              </div>
+              <ul className="px-3 py-2.5 space-y-1.5">
+                {overdraftItems.map((item) => {
+                  const stock = stockMap.get(item.sku.toLowerCase()) ?? 0;
+                  return (
+                    <li key={item.sku} className="flex items-start justify-between gap-2 text-xs">
+                      <span className="font-bold text-red-700 dark:text-red-300 truncate flex-1">{item.name}</span>
+                      <span className="shrink-0 font-mono text-red-600 dark:text-red-400 whitespace-nowrap">
+                        {item.quantity} requested · {stock} in stock
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="px-3 pb-2.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                Reduce quantities in the cart before confirming.
+              </p>
+            </div>
+          )}
+
           {/* Grand total */}
           <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-2xl px-4 py-3 flex items-center justify-between">
             <div>
@@ -257,7 +317,7 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading }: CheckoutM
             className="py-3.5 rounded-2xl border border-border text-muted-foreground font-bold text-sm hover:bg-muted active:scale-95 transition-all disabled:opacity-40">
             Cancel
           </button>
-          <button type="button" onClick={handleSubmit} disabled={loading || !!validatePhone(phone)}
+          <button type="button" onClick={handleSubmit} disabled={loading || !!validatePhone(phone) || hasStockIssues || stockPending}
             className={`py-3.5 rounded-2xl text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50 ${qrActive ? "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20" : "bg-green-600 hover:bg-green-500 shadow-green-500/20"}`}>
             {loading
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</>
@@ -570,6 +630,15 @@ export default function Scan() {
      cart before the full product list finishes loading.                      */
   const [fallbackCache, setFallbackCache] = useState<Map<string, ScannedProduct>>(() => new Map());
 
+  /* Combined sku (lowercase) → current stock, used by CheckoutModal for
+     pre-flight stock validation before the server is ever called.           */
+  const combinedStockMap = useMemo<Map<string, number>>(() => {
+    const map = new Map<string, number>();
+    skuCache.forEach((product, key) => { map.set(key, product.stock); });
+    fallbackCache.forEach((product, key) => { map.set(key, product.stock); });
+    return map;
+  }, [skuCache, fallbackCache]);
+
   const [muted, setMuted]             = useState(() => isSoundMuted());
   const [mode, setMode]               = useState<PageMode>("billing");
   const [manualSku, setManualSku]     = useState("");
@@ -784,6 +853,9 @@ export default function Scan() {
           onCancel={() => setShowModal(false)}
           onConfirm={handleConfirmCheckout}
           loading={checking}
+          items={items}
+          stockMap={combinedStockMap}
+          stockDataLoaded={allProducts !== undefined}
         />
       )}
 
