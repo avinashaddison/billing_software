@@ -3,7 +3,7 @@ import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCi
 import { useStoreSettings, usePerStaffScannerPrefs, type StoreSettings } from "@/lib/store-info";
 import { useAuth } from "@/hooks/use-auth";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
-import { useScanDebugLog } from "@/lib/scan-debug-log";
+import { useScanDebugLog, clearScanEvents } from "@/lib/scan-debug-log";
 import { toast } from "sonner";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
@@ -643,13 +643,22 @@ function RecentScanEvents() {
           )}
         </button>
         {open && events.length > 0 && (
-          <button
-            type="button"
-            onClick={exportCsv}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-500 text-white text-[10px] font-bold hover:bg-green-600 transition-colors shrink-0"
-          >
-            <Download className="w-3 h-3" /> Export CSV
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-500 text-white text-[10px] font-bold hover:bg-green-600 transition-colors"
+            >
+              <Download className="w-3 h-3" /> Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => { clearScanEvents(); }}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-red-500 text-white text-[10px] font-bold hover:bg-red-600 transition-colors"
+            >
+              <XCircle className="w-3 h-3" /> Clear log
+            </button>
+          </div>
         )}
       </div>
 
@@ -684,7 +693,7 @@ function RecentScanEvents() {
             </div>
           )}
           <p className="px-3 py-2 text-[10px] text-muted-foreground border-t">
-            Last {events.length} event{events.length !== 1 ? "s" : ""} · ring buffer resets on page reload
+            Last {events.length} event{events.length !== 1 ? "s" : ""} · saved across page reloads
           </p>
         </div>
       )}
