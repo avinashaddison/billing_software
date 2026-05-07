@@ -494,7 +494,7 @@ export default function Checkout() {
                     </div>
                     <div className="text-center">
                       <p className="text-base font-black text-indigo-700 dark:text-indigo-300">
-                        ₹{total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ₹{finalTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{upiId}</p>
                     </div>

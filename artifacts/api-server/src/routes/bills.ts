@@ -182,7 +182,12 @@ router.get("/bills", async (_req, res): Promise<void> => {
     .orderBy(desc(billsTable.createdAt))
     .limit(50);
 
-  res.json(bills.map((b) => ({ ...b, totalAmount: Number(b.totalAmount) })));
+  res.json(bills.map((b) => ({
+    ...b,
+    totalAmount:  Number(b.totalAmount),
+    discount:     b.discount != null ? Number(b.discount) : null,
+    discountType: b.discountType ?? null,
+  })));
 });
 
 router.get("/bills/:id", async (req, res): Promise<void> => {
