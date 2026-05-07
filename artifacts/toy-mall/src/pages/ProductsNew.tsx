@@ -567,14 +567,23 @@ export default function CreateProduct() {
                 );
               })()}
 
-              {/* ── Label preview — compact screen-mode card (160px wide, no transforms) ── */}
+              {/* ── Label preview — print-mode 50×24mm label, scaled down to 70% ── */}
               {hasPreviewData && (
                 <div className="border rounded-2xl overflow-hidden bg-card shadow-sm">
                   <div className="px-4 py-2.5 border-b bg-muted/40 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
                     Shelf Label Preview
                   </div>
-                  <div className="p-4 flex justify-center">
-                    <LabelCard p={labelProduct} compact={true} />
+                  <div className="p-4 flex flex-col items-center gap-2">
+                    {/*
+                      Print label is 50mm × 24mm. At 96dpi: ~189px × 91px.
+                      Scale to 70% → clip container to ~132px × 64px.
+                    */}
+                    <div style={{ width: 133, height: 64, overflow: "hidden", flexShrink: 0 }}>
+                      <div style={{ transform: "scale(0.7)", transformOrigin: "top left" }}>
+                        <LabelCard p={labelProduct} printMode={true} />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">50mm × 24mm thermal label</p>
                   </div>
                 </div>
               )}
