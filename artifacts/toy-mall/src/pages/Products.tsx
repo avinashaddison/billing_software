@@ -2,7 +2,7 @@ import { useState, useRef, memo, useCallback } from "react";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { Link, useSearch, useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
-import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2 } from "lucide-react";
+import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2, ScanLine } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { getCategoryStyle, getCategoryEmoji } from "@/lib/category-colors";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
+import { useScanFlash } from "@/hooks/use-scan-flash";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -360,6 +361,8 @@ export default function Products() {
   const [, navigate]                = useLocation();
   const searchInputRef              = useRef<HTMLInputElement>(null);
 
+  const { isFlashing, flash, clear } = useScanFlash(1500);
+
   const handleUsbScan = useCallback(async (raw: string) => {
     let sku = raw;
     try {
@@ -370,19 +373,23 @@ export default function Products() {
     } catch { /* use raw */ }
 
     sku = sku.trim().toUpperCase();
+    flash();
 
     try {
       const res = await fetch(`${BASE_URL}/api/products/scan/${encodeURIComponent(sku)}`);
       if (!res.ok) {
+        clear();
         toast.error(`Product not found: ${sku}`);
         return;
       }
       const product = await res.json() as { sku: string };
+      clear();
       navigate(`/product?sku=${encodeURIComponent(product.sku)}`);
     } catch {
+      clear();
       toast.error(`Product not found: ${sku}`);
     }
-  }, [navigate]);
+  }, [navigate, flash, clear]);
 
   useUsbScanner(handleUsbScan, {
     allowedInput: { ref: searchInputRef, onClear: () => setSearch("") },
@@ -463,6 +470,12 @@ export default function Products() {
             onChange={e => setSearch(e.target.value)}
             className="pl-10 h-12 rounded-xl text-base bg-muted/50 border-transparent focus-visible:bg-background"
             data-testid="input-search" />
+          {isFlashing && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 rounded-full px-2.5 py-1 text-xs font-bold animate-pulse pointer-events-none">
+              <ScanLine className="w-3.5 h-3.5" />
+              Scanning…
+            </div>
+          )}
         </div>
       </div>
 
