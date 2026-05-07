@@ -353,14 +353,18 @@ function StockInPanel({ product, onConfirm, onDismiss, loading }: StockInPanelPr
    Uses getUserMedia for reliable video rendering, then BarcodeDetector
    (Chrome Android 83+, Safari 17+) for decoding. No external lib needed.
 ────────────────────────────────────────────────────────────────── */
+const CAMERA_SCAN_COOLDOWN_MS = 1500;
+
 function useScanner(
   active: boolean,
   videoRef: React.RefObject<HTMLVideoElement | null>,
   onScan: (sku: string) => void,
   onCameraError?: (msg: string) => void,
 ) {
-  const processingRef = useRef(false);
-  const onScanRef     = useRef(onScan);
+  const detectingRef   = useRef(false);   // async re-entry guard for detector.detect()
+  const lastSkuRef     = useRef("");       // last successfully dispatched SKU
+  const lastScanTimeRef = useRef(0);      // timestamp of last dispatched scan
+  const onScanRef      = useRef(onScan);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
 
   useEffect(() => {
@@ -422,12 +426,12 @@ function useScanner(
       /* ── 4. Scan loop ~10 fps ── */
       const tick = async () => {
         if (!mounted) return;
-        if (!processingRef.current && video.readyState >= 2) {
+        if (!detectingRef.current && video.readyState >= 2) {
+          detectingRef.current = true;
           try {
             const codes = await detector.detect(video);
-            if (codes.length > 0 && !processingRef.current) {
+            if (codes.length > 0) {
               const raw = codes[0].rawValue;
-              processingRef.current = true;
               let sku = raw;
               try {
                 if (raw.includes("product?sku=")) {
@@ -435,10 +439,22 @@ function useScanner(
                   sku = u.searchParams.get("sku") ?? raw;
                 }
               } catch { /* use raw */ }
-              onScanRef.current(sku.toUpperCase());
-              setTimeout(() => { processingRef.current = false; }, 1500);
+              sku = sku.toUpperCase();
+
+              /* Per-SKU cooldown: ignore if the same code fires again within
+                 CAMERA_SCAN_COOLDOWN_MS. A different SKU is always accepted. */
+              const now = Date.now();
+              const isSameSku       = sku === lastSkuRef.current;
+              const isWithinCooldown = (now - lastScanTimeRef.current) < CAMERA_SCAN_COOLDOWN_MS;
+
+              if (!isSameSku || !isWithinCooldown) {
+                lastSkuRef.current      = sku;
+                lastScanTimeRef.current = now;
+                onScanRef.current(sku);
+              }
             }
           } catch { /* per-frame errors — ignore */ }
+          detectingRef.current = false;
         }
         rafId = window.setTimeout(() => { rafId = requestAnimationFrame(tick); }, 100);
       };
