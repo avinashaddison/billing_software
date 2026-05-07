@@ -139,10 +139,10 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
           )}
         </div>
 
-        {/* ── Barcode zone: fills remaining 12.5mm ── */}
+        {/* ── Barcode zone: fills remaining space ── */}
         <div style={{
           flex: 1, minHeight: 0,
-          padding: "0.5mm 1mm 0.8mm",
+          padding: "0.5mm 1mm 2mm",
           display: "flex", flexDirection: "column",
           justifyContent: "center",
           overflow: "hidden",
