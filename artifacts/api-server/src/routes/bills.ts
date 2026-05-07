@@ -12,6 +12,8 @@ function isValidCheckoutBody(body: unknown): body is {
   items: Array<{ productId: string; quantity: number; price: number; mrp?: number }>;
   paymentMode: PaymentMode;
   customerPhone?: string;
+  discount?: number;
+  discountType?: "percent" | "amount";
 } {
   if (!body || typeof body !== "object") return false;
   const b = body as Record<string, unknown>;
@@ -20,6 +22,12 @@ function isValidCheckoutBody(body: unknown): body is {
   if (b.customerPhone !== undefined && b.customerPhone !== "") {
     if (typeof b.customerPhone !== "string") return false;
     if (!/^\d{10}$/.test(b.customerPhone)) return false;
+  }
+  if (b.discount !== undefined) {
+    if (typeof b.discount !== "number" || (b.discount as number) < 0) return false;
+  }
+  if (b.discountType !== undefined) {
+    if (b.discountType !== "percent" && b.discountType !== "amount") return false;
   }
   return b.items.every((item) => {
     if (!item || typeof item !== "object") return false;
@@ -42,7 +50,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
     return;
   }
 
-  const { items, paymentMode, customerPhone } = req.body;
+  const { items, paymentMode, customerPhone, discount, discountType } = req.body;
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -97,8 +105,18 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         });
       }
 
-      const totalAmount = processedItems.reduce((s, i) => s + i.subtotal, 0);
-      const itemsCount  = processedItems.reduce((s, i) => s + i.quantity, 0);
+      const subtotal   = processedItems.reduce((s, i) => s + i.subtotal, 0);
+      const itemsCount = processedItems.reduce((s, i) => s + i.quantity, 0);
+
+      let discountAmount = 0;
+      if (discount && discount > 0 && discountType) {
+        if (discountType === "percent") {
+          discountAmount = Math.min(subtotal * discount / 100, subtotal);
+        } else {
+          discountAmount = Math.min(discount, subtotal);
+        }
+      }
+      const totalAmount = subtotal - discountAmount;
 
       const [bill] = await tx
         .insert(billsTable)
@@ -107,6 +125,8 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           itemsCount,
           paymentMode,
           customerPhone: customerPhone || null,
+          discount:      discount && discount > 0 ? String(discount) : null,
+          discountType:  discountType || null,
         })
         .returning();
 
@@ -191,7 +211,12 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
     .where(eq(saleItemsTable.saleId, id));
 
   res.json({
-    bill: { ...bill, totalAmount: Number(bill.totalAmount) },
+    bill: {
+      ...bill,
+      totalAmount:  Number(bill.totalAmount),
+      discount:     bill.discount != null ? Number(bill.discount) : null,
+      discountType: bill.discountType ?? null,
+    },
     items: items.map((i) => ({
       ...i,
       productName: i.productName ?? "Deleted Product",

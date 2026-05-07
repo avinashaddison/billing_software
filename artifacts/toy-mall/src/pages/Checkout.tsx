@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
   Phone, Wallet, Banknote, Smartphone, Minus, Plus,
-  Trash2, ScanLine, WifiOff, RefreshCw, QrCode, BadgeCheck,
+  Trash2, ScanLine, WifiOff, RefreshCw, QrCode, BadgeCheck, Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -21,6 +21,8 @@ async function postCheckout(payload: {
   items: { productId: string; quantity: number; price: number; mrp?: number }[];
   paymentMode: PaymentMode;
   customerPhone?: string;
+  discount?: number;
+  discountType?: "percent" | "amount";
 }) {
   const res = await fetch(`${BASE_URL}/api/bills/checkout`, {
     method: "POST",
@@ -173,10 +175,21 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [successBillId, setSuccessBillId] = useState<string | null>(null);
 
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountType, setDiscountType]   = useState<"percent" | "amount">("percent");
+
+  const discountNum    = parseFloat(discountValue) || 0;
+  const discountAmount = discountNum > 0
+    ? discountType === "percent"
+      ? Math.min(total * discountNum / 100, total)
+      : Math.min(discountNum, total)
+    : 0;
+  const finalTotal = Math.max(0, total - discountAmount);
+
   const qrActive = dynamicQrMode && !!upiId && paymentMode === "upi";
 
   const upiUrl = qrActive
-    ? `upi://pay?pa=${encodeURIComponent(upiId)}&am=${total.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Toy Mall Sale")}`
+    ? `upi://pay?pa=${encodeURIComponent(upiId)}&am=${finalTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Toy Mall Sale")}`
     : "";
 
   const validatePhone = (v: string) =>
@@ -219,6 +232,8 @@ export default function Checkout() {
         items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price, mrp: i.mrp })),
         paymentMode: paymentModeRef.current,
         customerPhone: phone || undefined,
+        discount:     discountNum > 0 ? discountNum : undefined,
+        discountType: discountNum > 0 ? discountType : undefined,
       });
       playCheckoutSuccess();
       clearCart();
@@ -336,18 +351,66 @@ export default function Checkout() {
               <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-2xl px-4 py-3 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium">Grand Total</p>
-                  <AnimatedTotal value={total} />
+                  <AnimatedTotal value={finalTotal} />
+                  {discountAmount > 0 && (
+                    <p className="text-xs text-muted-foreground mt-0.5 line-through">
+                      ₹{total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1">
                     {items.length} product{items.length !== 1 ? "s" : ""} · {count} unit{count !== 1 ? "s" : ""}
                   </p>
-                  {totalSavings > 0 && (
+                  {(totalSavings > 0 || discountAmount > 0) && (
                     <p className="text-xs font-bold text-red-600 dark:text-red-400 mt-0.5">
-                      You save ₹{totalSavings.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 🎉
+                      You save ₹{(totalSavings + discountAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 🎉
                     </p>
                   )}
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
                   <Receipt className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+            </div>
+
+            {/* Discount */}
+            <div className="px-4 pt-3">
+              <div className="bg-card border rounded-2xl px-4 py-3 space-y-2">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5" /> Discount
+                  <span className="normal-case font-medium text-muted-foreground/60">(optional)</span>
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex rounded-xl border overflow-hidden shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDiscountType("percent")}
+                      className={`px-3 py-1.5 text-xs font-black transition-colors ${discountType === "percent" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                    >
+                      %
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDiscountType("amount")}
+                      className={`px-3 py-1.5 text-xs font-black transition-colors ${discountType === "amount" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                    >
+                      ₹
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max={discountType === "percent" ? 100 : total}
+                    step="1"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder={discountType === "percent" ? "e.g. 10" : "e.g. 50"}
+                    className="flex-1 h-9 px-3 rounded-xl bg-muted border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  />
+                  {discountAmount > 0 && (
+                    <span className="text-sm font-black text-green-600 dark:text-green-400 shrink-0 tabular-nums">
+                      −₹{discountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

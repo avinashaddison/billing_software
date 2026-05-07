@@ -1,4 +1,4 @@
-import { pgTable, uuid, numeric, integer, timestamp, varchar, serial } from "drizzle-orm/pg-core";
+import { pgTable, uuid, numeric, integer, timestamp, varchar, serial, text } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -9,6 +9,8 @@ export const billsTable = pgTable("bills", {
   itemsCount:    integer("items_count").notNull(),
   customerPhone: varchar("customer_phone", { length: 10 }),
   paymentMode:   varchar("payment_mode", { length: 10 }).notNull().default("cash"),
+  discount:      numeric("discount", { precision: 10, scale: 2 }),
+  discountType:  text("discount_type"),
   createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
