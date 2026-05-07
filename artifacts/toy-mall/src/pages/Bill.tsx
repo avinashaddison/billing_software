@@ -239,6 +239,11 @@ export default function Bill() {
     <>
       {/* ── Print CSS ── */}
       <style>{`
+        @page {
+          size: ${store.receiptPaperWidth ?? "80mm"} auto;
+          margin: 2mm;
+        }
+
         @media print {
           /* 1. Hide EVERYTHING on the page — including sidebar, bottom nav, app shell */
           body * { visibility: hidden !important; }
@@ -247,19 +252,19 @@ export default function Bill() {
           .receipt-print-only,
           .receipt-print-only * { visibility: visible !important; }
 
-          /* 3. Pin the receipt to the top-left so it fills the print page cleanly */
+          /* 3. Pin the receipt to top-left, constrained to the thermal roll width */
           .receipt-print-only {
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
-            width: 100% !important;
+            width: ${store.receiptPaperWidth ?? "80mm"} !important;
+            max-width: ${store.receiptPaperWidth ?? "80mm"} !important;
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
             box-shadow: none !important;
             border: none !important;
             border-radius: 0 !important;
-            max-width: 100% !important;
             z-index: 99999 !important;
           }
 

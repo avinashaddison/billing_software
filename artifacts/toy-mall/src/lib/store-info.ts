@@ -14,6 +14,7 @@ export interface StoreSettings {
   dynamicQrMode: boolean;
   labelShowPrice: boolean;
   scannerThresholdMs: number;
+  receiptPaperWidth: "58mm" | "80mm";
 }
 
 interface StoreSettingsStore extends StoreSettings {
@@ -35,6 +36,7 @@ export const useStoreSettings = create<StoreSettingsStore>()(
       dynamicQrMode: false,
       labelShowPrice: true,
       scannerThresholdMs: 100,
+      receiptPaperWidth: "80mm",
       update: (patch) => set(patch),
     }),
     { name: "toy-mall-store-settings-v1" }

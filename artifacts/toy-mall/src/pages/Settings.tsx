@@ -23,6 +23,7 @@ const DEFAULTS: StoreSettings = {
   dynamicQrMode:      false,
   labelShowPrice:     true,
   scannerThresholdMs: 100,
+  receiptPaperWidth:  "80mm",
 };
 
 const SCANNER_PRESETS = [
@@ -50,6 +51,7 @@ export default function SettingsPage() {
     dynamicQrMode:      store.dynamicQrMode,
     labelShowPrice:     store.labelShowPrice ?? true,
     scannerThresholdMs: store.scannerThresholdMs ?? 100,
+    receiptPaperWidth:  store.receiptPaperWidth ?? "80mm",
   });
   const [saved, setSaved] = useState(false);
   const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
@@ -104,6 +106,7 @@ export default function SettingsPage() {
     upiId: store.upiId, dynamicQrMode: store.dynamicQrMode,
     labelShowPrice: store.labelShowPrice ?? true,
     scannerThresholdMs: store.scannerThresholdMs ?? 100,
+    receiptPaperWidth: store.receiptPaperWidth ?? "80mm",
   });
 
   return (
@@ -259,7 +262,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* ── Label Printing ── */}
-        <Section icon={Tag} title="Label Printing" color="text-amber-600 bg-amber-50 dark:bg-amber-950/30">
+        <Section icon={Tag} title="Label &amp; Receipt Printing" color="text-amber-600 bg-amber-50 dark:bg-amber-950/30">
           <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
             <div>
               <p className="text-xs font-bold">Show Price on Labels</p>
@@ -277,6 +280,34 @@ export default function SettingsPage() {
                 ? <ToggleRight className="w-10 h-10" />
                 : <ToggleLeft  className="w-10 h-10" />}
             </button>
+          </div>
+
+          <div className="p-3 rounded-xl border bg-muted/20 space-y-2">
+            <div>
+              <p className="text-xs font-bold">Receipt Paper Width</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Match this to your thermal roll size. Affects the paper size when printing bills.
+              </p>
+            </div>
+            <div className="flex gap-2 pt-1">
+              {(["58mm", "80mm"] as const).map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, receiptPaperWidth: w }))}
+                  className={`flex-1 py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${
+                    form.receiptPaperWidth === w
+                      ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300"
+                      : "border-border hover:border-amber-400 hover:bg-muted"
+                  }`}
+                >
+                  {w}
+                  <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">
+                    {w === "58mm" ? "Compact roll" : "Standard roll"}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </Section>
 
