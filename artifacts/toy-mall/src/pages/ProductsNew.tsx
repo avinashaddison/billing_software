@@ -477,8 +477,19 @@ export default function CreateProduct() {
                       <p className="text-sm font-medium text-muted-foreground">Fill in a name and price<br/>to see a live preview</p>
                     </div>
                   ) : (
-                    /* Exact structure of ProductMobileCard */
-                    <div className="p-4 rounded-xl border bg-card flex items-center justify-between relative overflow-hidden">
+                    /* Mirrors ProductMobileCard from Products.tsx */
+                    <div className="rounded-xl border bg-card overflow-hidden">
+                      {/* Image / placeholder */}
+                      {watchedImageUrl ? (
+                        <div className="h-32 overflow-hidden bg-muted">
+                          <img src={watchedImageUrl} alt={previewName} className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="h-20 bg-gradient-to-br from-muted to-muted/40 flex items-center justify-center text-4xl">
+                          {catEmoji}
+                        </div>
+                      )}
+                    <div className="p-4 flex items-center justify-between relative overflow-hidden">
                       <div className={`absolute left-0 top-0 bottom-0 w-1 ${cs?.dot ?? "bg-muted"}`} />
                       <div className="flex-1 min-w-0 pr-4 pl-3">
                         <div className="flex items-center gap-2 mb-1">
@@ -505,6 +516,7 @@ export default function CreateProduct() {
                           <span className="text-[10px] text-muted-foreground">₹{previewMrp.toLocaleString("en-IN")}</span>
                         )}
                       </div>
+                    </div>
                     </div>
                   )}
                 </div>
