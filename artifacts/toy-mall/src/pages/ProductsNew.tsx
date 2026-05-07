@@ -104,6 +104,20 @@ export default function CreateProduct() {
   const selectedCategory  = form.watch("category");
   const customCategoryVal = form.watch("customCategory") ?? "";
   const currentName       = form.watch("name");
+  const watchedPrice         = form.watch("price");
+  const watchedSalePrice     = form.watch("salePrice");
+  const watchedPurchasePrice = form.watch("purchasePrice");
+
+  const liveMargin = (() => {
+    const cost    = watchedPurchasePrice && typeof watchedPurchasePrice === "number" ? watchedPurchasePrice : null;
+    const selling = watchedSalePrice    && typeof watchedSalePrice    === "number" ? watchedSalePrice
+                  : watchedPrice        && typeof watchedPrice        === "number" ? watchedPrice
+                  : null;
+    if (cost == null || selling == null || selling <= 0 || cost <= 0) return null;
+    const profit = selling - cost;
+    const pct    = (profit / selling) * 100;
+    return { cost, selling, profit, pct };
+  })();
 
   const isCustom  = selectedCategory === "__custom__";
   const activeCat = dbCategories.find((c) => c.name === selectedCategory) ?? null;
@@ -317,6 +331,36 @@ export default function CreateProduct() {
                   <FormMessage />
                 </FormItem>
               )} />
+
+              {/* ── Live margin preview ── */}
+              {liveMargin && (
+                <div className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 transition-all ${
+                  liveMargin.pct >= 30 ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800"
+                  : liveMargin.pct >= 15 ? "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"
+                  : "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800"
+                }`}>
+                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Live Margin</div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-[11px] text-muted-foreground">Profit per unit</p>
+                      <p className={`font-black text-sm ${
+                        liveMargin.pct >= 30 ? "text-green-700 dark:text-green-400"
+                        : liveMargin.pct >= 15 ? "text-amber-700 dark:text-amber-400"
+                        : "text-red-700 dark:text-red-400"
+                      }`}>
+                        {liveMargin.profit >= 0 ? "+" : ""}₹{liveMargin.profit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className={`text-2xl font-black px-3 py-1 rounded-xl ${
+                      liveMargin.pct >= 30 ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+                      : liveMargin.pct >= 15 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
+                    }`}>
+                      {liveMargin.pct.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <FormField control={form.control} name="salePriceUntil" render={({ field }) => (
                 <FormItem>
