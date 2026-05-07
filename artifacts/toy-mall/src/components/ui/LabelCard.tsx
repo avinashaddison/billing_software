@@ -91,12 +91,6 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
             } as React.CSSProperties}>
               {p.name}
             </div>
-            <div style={{
-              fontSize: "5pt", fontFamily: "monospace",
-              color: "#555", marginTop: "0.4mm", lineHeight: 1,
-            }}>
-              {p.sku}
-            </div>
           </div>
 
           {/* Price */}
@@ -119,7 +113,7 @@ export function LabelCard({ p, compact = false, printMode = false }: LabelCardPr
                     MRP ₹{mrp}
                   </div>
                   <div style={{
-                    fontSize: "8.5pt", fontWeight: 900, lineHeight: 1.1,
+                    fontSize: "10pt", fontWeight: 900, lineHeight: 1.1,
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   }}>
                     ₹{sale}
