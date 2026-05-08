@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startDailyReportScheduler } from "./lib/scheduler";
+import { bootstrapDefaultOwner } from "./lib/bootstrap";
 
 const rawPort = process.env["PORT"];
 
@@ -16,7 +17,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+app.listen(port, async (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
@@ -24,4 +25,8 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
   startDailyReportScheduler();
+
+  // First-run: if the DB has no staff yet, create a default Owner so the
+  // operator can log in. No-op on already-seeded databases.
+  await bootstrapDefaultOwner();
 });

@@ -94,6 +94,13 @@ function Show-DoneBanner($domain) {
   Write-Host "    Phone scanner :   " -ForegroundColor Gray -NoNewline
   Write-Host "https://$domain" -ForegroundColor Cyan
   Write-Host ""
+  Write-Host "    Default login (auto-created on first start):" -ForegroundColor DarkGray
+  Write-Host "       Name : " -ForegroundColor DarkGray -NoNewline
+  Write-Host "Owner    " -ForegroundColor White -NoNewline
+  Write-Host "PIN : " -ForegroundColor DarkGray -NoNewline
+  Write-Host "1234" -ForegroundColor White
+  Write-Host "    >> Change the PIN immediately from Staff Management <<" -ForegroundColor Yellow
+  Write-Host ""
   Write-Host "    Auto-starts on every Windows boot. No further setup needed." -ForegroundColor DarkGray
   Write-Host ""
   Write-Host "                  -- powered by " -ForegroundColor DarkGray -NoNewline
