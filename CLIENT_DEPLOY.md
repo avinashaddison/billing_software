@@ -165,6 +165,44 @@ Get-NetTCPConnection -LocalPort 3000 -State Listen | ForEach-Object { Stop-Proce
 
 ## Updating the software later
 
+The app intentionally **does not auto-update on boot** — a bad push at 2am can't break the shop on Monday morning. Updates are always deliberate.
+
+There are two supported workflows:
+
+### Workflow A — Developer drives via AnyDesk (preferred)
+
+Set up once, then every future update is fully under your control without bothering the cashier.
+
+**One-time setup on the client PC:**
+1. Download AnyDesk from https://anydesk.com/download → install
+2. Open AnyDesk on the client PC → note the **9-digit AnyDesk address** (top-left)
+3. Click **"Set password for unattended access"** → set a strong password (save it in your password manager)
+4. Tell AnyDesk to start with Windows: Settings → General → "Start AnyDesk with Windows" ✓
+
+**On your dev PC:** install AnyDesk too, save her PC's address as a favourite.
+
+**Each time you ship an update:**
+1. `git push` from your dev PC
+2. Open AnyDesk → connect to her PC → enter the unattended password
+3. On her PC's screen, double-click `C:\HiraBilling\update.bat`
+4. Wait ~2 min for it to finish
+5. Close any open `Billing Server` / `Billing Tunnel` windows
+6. Double-click `start.bat`
+7. Open `http://localhost:3000` and click around to verify (esp. checkout flow)
+8. Disconnect from AnyDesk
+
+She doesn't need to be at the PC, doesn't need to do anything, doesn't even know an update happened.
+
+### Workflow B — Phone the cashier
+
+If you can't get on AnyDesk, call her:
+
+> "Double-click `update.bat` on the desktop. When it finishes and says 'UPDATE DONE', close any black windows on the screen and double-click `start.bat`."
+
+Total: ~2 min, one click on her end.
+
+### Manual fallback (terminal)
+
 ```powershell
 cd C:\HiraBilling
 git pull
@@ -172,4 +210,16 @@ pnpm install
 pnpm run build:prod
 ```
 
-Then restart `start.bat`.
+Then close & reopen `start.bat`.
+
+---
+
+## Why no auto-update?
+
+Earlier versions of `start.bat` did `git pull` on every boot. We removed it because:
+
+- A buggy push at 2am could break the cashier's first sale of the morning
+- Updates should be **verified by the developer** before going live (AnyDesk lets you click around on her PC after the rebuild)
+- Slow startup on update days (~1 min vs ~5 sec) is annoying when she just wants to bill
+
+If you want to re-enable auto-update for a specific PC anyway, edit `start.bat` and add `git pull && pnpm install && pnpm run build:prod` before the launch lines. Recommended only after the app has been stable for several weeks with no broken pushes.
