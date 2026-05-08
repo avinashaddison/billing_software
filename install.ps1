@@ -14,13 +14,93 @@ $ErrorActionPreference = "Stop"
 $REPO_URL    = "https://github.com/avinashaddison/billing_software.git"
 $INSTALL_DIR = "C:\HiraBilling"
 
+# Make sure the box-drawing + block characters render correctly
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
+
 function Write-Step($msg) {
   Write-Host ""
-  Write-Host "==> $msg" -ForegroundColor Cyan
+  Write-Host "  [>] " -ForegroundColor Green -NoNewline
+  Write-Host $msg -ForegroundColor White
 }
-function Write-Ok($msg)   { Write-Host "  [OK] $msg" -ForegroundColor Green }
-function Write-Warn2($msg) { Write-Host "  [!]  $msg" -ForegroundColor Yellow }
-function Write-Err($msg)  { Write-Host "  [X]  $msg" -ForegroundColor Red }
+function Write-Ok($msg)    { Write-Host "      [OK] " -ForegroundColor Green -NoNewline; Write-Host $msg -ForegroundColor Gray }
+function Write-Warn2($msg) { Write-Host "      [!]  " -ForegroundColor Yellow -NoNewline; Write-Host $msg -ForegroundColor Yellow }
+function Write-Err($msg)   { Write-Host "      [X]  " -ForegroundColor Red -NoNewline; Write-Host $msg -ForegroundColor Red }
+
+function Write-Hack($msg, $color = "Green") {
+  Write-Host "  [*] " -ForegroundColor DarkGreen -NoNewline
+  Write-Host $msg -ForegroundColor $color
+}
+
+function Show-Banner {
+  Clear-Host
+  Write-Host ""
+  $logo = @(
+    "      ___       ___    ___    ___  ____    ___    _ __    __  __ ",
+    "     /   \    |   \  |   \  |_ _| / ___|  / _ \  | '_ \   \ \/ / ",
+    "    / ___ \   | |) | | |) |  | |  \___ \ | | | | | | | |   >  <  ",
+    "   /_/   \_\  |___/  |___/  |___|  ___) ||_| |_| |_| |_|  /_/\_\ ",
+    "                                  |____/                          "
+  )
+  foreach ($line in $logo) {
+    Write-Host $line -ForegroundColor Green
+    Start-Sleep -Milliseconds 30
+  }
+  Write-Host ""
+  Write-Host "        S  O  F  T  W  A  R  E " -ForegroundColor DarkGreen -NoNewline
+  Write-Host "  +  " -ForegroundColor DarkGray -NoNewline
+  Write-Host "Billing System v1.0" -ForegroundColor Cyan
+  Write-Host ""
+  Write-Host "  ================================================================" -ForegroundColor DarkGreen
+  Write-Host ""
+
+  # Boot-style scanlines
+  $boot = @(
+    "Initializing AddisonX installer...",
+    "Establishing secure channel..............[ ENCRYPTED ]",
+    "Verifying system integrity...............[   PASS    ]",
+    "Loading deployment manifest..............[  LOADED   ]",
+    "Authenticating package mirrors...........[ TRUSTED   ]",
+    "All systems nominal. Beginning install..."
+  )
+  foreach ($line in $boot) {
+    Write-Hack $line
+    Start-Sleep -Milliseconds 220
+  }
+  Start-Sleep -Milliseconds 400
+  Write-Host ""
+}
+
+function Show-DoneBanner($domain) {
+  Write-Host ""
+  Write-Host ""
+  $done = @(
+    "   ____    ___    _   _   _____ ",
+    "  |  _ \  / _ \  | \ | | | ____|",
+    "  | | | || | | | |  \| | |  _|  ",
+    "  | |_| || |_| | | |\  | | |___ ",
+    "  |____/  \___/  |_| \_| |_____|"
+  )
+  foreach ($line in $done) {
+    Write-Host $line -ForegroundColor Green
+    Start-Sleep -Milliseconds 40
+  }
+  Write-Host ""
+  Write-Host "  ================================================================" -ForegroundColor DarkGreen
+  Write-Host "             SOFTWARE INSTALL COMPLETE" -ForegroundColor Green
+  Write-Host "  ================================================================" -ForegroundColor DarkGreen
+  Write-Host ""
+  Write-Host "    Cashier PC URL :  " -ForegroundColor Gray -NoNewline
+  Write-Host "http://localhost:3000" -ForegroundColor Cyan
+  Write-Host "    Phone scanner :   " -ForegroundColor Gray -NoNewline
+  Write-Host "https://$domain" -ForegroundColor Cyan
+  Write-Host ""
+  Write-Host "    Auto-starts on every Windows boot. No further setup needed." -ForegroundColor DarkGray
+  Write-Host ""
+  Write-Host "                  -- powered by " -ForegroundColor DarkGray -NoNewline
+  Write-Host "AddisonX Software" -ForegroundColor Green -NoNewline
+  Write-Host " --" -ForegroundColor DarkGray
+  Write-Host ""
+}
 
 function Ensure-Winget {
   if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
@@ -50,17 +130,9 @@ function Refresh-Path {
 }
 
 # -----------------------------------------------------------------------------
-# 0. Banner
+# 0. Banner + boot sequence
 # -----------------------------------------------------------------------------
-Clear-Host
-Write-Host @"
-
-  +------------------------------------------------------------+
-  |     Hira & Sons Billing - Client PC Installer              |
-  |     This will set up everything on this PC.                |
-  +------------------------------------------------------------+
-
-"@ -ForegroundColor Magenta
+Show-Banner
 
 # -----------------------------------------------------------------------------
 # 1. Prerequisites
@@ -220,31 +292,14 @@ $lnk.Save()
 Write-Ok "Shortcut created in $startupDir"
 
 # -----------------------------------------------------------------------------
-# 7. Done
+# 7. Done — show the styled finish banner
 # -----------------------------------------------------------------------------
-Write-Host ""
-Write-Host @"
+Show-DoneBanner $dom
 
-  +------------------------------------------------------------+
-  |     SETUP COMPLETE                                         |
-  +------------------------------------------------------------+
-
-    Local cashier URL:  http://localhost:3000
-    Phone scanner URL:  https://$dom
-
-  The app will auto-start the next time Windows boots.
-
-  Want to launch it right now?
-
-"@ -ForegroundColor Green
-
-$go = Read-Host "  Launch now? (y/n)"
+$go = Read-Host "    Launch the app now? (y/n)"
 if ($go -eq "y" -or $go -eq "Y") {
   Start-Process -FilePath "$INSTALL_DIR\start.bat" -WorkingDirectory $INSTALL_DIR
   Write-Host ""
-  Write-Ok "Launched. Two new windows should open shortly."
+  Write-Hack "Launched. Two new windows should open shortly." "Cyan"
   Write-Host ""
 }
-
-Write-Host "Bookmark on phone:  https://$dom" -ForegroundColor Cyan
-Write-Host ""
