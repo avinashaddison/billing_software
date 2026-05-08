@@ -32,11 +32,23 @@ if defined NGROK_DOMAIN (
   start "Billing Tunnel" cmd /k ngrok http %PORT%
 )
 
-REM ── Wait for server to be ready, then open the app in default browser ──────
+REM ── Wait for server to be ready, then open in Chrome ──────────────────────
 echo.
-echo Waiting for server to come up, then opening browser...
+echo Waiting for server to come up, then opening Chrome...
 timeout /t 5 /nobreak >nul
-start "" "http://localhost:%PORT%"
+
+REM Try Chrome first; fall back to default browser if Chrome isn't installed
+set "CHROME_EXE="
+if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe"        set "CHROME_EXE=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"   set "CHROME_EXE=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe"        set "CHROME_EXE=%LocalAppData%\Google\Chrome\Application\chrome.exe"
+
+if defined CHROME_EXE (
+  start "" "%CHROME_EXE%" --new-window "http://localhost:%PORT%"
+) else (
+  echo Chrome not found. Opening in default browser instead.
+  start "" "http://localhost:%PORT%"
+)
 
 echo.
 echo App opened in browser.

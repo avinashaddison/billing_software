@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 import { CartProvider } from "@/contexts/cart-context";
 import { useRealtime }         from "@/hooks/use-realtime";
 import { useInactivityLogout } from "@/hooks/use-inactivity";
@@ -113,6 +114,7 @@ function App() {
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <RealtimeProvider>
               <Router />
+              <PwaInstallPrompt />
             </RealtimeProvider>
           </WouterRouter>
         </CartProvider>
