@@ -2,10 +2,10 @@ import { useState, useRef, memo, useCallback } from "react";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { Link, useSearch, useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
-import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2, ScanLine } from "lucide-react";
+import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2, ScanLine, Truck } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { getCategoryStyle, getCategoryEmoji } from "@/lib/category-colors";
@@ -241,19 +241,32 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
 
 /* ── Memoized product rows ── */
 interface ProductRowProps {
-  product: { id: string; name: string; sku: string; category: string; price: number; salePrice?: number | null; salePriceUntil?: string | null; stock: number; lowStockThreshold: number; imageUrl?: string | null };
+  product: { id: string; name: string; sku: string; category: string; price: number; salePrice?: number | null; salePriceUntil?: string | null; stock: number; lowStockThreshold: number; imageUrl?: string | null; supplierId?: string | null };
+  supplierName?: string | null;
   isAdmin?: boolean;
   onDelete?: (product: { id: string; name: string; sku: string }) => void;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
-const ProductMobileCard = memo(function ProductMobileCard({ product, isAdmin, onDelete }: ProductRowProps) {
+const ProductMobileCard = memo(function ProductMobileCard({ product, supplierName, isAdmin, onDelete, selected, onToggleSelect }: ProductRowProps) {
   const cs = getCategoryStyle(product.category);
   const emoji = getCategoryEmoji(product.category);
   const isLow = product.stock <= product.lowStockThreshold;
   return (
     <Link href={`/product?sku=${product.sku}`} className="block">
-      <div className="p-4 rounded-xl border bg-card hover:bg-muted/30 active:scale-[0.98] transition-all flex items-center justify-between relative overflow-hidden" data-testid={`card-product-${product.id}`}>
+      <div className={`p-4 rounded-xl border bg-card hover:bg-muted/30 active:scale-[0.98] transition-all flex items-center justify-between relative overflow-hidden ${selected ? "ring-2 ring-primary" : ""}`} data-testid={`card-product-${product.id}`}>
         <div className={`absolute left-0 top-0 bottom-0 w-1 ${cs.dot}`} />
+        {isAdmin && onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={() => onToggleSelect(product.id)}
+            onClick={(e) => { e.stopPropagation(); }}
+            className="ml-2 mr-1 w-4 h-4 rounded border-muted-foreground/40 text-primary focus:ring-primary cursor-pointer shrink-0"
+            aria-label="Select product"
+          />
+        )}
         <div className="flex-1 min-w-0 pr-4 pl-3">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-base">{emoji}</span>
@@ -263,6 +276,12 @@ const ProductMobileCard = memo(function ProductMobileCard({ product, isAdmin, on
             <span className="font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md text-xs">{product.sku}</span>
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cs.badge}`}>{product.category}</span>
           </div>
+          {supplierName && (
+            <div className="flex items-center gap-1 mt-1.5 text-[11px] text-muted-foreground">
+              <Truck className="w-3 h-3 shrink-0" />
+              <span className="truncate">by <span className="font-semibold text-foreground/80">{supplierName}</span></span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="flex flex-col items-end">
@@ -300,12 +319,22 @@ const ProductMobileCard = memo(function ProductMobileCard({ product, isAdmin, on
   );
 });
 
-const ProductDesktopRow = memo(function ProductDesktopRow({ product, isAdmin, onDelete }: ProductRowProps) {
+const ProductDesktopRow = memo(function ProductDesktopRow({ product, supplierName, isAdmin, onDelete, selected, onToggleSelect }: ProductRowProps) {
   const cs = getCategoryStyle(product.category);
   const emoji = getCategoryEmoji(product.category);
   const isLow = product.stock <= product.lowStockThreshold;
   return (
-    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-6 py-3.5 hover:bg-muted/40 transition-colors items-center border-b last:border-0" data-testid={`card-product-${product.id}`}>
+    <div className={`grid ${isAdmin ? "grid-cols-[auto_1fr_auto_auto_auto_auto_auto]" : "grid-cols-[1fr_auto_auto_auto_auto_auto]"} gap-4 px-6 py-3.5 hover:bg-muted/40 transition-colors items-center border-b last:border-0 ${selected ? "bg-primary/5" : ""}`} data-testid={`card-product-${product.id}`}>
+      {isAdmin && onToggleSelect && (
+        <input
+          type="checkbox"
+          checked={!!selected}
+          onChange={() => onToggleSelect(product.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-muted-foreground/40 text-primary focus:ring-primary cursor-pointer"
+          aria-label="Select product"
+        />
+      )}
       <Link href={`/product?sku=${product.sku}`} className="contents">
         <div className="min-w-0">
           <div className="flex items-center gap-3">
@@ -320,6 +349,16 @@ const ProductDesktopRow = memo(function ProductDesktopRow({ product, isAdmin, on
         </div>
         <div className="w-32 text-center">
           <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${cs.badge}`}>{product.category}</span>
+        </div>
+        <div className="w-36 text-left min-w-0">
+          {supplierName ? (
+            <span className="inline-flex items-center gap-1.5 max-w-full text-xs font-semibold text-foreground/80 bg-muted/60 px-2 py-1 rounded-md">
+              <Truck className="w-3 h-3 text-primary shrink-0" />
+              <span className="truncate">{supplierName}</span>
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground/50 italic">—</span>
+          )}
         </div>
         <div className="w-24 text-right">
           {product.salePrice != null ? (
@@ -364,6 +403,37 @@ export default function Products() {
   const [showImport, setShowImport] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; sku: string } | null>(null);
   const [deleting, setDeleting]     = useState(false);
+  const [selected, setSelected]     = useState<Set<string>>(new Set());
+  const [bulkAssigning, setBulkAssigning] = useState(false);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const bulkAssignSupplier = async (supplierId: string | null) => {
+    if (selected.size === 0) return;
+    setBulkAssigning(true);
+    try {
+      const r = await fetch(`${BASE_URL}/api/products/bulk-assign-supplier`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productIds: Array.from(selected), supplierId }),
+      });
+      if (!r.ok) throw new Error("Bulk assign failed");
+      const out = await r.json();
+      qc.invalidateQueries({ queryKey: getListProductsQueryKey() });
+      toast.success(`${out.updated} product${out.updated === 1 ? "" : "s"} updated`);
+      setSelected(new Set());
+    } catch {
+      toast.error("Failed to update products");
+    } finally {
+      setBulkAssigning(false);
+    }
+  };
   const debouncedSearch             = useDebounce(search, 300);
   const { role }                    = useAuth();
   const isAdmin                     = role === "owner";
@@ -409,6 +479,17 @@ export default function Products() {
     { search: debouncedSearch || undefined },
     { query: { queryKey: getListProductsQueryKey({ search: debouncedSearch || undefined }) } }
   );
+
+  const { data: suppliers = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ["suppliers"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE_URL}/api/suppliers`);
+      if (!r.ok) return [];
+      return r.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const supplierMap = new Map(suppliers.map((s) => [s.id, s.name]));
 
   const products = filterLowStock
     ? allProducts?.filter((p) => p.stock <= p.lowStockThreshold)
@@ -489,10 +570,62 @@ export default function Products() {
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {isAdmin && selected.size > 0 && (
+        <div className="sticky top-[88px] md:top-[112px] z-10 bg-primary/10 border-b border-primary/20 px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-bold text-primary">
+            {selected.size} selected
+          </span>
+          <span className="text-xs text-muted-foreground">·</span>
+          <span className="text-xs text-muted-foreground">Set supplier:</span>
+          <select
+            disabled={bulkAssigning}
+            defaultValue=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              bulkAssignSupplier(v === "__none__" ? null : v);
+              e.currentTarget.value = "";
+            }}
+            className="text-xs font-semibold bg-background border border-border rounded-lg px-2 py-1.5 hover:bg-muted disabled:opacity-50"
+          >
+            <option value="">Choose…</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+            <option value="__none__">— Clear supplier —</option>
+          </select>
+          {bulkAssigning && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />}
+          <button
+            onClick={() => setSelected(new Set())}
+            className="ml-auto text-xs font-bold text-muted-foreground hover:text-foreground flex items-center gap-1"
+          >
+            <X className="w-3 h-3" /> Clear
+          </button>
+        </div>
+      )}
+
       {/* Desktop table header */}
-      <div className="hidden md:grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-6 py-2 border-b text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30">
+      <div className={`hidden md:grid ${isAdmin ? "grid-cols-[auto_1fr_auto_auto_auto_auto_auto]" : "grid-cols-[1fr_auto_auto_auto_auto_auto]"} gap-4 px-6 py-2 border-b text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30`}>
+        {isAdmin && (
+          <input
+            type="checkbox"
+            checked={products && products.length > 0 && selected.size === products.length}
+            ref={(el) => {
+              if (el && products) el.indeterminate = selected.size > 0 && selected.size < products.length;
+            }}
+            onChange={() => {
+              if (!products) return;
+              if (selected.size === products.length) setSelected(new Set());
+              else setSelected(new Set(products.map((p) => p.id)));
+            }}
+            className="w-4 h-4 rounded border-muted-foreground/40 text-primary focus:ring-primary cursor-pointer"
+            aria-label="Select all"
+          />
+        )}
         <span>Product</span>
         <span className="w-32 text-center">Category</span>
+        <span className="w-36 text-left">Supplier</span>
         <span className="w-24 text-right">Price</span>
         <span className="w-20 text-right">Stock</span>
         <span className="w-10"></span>
@@ -515,26 +648,38 @@ export default function Products() {
           <>
             {/* Mobile: card list */}
             <div className="p-4 space-y-3 md:hidden">
-              {products?.map((product) => (
-                <ProductMobileCard
-                  key={product.id}
-                  product={product}
-                  isAdmin={isAdmin}
-                  onDelete={setPendingDelete}
-                />
-              ))}
+              {products?.map((product) => {
+                const sid = "supplierId" in product ? (product.supplierId as string | null | undefined) : null;
+                return (
+                  <ProductMobileCard
+                    key={product.id}
+                    product={product}
+                    supplierName={sid ? supplierMap.get(sid) ?? null : null}
+                    isAdmin={isAdmin}
+                    onDelete={setPendingDelete}
+                    selected={selected.has(product.id)}
+                    onToggleSelect={toggleSelect}
+                  />
+                );
+              })}
             </div>
 
             {/* Desktop: table rows */}
             <div className="hidden md:block">
-              {products?.map((product) => (
-                <ProductDesktopRow
-                  key={product.id}
-                  product={product}
-                  isAdmin={isAdmin}
-                  onDelete={setPendingDelete}
-                />
-              ))}
+              {products?.map((product) => {
+                const sid = "supplierId" in product ? (product.supplierId as string | null | undefined) : null;
+                return (
+                  <ProductDesktopRow
+                    key={product.id}
+                    product={product}
+                    supplierName={sid ? supplierMap.get(sid) ?? null : null}
+                    isAdmin={isAdmin}
+                    onDelete={setPendingDelete}
+                    selected={selected.has(product.id)}
+                    onToggleSelect={toggleSelect}
+                  />
+                );
+              })}
             </div>
           </>
         )}

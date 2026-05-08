@@ -47,3 +47,11 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local secrets
+.env
+.env.local
+.env.*.local
+
+# Claude Code harness state
+.claude/

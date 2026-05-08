@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useCreateProduct, getListProductsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Tag, PenLine, FolderOpen, Eye, TrendingUp, AlertTriangle, Truck } from "lucide-react";
+import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Tag, PenLine, FolderOpen, Eye, TrendingUp, AlertTriangle, Truck, Check, ChevronsUpDown } from "lucide-react";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,17 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { cn } from "@/lib/utils";
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
 import { LabelCard, type LabelProduct } from "@/components/ui/LabelCard";
 import { getCategoryStyle, getCategoryEmoji } from "@/lib/category-colors";
 
@@ -117,6 +122,7 @@ export default function CreateProduct() {
 
   const [autoSku, setAutoSku]         = useState<string>("");
   const [skuLoading, setSkuLoading]   = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<FormValues>({
@@ -243,47 +249,107 @@ export default function CreateProduct() {
                     <h2>Basic Info</h2>
                   </div>
 
-                  {/* Category dropdown */}
-                  <FormField control={form.control} name="category" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="font-bold text-muted-foreground">
-                        <Tag className="w-3.5 h-3.5 inline mr-1.5" />Category
-                      </FormLabel>
-                      <Select onValueChange={(v) => { field.onChange(v); form.setValue("customCategory", ""); }} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="h-14 text-base rounded-xl">
-                            <SelectValue placeholder={catsLoading ? "Loading categories…" : dbCategories.length === 0 ? "No categories yet — create one first" : "Select a category…"} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="max-h-72">
-                          {dbCategories.length === 0 && !catsLoading && (
-                            <div className="px-4 py-3 text-sm text-muted-foreground text-center">
-                              No categories found. Go to <span className="font-bold">Categories</span> to add some.
-                            </div>
-                          )}
-                          {dbCategories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.name}>
-                              <span className="mr-2">{cat.emoji}</span>
-                              <span className="font-semibold">{cat.name}</span>
-                              <span className="ml-2 font-mono text-xs text-muted-foreground">({cat.skuCode})</span>
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="__custom__">
-                            <span className="mr-2">🎁</span>
-                            <span className="font-semibold">Other / Custom</span>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                      {dbCategories.length === 0 && !catsLoading && (
-                        <p className="text-xs text-amber-600 font-medium flex items-center gap-1 mt-1">
-                          <FolderOpen className="w-3.5 h-3.5" />
-                          No categories in database.{" "}
-                          <Link href="/categories" className="underline font-bold">Add categories here</Link> first, or use "Other / Custom" below.
-                        </p>
-                      )}
-                    </FormItem>
-                  )} />
+                  {/* Category combobox (searchable) */}
+                  <FormField control={form.control} name="category" render={({ field }) => {
+                    const selectedCat = dbCategories.find((c) => c.name === field.value);
+                    const isCustomSelected = field.value === "__custom__";
+                    return (
+                      <FormItem className="flex flex-col">
+                        <FormLabel className="font-bold text-muted-foreground">
+                          <Tag className="w-3.5 h-3.5 inline mr-1.5" />Category
+                        </FormLabel>
+                        <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={categoryOpen}
+                                className={cn(
+                                  "h-14 text-base rounded-xl justify-between font-normal w-full",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                <span className="flex items-center gap-2 truncate">
+                                  {selectedCat ? (
+                                    <>
+                                      <span>{selectedCat.emoji}</span>
+                                      <span className="font-semibold">{selectedCat.name}</span>
+                                      <span className="font-mono text-xs text-muted-foreground">({selectedCat.skuCode})</span>
+                                    </>
+                                  ) : isCustomSelected ? (
+                                    <><span>🎁</span><span className="font-semibold">Other / Custom</span></>
+                                  ) : (
+                                    catsLoading
+                                      ? "Loading categories…"
+                                      : dbCategories.length === 0
+                                        ? "No categories yet — create one first"
+                                        : "Select a category…"
+                                  )}
+                                </span>
+                                <ChevronsUpDown className="w-4 h-4 opacity-50 shrink-0" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                            <Command
+                              filter={(value, search) => {
+                                if (!search) return 1;
+                                const v = value.toLowerCase();
+                                const s = search.toLowerCase();
+                                if (v.startsWith(s)) return 2;
+                                if (v.includes(s))   return 1;
+                                return 0;
+                              }}
+                            >
+                              <CommandInput placeholder="Search category…" autoFocus />
+                              <CommandList className="max-h-72">
+                                <CommandEmpty>No category found.</CommandEmpty>
+                                <CommandGroup>
+                                  {dbCategories.map((cat) => (
+                                    <CommandItem
+                                      key={cat.id}
+                                      value={`${cat.name} ${cat.skuCode}`}
+                                      onSelect={() => {
+                                        field.onChange(cat.name);
+                                        form.setValue("customCategory", "");
+                                        setCategoryOpen(false);
+                                      }}
+                                    >
+                                      <span className="mr-2">{cat.emoji}</span>
+                                      <span className="font-semibold flex-1">{cat.name}</span>
+                                      <span className="ml-2 font-mono text-xs text-muted-foreground">({cat.skuCode})</span>
+                                      <Check className={cn("ml-2 w-4 h-4", field.value === cat.name ? "opacity-100" : "opacity-0")} />
+                                    </CommandItem>
+                                  ))}
+                                  <CommandItem
+                                    value="Other Custom"
+                                    onSelect={() => {
+                                      field.onChange("__custom__");
+                                      setCategoryOpen(false);
+                                    }}
+                                  >
+                                    <span className="mr-2">🎁</span>
+                                    <span className="font-semibold flex-1">Other / Custom</span>
+                                    <Check className={cn("ml-2 w-4 h-4", isCustomSelected ? "opacity-100" : "opacity-0")} />
+                                  </CommandItem>
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                        {dbCategories.length === 0 && !catsLoading && (
+                          <p className="text-xs text-amber-600 font-medium flex items-center gap-1 mt-1">
+                            <FolderOpen className="w-3.5 h-3.5" />
+                            No categories in database.{" "}
+                            <Link href="/categories" className="underline font-bold">Add categories here</Link> first, or use "Other / Custom" below.
+                          </p>
+                        )}
+                      </FormItem>
+                    );
+                  }} />
 
                   {/* Custom category input */}
                   {isCustom && (

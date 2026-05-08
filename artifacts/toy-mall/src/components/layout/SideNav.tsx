@@ -46,14 +46,35 @@ export function SideNav() {
 
   return (
     <aside className="hidden md:flex flex-col w-56 min-h-screen bg-background border-r border-border shrink-0 sticky top-0 h-screen">
-      <div className="px-4 py-4 border-b border-border">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-sm shadow-primary/30">
-            <span className="text-base leading-none">{store.logoEmoji}</span>
+      <div className="relative px-4 py-3.5 border-b border-border overflow-hidden">
+        {/* Soft accent line at top */}
+        <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-violet-500/40 to-transparent" />
+
+        <div className="relative flex items-center gap-3 group">
+          {/* Logo */}
+          <div className="relative shrink-0">
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-violet-500 via-blue-500 to-cyan-400 opacity-30 blur-lg transition-opacity duration-500 group-hover:opacity-50" />
+            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-blue-500 to-cyan-400 flex items-center justify-center shadow-md shadow-blue-500/25 ring-1 ring-white/25">
+              <span className="text-lg leading-none transition-transform duration-300 group-hover:scale-110">
+                {store.logoEmoji}
+              </span>
+              <span className="pointer-events-none absolute inset-x-1 top-0.5 h-1/3 rounded-t-lg bg-gradient-to-b from-white/30 to-transparent" />
+            </div>
           </div>
-          <div className="min-w-0">
-            <h1 className="text-[13px] font-black tracking-tight text-foreground leading-tight whitespace-nowrap">{store.name}</h1>
-            <p className="text-[10px] text-muted-foreground font-medium mt-px">{store.appSubtitle}</p>
+
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[12.5px] font-black tracking-tight leading-[1.15] text-foreground">
+              {store.name}
+            </h1>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              </span>
+              <p className="text-[9px] text-muted-foreground font-bold tracking-[0.1em] uppercase truncate">
+                {store.appSubtitle}
+              </p>
+            </div>
           </div>
         </div>
       </div>

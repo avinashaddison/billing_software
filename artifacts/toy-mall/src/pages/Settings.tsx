@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus } from "lucide-react";
 import { useStoreSettings, usePerStaffScannerPrefs, type StoreSettings } from "@/lib/store-info";
+import { ImageUploader } from "@/components/ui/ImageUploader";
 import { useAuth } from "@/hooks/use-auth";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import { useScanDebugLog, clearScanEvents } from "@/lib/scan-debug-log";
@@ -17,6 +18,7 @@ const DEFAULTS: StoreSettings = {
   address:            "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
   gst:                "",
   logoEmoji:          "🧸",
+  logoUrl:            "",
   appSubtitle:        "Billing Management",
   footerNote:         "Goods once sold will not be returned or exchanged.",
   upiId:              "",
@@ -45,6 +47,7 @@ export default function SettingsPage() {
     address:            store.address,
     gst:                store.gst,
     logoEmoji:          store.logoEmoji,
+    logoUrl:            store.logoUrl ?? "",
     appSubtitle:        store.appSubtitle,
     footerNote:         store.footerNote,
     upiId:              store.upiId,
@@ -102,6 +105,7 @@ export default function SettingsPage() {
   const isDirty = JSON.stringify(form) !== JSON.stringify({
     name: store.name, tagline: store.tagline, phone: store.phone,
     address: store.address, gst: store.gst, logoEmoji: store.logoEmoji,
+    logoUrl: store.logoUrl ?? "",
     appSubtitle: store.appSubtitle, footerNote: store.footerNote,
     upiId: store.upiId, dynamicQrMode: store.dynamicQrMode,
     labelShowPrice: store.labelShowPrice ?? true,
@@ -176,9 +180,30 @@ export default function SettingsPage() {
           </Field>
         </Section>
 
-        {/* ── Logo Emoji ── */}
-        <Section icon={Smile} title="Logo Icon" color="text-amber-600 bg-amber-50 dark:bg-amber-950/30">
-          <Field label="Pick an emoji for your logo" hint="Shown in the sidebar, login screen and bill footer">
+        {/* ── Logo Image ── */}
+        <Section icon={ImagePlus} title="Logo Image" color="text-violet-600 bg-violet-50 dark:bg-violet-950/30">
+          <Field label="Upload your shop logo" hint="Used on the printed bill header. Square or rectangular PNG / JPG works best (transparent PNG = cleanest receipt look).">
+            <ImageUploader
+              value={form.logoUrl}
+              onChange={(url) => set("logoUrl", url)}
+              onClear={() => set("logoUrl", "")}
+              label="Shop Logo"
+            />
+            {form.logoUrl && (
+              <div className="mt-3 p-3 rounded-xl border bg-white dark:bg-neutral-900 flex items-center justify-center">
+                <img src={form.logoUrl} alt="Logo preview" className="max-h-20 object-contain"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Tip: leave empty to use a clean text-only header. Only one of logo image or emoji shows on the receipt.
+            </p>
+          </Field>
+        </Section>
+
+        {/* ── Logo Emoji (fallback) ── */}
+        <Section icon={Smile} title="Logo Emoji (fallback)" color="text-amber-600 bg-amber-50 dark:bg-amber-950/30">
+          <Field label="Pick an emoji for your logo" hint="Used in the sidebar and login screen when no logo image is uploaded.">
             <div className="flex flex-wrap gap-2 mb-3">
               {EMOJI_OPTIONS.map((e) => (
                 <button key={e} onClick={() => set("logoEmoji", e)}

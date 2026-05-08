@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useSearch, useLocation, Link } from "wouter";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import { useScanFlash, ScanFlash } from "@/components/ui/ScanFlash";
@@ -25,6 +26,7 @@ import { toast } from "sonner";
 import { playTick, playStockIn, playStockOut, playError } from "@/lib/sounds";
 import { getCategoryStyle, getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 import { useStoreSettings } from "@/lib/store-info";
+import { MM_TO_PX, loadLabelSize } from "@/lib/label-size";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -49,6 +51,7 @@ export default function ProductDetail() {
   const [editForm, setEditForm]         = useState({ name: "", price: "", salePrice: "", salePriceUntil: "", purchasePrice: "", category: "", lowStockThreshold: "", supplierId: "" });
   const [printing, setPrinting]             = useState(false);
   const [printCopies, setPrintCopies]       = useState(1);
+  const [labelSize]                          = useState(loadLabelSize);
 
   /* Load suppliers for the edit panel */
   const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<ApiSupplier[]>({
@@ -258,37 +261,59 @@ export default function ProductDetail() {
       {/* ── Scan confirmation flash ── */}
       <ScanFlash flash={flash} />
 
-      {/* ── Print CSS ── */}
+      {/* ── Print CSS — same strategy as Labels page (portal + display:none) ── */}
       <style>{`
+        @page { size: ${labelSize.w}mm ${labelSize.h}mm; margin: 1mm 0 0 0; }
         @media print {
-          body * { visibility: hidden !important; }
-          .product-print-area, .product-print-area * { visibility: visible !important; }
+          html, body { height: auto !important; overflow: visible !important; }
+          body > *:not(.product-print-area) { display: none !important; }
           .product-print-area {
-            position: fixed !important; top: 0 !important; left: 0 !important;
-            width: 100% !important; margin: 0 !important; padding: 16px !important;
-            background: white !important;
-            display: grid !important;
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 10px !important;
+            display: block !important;
+            position: static !important; top: auto !important; left: auto !important;
+            width: 100% !important; height: auto !important;
+            overflow: visible !important; visibility: visible !important;
+            margin: 0 !important; padding: 0 !important; background: white !important;
+          }
+          .product-print-area .label-page {
+            display: block !important;
+            width: ${labelSize.w}mm !important; height: ${labelSize.h - 1}mm !important;
+            page-break-after: always !important; break-after: page !important;
+            overflow: hidden !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+          .product-print-area .label-page:last-child {
+            page-break-after: avoid !important; break-after: avoid !important;
           }
         }
       `}</style>
 
-      {/* ── Hidden print area — N copies of LabelCard in a 3-column grid ── */}
-      {printing && product && (
-        <div className="product-print-area hidden print:grid">
+      {/* ── Print portal — mounted at body level so the rest of the app can be display:none-ed ── */}
+      {printing && product && createPortal(
+        <div className="product-print-area" style={{
+          position: "fixed", top: "-200vh", left: 0, width: `${labelSize.w}mm`,
+          background: "white",
+        }}>
           {Array.from({ length: printCopies }).map((_, i) => (
-            <LabelCard key={i} p={{
-              id:        String(product.id),
-              name:      product.name,
-              sku:       product.sku,
-              price:     product.price,
-              salePrice: "salePrice" in product ? (product.salePrice as number | null | undefined) : null,
-              category:  product.category,
-              stock:     product.stock,
-            }} />
+            <div key={i} className="label-page" style={{ width: `${labelSize.w}mm`, height: `${labelSize.h - 1}mm` }}>
+              <LabelCard
+                p={{
+                  id:        String(product.id),
+                  name:      product.name,
+                  sku:       product.sku,
+                  price:     product.price,
+                  salePrice: "salePrice" in product ? (product.salePrice as number | null | undefined) : null,
+                  category:  product.category,
+                  stock:     product.stock,
+                }}
+                printMode
+                widthMm={labelSize.w}
+                heightMm={labelSize.h}
+              />
+            </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
 
     <div className="flex flex-col h-full bg-background">
@@ -648,35 +673,49 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {/* ══ Col 3: Barcode ══ */}
+          {/* ══ Col 3: Print Label preview ══ */}
           <div className="bg-card border rounded-3xl shadow-sm overflow-hidden flex flex-col">
-            {/* Coloured top strip */}
-            <div
-              className="flex items-center justify-between px-4 py-2.5 shrink-0"
-              style={{ background: hex.strip }}>
-              <span className="text-xs font-black text-white tracking-tight">{store.name}</span>
-              <span className="text-lg">{emoji}</span>
+            <div className="px-4 py-2.5 shrink-0 border-b bg-muted/40 flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Print Label Preview</span>
+              <span className="text-[10px] font-mono text-muted-foreground">{labelSize.w}×{labelSize.h}mm</span>
             </div>
 
             <div className="flex flex-col items-center gap-3 p-5 flex-1 justify-center">
-              {/* Category badge */}
-              <span
-                className="text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide"
-                style={{ background: hex.badge, color: hex.text }}>
-                {product.category}
-              </span>
+              <p className="text-[11px] text-muted-foreground font-medium">Exact size — what will print</p>
 
-              <p className="text-xs text-muted-foreground font-medium">Scan to open this product</p>
+              {/* Actual-size LabelCard (same template as Labels page) */}
               <div
-                className="w-full rounded-2xl overflow-hidden shadow-sm flex items-center justify-center bg-white py-2 px-1"
-                style={{ border: `3px solid ${hex.strip}` }}
+                style={{
+                  width:  `${Math.round(labelSize.w * MM_TO_PX)}px`,
+                  height: `${Math.round(labelSize.h * MM_TO_PX)}px`,
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                  background: "#fff",
+                  border: "1px solid #e5e7eb",
+                  flexShrink: 0,
+                }}
               >
-                <BarcodeImage value={product.sku} height={72} fontSize={13} className="w-full max-w-[220px]" />
+                <LabelCard
+                  p={{
+                    id:        String(product.id),
+                    name:      product.name,
+                    sku:       product.sku,
+                    price:     product.price,
+                    salePrice: "salePrice" in product ? (product.salePrice as number | null | undefined) : null,
+                    category:  product.category,
+                    stock:     product.stock,
+                  }}
+                  printMode
+                  widthMm={labelSize.w}
+                  heightMm={labelSize.h}
+                />
               </div>
-              <div className="text-center space-y-0.5">
-                <p className="font-mono font-black text-lg tracking-widest">{product.sku}</p>
-                <p className="text-xs text-muted-foreground">{product.name}</p>
-              </div>
+
+              <p className="text-[10px] text-muted-foreground text-center max-w-[220px]">
+                Change the label size from the <Link href="/labels" className="font-bold underline">Labels page</Link>
+              </p>
+
               {/* Copies counter */}
               <div className="flex items-center justify-between w-full px-1">
                 <span className="text-xs font-bold text-muted-foreground">Copies</span>

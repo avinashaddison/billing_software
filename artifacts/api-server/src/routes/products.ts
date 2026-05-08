@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, and, lte } from "drizzle-orm";
+import { eq, ilike, or, and, lte, inArray } from "drizzle-orm";
 import { db, productsTable, stockLogsTable, salesTable, saleItemsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import {
@@ -475,6 +475,38 @@ router.get("/products/:id/qr", async (req, res): Promise<void> => {
     url,
     qrDataUrl,
   });
+});
+
+/**
+ * POST /api/products/bulk-assign-supplier
+ * Body: { productIds: string[]; supplierId: string | null }
+ * Sets supplier_id on every listed product (null clears it).
+ */
+router.post("/products/bulk-assign-supplier", async (req, res): Promise<void> => {
+  const productIds = Array.isArray(req.body?.productIds) ? req.body.productIds : null;
+  const supplierId = req.body?.supplierId ?? null;
+
+  if (!productIds || productIds.length === 0) {
+    res.status(400).json({ error: "productIds must be a non-empty array" });
+    return;
+  }
+  if (supplierId !== null && typeof supplierId !== "string") {
+    res.status(400).json({ error: "supplierId must be a string or null" });
+    return;
+  }
+  if (productIds.some((id: unknown) => typeof id !== "string")) {
+    res.status(400).json({ error: "productIds must be strings" });
+    return;
+  }
+
+  const updated = await db
+    .update(productsTable)
+    .set({ supplierId })
+    .where(inArray(productsTable.id, productIds))
+    .returning({ id: productsTable.id, name: productsTable.name, sku: productsTable.sku });
+
+  broadcast("product_updated", { bulk: true, count: updated.length });
+  res.json({ updated: updated.length, products: updated });
 });
 
 /**

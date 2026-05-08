@@ -32,16 +32,48 @@ interface BillData {
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-/* ─── tiny helpers ───────────────────────────────────────────────── */
-function pad(s: string, len: number, right = false) {
-  const str = String(s);
-  if (str.length >= len) return str.slice(0, len);
-  const spaces = " ".repeat(len - str.length);
-  return right ? spaces + str : str + spaces;
+/* ─── Number → Indian English words (paise rounded) ───────────────── */
+const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+function twoDigitWords(n: number): string {
+  if (n < 20) return ONES[n];
+  const t = Math.floor(n / 10);
+  const o = n % 10;
+  return TENS[t] + (o ? " " + ONES[o] : "");
 }
 
-const LINE = "─".repeat(36);
-const DASH = "- ".repeat(18).trimEnd();
+function threeDigitWords(n: number): string {
+  const h = Math.floor(n / 100);
+  const r = n % 100;
+  let out = "";
+  if (h) out += ONES[h] + " Hundred";
+  if (r) out += (out ? " " : "") + twoDigitWords(r);
+  return out;
+}
+
+function numberToIndianWords(num: number): string {
+  if (!Number.isFinite(num)) return "";
+  const rupees = Math.floor(num);
+  const paise  = Math.round((num - rupees) * 100);
+
+  if (rupees === 0 && paise === 0) return "Zero Only";
+
+  const crore = Math.floor(rupees / 10000000);
+  const lakh  = Math.floor((rupees % 10000000) / 100000);
+  const thousand = Math.floor((rupees % 100000) / 1000);
+  const remainder = rupees % 1000;
+
+  const parts: string[] = [];
+  if (crore)    parts.push(twoDigitWords(crore)    + " Crore");
+  if (lakh)     parts.push(twoDigitWords(lakh)     + " Lakh");
+  if (thousand) parts.push(twoDigitWords(thousand) + " Thousand");
+  if (remainder) parts.push(threeDigitWords(remainder));
+
+  let words = parts.join(" ").trim();
+  if (paise > 0) words += " and " + twoDigitWords(paise) + " Paise";
+  return words + " Only";
+}
 
 /* ─── Return modal ───────────────────────────────────────────────── */
 function ReturnModal({ billId, items, onClose }: { billId: string; items: BillItem[]; onClose: (restocked: boolean) => void }) {
@@ -247,14 +279,11 @@ export default function Bill() {
         }
 
         @media print {
-          /* 1. Hide EVERYTHING on the page — including sidebar, bottom nav, app shell */
           body * { visibility: hidden !important; }
 
-          /* 2. Make ONLY the receipt card and its children visible */
           .receipt-print-only,
           .receipt-print-only * { visibility: visible !important; }
 
-          /* 3. Pin the receipt to top-left, constrained to the thermal roll width */
           .receipt-print-only {
             position: fixed !important;
             top: 0 !important;
@@ -276,8 +305,14 @@ export default function Bill() {
             background: white !important;
           }
 
-          /* 4. Strip zigzag SVG decorations — they add blank space when printed */
-          .receipt-print-only svg { display: none !important; }
+          /* Hide screen-only chrome inside the receipt */
+          .receipt-print-only .no-print { display: none !important; }
+
+          /* Force black-fill GRAND TOTAL bar to render solid in browser print */
+          .receipt-print-only .receipt-grand-total {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
         }
       `}</style>
 
@@ -299,191 +334,215 @@ export default function Bill() {
         </div>
 
         {/* ── Receipt wrapper ── */}
-        <div className="receipt-print-only receipt-card mx-auto my-6 w-full max-w-sm bg-white shadow-2xl rounded-sm overflow-hidden"
-             style={{ fontFamily: "'Courier New', Courier, monospace" }}>
+        {(() => {
+          const itemsSubtotal  = items.reduce((s, i) => s + i.subtotal, 0);
+          const mrpTotal       = items.reduce((s, i) => s + (i.mrp ?? i.price) * i.quantity, 0);
+          const saleSavings    = items.reduce((sum, i) =>
+            i.mrp != null && i.mrp > i.price ? sum + (i.mrp - i.price) * i.quantity : sum, 0);
+          const manualDiscount = Math.max(0, itemsSubtotal - bill.totalAmount);
+          const totalSavings   = saleSavings + manualDiscount;
+          const totalQty       = items.reduce((s, i) => s + i.quantity, 0);
+          const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          return (
+        <div className="receipt-print-only receipt-card mx-auto my-6 w-full max-w-sm bg-white shadow-2xl overflow-hidden text-black"
+             style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
 
-          {/* Zigzag top edge */}
-          <div className="no-print w-full overflow-hidden leading-none" style={{ marginBottom: "-1px" }}>
-            <svg viewBox="0 0 300 12" preserveAspectRatio="none" className="w-full" height="12">
-              <path d="M0,0 L10,12 L20,0 L30,12 L40,0 L50,12 L60,0 L70,12 L80,0 L90,12 L100,0 L110,12 L120,0 L130,12 L140,0 L150,12 L160,0 L170,12 L180,0 L190,12 L200,0 L210,12 L220,0 L230,12 L240,0 L250,12 L260,0 L270,12 L280,0 L290,12 L300,0 L300,0 L0,0 Z"
-                    fill="#f3f4f6"/>
-            </svg>
-          </div>
-
-          <div className="px-5 py-4 text-black text-[13px] leading-relaxed">
+          <div className="px-4 py-4 text-[12px] leading-snug">
 
             {/* ── STORE HEADER ── */}
-            <div className="text-center mb-2">
-              <div className="text-xl font-black tracking-widest uppercase">{store.name}</div>
-              <div className="text-[11px] tracking-wide mt-0.5">{store.tagline}</div>
-              <div className="text-[11px] mt-0.5">📞 {store.phone}</div>
-              <div className="text-[11px]">{store.address}</div>
-              {store.gst && <div className="text-[11px] font-bold mt-0.5">GST: {store.gst}</div>}
-            </div>
-
-            <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
-
-            {/* ── BILL INFO ── */}
-            <div className="text-[12px] space-y-0.5">
-              <div className="flex justify-between">
-                <span>Bill No :</span>
-                <span className="font-bold">#{billNo}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Date    :</span>
-                <span>{dateStr}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Time    :</span>
-                <span>{timeStr}</span>
-              </div>
-            </div>
-
-            <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
-
-            {/* ── ITEMS HEADER ── */}
-            <div className="text-[11px] font-bold flex justify-between mb-1">
-              <span className="flex-1">ITEM</span>
-              <span className="w-8 text-center">QTY</span>
-              <span className="w-20 text-right">AMOUNT</span>
-            </div>
-            <div className="text-[11px] text-gray-400">{DASH}</div>
-
-            {/* ── ITEMS ── */}
-            <div className="space-y-2 my-2">
-              {items.map((item, i) => {
-                const name    = item.productName.length > 22
-                  ? item.productName.slice(0, 20) + ".."
-                  : item.productName;
-                const subtotal = `₹${item.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                const onSale = item.mrp != null && item.mrp > item.price;
-
-                return (
-                  <div key={item.id}>
-                    <div className="flex justify-between items-start text-[12px]">
-                      <span className="flex-1 font-semibold">
-                        {name}{onSale ? " *" : ""}
-                      </span>
-                      <span className="w-8 text-center">{item.quantity}</span>
-                      <span className="w-20 text-right font-bold">{subtotal}</span>
-                    </div>
-                    {onSale ? (
-                      <div className="text-[10px] text-gray-500 pl-0">
-                        <span style={{ textDecoration: "line-through" }}>MRP ₹{item.mrp!.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                        {" → Sale ₹"}{item.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })} each
-                      </div>
-                    ) : (
-                      <div className="text-[10px] text-gray-500 pl-0">
-                        @ ₹{item.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })} each
-                      </div>
-                    )}
-                    {i < items.length - 1 && (
-                      <div className="text-[10px] text-gray-200 mt-1">{"· ".repeat(18).trimEnd()}</div>
-                    )}
+            {store.logoUrl ? (
+              /* Custom logo + name on the right */
+              <div className="flex items-center gap-3">
+                <img src={store.logoUrl} alt={store.name}
+                     className="shrink-0 h-14 w-auto max-w-[80px] object-contain"
+                     style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
+                <div className="flex-1 text-center pr-1">
+                  <div className="font-black uppercase leading-[1.05]"
+                       style={{
+                         fontSize: store.name.length > 18 ? "15px" : "18px",
+                         letterSpacing: "0.02em",
+                         textWrap: "balance",
+                       } as any}>
+                    {store.name}
                   </div>
-                );
-              })}
-            </div>
-
-            <div className="text-[11px] text-gray-400">{DASH}</div>
-
-            {/* ── SUMMARY ── */}
-            {(() => {
-              const itemsSubtotal = items.reduce((s, i) => s + i.subtotal, 0);
-              const saleSavings   = items.reduce((sum, i) =>
-                i.mrp != null && i.mrp > i.price ? sum + (i.mrp - i.price) * i.quantity : sum, 0);
-              const manualDiscount = itemsSubtotal - bill.totalAmount;
-              const totalSavings   = saleSavings + (manualDiscount > 0.001 ? manualDiscount : 0);
-              return (
-                <div className="text-[12px] space-y-0.5 my-2">
-                  <div className="flex justify-between">
-                    <span>Total Items :</span>
-                    <span>{bill.itemsCount}</span>
-                  </div>
-                  {totalSavings > 0 && (
-                    <div className="flex justify-between text-[11px] text-gray-600">
-                      <span>You Saved   :</span>
-                      <span>₹{totalSavings.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
+                  {store.tagline && (
+                    <div className="text-[10.5px] italic mt-1 text-black/70">{store.tagline}</div>
                   )}
-                  <div className="flex justify-between font-bold text-[13px]">
-                    <span>Sub Total   :</span>
-                    <span>₹{itemsSubtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                  {manualDiscount > 0.001 && (
-                    <div className="flex justify-between text-[11px] text-green-700">
-                      <span>
-                        Discount
-                        {bill.discount != null && bill.discountType === "percent"
-                          ? ` (${bill.discount}%)`
-                          : ""}
-                        {" "}:
-                      </span>
-                      <span>−₹{manualDiscount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-[11px] text-gray-500">
-                    <span>Tax (GST)   :</span>
-                    <span>Incl.</span>
-                  </div>
                 </div>
-              );
-            })()}
+              </div>
+            ) : (
+              /* Clean centered header — no illustration */
+              <div className="text-center">
+                <div className="font-black uppercase leading-[1.05] mx-auto"
+                     style={{
+                       fontSize: store.name.length > 22 ? "16px" : "20px",
+                       letterSpacing: "0.04em",
+                       textWrap: "balance",
+                     } as any}>
+                  {store.name}
+                </div>
+                {store.tagline && (
+                  <div className="text-[11px] italic mt-1 text-black/70">{store.tagline}</div>
+                )}
+              </div>
+            )}
 
-            <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
+            <div className="text-center text-[10.5px] leading-tight mt-2.5 space-y-px">
+              <div>{store.address}</div>
+              <div>Phone : <span className="font-semibold">{store.phone}</span></div>
+              {store.email && <div>E-Mail : {store.email}</div>}
+              {store.gst && <div>GSTIN : <span className="font-semibold">{store.gst}</span></div>}
+            </div>
 
-            {/* ── GRAND TOTAL ── */}
-            <div className="flex justify-between items-center my-2">
-              <span className="text-base font-black tracking-wide">TOTAL</span>
-              <span className="text-xl font-black">
-                ₹{bill.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <div className="text-center font-black text-[13px] tracking-[0.2em] mt-2.5 mb-1.5 border-y border-black py-0.5">GST INVOICE</div>
+
+            {/* ── CUSTOMER + BILL META ── */}
+            <div className="border border-black grid grid-cols-2 text-[10.5px] leading-[1.55]">
+              <div className="p-1.5 border-r border-black space-y-0.5">
+                <div className="flex">
+                  <span className="w-[58px] shrink-0">Customer</span>
+                  <span>:&nbsp;</span>
+                  <span className="flex-1 border-b border-dotted border-black/40">&nbsp;</span>
+                </div>
+                <div className="flex">
+                  <span className="w-[58px] shrink-0">Mobile</span>
+                  <span>:&nbsp;</span>
+                  <span className="flex-1 border-b border-dotted border-black/40">{bill.customerPhone ? `+91 ${bill.customerPhone}` : ""}</span>
+                </div>
+                <div className="flex">
+                  <span className="w-[58px] shrink-0">Address</span>
+                  <span>:&nbsp;</span>
+                  <span className="flex-1 border-b border-dotted border-black/40">&nbsp;</span>
+                </div>
+              </div>
+              <div className="p-1.5 space-y-0.5">
+                <div className="flex justify-between"><span>Bill&nbsp;No</span><span className="font-bold tabular-nums">#{billNo}</span></div>
+                <div className="flex justify-between"><span>Date</span><span className="tabular-nums">{dt.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })}</span></div>
+                <div className="flex justify-between"><span>Time</span><span className="tabular-nums">{timeStr}</span></div>
+              </div>
+            </div>
+
+            {/* ── ITEM TABLE ── */}
+            <table className="w-full border border-black border-collapse text-[10px]" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "7%"  }} />
+                <col style={{ width: "33%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "18%" }} />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-black bg-black/[0.05]">
+                  <th className="text-left  px-1.5 py-1 font-bold border-r border-black/40">Sn.</th>
+                  <th className="text-left  px-1.5 py-1 font-bold border-r border-black/40">Item</th>
+                  <th className="text-right px-1.5 py-1 font-bold border-r border-black/40">Qty</th>
+                  <th className="text-right px-1.5 py-1 font-bold border-r border-black/40">MRP</th>
+                  <th className="text-right px-1.5 py-1 font-bold border-r border-black/40">Rate</th>
+                  <th className="text-right px-1.5 py-1 font-bold">Amt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, idx) => (
+                  <tr key={item.id} className="align-top">
+                    <td className="px-1.5 py-1 tabular-nums border-r border-black/15">{idx + 1}.</td>
+                    <td className="px-1.5 py-1 break-words leading-tight border-r border-black/15">{item.productName}</td>
+                    <td className="px-1.5 py-1 text-right tabular-nums border-r border-black/15">{item.quantity}</td>
+                    <td className="px-1.5 py-1 text-right tabular-nums border-r border-black/15 whitespace-nowrap">{(item.mrp ?? item.price).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right tabular-nums border-r border-black/15 whitespace-nowrap">{item.price.toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right tabular-nums font-bold whitespace-nowrap">{item.subtotal.toFixed(2)}</td>
+                  </tr>
+                ))}
+                {/* Spacer rows for tiny bills */}
+                {items.length < 3 && Array.from({ length: 3 - items.length }).map((_, i) => (
+                  <tr key={`pad-${i}`}>
+                    <td className="px-1.5 py-1 border-r border-black/15">&nbsp;</td>
+                    <td className="border-r border-black/15"/>
+                    <td className="border-r border-black/15"/>
+                    <td className="border-r border-black/15"/>
+                    <td className="border-r border-black/15"/>
+                    <td/>
+                  </tr>
+                ))}
+                <tr className="border-t border-black bg-black/[0.05]">
+                  <td colSpan={3} className="px-1.5 py-1 font-bold border-r border-black/40">
+                    Items&nbsp;:&nbsp;{items.length}&nbsp;·&nbsp;Qty&nbsp;:&nbsp;{totalQty}
+                  </td>
+                  <td colSpan={2} className="px-1.5 py-1 text-right font-bold border-r border-black/40">TOTAL</td>
+                  <td className="px-1.5 py-1 text-right font-black tabular-nums whitespace-nowrap">{fmt(itemsSubtotal)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* ── AMOUNT IN WORDS ── */}
+            <div className="text-[10.5px] italic mt-1 mb-1.5 leading-tight">
+              <span className="font-bold not-italic">Rs. </span>
+              {numberToIndianWords(bill.totalAmount)}
+            </div>
+
+            {/* ── GRAND TOTAL bar ── */}
+            <div className="receipt-grand-total bg-black text-white px-3 py-2 flex items-baseline justify-between mt-1"
+                 style={{ backgroundColor: "#000", color: "#fff" }}>
+              <span className="font-black tracking-[0.15em] text-[13px]">GRAND&nbsp;TOTAL</span>
+              <span className="font-black text-[18px] tabular-nums leading-none">₹{fmt(bill.totalAmount)}</span>
+            </div>
+
+            {/* ── SAVINGS / NET BOX (double border) ── */}
+            <div className="mt-2.5 border border-black p-[2px]">
+              <div className="border border-black px-2.5 py-2 text-[10.5px]">
+                <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 leading-tight">
+                  <span className="text-black/80">MRP Total</span>
+                  <span className="text-right tabular-nums">₹{fmt(mrpTotal)}</span>
+                  <span className="text-black/80">You Saved</span>
+                  <span className="text-right tabular-nums text-green-700">−₹{fmt(totalSavings)}</span>
+                </div>
+                <div className="border-t border-dashed border-black/60 mt-1.5 pt-1.5 grid grid-cols-[1fr_auto] gap-x-2 leading-tight text-[12px] font-black">
+                  <span>NET TOTAL</span>
+                  <span className="text-right tabular-nums">₹{fmt(bill.totalAmount)}</span>
+                </div>
+                {manualDiscount > 0.001 && (
+                  <div className="flex justify-between mt-1 text-[9.5px] text-black/60">
+                    <span>
+                      (incl. discount
+                      {bill.discount != null && bill.discountType === "percent"
+                        ? ` ${bill.discount}%`
+                        : ""}
+                      )
+                    </span>
+                    <span className="tabular-nums">−₹{fmt(manualDiscount)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── PAYMENT META ── */}
+            <div className="mt-2.5 flex justify-between items-center text-[10.5px]">
+              <span>Payment&nbsp;: <span className="font-bold">{(bill.paymentMode ?? "cash").toUpperCase()}</span></span>
+              <span className="inline-flex items-center gap-1 font-bold border border-black px-2 py-0.5 rounded-sm">
+                ✓ PAID
               </span>
             </div>
 
-            {/* ── PAYMENT ── */}
-            {bill.customerPhone && (
-              <div className="text-[11px] flex justify-between text-gray-600">
-                <span>Customer Ph :</span>
-                <span className="font-bold">+91 {bill.customerPhone}</span>
+            {/* ── TERMS & CONDITIONS ── */}
+            {store.termsAndConditions && store.termsAndConditions.length > 0 && (
+              <div className="mt-2 text-[9.5px] leading-tight">
+                <div className="font-bold underline mb-0.5">Terms &amp; Conditions :-</div>
+                <ol className="list-decimal pl-4 space-y-px">
+                  {store.termsAndConditions.map((t, i) => <li key={i}>{t}</li>)}
+                </ol>
               </div>
             )}
-            <div className="text-[11px] flex justify-between text-gray-600">
-              <span>Payment Mode :</span>
-              <span className="font-bold">{(bill.paymentMode ?? "cash").toUpperCase()}</span>
-            </div>
-            <div className="text-[11px] flex justify-between text-gray-600 mb-2">
-              <span>Status       :</span>
-              <span className="font-black">✓ PAID</span>
-            </div>
-
-            <div className="text-center text-[11px] my-2 tracking-widest">{LINE}</div>
 
             {/* ── FOOTER ── */}
-            <div className="text-center text-[11px] space-y-1 mt-2">
-              <div className="font-black text-sm tracking-wide">** THANK YOU! **</div>
-              <div>Please Visit Again!</div>
-              <div className="text-gray-500 text-[10px] mt-1">
-                {store.footerNote}
-              </div>
-              <div className="text-gray-400 text-[10px] mt-2">
-                — {store.name} —
-              </div>
-              <div className="font-mono text-[10px] text-gray-400 mt-1">
-                Ref: {bill.id.slice(0, 8).toUpperCase()}
-              </div>
+            <div className="text-center text-[10px] mt-3 pt-2 border-t border-dashed border-black/40">
+              <div className="font-black tracking-[0.18em] mb-0.5">— THANK YOU · VISIT AGAIN —</div>
+              <div className="text-[9px] text-black/60">Powered by {store.appSubtitle}</div>
+              <div className="font-mono text-[8px] text-black/40 mt-0.5">Ref: {bill.id.slice(0, 8).toUpperCase()}</div>
             </div>
-
-            <div className="text-center text-[11px] mt-3 tracking-widest">{LINE}</div>
-          </div>
-
-          {/* Zigzag bottom edge */}
-          <div className="no-print w-full overflow-hidden leading-none" style={{ marginTop: "-1px" }}>
-            <svg viewBox="0 0 300 12" preserveAspectRatio="none" className="w-full" height="12">
-              <path d="M0,12 L10,0 L20,12 L30,0 L40,12 L50,0 L60,12 L70,0 L80,12 L90,0 L100,12 L110,0 L120,12 L130,0 L140,12 L150,0 L160,12 L170,0 L180,12 L190,0 L200,12 L210,0 L220,12 L230,0 L240,12 L250,0 L260,12 L270,0 L280,12 L290,0 L300,12 L300,12 L0,12 Z"
-                    fill="#f3f4f6"/>
-            </svg>
           </div>
         </div>
+        );
+        })()}
 
         {/* ── Action buttons (screen only) ── */}
         <div className="no-print flex flex-col gap-3 px-4 pb-8 max-w-sm mx-auto w-full">

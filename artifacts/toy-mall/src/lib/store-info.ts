@@ -5,11 +5,14 @@ export interface StoreSettings {
   name: string;
   tagline: string;
   phone: string;
+  email: string;
   address: string;
   gst: string;
   logoEmoji: string;
+  logoUrl: string;
   appSubtitle: string;
   footerNote: string;
+  termsAndConditions: string[];
   upiId: string;
   dynamicQrMode: boolean;
   labelShowPrice: boolean;
@@ -27,11 +30,18 @@ export const useStoreSettings = create<StoreSettingsStore>()(
       name:          "Hira & Sons Gift Shop",
       tagline:       "The Complete Toy Store",
       phone:         "+91 94318 01793",
+      email:         "",
       address:       "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
       gst:           "",
       logoEmoji:     "🧸",
+      logoUrl:       "",
       appSubtitle:   "Billing Management",
       footerNote:    "Goods once sold will not be returned or exchanged.",
+      termsAndConditions: [
+        "No Cash Refund.",
+        "Goods once sold will not be returned or exchanged.",
+        "Subject to Ranchi jurisdiction.",
+      ],
       upiId:         "",
       dynamicQrMode: false,
       labelShowPrice: true,

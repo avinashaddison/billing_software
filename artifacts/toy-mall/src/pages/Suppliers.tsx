@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
-import { Truck, Plus, X, Edit3, Check, Phone, Mail, MapPin, FileText, Loader2, Search } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Link } from "wouter";
+import { Truck, Plus, X, Edit3, Check, Phone, Mail, MapPin, FileText, Loader2, Search, Package, ChevronDown, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { getCategoryEmoji } from "@/lib/category-colors";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -12,8 +14,20 @@ interface Supplier {
   createdAt: string;
 }
 
+interface ProductLite {
+  id: string; name: string; sku: string; category: string;
+  price: number; stock: number; lowStockThreshold: number;
+  supplierId?: string | null;
+}
+
 async function fetchSuppliers(): Promise<Supplier[]> {
   const r = await fetch(`${BASE_URL}/api/suppliers`);
+  return r.json();
+}
+
+async function fetchProducts(): Promise<ProductLite[]> {
+  const r = await fetch(`${BASE_URL}/api/products`);
+  if (!r.ok) return [];
   return r.json();
 }
 
@@ -21,15 +35,38 @@ export default function Suppliers() {
   const { role } = useAuth();
   const isAdmin = role === "owner";
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts]   = useState<ProductLite[]>([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState("");
   const [showForm, setShowForm]   = useState(false);
   const [editId, setEditId]       = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
+  const [expanded, setExpanded]   = useState<Set<string>>(new Set());
   const [form, setForm] = useState({ name: "", contact: "", email: "", phone: "", address: "", notes: "" });
 
-  const load = () => fetchSuppliers().then(setSuppliers).finally(() => setLoading(false));
+  const load = () => Promise.all([fetchSuppliers(), fetchProducts()])
+    .then(([s, p]) => { setSuppliers(s); setProducts(p); })
+    .finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
+
+  const productsBySupplier = useMemo(() => {
+    const map = new Map<string, ProductLite[]>();
+    for (const p of products) {
+      if (!p.supplierId) continue;
+      const list = map.get(p.supplierId) ?? [];
+      list.push(p);
+      map.set(p.supplierId, list);
+    }
+    return map;
+  }, [products]);
+
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const filtered = suppliers.filter((s) =>
     !search || s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -142,37 +179,87 @@ export default function Suppliers() {
           </div>
         ) : (
           <div className="divide-y divide-border md:p-4 md:space-y-3 md:divide-none">
-            {filtered.map((s) => (
-              <div key={s.id} className="p-4 md:p-5 md:rounded-2xl md:border bg-card hover:bg-muted/30 transition-colors">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <Truck className="w-4 h-4 text-primary" />
+            {filtered.map((s) => {
+              const supplierProducts = productsBySupplier.get(s.id) ?? [];
+              const productCount = supplierProducts.length;
+              const isExpanded = expanded.has(s.id);
+              return (
+                <div key={s.id} className="md:rounded-2xl md:border bg-card hover:bg-muted/30 transition-colors overflow-hidden">
+                  <div className="p-4 md:p-5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <Truck className="w-4 h-4 text-primary" />
+                          </div>
+                          <h3 className="font-black truncate">{s.name}</h3>
+                          <button
+                            onClick={() => toggleExpanded(s.id)}
+                            disabled={productCount === 0}
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                              productCount > 0
+                                ? "bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
+                                : "bg-muted text-muted-foreground cursor-default"
+                            }`}
+                          >
+                            <Package className="w-3 h-3" />
+                            {productCount} product{productCount !== 1 ? "s" : ""}
+                            {productCount > 0 && (
+                              <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                            )}
+                          </button>
+                        </div>
+                        <div className="pl-10 space-y-0.5">
+                          {s.contact  && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><FileText className="w-3 h-3" /> {s.contact}</p>}
+                          {s.phone    && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Phone className="w-3 h-3" /> {s.phone}</p>}
+                          {s.email    && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Mail className="w-3 h-3" /> {s.email}</p>}
+                          {s.address  && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {s.address}</p>}
+                          {s.notes    && <p className="text-xs text-muted-foreground italic mt-1">"{s.notes}"</p>}
+                        </div>
                       </div>
-                      <h3 className="font-black truncate">{s.name}</h3>
-                    </div>
-                    <div className="pl-10 space-y-0.5">
-                      {s.contact  && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><FileText className="w-3 h-3" /> {s.contact}</p>}
-                      {s.phone    && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Phone className="w-3 h-3" /> {s.phone}</p>}
-                      {s.email    && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Mail className="w-3 h-3" /> {s.email}</p>}
-                      {s.address  && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {s.address}</p>}
-                      {s.notes    && <p className="text-xs text-muted-foreground italic mt-1">"{s.notes}"</p>}
+                      {isAdmin && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => startEdit(s)} className="w-8 h-8 rounded-full bg-muted hover:bg-primary/10 flex items-center justify-center transition-colors">
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => handleDelete(s.id, s.name)} className="w-8 h-8 rounded-full bg-muted hover:bg-red-100 dark:hover:bg-red-900/30 flex items-center justify-center transition-colors">
+                            <X className="w-3.5 h-3.5 text-red-500" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {isAdmin && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => startEdit(s)} className="w-8 h-8 rounded-full bg-muted hover:bg-primary/10 flex items-center justify-center transition-colors">
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => handleDelete(s.id, s.name)} className="w-8 h-8 rounded-full bg-muted hover:bg-red-100 dark:hover:bg-red-900/30 flex items-center justify-center transition-colors">
-                        <X className="w-3.5 h-3.5 text-red-500" />
-                      </button>
+
+                  {isExpanded && productCount > 0 && (
+                    <div className="border-t bg-muted/30 px-3 py-2 space-y-1">
+                      {supplierProducts.map((p) => {
+                        const isLow = p.stock <= p.lowStockThreshold;
+                        return (
+                          <Link
+                            key={p.id}
+                            href={`/product?sku=${encodeURIComponent(p.sku)}`}
+                            className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-background active:scale-[0.99] transition-all"
+                          >
+                            <span className="text-base shrink-0">{getCategoryEmoji(p.category)}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold truncate">{p.name}</p>
+                              <p className="text-[11px] font-mono text-muted-foreground">{p.sku}</p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-xs text-muted-foreground">₹{Number(p.price).toLocaleString("en-IN")}</p>
+                              <p className={`text-[11px] font-bold flex items-center justify-end gap-1 ${isLow ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                                {isLow && <AlertTriangle className="w-3 h-3" />}
+                                {p.stock} in stock
+                              </p>
+                            </div>
+                          </Link>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
