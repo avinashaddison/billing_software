@@ -10,11 +10,14 @@ How to install Hira & Sons Billing on a client's Windows PC so:
 
 ## ⚡ Fast path: one-line installer (recommended)
 
-Open **PowerShell as Administrator** on the client PC and paste this:
+**Step 1.** Open a terminal **as Administrator**:
+- Press **Win + X** → click **"Terminal (Admin)"** (Windows 11)
+- OR press **Win**, type `cmd`, right-click → **"Run as administrator"**
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass -Force
-irm https://raw.githubusercontent.com/avinashaddison/billing_software/main/install.ps1 | iex
+**Step 2.** Paste this single line — it works in both PowerShell and Command Prompt:
+
+```cmd
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/avinashaddison/billing_software/main/install.ps1 | iex"
 ```
 
 The script auto-installs Node.js, Git, pnpm, ngrok (and updates ngrok), clones the repo to `C:\HiraBilling`, prompts for the values it needs (Neon URL, ngrok token, ngrok domain, optional Telegram/Cloudinary), builds the production bundle, sets up auto-start on boot, and launches the app.
