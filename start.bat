@@ -32,8 +32,15 @@ if defined NGROK_DOMAIN (
   start "Billing Tunnel" cmd /k ngrok http %PORT%
 )
 
+REM ── Wait for server to be ready, then open the app in default browser ──────
 echo.
-echo Both windows are running. Close them to stop the app.
-echo The HTTPS phone-scanner URL is shown in the "Billing Tunnel" window.
+echo Waiting for server to come up, then opening browser...
+timeout /t 5 /nobreak >nul
+start "" "http://localhost:%PORT%"
+
+echo.
+echo App opened in browser.
+echo Server / Tunnel windows are running in the background.
+echo Close them to stop the app.
 echo.
 pause
