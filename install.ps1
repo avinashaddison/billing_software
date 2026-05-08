@@ -1,0 +1,250 @@
+# =============================================================================
+# Hira & Sons Billing - One-shot client PC installer
+# =============================================================================
+# Usage:
+#   1. Open PowerShell as Administrator (Win + X -> "Terminal (Admin)")
+#   2. cd to the folder containing this script
+#   3. Set-ExecutionPolicy -Scope Process Bypass -Force; .\install.ps1
+#
+# Or even simpler - paste this one line into Admin PowerShell:
+#   irm https://raw.githubusercontent.com/avinashaddison/billing_software/main/install.ps1 | iex
+# =============================================================================
+
+$ErrorActionPreference = "Stop"
+$REPO_URL    = "https://github.com/avinashaddison/billing_software.git"
+$INSTALL_DIR = "C:\HiraBilling"
+
+function Write-Step($msg) {
+  Write-Host ""
+  Write-Host "==> $msg" -ForegroundColor Cyan
+}
+function Write-Ok($msg)   { Write-Host "  [OK] $msg" -ForegroundColor Green }
+function Write-Warn2($msg) { Write-Host "  [!]  $msg" -ForegroundColor Yellow }
+function Write-Err($msg)  { Write-Host "  [X]  $msg" -ForegroundColor Red }
+
+function Ensure-Winget {
+  if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Write-Err "winget is not available. Update Windows or install 'App Installer' from the Microsoft Store, then re-run."
+    exit 1
+  }
+}
+
+function Ensure-WingetPackage($id, $cmd, $friendlyName) {
+  if (Get-Command $cmd -ErrorAction SilentlyContinue) {
+    Write-Ok "$friendlyName already installed."
+    return
+  }
+  Write-Host "  -> Installing $friendlyName via winget..." -ForegroundColor Gray
+  winget install --id $id --silent --accept-source-agreements --accept-package-agreements | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Err "winget install failed for $id. Install manually and re-run."
+    exit 1
+  }
+  Write-Ok "$friendlyName installed."
+}
+
+function Refresh-Path {
+  # Reload PATH so just-installed binaries become callable in THIS shell.
+  $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+              [System.Environment]::GetEnvironmentVariable("Path","User")
+}
+
+# -----------------------------------------------------------------------------
+# 0. Banner
+# -----------------------------------------------------------------------------
+Clear-Host
+Write-Host @"
+
+  +------------------------------------------------------------+
+  |     Hira & Sons Billing - Client PC Installer              |
+  |     This will set up everything on this PC.                |
+  +------------------------------------------------------------+
+
+"@ -ForegroundColor Magenta
+
+# -----------------------------------------------------------------------------
+# 1. Prerequisites
+# -----------------------------------------------------------------------------
+Write-Step "Checking prerequisites"
+Ensure-Winget
+
+Ensure-WingetPackage "OpenJS.NodeJS.LTS"  "node" "Node.js (LTS)"
+Ensure-WingetPackage "Git.Git"             "git"  "Git"
+Refresh-Path
+
+if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+  Write-Host "  -> Installing pnpm globally via npm..." -ForegroundColor Gray
+  npm install -g pnpm | Out-Null
+  Refresh-Path
+  Write-Ok "pnpm installed."
+} else {
+  Write-Ok "pnpm already installed."
+}
+
+# -----------------------------------------------------------------------------
+# 2. Clone or update the repo
+# -----------------------------------------------------------------------------
+Write-Step "Fetching the latest code into $INSTALL_DIR"
+if (Test-Path "$INSTALL_DIR\.git") {
+  Write-Ok "Repo already exists - pulling latest changes."
+  Push-Location $INSTALL_DIR
+  git pull --ff-only
+  Pop-Location
+} else {
+  if (Test-Path $INSTALL_DIR) {
+    Write-Err "$INSTALL_DIR exists but is not a git repo. Move/delete it and re-run."
+    exit 1
+  }
+  git clone $REPO_URL $INSTALL_DIR
+  Write-Ok "Cloned into $INSTALL_DIR"
+}
+
+Set-Location $INSTALL_DIR
+
+# -----------------------------------------------------------------------------
+# 3. Collect secrets and write .env (only if .env doesn't already exist)
+# -----------------------------------------------------------------------------
+Write-Step "Configuring secrets (.env)"
+
+if (Test-Path ".env") {
+  Write-Ok ".env already present - keeping existing values."
+} else {
+  Write-Host ""
+  Write-Host "  Paste the values from your services. Press Enter to skip optional ones." -ForegroundColor Gray
+  Write-Host ""
+
+  $neon = Read-Host "  Neon Postgres URL  (required)"
+  while ([string]::IsNullOrWhiteSpace($neon)) {
+    Write-Warn2 "Neon URL is required. Get it from https://neon.tech/"
+    $neon = Read-Host "  Neon Postgres URL"
+  }
+
+  $tgToken  = Read-Host "  Telegram bot token (optional)"
+  $tgChat   = Read-Host "  Telegram chat ID   (optional)"
+  $cloudUrl = Read-Host "  Cloudinary URL     (optional)"
+  $storeName = Read-Host "  Store name (e.g. Hira & Sons Gift Shop)"
+  if ([string]::IsNullOrWhiteSpace($storeName)) { $storeName = "My Shop" }
+
+  @"
+# Generated by install.ps1 - $(Get-Date -Format 'yyyy-MM-dd HH:mm')
+
+NEON_DATABASE_URL="$neon"
+DATABASE_URL="$neon"
+
+PORT=3000
+API_PORT=8080
+
+TELEGRAM_BOT_TOKEN="$tgToken"
+TELEGRAM_CHAT_ID="$tgChat"
+STORE_NAME="$storeName"
+
+CLOUDINARY_URL="$cloudUrl"
+"@ | Out-File -Encoding utf8 -FilePath ".env"
+
+  Write-Ok "Wrote .env"
+}
+
+# -----------------------------------------------------------------------------
+# 4. Install dependencies, push DB schema, build production bundle
+# -----------------------------------------------------------------------------
+Write-Step "Installing dependencies (this can take 3-5 minutes)"
+pnpm install --frozen-lockfile
+Write-Ok "Dependencies installed."
+
+Write-Step "Syncing database schema"
+pnpm --filter "@workspace/db" run push
+Write-Ok "Schema synced."
+
+Write-Step "Building production bundle"
+pnpm run build:prod
+Write-Ok "Build complete."
+
+# -----------------------------------------------------------------------------
+# 5. Install + update ngrok, configure authtoken & static domain
+# -----------------------------------------------------------------------------
+Write-Step "Setting up ngrok (HTTPS tunnel for phone scanning)"
+Ensure-WingetPackage "Ngrok.Ngrok" "ngrok" "ngrok"
+Refresh-Path
+
+# Resolve ngrok path (winget sometimes doesn't refresh in this session)
+$ngrokExe = (Get-Command ngrok -ErrorAction SilentlyContinue).Source
+if (-not $ngrokExe) {
+  $candidate = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe\ngrok.exe"
+  if (Test-Path $candidate) { $ngrokExe = $candidate }
+}
+if (-not $ngrokExe) {
+  Write-Err "ngrok install completed but binary not found. Install manually from https://ngrok.com/download"
+  exit 1
+}
+
+Write-Host "  -> Updating ngrok to latest..." -ForegroundColor Gray
+& $ngrokExe update | Out-Null
+Write-Ok "ngrok up to date."
+
+Write-Host ""
+Write-Host "  Sign up free at https://ngrok.com/ (Google login works)." -ForegroundColor Gray
+Write-Host "  Then visit https://dashboard.ngrok.com/get-started/your-authtoken" -ForegroundColor Gray
+$tok = Read-Host "  ngrok authtoken (required)"
+while ([string]::IsNullOrWhiteSpace($tok)) {
+  Write-Warn2 "Authtoken is required to start the tunnel."
+  $tok = Read-Host "  ngrok authtoken"
+}
+& $ngrokExe config add-authtoken $tok | Out-Null
+Write-Ok "Authtoken saved."
+
+Write-Host ""
+Write-Host "  Visit https://dashboard.ngrok.com/domains and copy your free static domain" -ForegroundColor Gray
+Write-Host "  (looks like 'word-word-word.ngrok-free.dev')." -ForegroundColor Gray
+$dom = Read-Host "  ngrok static domain (required)"
+while ([string]::IsNullOrWhiteSpace($dom)) {
+  Write-Warn2 "Static domain is required so the URL stays the same across restarts."
+  $dom = Read-Host "  ngrok static domain"
+}
+[System.Environment]::SetEnvironmentVariable("NGROK_DOMAIN", $dom, "User")
+$env:NGROK_DOMAIN = $dom
+Write-Ok "NGROK_DOMAIN saved (value: $dom)."
+
+# -----------------------------------------------------------------------------
+# 6. Add start.bat to Windows Startup so it auto-launches on boot
+# -----------------------------------------------------------------------------
+Write-Step "Configuring auto-start on Windows boot"
+$startupDir = [Environment]::GetFolderPath("Startup")
+$shortcut = Join-Path $startupDir "Hira Billing.lnk"
+$wshell = New-Object -ComObject WScript.Shell
+$lnk = $wshell.CreateShortcut($shortcut)
+$lnk.TargetPath       = (Resolve-Path "$INSTALL_DIR\start.bat").Path
+$lnk.WorkingDirectory = $INSTALL_DIR
+$lnk.WindowStyle      = 1
+$lnk.Description      = "Hira & Sons Billing"
+$lnk.Save()
+Write-Ok "Shortcut created in $startupDir"
+
+# -----------------------------------------------------------------------------
+# 7. Done
+# -----------------------------------------------------------------------------
+Write-Host ""
+Write-Host @"
+
+  +------------------------------------------------------------+
+  |     SETUP COMPLETE                                         |
+  +------------------------------------------------------------+
+
+    Local cashier URL:  http://localhost:3000
+    Phone scanner URL:  https://$dom
+
+  The app will auto-start the next time Windows boots.
+
+  Want to launch it right now?
+
+"@ -ForegroundColor Green
+
+$go = Read-Host "  Launch now? (y/n)"
+if ($go -eq "y" -or $go -eq "Y") {
+  Start-Process -FilePath "$INSTALL_DIR\start.bat" -WorkingDirectory $INSTALL_DIR
+  Write-Host ""
+  Write-Ok "Launched. Two new windows should open shortly."
+  Write-Host ""
+}
+
+Write-Host "Bookmark on phone:  https://$dom" -ForegroundColor Cyan
+Write-Host ""

@@ -8,7 +8,34 @@ How to install Hira & Sons Billing on a client's Windows PC so:
 
 ---
 
-## Prerequisites (one-time, on the client PC)
+## ⚡ Fast path: one-line installer (recommended)
+
+Open **PowerShell as Administrator** on the client PC and paste this:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+irm https://raw.githubusercontent.com/avinashaddison/billing_software/main/install.ps1 | iex
+```
+
+The script auto-installs Node.js, Git, pnpm, ngrok (and updates ngrok), clones the repo to `C:\HiraBilling`, prompts for the values it needs (Neon URL, ngrok token, ngrok domain, optional Telegram/Cloudinary), builds the production bundle, sets up auto-start on boot, and launches the app.
+
+**Total time:** ~5–8 minutes including downloads.
+
+You'll only need to paste 4 values during the run (everything else is automatic):
+1. The client's Neon Postgres URL
+2. The client's ngrok authtoken
+3. The client's ngrok static domain
+4. (optional) Telegram bot token + chat ID, Cloudinary URL, store name
+
+When it finishes, the cashier PC has `http://localhost:3000` and the phone has `https://<her-domain>.ngrok-free.dev` — both auto-start at boot.
+
+If you prefer to do it step-by-step manually, follow the rest of this guide ↓.
+
+---
+
+## Manual path (step-by-step)
+
+### Prerequisites (one-time, on the client PC)
 
 1. **Node.js 24 LTS** — install from https://nodejs.org/
 2. **Git for Windows** — install from https://git-scm.com/download/win

@@ -88,7 +88,7 @@ if errorlevel 1 (
 )
 echo [OK] Build complete.
 
-REM ── 7. Try to install ngrok via winget ──────────────────────────────────────
+REM ── 7. Install ngrok via winget, then update to a supported version ────────
 where ngrok >nul 2>nul
 if errorlevel 1 (
   echo.
@@ -100,6 +100,9 @@ if errorlevel 1 (
 ) else (
   echo [OK] ngrok already installed.
 )
+
+echo [..] Ensuring ngrok is up to date (winget ships an old version)...
+ngrok update >nul 2>nul
 
 REM ── 8. Done ─────────────────────────────────────────────────────────────────
 echo.
