@@ -7,17 +7,28 @@ export interface CartItem {
   quantity:  number;
   price:     number;
   mrp?:      number;
+  /** Per-line discount percent (0-100). Applied on top of any existing sale price. */
+  discountPercent?: number;
 }
 
 interface CartContextType {
-  items:          CartItem[];
-  count:          number;
-  total:          number;
-  addItem:        (item: Omit<CartItem, "quantity">) => void;
-  removeItem:     (productId: string) => void;
-  updateQty:      (productId: string, qty: number) => void;
-  clearCart:      () => void;
-  syncFromServer: (items: CartItem[]) => void;
+  items:            CartItem[];
+  count:            number;
+  total:            number;
+  addItem:          (item: Omit<CartItem, "quantity">) => void;
+  removeItem:       (productId: string) => void;
+  updateQty:        (productId: string, qty: number) => void;
+  setLineDiscount:  (productId: string, percent: number) => void;
+  clearCart:        () => void;
+  syncFromServer:   (items: CartItem[]) => void;
+}
+
+/** Effective per-unit price after applying any line discount. */
+export function effectivePrice(item: { price: number; discountPercent?: number }): number {
+  const pct = item.discountPercent ?? 0;
+  if (pct <= 0) return item.price;
+  if (pct >= 100) return 0;
+  return Math.max(0, item.price * (1 - pct / 100));
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -153,17 +164,33 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setLineDiscount = useCallback((productId: string, percent: number) => {
+    const clamped = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
+    setItems((prev) =>
+      prev.map((i) =>
+        i.productId === productId
+          ? { ...i, discountPercent: clamped > 0 ? clamped : undefined }
+          : i,
+      )
+    );
+    /* Line discount is local-only for now; not synced to shared cart since other
+       devices wouldn't know to render it consistently. Bills capture it on checkout. */
+  }, []);
+
   const clearCart = useCallback(() => {
     setItems([]);
     serverSync("DELETE", "");
   }, []);
 
   const count = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
-  const total = useMemo(() => items.reduce((sum, i) => sum + i.price * i.quantity, 0), [items]);
+  const total = useMemo(
+    () => items.reduce((sum, i) => sum + effectivePrice(i) * i.quantity, 0),
+    [items]
+  );
 
   const value = useMemo(
-    () => ({ items, count, total, addItem, removeItem, updateQty, clearCart, syncFromServer }),
-    [items, count, total, addItem, removeItem, updateQty, clearCart, syncFromServer]
+    () => ({ items, count, total, addItem, removeItem, updateQty, setLineDiscount, clearCart, syncFromServer }),
+    [items, count, total, addItem, removeItem, updateQty, setLineDiscount, clearCart, syncFromServer]
   );
 
   return (

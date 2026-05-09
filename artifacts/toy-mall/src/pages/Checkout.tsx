@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { playCheckoutSuccess, playError, playTick } from "@/lib/sounds";
-import { useCart } from "@/contexts/cart-context";
+import { useCart, effectivePrice } from "@/contexts/cart-context";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useOnline } from "@/hooks/use-online";
 import { useStoreSettings } from "@/lib/store-info";
@@ -89,64 +89,107 @@ function SuccessOverlay({ billId }: { billId: string }) {
 
 /* ── Memoized cart item row ─────────────────────────────────────── */
 interface CartItemRowProps {
-  item: { productId: string; name: string; sku: string; price: number; mrp?: number; quantity: number };
+  item: { productId: string; name: string; sku: string; price: number; mrp?: number; quantity: number; discountPercent?: number };
   onQtyChange: (productId: string, qty: number) => void;
   onRemove: (productId: string) => void;
+  onLineDiscount: (productId: string, percent: number) => void;
 }
-const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove }: CartItemRowProps) {
+const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onLineDiscount }: CartItemRowProps) {
   const onSale = item.mrp != null && item.mrp > item.price;
+  const pct    = item.discountPercent ?? 0;
+  const eff    = effectivePrice(item);
+  const hasLineDiscount = pct > 0;
+  const subtotal = eff * item.quantity;
   return (
-    <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 border bg-card transition-all ${onSale ? "border-red-200 dark:border-red-800" : "border-border"}`}>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="font-bold text-sm truncate text-foreground">{item.name}</p>
-          {onSale && (
-            <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 leading-none">
-              SALE
-            </span>
-          )}
-        </div>
-        <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
-        {onSale ? (
+    <div className={`rounded-2xl px-4 py-3 border bg-card transition-all ${
+      hasLineDiscount ? "border-amber-300 dark:border-amber-700" : onSale ? "border-red-200 dark:border-red-800" : "border-border"
+    }`}>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-bold text-sm truncate text-foreground">{item.name}</p>
+            {onSale && (
+              <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 leading-none">
+                SALE
+              </span>
+            )}
+            {hasLineDiscount && (
+              <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 leading-none">
+                -{pct}%
+              </span>
+            )}
+          </div>
+          <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            <span className="line-through">MRP ₹{item.mrp!.toLocaleString("en-IN")}</span>
-            {" → "}
-            <span className="text-red-600 dark:text-red-400 font-bold">₹{item.price.toLocaleString("en-IN")}</span>
+            {item.mrp != null && item.mrp > eff && (
+              <span className="line-through mr-1">MRP ₹{item.mrp.toLocaleString("en-IN")}</span>
+            )}
+            {!item.mrp && hasLineDiscount && (
+              <span className="line-through mr-1">₹{item.price.toLocaleString("en-IN")}</span>
+            )}
+            <span className={`font-bold ${(hasLineDiscount || onSale) ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
+              ₹{eff.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
             {" × "}{item.quantity} ={" "}
             <span className="font-bold text-foreground">
-              ₹{(item.price * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              ₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </span>
           </p>
-        ) : (
-          <p className="text-xs text-muted-foreground mt-0.5">
-            ₹{item.price.toLocaleString("en-IN")} × {item.quantity} ={" "}
-            <span className="font-bold text-foreground">
-              ₹{(item.price * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-            </span>
-          </p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => onQtyChange(item.productId, item.quantity - 1)}
+            className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border"
+          >
+            <Minus className="w-3.5 h-3.5 text-muted-foreground" />
+          </button>
+          <span className="w-7 text-center font-black text-sm tabular-nums">{item.quantity}</span>
+          <button
+            onClick={() => onQtyChange(item.productId, item.quantity + 1)}
+            className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border"
+          >
+            <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+          </button>
+        </div>
+        <button
+          onClick={() => onRemove(item.productId)}
+          className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 active:scale-90 flex items-center justify-center transition-all shrink-0 border border-red-200 dark:border-red-800"
+        >
+          <X className="w-3.5 h-3.5 text-red-500" />
+        </button>
+      </div>
+      {/* ── Per-line discount input ── */}
+      <div className="flex items-center gap-2 mt-2 pl-1">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+          <Tag className="w-3 h-3" />
+          Item discount
+        </span>
+        <div className="relative flex-1 max-w-[140px]">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            inputMode="decimal"
+            value={pct === 0 ? "" : String(pct)}
+            placeholder="0"
+            onChange={(e) => {
+              const v = e.target.value === "" ? 0 : parseFloat(e.target.value);
+              onLineDiscount(item.productId, Number.isFinite(v) ? v : 0);
+            }}
+            className="w-full h-8 pl-2 pr-7 text-xs rounded-lg border bg-muted/40 focus:outline-none focus:ring-2 focus:ring-amber-400/40 font-bold tabular-nums"
+          />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-black text-muted-foreground pointer-events-none">%</span>
+        </div>
+        {hasLineDiscount && (
+          <button
+            onClick={() => onLineDiscount(item.productId, 0)}
+            className="text-[10px] font-bold text-muted-foreground hover:text-foreground underline"
+          >
+            clear
+          </button>
         )}
       </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <button
-          onClick={() => onQtyChange(item.productId, item.quantity - 1)}
-          className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border"
-        >
-          <Minus className="w-3.5 h-3.5 text-muted-foreground" />
-        </button>
-        <span className="w-7 text-center font-black text-sm tabular-nums">{item.quantity}</span>
-        <button
-          onClick={() => onQtyChange(item.productId, item.quantity + 1)}
-          className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border"
-        >
-          <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-        </button>
-      </div>
-      <button
-        onClick={() => onRemove(item.productId)}
-        className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 active:scale-90 flex items-center justify-center transition-all shrink-0 border border-red-200 dark:border-red-800"
-      >
-        <X className="w-3.5 h-3.5 text-red-500" />
-      </button>
     </div>
   );
 });
@@ -156,13 +199,14 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove }: C
 ═══════════════════════════════════════════════════════════════════ */
 export default function Checkout() {
   const [, setLocation] = useLocation();
-  const { items, count, total, removeItem, updateQty, clearCart } = useCart();
+  const { items, count, total, removeItem, updateQty, setLineDiscount, clearCart } = useCart();
 
+  /* "You save" = sale-price savings + per-line discount savings (does NOT include
+     the global Discount field, which is added separately further below). */
   const totalSavings = items.reduce((sum, i) => {
-    if (i.mrp != null && i.mrp > i.price) {
-      return sum + (i.mrp - i.price) * i.quantity;
-    }
-    return sum;
+    const eff       = effectivePrice(i);
+    const reference = i.mrp != null ? i.mrp : i.price;
+    return sum + Math.max(0, reference - eff) * i.quantity;
   }, 0);
   const isOnline = useOnline();
   const { pendingCount, enqueue, syncAll } = useOfflineQueue();
@@ -208,6 +252,30 @@ export default function Checkout() {
     [updateQty],
   );
 
+  const handleLineDiscount = useCallback(
+    (productId: string, percent: number) => {
+      setLineDiscount(productId, percent);
+    },
+    [setLineDiscount],
+  );
+
+  /* Build the items payload sent to /api/bills/checkout. We send the
+     EFFECTIVE per-unit price (after the line discount) as `price`, and the
+     reference (MRP, or sticker if no MRP) as `mrp` so the receipt can show
+     the savings line correctly. */
+  const buildCheckoutItems = () =>
+    items.map((i) => {
+      const eff       = effectivePrice(i);
+      const hasLine   = (i.discountPercent ?? 0) > 0;
+      const reference = i.mrp != null ? i.mrp : (hasLine ? i.price : undefined);
+      return {
+        productId: i.productId,
+        quantity:  i.quantity,
+        price:     eff,
+        mrp:       reference,
+      };
+    });
+
   const handleCheckout = async () => {
     const err = validatePhone(phone);
     if (err) { setPhoneError(err); return; }
@@ -215,7 +283,7 @@ export default function Checkout() {
 
     if (!isOnline) {
       enqueue({
-        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price, mrp: i.mrp })),
+        items: buildCheckoutItems(),
         paymentMode: paymentModeRef.current,
         customerPhone: phone || undefined,
         discount:     discountNum > 0 ? discountNum : undefined,
@@ -231,7 +299,7 @@ export default function Checkout() {
     setLoading(true);
     try {
       const result = await postCheckout({
-        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price, mrp: i.mrp })),
+        items: buildCheckoutItems(),
         paymentMode: paymentModeRef.current,
         customerPhone: phone || undefined,
         discount:     discountNum > 0 ? discountNum : undefined,
@@ -344,6 +412,7 @@ export default function Checkout() {
                   item={item}
                   onQtyChange={handleQtyChange}
                   onRemove={removeItem}
+                  onLineDiscount={handleLineDiscount}
                 />
               ))}
             </div>
