@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+const BASE_URL = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
+
 export interface StoreSettings {
   name: string;
   tagline: string;
@@ -21,12 +23,19 @@ export interface StoreSettings {
 }
 
 interface StoreSettingsStore extends StoreSettings {
+  /** Hydrated = server values have been loaded at least once this session */
+  _hydrated: boolean;
+  /** Update locally only — used by the server-hydrate effect to avoid loops */
+  applyServerPatch: (patch: Partial<StoreSettings>) => void;
+  /** Update locally + write through to the server (best-effort) */
   update: (patch: Partial<StoreSettings>) => void;
+  /** One-shot fetch from server. Call once on app mount. */
+  hydrateFromServer: () => Promise<void>;
 }
 
 export const useStoreSettings = create<StoreSettingsStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       name:          "Hira & Sons Gift Shop",
       tagline:       "The Complete Toy Store",
       phone:         "+91 94318 01793",
@@ -47,7 +56,44 @@ export const useStoreSettings = create<StoreSettingsStore>()(
       labelShowPrice: true,
       scannerThresholdMs: 100,
       receiptPaperWidth: "80mm",
-      update: (patch) => set(patch),
+
+      _hydrated: false,
+      applyServerPatch: (patch) => set({ ...patch, _hydrated: true }),
+      update: (patch) => {
+        // 1. update local state immediately (optimistic, fast UI)
+        set(patch);
+        // 2. push the FULL settings blob to the server (best-effort fire-and-forget)
+        const full = { ...get(), ...patch };
+        // Drop computed/transient keys before sending
+        const {
+          _hydrated: _h, applyServerPatch: _a, update: _u, hydrateFromServer: _hf,
+          ...payload
+        } = full as StoreSettingsStore;
+        void _h; void _a; void _u; void _hf;
+        try {
+          fetch(`${BASE_URL}/api/settings`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }).catch(() => { /* network blip — local is still saved */ });
+        } catch { /* ignore */ }
+      },
+      hydrateFromServer: async () => {
+        try {
+          const res = await fetch(`${BASE_URL}/api/settings`);
+          if (!res.ok) return;
+          const body = await res.json();
+          if (body && body.data && typeof body.data === "object") {
+            // Merge server values on top of local — server is authoritative
+            set({ ...body.data, _hydrated: true });
+          } else {
+            set({ _hydrated: true });
+          }
+        } catch {
+          // Server unreachable — keep local cache, no error to the user
+          set({ _hydrated: true });
+        }
+      },
     }),
     { name: "toy-mall-store-settings-v1" }
   )

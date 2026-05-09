@@ -5,9 +5,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 import { CartProvider } from "@/contexts/cart-context";
+import { useEffect }           from "react";
 import { useRealtime }         from "@/hooks/use-realtime";
 import { useInactivityLogout } from "@/hooks/use-inactivity";
 import { useAuth, usePermission } from "@/hooks/use-auth";
+import { useStoreSettings }    from "@/lib/store-info";
 import { type ResourceKey } from "@/lib/permissions";
 import NotFound from "@/pages/not-found";
 
@@ -45,6 +47,10 @@ const queryClient = new QueryClient({
 function RealtimeProvider({ children }: { children: React.ReactNode }) {
   useRealtime();
   useInactivityLogout();
+  // One-shot: pull settings from the server so they persist across devices
+  // and survive browser cache clears.
+  const hydrate = useStoreSettings((s) => s.hydrateFromServer);
+  useEffect(() => { void hydrate(); }, [hydrate]);
   return <>{children}</>;
 }
 
