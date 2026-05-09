@@ -47,38 +47,58 @@ export function SideNav() {
 
   return (
     <aside className="hidden md:flex flex-col w-56 min-h-screen bg-background border-r border-border shrink-0 sticky top-0 h-screen">
-      <div className="relative px-4 py-3.5 border-b border-border overflow-hidden">
-        {/* Soft accent line at top */}
-        <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-violet-500/40 to-transparent" />
+      <div className="relative px-4 py-4 overflow-hidden bg-gradient-to-br from-violet-600 via-blue-600 to-cyan-500 text-white">
+        {/* Animated glow blobs */}
+        <div className="pointer-events-none absolute -top-12 -left-10 w-32 h-32 rounded-full bg-fuchsia-400/30 blur-2xl animate-pulse" style={{ animationDuration: "5s" }} />
+        <div className="pointer-events-none absolute -bottom-10 -right-8 w-32 h-32 rounded-full bg-yellow-300/20 blur-2xl animate-pulse" style={{ animationDuration: "6s", animationDelay: "1s" }} />
+
+        {/* Subtle dot pattern overlay */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.4) 1px, transparent 0)",
+            backgroundSize: "12px 12px",
+          }}
+        />
+
+        {/* Floating sparkles */}
+        <span aria-hidden className="absolute top-2 right-4 text-yellow-200 text-[10px] animate-pulse" style={{ animationDuration: "3s" }}>✦</span>
+        <span aria-hidden className="absolute bottom-3 left-14 text-white/60 text-[8px] animate-pulse" style={{ animationDuration: "4s", animationDelay: "1s" }}>✦</span>
 
         <div className="relative flex items-center gap-3 group">
           {/* Logo */}
           <div className="relative shrink-0">
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-violet-500 via-blue-500 to-cyan-400 opacity-30 blur-lg transition-opacity duration-500 group-hover:opacity-50" />
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-blue-500 to-cyan-400 flex items-center justify-center shadow-md shadow-blue-500/25 ring-1 ring-white/25">
-              <span className="text-lg leading-none transition-transform duration-300 group-hover:scale-110">
+            <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-yellow-300 via-orange-300 to-pink-300 opacity-40 blur-md transition-opacity duration-500 group-hover:opacity-70" />
+            <div className="relative w-11 h-11 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-blue-900/30 ring-2 ring-white/40">
+              <span className="text-xl leading-none transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 drop-shadow-sm">
                 {store.logoEmoji}
               </span>
-              <span className="pointer-events-none absolute inset-x-1 top-0.5 h-1/3 rounded-t-lg bg-gradient-to-b from-white/30 to-transparent" />
+              <span className="pointer-events-none absolute inset-x-1 top-0.5 h-1/3 rounded-t-lg bg-gradient-to-b from-white/60 to-transparent" />
             </div>
           </div>
 
           <div className="min-w-0 flex-1">
-            <h1 className="text-[12.5px] font-black tracking-tight leading-[1.15] text-foreground">
+            <h1 className="text-[13px] font-black tracking-tight leading-[1.15] text-white drop-shadow-sm">
               {store.name}
             </h1>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="relative flex h-1.5 w-1.5 shrink-0">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300" />
               </span>
-              <p className="text-[9px] text-muted-foreground font-bold tracking-[0.1em] uppercase truncate">
+              <p className="text-[9px] text-white/85 font-black tracking-[0.15em] uppercase truncate">
                 {store.appSubtitle}
               </p>
             </div>
           </div>
         </div>
+
+        {/* Decorative bottom edge — soft fade into nav */}
+        <div aria-hidden className="absolute inset-x-0 bottom-0 h-3 bg-gradient-to-b from-transparent to-background/0" />
       </div>
+      {/* Hairline accent under header */}
+      <div aria-hidden className="h-[2px] bg-gradient-to-r from-fuchsia-500 via-violet-500 via-blue-500 to-cyan-400" />
 
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
