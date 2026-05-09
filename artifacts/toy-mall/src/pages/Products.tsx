@@ -2,7 +2,7 @@ import { useState, useRef, memo, useCallback } from "react";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { Link, useSearch, useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
-import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2, ScanLine, Truck } from "lucide-react";
+import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2, ScanLine, Truck, Sparkles } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -239,92 +239,249 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+/* ── Quick "Activate Today's Deal" dialog ──────────────────────── */
+interface DealQuickModalProps {
+  product: { id: string; name: string; price: number; salePrice?: number | null };
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function DealQuickModal({ product, onClose, onSaved }: DealQuickModalProps) {
+  const [type, setType]   = useState<"percent" | "amount">("percent");
+  const [value, setValue] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [saving, setSaving]   = useState(false);
+
+  const v = parseFloat(value);
+  const computedSale = !Number.isFinite(v) || v <= 0
+    ? null
+    : type === "percent"
+      ? Math.max(0, Math.round(product.price * (1 - v / 100) * 100) / 100)
+      : Math.max(0, product.price - v);
+
+  const endOfDayISO = (d: Date) => {
+    const x = new Date(d);
+    x.setUTCHours(23, 59, 59, 999);
+    return x.toISOString();
+  };
+
+  const handleActivate = async () => {
+    if (computedSale == null) {
+      toast.error("Enter a discount value");
+      return;
+    }
+    setSaving(true);
+    try {
+      const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salePrice:      computedSale,
+          salePriceUntil: endDate ? endOfDayISO(new Date(endDate)) : endOfDayISO(new Date()),
+          isTodayDeal:    true,
+        }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.error ?? "Failed");
+      }
+      toast.success(`${product.name} → ₹${computedSale} (live on Today's Deals)`);
+      onSaved();
+      onClose();
+    } catch (e) {
+      toast.error((e as Error).message ?? "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full md:max-w-md bg-background rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="font-black text-base flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-violet-500" /> Activate Today's Deal
+          </h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div className="p-3 rounded-xl border bg-muted/40">
+            <p className="font-bold text-sm">{product.name}</p>
+            <p className="text-xs text-muted-foreground">MRP ₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold text-muted-foreground mb-1.5">Discount</p>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-xl border bg-muted/30 overflow-hidden h-11">
+                <button onClick={() => setType("percent")}
+                  className={`px-4 text-sm font-black transition-colors ${type === "percent" ? "bg-violet-500 text-white" : "text-muted-foreground hover:text-foreground"}`}>%</button>
+                <button onClick={() => setType("amount")}
+                  className={`px-4 text-sm font-black transition-colors border-l ${type === "amount" ? "bg-violet-500 text-white" : "text-muted-foreground hover:text-foreground"}`}>₹</button>
+              </div>
+              <Input
+                type="number"
+                min={0}
+                max={type === "percent" ? 100 : product.price}
+                placeholder={type === "percent" ? "e.g. 20" : "e.g. 50"}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                autoFocus
+                className="h-11 rounded-xl flex-1 font-bold tabular-nums"
+              />
+            </div>
+            {computedSale != null && (
+              <div className="mt-2 p-3 rounded-xl bg-gradient-to-br from-violet-500/10 via-blue-500/10 to-cyan-400/10 border border-violet-500/30">
+                <p className="text-xs text-muted-foreground">Customer pays</p>
+                <p className="text-2xl font-black bg-gradient-to-r from-violet-600 via-blue-600 to-cyan-500 bg-clip-text text-transparent">
+                  ₹{computedSale.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Saving ₹{(product.price - computedSale).toFixed(2)} per unit
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs font-bold text-muted-foreground mb-1.5">Valid until (optional)</p>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              min={new Date().toISOString().slice(0, 10)}
+              className="h-11 rounded-xl"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">Leave empty for "today only" — auto-expires at midnight.</p>
+          </div>
+        </div>
+        <div className="p-4 border-t bg-muted/20">
+          <button
+            onClick={handleActivate}
+            disabled={computedSale == null || saving}
+            className="w-full h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-gradient-to-r from-violet-600 via-blue-600 to-cyan-500 text-white shadow-lg disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {saving ? "Activating…" : "Activate Deal"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Memoized product rows ── */
 interface ProductRowProps {
-  product: { id: string; name: string; sku: string; category: string; price: number; salePrice?: number | null; salePriceUntil?: string | null; stock: number; lowStockThreshold: number; imageUrl?: string | null; supplierId?: string | null };
+  product: { id: string; name: string; sku: string; category: string; price: number; salePrice?: number | null; salePriceUntil?: string | null; stock: number; lowStockThreshold: number; imageUrl?: string | null; supplierId?: string | null; isTodayDeal?: boolean };
   supplierName?: string | null;
   isAdmin?: boolean;
   onDelete?: (product: { id: string; name: string; sku: string }) => void;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
+  onToggleDeal?: (product: { id: string; name: string; price: number; salePrice?: number | null; isTodayDeal?: boolean }) => void;
 }
 
-const ProductMobileCard = memo(function ProductMobileCard({ product, supplierName, isAdmin, onDelete, selected, onToggleSelect }: ProductRowProps) {
+const ProductMobileCard = memo(function ProductMobileCard({ product, supplierName, isAdmin, onDelete, selected, onToggleSelect, onToggleDeal }: ProductRowProps) {
   const cs = getCategoryStyle(product.category);
   const emoji = getCategoryEmoji(product.category);
   const isLow = product.stock <= product.lowStockThreshold;
+  const dealOn = product.isTodayDeal === true;
   return (
     <Link href={`/product?sku=${product.sku}`} className="block">
-      <div className={`p-4 rounded-xl border bg-card hover:bg-muted/30 active:scale-[0.98] transition-all flex items-center justify-between relative overflow-hidden ${selected ? "ring-2 ring-primary" : ""}`} data-testid={`card-product-${product.id}`}>
+      <div className={`p-4 rounded-xl border bg-card hover:bg-muted/30 active:scale-[0.98] transition-all relative overflow-hidden ${selected ? "ring-2 ring-primary" : ""} ${dealOn ? "border-violet-300 dark:border-violet-700" : ""}`} data-testid={`card-product-${product.id}`}>
         <div className={`absolute left-0 top-0 bottom-0 w-1 ${cs.dot}`} />
-        {isAdmin && onToggleSelect && (
-          <input
-            type="checkbox"
-            checked={!!selected}
-            onChange={() => onToggleSelect(product.id)}
-            onClick={(e) => { e.stopPropagation(); }}
-            className="ml-2 mr-1 w-4 h-4 rounded border-muted-foreground/40 text-primary focus:ring-primary cursor-pointer shrink-0"
-            aria-label="Select product"
-          />
-        )}
-        <div className="flex-1 min-w-0 pr-4 pl-3">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-base">{emoji}</span>
-            <h3 className="font-bold text-base truncate">{product.name}</h3>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md text-xs">{product.sku}</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cs.badge}`}>{product.category}</span>
-          </div>
-          {supplierName && (
-            <div className="flex items-center gap-1 mt-1.5 text-[11px] text-muted-foreground">
-              <Truck className="w-3 h-3 shrink-0" />
-              <span className="truncate">by <span className="font-semibold text-foreground/80">{supplierName}</span></span>
-            </div>
+        <div className="flex items-center justify-between">
+          {isAdmin && onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={() => onToggleSelect(product.id)}
+              onClick={(e) => { e.stopPropagation(); }}
+              className="ml-2 mr-1 w-4 h-4 rounded border-muted-foreground/40 text-primary focus:ring-primary cursor-pointer shrink-0"
+              aria-label="Select product"
+            />
           )}
-        </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="flex flex-col items-end">
-            <div className={`text-2xl font-black leading-none flex items-center gap-1 ${isLow ? "text-red-600 dark:text-red-400" : ""}`}>
-              {isLow && <AlertTriangle className="w-4 h-4" />}
-              {product.stock}
+          <div className="flex-1 min-w-0 pr-4 pl-3">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="text-base">{emoji}</span>
+              <h3 className="font-bold text-base truncate">{product.name}</h3>
+              {dealOn && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 shrink-0">
+                  <Sparkles className="w-2.5 h-2.5" /> DEAL
+                </span>
+              )}
             </div>
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Left</span>
-            {product.salePrice != null ? (
-              <span className="text-[10px]">
-                <span className="line-through text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
-                {" "}<span className="text-red-600 font-bold">₹{product.salePrice.toLocaleString("en-IN")}</span>
-                {product.salePriceUntil && (
-                  <span className="block text-amber-600 dark:text-amber-400">
-                    Sale ends {new Date(product.salePriceUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                  </span>
-                )}
-              </span>
-            ) : (
-              <span className="text-[10px] text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md text-xs">{product.sku}</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cs.badge}`}>{product.category}</span>
+            </div>
+            {supplierName && (
+              <div className="flex items-center gap-1 mt-1.5 text-[11px] text-muted-foreground">
+                <Truck className="w-3 h-3 shrink-0" />
+                <span className="truncate">by <span className="font-semibold text-foreground/80">{supplierName}</span></span>
+              </div>
             )}
           </div>
-          {isAdmin && onDelete && (
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(product); }}
-              className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center text-red-500 dark:text-red-400 transition-colors shrink-0"
-              aria-label="Delete product"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex flex-col items-end">
+              <div className={`text-2xl font-black leading-none flex items-center gap-1 ${isLow ? "text-red-600 dark:text-red-400" : ""}`}>
+                {isLow && <AlertTriangle className="w-4 h-4" />}
+                {product.stock}
+              </div>
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Left</span>
+              {product.salePrice != null ? (
+                <span className="text-[10px]">
+                  <span className="line-through text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
+                  {" "}<span className="text-red-600 font-bold">₹{product.salePrice.toLocaleString("en-IN")}</span>
+                  {product.salePriceUntil && (
+                    <span className="block text-amber-600 dark:text-amber-400">
+                      Sale ends {new Date(product.salePriceUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-[10px] text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
+              )}
+            </div>
+            {isAdmin && onDelete && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(product); }}
+                className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center text-red-500 dark:text-red-400 transition-colors shrink-0"
+                aria-label="Delete product"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
+        {/* Today's Deal toggle (admin only) — full-width pill below */}
+        {isAdmin && onToggleDeal && (
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleDeal(product); }}
+            className={`mt-3 ml-3 w-[calc(100%-0.75rem)] h-9 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] border-2 ${
+              dealOn
+                ? "bg-gradient-to-r from-violet-600 via-blue-600 to-cyan-500 text-white border-transparent shadow-md"
+                : "bg-card border-violet-300 text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {dealOn ? "DEACTIVATE TODAY DEAL" : "ACTIVATE TODAY DEAL"}
+          </button>
+        )}
       </div>
     </Link>
   );
 });
 
-const ProductDesktopRow = memo(function ProductDesktopRow({ product, supplierName, isAdmin, onDelete, selected, onToggleSelect }: ProductRowProps) {
+const ProductDesktopRow = memo(function ProductDesktopRow({ product, supplierName, isAdmin, onDelete, selected, onToggleSelect, onToggleDeal }: ProductRowProps) {
   const cs = getCategoryStyle(product.category);
   const emoji = getCategoryEmoji(product.category);
   const isLow = product.stock <= product.lowStockThreshold;
+  const dealOn = product.isTodayDeal === true;
   return (
-    <div className={`grid ${isAdmin ? "grid-cols-[auto_1fr_auto_auto_auto_auto_auto]" : "grid-cols-[1fr_auto_auto_auto_auto_auto]"} gap-4 px-6 py-3.5 hover:bg-muted/40 transition-colors items-center border-b last:border-0 ${selected ? "bg-primary/5" : ""}`} data-testid={`card-product-${product.id}`}>
+    <div className={`grid ${isAdmin ? "grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto]" : "grid-cols-[1fr_auto_auto_auto_auto_auto_auto]"} gap-4 px-6 py-3.5 hover:bg-muted/40 transition-colors items-center border-b last:border-0 ${selected ? "bg-primary/5" : ""}`} data-testid={`card-product-${product.id}`}>
       {isAdmin && onToggleSelect && (
         <input
           type="checkbox"
@@ -380,6 +537,29 @@ const ProductDesktopRow = memo(function ProductDesktopRow({ product, supplierNam
           <p className={`text-xl font-black ${isLow ? "text-destructive" : ""}`}>{product.stock}</p>
         </div>
       </Link>
+      {/* Today's Deal toggle — outside the Link so click doesn't navigate */}
+      <div className="w-28 flex items-center justify-center">
+        {isAdmin && onToggleDeal ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleDeal(product); }}
+            className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-[11px] font-black border-2 transition-all active:scale-95 ${
+              dealOn
+                ? "bg-gradient-to-r from-violet-600 via-blue-600 to-cyan-500 text-white border-transparent shadow-sm"
+                : "bg-card border-violet-300 text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30"
+            }`}
+          >
+            <Sparkles className="w-3 h-3" />
+            {dealOn ? "DEACTIVATE" : "ACTIVATE"}
+          </button>
+        ) : dealOn ? (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300">
+            <Sparkles className="w-3 h-3" /> ACTIVE
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground/40">—</span>
+        )}
+      </div>
       <div className="w-10 flex items-center justify-center">
         {isAdmin && onDelete && (
           <button
@@ -405,6 +585,7 @@ export default function Products() {
   const [deleting, setDeleting]     = useState(false);
   const [selected, setSelected]     = useState<Set<string>>(new Set());
   const [bulkAssigning, setBulkAssigning] = useState(false);
+  const [pendingDeal, setPendingDeal] = useState<{ id: string; name: string; price: number; salePrice?: number | null; isTodayDeal?: boolean } | null>(null);
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
@@ -413,6 +594,30 @@ export default function Products() {
       return next;
     });
   }, []);
+
+  /* Today's Deal toggle handler.
+     - If product is currently active → instantly deactivate (sets isTodayDeal=false,
+       preserves salePrice so any other context still applies).
+     - If inactive → open the DealQuickModal so the cashier can enter discount + end date,
+       then activate. */
+  const handleToggleDeal = useCallback(async (product: { id: string; name: string; price: number; salePrice?: number | null; isTodayDeal?: boolean }) => {
+    if (product.isTodayDeal) {
+      try {
+        const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isTodayDeal: false }),
+        });
+        if (!r.ok) throw new Error("failed");
+        toast.success(`${product.name} removed from Today's Deals`);
+        qc.invalidateQueries({ queryKey: getListProductsQueryKey() });
+      } catch {
+        toast.error("Could not deactivate deal");
+      }
+    } else {
+      setPendingDeal(product);
+    }
+  }, [qc]);
 
   const bulkAssignSupplier = async (supplierId: string | null) => {
     if (selected.size === 0) return;
@@ -514,6 +719,13 @@ export default function Products() {
   return (
     <div className="flex flex-col h-full">
       {showImport && <CsvImportModal onClose={() => setShowImport(false)} />}
+      {pendingDeal && (
+        <DealQuickModal
+          product={pendingDeal}
+          onClose={() => setPendingDeal(null)}
+          onSaved={() => qc.invalidateQueries({ queryKey: getListProductsQueryKey() })}
+        />
+      )}
       {pendingDelete && (
         <DeleteConfirmModal
           product={pendingDelete}
@@ -606,7 +818,7 @@ export default function Products() {
       )}
 
       {/* Desktop table header */}
-      <div className={`hidden md:grid ${isAdmin ? "grid-cols-[auto_1fr_auto_auto_auto_auto_auto]" : "grid-cols-[1fr_auto_auto_auto_auto_auto]"} gap-4 px-6 py-2 border-b text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30`}>
+      <div className={`hidden md:grid ${isAdmin ? "grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto]" : "grid-cols-[1fr_auto_auto_auto_auto_auto_auto]"} gap-4 px-6 py-2 border-b text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30`}>
         {isAdmin && (
           <input
             type="checkbox"
@@ -628,6 +840,7 @@ export default function Products() {
         <span className="w-36 text-left">Supplier</span>
         <span className="w-24 text-right">Price</span>
         <span className="w-20 text-right">Stock</span>
+        <span className="w-28 text-center">Today Deal</span>
         <span className="w-10"></span>
       </div>
 
@@ -659,6 +872,7 @@ export default function Products() {
                     onDelete={setPendingDelete}
                     selected={selected.has(product.id)}
                     onToggleSelect={toggleSelect}
+                    onToggleDeal={handleToggleDeal}
                   />
                 );
               })}
@@ -677,6 +891,7 @@ export default function Products() {
                     onDelete={setPendingDelete}
                     selected={selected.has(product.id)}
                     onToggleSelect={toggleSelect}
+                    onToggleDeal={handleToggleDeal}
                   />
                 );
               })}
