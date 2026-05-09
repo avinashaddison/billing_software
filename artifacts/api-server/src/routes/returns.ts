@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
-import { db, returnsTable, productsTable, billsTable } from "@workspace/db";
+import { eq, desc, and } from "drizzle-orm";
+import { db, returnsTable, productsTable, billsTable, saleItemsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -79,7 +80,30 @@ router.post("/returns", async (req, res): Promise<void> => {
       const [product] = await tx.select().from(productsTable).where(eq(productsTable.id, line.productId));
       if (!product) continue;
 
-      const refundAmount = Number(product.price) * line.quantity;
+      /* Refund at the HISTORICAL price the customer actually paid (from sale_items),
+         not the current product.price. Falls back to product.price only if the
+         sale_items row is missing (e.g. product was deleted-cascade-nulled). */
+      const [saleItem] = await tx
+        .select({ price: saleItemsTable.price })
+        .from(saleItemsTable)
+        .where(and(
+          eq(saleItemsTable.saleId, billId),
+          eq(saleItemsTable.productId, line.productId),
+        ))
+        .limit(1);
+
+      const unitPrice = saleItem
+        ? Number(saleItem.price)
+        : Number(product.price);
+
+      if (!saleItem) {
+        logger.warn(
+          { billId, productId: line.productId },
+          "Return: no sale_items row found for this bill+product, falling back to current product.price for refund",
+        );
+      }
+
+      const refundAmount = unitPrice * line.quantity;
       totalRefund += refundAmount;
 
       const [ret] = await tx
