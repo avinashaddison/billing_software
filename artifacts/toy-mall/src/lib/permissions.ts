@@ -9,6 +9,7 @@ export const RESOURCES = [
   { key: "categories", label: "Categories",        description: "Manage product categories" },
   { key: "labels",     label: "Labels",            description: "Print QR shelf labels" },
   { key: "suppliers",  label: "Suppliers",         description: "Manage supplier information" },
+  { key: "deals",      label: "Today's Deals",     description: "Set up daily offers customers see at checkout" },
   { key: "staff",      label: "Staff Management",  description: "Manage staff & access control" },
   { key: "settings",   label: "Settings",           description: "Configure shop settings" },
 ] as const;
@@ -29,6 +30,7 @@ export const DEFAULT_STAFF_PERMISSIONS: Permissions = {
   categories: "none",
   labels:     "none",
   suppliers:  "none",
+  deals:      "read",
   staff:      "none",
 };
 
@@ -65,5 +67,6 @@ export const PATH_RESOURCE: Record<string, ResourceKey> = {
   "/categories": "categories",
   "/labels":     "labels",
   "/suppliers":  "suppliers",
+  "/deals":      "deals",
   "/staff":      "staff",
 };

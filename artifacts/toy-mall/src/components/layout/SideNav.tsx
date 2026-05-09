@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2 } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -35,12 +35,13 @@ export function SideNav() {
   ].filter((item) => !item.resource || visible(item.resource));
 
   const extraItems = [
-    { name: "Reports",    href: "/report",     icon: FileText,  resource: "reports"   },
-    { name: "Customers",  href: "/customers",  icon: Users,     resource: "customers"  },
-    { name: "Categories", href: "/categories", icon: Layers,    resource: "categories" },
-    { name: "Labels",     href: "/labels",     icon: Tag,       resource: "labels"    },
-    { name: "Suppliers",  href: "/suppliers",  icon: Truck,     resource: "suppliers"  },
-    { name: "Staff",      href: "/staff",      icon: Users2,    resource: "staff"     },
+    { name: "Today's Deals", href: "/deals",      icon: Sparkles,  resource: "deals"     },
+    { name: "Reports",       href: "/report",     icon: FileText,  resource: "reports"   },
+    { name: "Customers",     href: "/customers",  icon: Users,     resource: "customers" },
+    { name: "Categories",    href: "/categories", icon: Layers,    resource: "categories"},
+    { name: "Labels",        href: "/labels",     icon: Tag,       resource: "labels"    },
+    { name: "Suppliers",     href: "/suppliers",  icon: Truck,     resource: "suppliers" },
+    { name: "Staff",         href: "/staff",      icon: Users2,    resource: "staff"     },
     ...(role === "owner" ? [{ name: "Settings", href: "/settings", icon: Settings2, resource: "staff" as const }] : []),
   ].filter((item) => visible(item.resource));
 

@@ -25,6 +25,7 @@ import Customers      from "@/pages/Customers";
 import Report         from "@/pages/Report";
 import Labels         from "@/pages/Labels";
 import Categories     from "@/pages/Categories";
+import Deals          from "@/pages/Deals";
 import Login          from "@/pages/Login";
 import StaffManagement from "@/pages/StaffManagement";
 import Checkout        from "@/pages/Checkout";
@@ -95,6 +96,7 @@ function Router() {
             <Route path="/report"       component={() => <Protected resource="reports"><Report /></Protected>} />
             <Route path="/labels"       component={() => <Protected resource="labels"><Labels /></Protected>} />
             <Route path="/categories"   component={() => <Protected resource="categories"><Categories /></Protected>} />
+            <Route path="/deals"        component={() => <Protected resource="deals"><Deals /></Protected>} />
             <Route path="/staff"        component={() => <Protected resource="staff"><StaffManagement /></Protected>} />
             <Route path="/checkout"     component={() => <Protected resource="scan"><Checkout /></Protected>} />
             <Route path="/settings"     component={() => <Protected resource="settings"><SettingsPage /></Protected>} />
