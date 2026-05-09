@@ -443,16 +443,32 @@ export default function Bill() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, idx) => (
-                  <tr key={item.id} className="align-top">
-                    <td className="px-1.5 py-1 tabular-nums border-r border-black/15">{idx + 1}.</td>
-                    <td className="px-1.5 py-1 break-words leading-tight border-r border-black/15">{item.productName}</td>
-                    <td className="px-1.5 py-1 text-right tabular-nums border-r border-black/15">{item.quantity}</td>
-                    <td className="px-1.5 py-1 text-right tabular-nums border-r border-black/15 whitespace-nowrap">{(item.mrp ?? item.price).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right tabular-nums border-r border-black/15 whitespace-nowrap">{item.price.toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right tabular-nums font-bold whitespace-nowrap">{item.subtotal.toFixed(2)}</td>
-                  </tr>
-                ))}
+                {items.map((item, idx) => {
+                  const mrp = item.mrp ?? item.price;
+                  const hasDiscount = mrp > item.price + 0.001;
+                  const pct = hasDiscount ? Math.round(((mrp - item.price) / mrp) * 100) : 0;
+                  const lineSavings = hasDiscount ? (mrp - item.price) * item.quantity : 0;
+                  return (
+                    <tr key={item.id} className="align-top">
+                      <td className="px-1.5 py-1 tabular-nums border-r border-black/15">{idx + 1}.</td>
+                      <td className="px-1.5 py-1 break-words leading-tight border-r border-black/15">
+                        {item.productName}
+                        {hasDiscount && (
+                          <div className="text-[9px] font-bold mt-0.5 leading-tight">
+                            <span className="bg-black text-white px-1 py-px rounded-sm" style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any}>
+                              {pct}% OFF
+                            </span>
+                            <span className="text-black/60 ml-1">saved ₹{lineSavings.toFixed(2)}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-1.5 py-1 text-right tabular-nums border-r border-black/15">{item.quantity}</td>
+                      <td className="px-1.5 py-1 text-right tabular-nums border-r border-black/15 whitespace-nowrap">{mrp.toFixed(2)}</td>
+                      <td className="px-1.5 py-1 text-right tabular-nums border-r border-black/15 whitespace-nowrap">{item.price.toFixed(2)}</td>
+                      <td className="px-1.5 py-1 text-right tabular-nums font-bold whitespace-nowrap">{item.subtotal.toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
                 {/* Spacer rows for tiny bills */}
                 {items.length < 3 && Array.from({ length: 3 - items.length }).map((_, i) => (
                   <tr key={`pad-${i}`}>
@@ -493,25 +509,26 @@ export default function Bill() {
                 <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 leading-tight">
                   <span className="text-black/80">MRP Total</span>
                   <span className="text-right tabular-nums">₹{fmt(mrpTotal)}</span>
-                  <span className="text-black/80">You Saved</span>
-                  <span className="text-right tabular-nums text-green-700">−₹{fmt(totalSavings)}</span>
+                  <span className="text-black/80">Sub Total</span>
+                  <span className="text-right tabular-nums">₹{fmt(itemsSubtotal)}</span>
+                  {manualDiscount > 0.001 && (
+                    <>
+                      <span className="text-black/80">
+                        Bill Discount
+                        {bill.discount != null && bill.discountType === "percent"
+                          ? ` (${bill.discount}%)`
+                          : ""}
+                      </span>
+                      <span className="text-right tabular-nums text-green-700">−₹{fmt(manualDiscount)}</span>
+                    </>
+                  )}
+                  <span className="text-black font-bold">You Saved (Total)</span>
+                  <span className="text-right tabular-nums font-bold text-green-700">−₹{fmt(totalSavings)}</span>
                 </div>
                 <div className="border-t border-dashed border-black/60 mt-1.5 pt-1.5 grid grid-cols-[1fr_auto] gap-x-2 leading-tight text-[12px] font-black">
                   <span>NET TOTAL</span>
                   <span className="text-right tabular-nums">₹{fmt(bill.totalAmount)}</span>
                 </div>
-                {manualDiscount > 0.001 && (
-                  <div className="flex justify-between mt-1 text-[9.5px] text-black/60">
-                    <span>
-                      (incl. discount
-                      {bill.discount != null && bill.discountType === "percent"
-                        ? ` ${bill.discount}%`
-                        : ""}
-                      )
-                    </span>
-                    <span className="tabular-nums">−₹{fmt(manualDiscount)}</span>
-                  </div>
-                )}
               </div>
             </div>
 
