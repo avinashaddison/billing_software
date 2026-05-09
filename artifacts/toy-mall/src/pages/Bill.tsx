@@ -401,21 +401,13 @@ export default function Bill() {
 
             {/* ── CUSTOMER + BILL META ── */}
             <div className="border border-black grid grid-cols-2 text-[10.5px] leading-[1.55]">
-              <div className="p-1.5 border-r border-black space-y-0.5">
-                <div className="flex">
-                  <span className="w-[58px] shrink-0">Customer</span>
-                  <span>:&nbsp;</span>
-                  <span className="flex-1 border-b border-dotted border-black/40">&nbsp;</span>
-                </div>
+              <div className="p-1.5 border-r border-black space-y-0.5 flex flex-col justify-center">
                 <div className="flex">
                   <span className="w-[58px] shrink-0">Mobile</span>
                   <span>:&nbsp;</span>
-                  <span className="flex-1 border-b border-dotted border-black/40">{bill.customerPhone ? `+91 ${bill.customerPhone}` : ""}</span>
-                </div>
-                <div className="flex">
-                  <span className="w-[58px] shrink-0">Address</span>
-                  <span>:&nbsp;</span>
-                  <span className="flex-1 border-b border-dotted border-black/40">&nbsp;</span>
+                  <span className="flex-1 border-b border-dotted border-black/40 font-semibold">
+                    {bill.customerPhone ? `+91 ${bill.customerPhone}` : <span className="text-black/30">—</span>}
+                  </span>
                 </div>
               </div>
               <div className="p-1.5 space-y-0.5">
