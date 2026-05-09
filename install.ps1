@@ -1,13 +1,15 @@
 # =============================================================================
 # Hira & Sons Billing - One-shot client PC installer
 # =============================================================================
-# Usage:
-#   1. Open PowerShell as Administrator (Win + X -> "Terminal (Admin)")
-#   2. cd to the folder containing this script
-#   3. Set-ExecutionPolicy -Scope Process Bypass -Force; .\install.ps1
+# Universal one-liner (works in BOTH cmd.exe and PowerShell, must be Admin):
 #
-# Or even simpler - paste this one line into Admin PowerShell:
+#   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/avinashaddison/billing_software/main/install.ps1 | iex"
+#
+# Or, if already in PowerShell as Administrator:
 #   irm https://raw.githubusercontent.com/avinashaddison/billing_software/main/install.ps1 | iex
+#
+# Re-running this script is safe: it pulls latest, skips installed packages,
+# preserves existing .env and Startup-folder shortcut.
 # =============================================================================
 
 $ErrorActionPreference = "Stop"
@@ -151,6 +153,20 @@ Ensure-WingetPackage "OpenJS.NodeJS.LTS"  "node" "Node.js (LTS)"
 Ensure-WingetPackage "Git.Git"             "git"  "Git"
 Refresh-Path
 
+# Node version sanity check - app uses --env-file-if-exists (Node 22.7+).
+# OpenJS.NodeJS.LTS pulls the current LTS which is fine, but in case the
+# machine had an older Node already installed and PATH preferred it.
+try {
+  $nodeVer = (& node --version) -replace "^v",""
+  $major   = [int]($nodeVer.Split(".")[0])
+  if ($major -lt 22) {
+    Write-Warn2 "Detected Node.js v$nodeVer. App requires Node 22+ for --env-file-if-exists."
+    Write-Warn2 "If the install fails, uninstall the old Node from Add/Remove Programs and re-run."
+  } else {
+    Write-Ok "Node.js v$nodeVer (>= 22 required)."
+  }
+} catch { }
+
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
   Write-Host "  -> Installing pnpm globally via npm..." -ForegroundColor Gray
   npm install -g pnpm | Out-Null
@@ -193,9 +209,19 @@ if (Test-Path ".env") {
   Write-Host ""
 
   $neon = Read-Host "  Neon Postgres URL  (required)"
-  while ([string]::IsNullOrWhiteSpace($neon)) {
-    Write-Warn2 "Neon URL is required. Get it from https://neon.tech/"
-    $neon = Read-Host "  Neon Postgres URL"
+  while ($true) {
+    if ([string]::IsNullOrWhiteSpace($neon)) {
+      Write-Warn2 "Neon URL is required. Get it from https://neon.tech/"
+      $neon = Read-Host "  Neon Postgres URL"
+      continue
+    }
+    if ($neon -notmatch "^postgres(ql)?://[^:]+:[^@]+@[^/]+/\S+") {
+      Write-Warn2 "That doesn't look like a valid Postgres connection string."
+      Write-Warn2 "Format: postgresql://user:password@host/dbname?sslmode=require"
+      $neon = Read-Host "  Neon Postgres URL"
+      continue
+    }
+    break
   }
 
   $tgToken  = Read-Host "  Telegram bot token (optional)"
@@ -289,14 +315,18 @@ Write-Ok "NGROK_DOMAIN saved (value: $dom)."
 Write-Step "Configuring auto-start on Windows boot"
 $startupDir = [Environment]::GetFolderPath("Startup")
 $shortcut = Join-Path $startupDir "Hira Billing.lnk"
-$wshell = New-Object -ComObject WScript.Shell
-$lnk = $wshell.CreateShortcut($shortcut)
-$lnk.TargetPath       = (Resolve-Path "$INSTALL_DIR\start.bat").Path
-$lnk.WorkingDirectory = $INSTALL_DIR
-$lnk.WindowStyle      = 1
-$lnk.Description      = "Hira & Sons Billing"
-$lnk.Save()
-Write-Ok "Shortcut created in $startupDir"
+if (Test-Path $shortcut) {
+  Write-Ok "Auto-start shortcut already in place."
+} else {
+  $wshell = New-Object -ComObject WScript.Shell
+  $lnk = $wshell.CreateShortcut($shortcut)
+  $lnk.TargetPath       = (Resolve-Path "$INSTALL_DIR\start.bat").Path
+  $lnk.WorkingDirectory = $INSTALL_DIR
+  $lnk.WindowStyle      = 1
+  $lnk.Description      = "Hira & Sons Billing"
+  $lnk.Save()
+  Write-Ok "Shortcut created in $startupDir"
+}
 
 # -----------------------------------------------------------------------------
 # 7. Done — show the styled finish banner
