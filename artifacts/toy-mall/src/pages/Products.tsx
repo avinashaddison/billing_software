@@ -595,30 +595,6 @@ export default function Products() {
     });
   }, []);
 
-  /* Today's Deal toggle handler.
-     - If product is currently active → instantly deactivate (sets isTodayDeal=false,
-       preserves salePrice so any other context still applies).
-     - If inactive → open the DealQuickModal so the cashier can enter discount + end date,
-       then activate. */
-  const handleToggleDeal = useCallback(async (product: { id: string; name: string; price: number; salePrice?: number | null; isTodayDeal?: boolean }) => {
-    if (product.isTodayDeal) {
-      try {
-        const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isTodayDeal: false }),
-        });
-        if (!r.ok) throw new Error("failed");
-        toast.success(`${product.name} removed from Today's Deals`);
-        qc.invalidateQueries({ queryKey: getListProductsQueryKey() });
-      } catch {
-        toast.error("Could not deactivate deal");
-      }
-    } else {
-      setPendingDeal(product);
-    }
-  }, [qc]);
-
   const bulkAssignSupplier = async (supplierId: string | null) => {
     if (selected.size === 0) return;
     setBulkAssigning(true);
@@ -645,6 +621,30 @@ export default function Products() {
   const qc                          = useQueryClient();
   const [, navigate]                = useLocation();
   const searchInputRef              = useRef<HTMLInputElement>(null);
+
+  /* Today's Deal toggle handler.
+     - If product is currently active → instantly deactivate (sets isTodayDeal=false,
+       preserves salePrice so any other context still applies).
+     - If inactive → open the DealQuickModal so the cashier can enter discount + end date,
+       then activate. */
+  const handleToggleDeal = useCallback(async (product: { id: string; name: string; price: number; salePrice?: number | null; isTodayDeal?: boolean }) => {
+    if (product.isTodayDeal) {
+      try {
+        const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isTodayDeal: false }),
+        });
+        if (!r.ok) throw new Error("failed");
+        toast.success(`${product.name} removed from Today's Deals`);
+        qc.invalidateQueries({ queryKey: getListProductsQueryKey() });
+      } catch {
+        toast.error("Could not deactivate deal");
+      }
+    } else {
+      setPendingDeal(product);
+    }
+  }, [qc]);
 
   const { isFlashing, flash, clear } = useScanFlash(1500);
 
