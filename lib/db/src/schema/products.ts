@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, numeric, integer, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, numeric, integer, timestamp, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -13,6 +13,9 @@ export const productsTable = pgTable(
     price:             numeric("price", { precision: 10, scale: 2 }).notNull(),
     salePrice:         numeric("sale_price", { precision: 10, scale: 2 }),
     salePriceUntil:    timestamp("sale_price_until", { withTimezone: true }),
+    /** Cashier-controlled flag: only products with this true show on the
+        Today's Deals page (independent of having a sale price). */
+    isTodayDeal:       boolean("is_today_deal").notNull().default(false),
     stock:             integer("stock").notNull().default(0),
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
     purchasePrice:     numeric("purchase_price", { precision: 10, scale: 2 }),

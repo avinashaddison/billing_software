@@ -20,6 +20,7 @@ interface DealProduct {
   price: number;
   salePrice: number | null;
   salePriceUntil: string | null;
+  isTodayDeal?: boolean;
   stock: number;
   imageUrl?: string | null;
 }
@@ -44,7 +45,8 @@ function NewDealModal({ allProducts, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
 
   const matches = !search ? [] : allProducts
-    .filter((p) => !p.salePrice || !isLive(p))
+    // Exclude products already featured on Today's Deals (with a live sale)
+    .filter((p) => !(p.isTodayDeal === true && isLive(p)))
     .filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.sku.toLowerCase().includes(search.toLowerCase())
@@ -75,6 +77,9 @@ function NewDealModal({ allProducts, onClose, onSaved }: {
       const body = {
         salePrice: newSale,
         salePriceUntil: endDate ? endOfDayISO(new Date(endDate)) : endOfDayISO(new Date()),
+        // Mark this product as a "Today's Deal" so it appears on the deals page.
+        // Products that just have a salePrice (set elsewhere) will NOT show here.
+        isTodayDeal: true,
       };
       const res = await fetch(`${BASE_URL}/api/products/${picked.id}`, {
         method: "PATCH",
@@ -243,11 +248,13 @@ export default function Deals() {
   const [showNew, setShowNew] = useState(false);
 
   const liveDeals = useMemo(
-    () => products.filter(isLive).sort((a, b) => {
-      const aOff = (a.price - (a.salePrice ?? 0)) / a.price;
-      const bOff = (b.price - (b.salePrice ?? 0)) / b.price;
-      return bOff - aOff;
-    }),
+    () => products
+      .filter((p) => p.isTodayDeal === true && isLive(p))
+      .sort((a, b) => {
+        const aOff = (a.price - (a.salePrice ?? 0)) / a.price;
+        const bOff = (b.price - (b.salePrice ?? 0)) / b.price;
+        return bOff - aOff;
+      }),
     [products],
   );
 
@@ -265,10 +272,13 @@ export default function Deals() {
   const handleEndDeal = async (p: DealProduct) => {
     if (!confirm(`End the deal on "${p.name}"?`)) return;
     try {
+      // Remove from Today's Deals page. We keep salePrice intact in case the
+      // owner wants the discount to remain elsewhere; toggling the flag is
+      // enough to take it off this page.
       const res = await fetch(`${BASE_URL}/api/products/${p.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ salePrice: null, salePriceUntil: null }),
+        body: JSON.stringify({ isTodayDeal: false }),
       });
       if (!res.ok) throw new Error("Failed");
       toast.success("Deal ended");

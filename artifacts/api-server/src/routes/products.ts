@@ -293,6 +293,12 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
       updates.salePriceUntil = null;
     }
   }
+  /* isTodayDeal: when explicitly sent in the body, write it through. Outside
+     of the OpenAPI schema right now, so accept directly off req.body too. */
+  const rawIsTodayDeal = (req.body as Record<string, unknown>)?.["isTodayDeal"];
+  if (rawIsTodayDeal !== undefined) {
+    updates.isTodayDeal = Boolean(rawIsTodayDeal);
+  }
 
   const [product] = await db
     .update(productsTable)
