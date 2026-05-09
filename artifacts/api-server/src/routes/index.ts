@@ -16,9 +16,16 @@ import uploadRouter      from "./upload";
 import sharedCartRouter  from "./shared-cart";
 import telegramRouter    from "./telegram";
 import settingsRouter    from "./settings";
+import licenseRouter     from "./license";
+import { licenseGate }   from "../lib/license";
 
 const router: IRouter = Router();
 
+// License gate runs first so unlicensed installs see 402 on every endpoint
+// EXCEPT /api/license/status and /api/health (whitelisted inside licenseGate).
+router.use(licenseGate);
+
+router.use(licenseRouter);
 router.use(healthRouter);
 router.use(productsRouter);
 router.use(stockLogsRouter);

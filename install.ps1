@@ -1,5 +1,5 @@
 # =============================================================================
-# Hira & Sons Billing - One-shot client PC installer
+# Counter Billing - One-shot client PC installer
 # =============================================================================
 # Universal one-liner (works in BOTH cmd.exe and PowerShell, must be Admin):
 #
@@ -14,7 +14,8 @@
 
 $ErrorActionPreference = "Stop"
 $REPO_URL    = "https://github.com/avinashaddison/billing_software.git"
-$INSTALL_DIR = "C:\HiraBilling"
+$INSTALL_DIR = $env:COUNTER_INSTALL_DIR
+if ([string]::IsNullOrWhiteSpace($INSTALL_DIR)) { $INSTALL_DIR = "C:\Counter" }
 
 # Make sure the box-drawing + block characters render correctly
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
@@ -50,7 +51,7 @@ function Show-Banner {
   Write-Host ""
   Write-Host "        S  O  F  T  W  A  R  E " -ForegroundColor DarkGreen -NoNewline
   Write-Host "  +  " -ForegroundColor DarkGray -NoNewline
-  Write-Host "Billing System v1.0" -ForegroundColor Cyan
+  Write-Host "Counter Billing v1.0" -ForegroundColor Cyan
   Write-Host ""
   Write-Host "  ================================================================" -ForegroundColor DarkGreen
   Write-Host ""
@@ -224,10 +225,11 @@ if (Test-Path ".env") {
     break
   }
 
+  $licenseKey = Read-Host "  License key (leave empty to start 14-day trial)"
   $tgToken  = Read-Host "  Telegram bot token (optional)"
   $tgChat   = Read-Host "  Telegram chat ID   (optional)"
   $cloudUrl = Read-Host "  Cloudinary URL     (optional)"
-  $storeName = Read-Host "  Store name (e.g. Hira & Sons Gift Shop)"
+  $storeName = Read-Host "  Store name (e.g. Acme Gift Shop)"
   if ([string]::IsNullOrWhiteSpace($storeName)) { $storeName = "My Shop" }
 
   @"
@@ -238,6 +240,8 @@ DATABASE_URL="$neon"
 
 PORT=3000
 API_PORT=8080
+
+LICENSE_KEY="$licenseKey"
 
 TELEGRAM_BOT_TOKEN="$tgToken"
 TELEGRAM_CHAT_ID="$tgChat"
@@ -314,7 +318,7 @@ Write-Ok "NGROK_DOMAIN saved (value: $dom)."
 # -----------------------------------------------------------------------------
 Write-Step "Configuring auto-start on Windows boot"
 $startupDir = [Environment]::GetFolderPath("Startup")
-$shortcut = Join-Path $startupDir "Hira Billing.lnk"
+$shortcut = Join-Path $startupDir "Counter Billing.lnk"
 if (Test-Path $shortcut) {
   Write-Ok "Auto-start shortcut already in place."
 } else {
@@ -323,7 +327,7 @@ if (Test-Path $shortcut) {
   $lnk.TargetPath       = (Resolve-Path "$INSTALL_DIR\start.bat").Path
   $lnk.WorkingDirectory = $INSTALL_DIR
   $lnk.WindowStyle      = 1
-  $lnk.Description      = "Hira & Sons Billing"
+  $lnk.Description      = "Counter Billing"
   $lnk.Save()
   Write-Ok "Shortcut created in $startupDir"
 }

@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM Hira & Sons Billing - production launcher
+REM Counter Billing - production launcher
 REM Runs the local server (port 3000) and the ngrok tunnel for phone access.
 REM Does NOT auto-update on boot - updates are deliberate via update.bat
 REM (run from the developer's AnyDesk session) so a broken push can never
@@ -14,7 +14,7 @@ if "%PORT%"=="" set PORT=3000
 
 echo.
 echo ============================================================
-echo   Hira ^& Sons Billing
+echo   Counter Billing
 echo   Local URL:  http://localhost:%PORT%
 echo ============================================================
 echo.

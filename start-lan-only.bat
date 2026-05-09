@@ -12,7 +12,7 @@ if "%PORT%"=="" set PORT=3000
 
 echo.
 echo ============================================================
-echo   Hira ^& Sons Billing  (LAN-only)
+echo   Counter Billing  (LAN-only)
 echo   Local PC:    http://localhost:%PORT%
 echo   Other devs:  http://YOUR-PC-IP:%PORT%   (run "ipconfig" to find IP)
 echo ============================================================

@@ -36,20 +36,19 @@ interface StoreSettingsStore extends StoreSettings {
 export const useStoreSettings = create<StoreSettingsStore>()(
   persist(
     (set, get) => ({
-      name:          "Hira & Sons Gift Shop",
-      tagline:       "The Complete Toy Store",
-      phone:         "+91 94318 01793",
+      name:          "Your Shop Name",
+      tagline:       "Set your tagline in Settings",
+      phone:         "",
       email:         "",
-      address:       "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
+      address:       "",
       gst:           "",
-      logoEmoji:     "🧸",
+      logoEmoji:     "🏪",
       logoUrl:       "",
-      appSubtitle:   "Billing Management",
-      footerNote:    "Goods once sold will not be returned or exchanged.",
+      appSubtitle:   "Billing & Inventory",
+      footerNote:    "Thank you for your business.",
       termsAndConditions: [
         "No Cash Refund.",
         "Goods once sold will not be returned or exchanged.",
-        "Subject to Ranchi jurisdiction.",
       ],
       upiId:         "",
       dynamicQrMode: false,

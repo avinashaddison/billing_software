@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, KeyRound, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useStoreSettings, usePerStaffScannerPrefs, type StoreSettings } from "@/lib/store-info";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,20 +12,19 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 const EMOJI_OPTIONS = ["🧸", "🎮", "🛒", "🏪", "🎁", "🧩", "🎯", "🪀", "🎈", "⭐"];
 
 const DEFAULTS: StoreSettings = {
-  name:               "Hira & Sons Gift Shop",
-  tagline:            "The Complete Toy Store",
-  phone:              "+91 94318 01793",
+  name:               "Your Shop Name",
+  tagline:            "Set your tagline in Settings",
+  phone:              "",
   email:              "",
-  address:            "Near Old Bus Stand, Ranchi, Jharkhand - 834001",
+  address:            "",
   gst:                "",
-  logoEmoji:          "🧸",
+  logoEmoji:          "🏪",
   logoUrl:            "",
-  appSubtitle:        "Billing Management",
-  footerNote:         "Goods once sold will not be returned or exchanged.",
+  appSubtitle:        "Billing & Inventory",
+  footerNote:         "Thank you for your business.",
   termsAndConditions: [
     "No Cash Refund.",
     "Goods once sold will not be returned or exchanged.",
-    "Subject to Ranchi jurisdiction.",
   ],
   upiId:              "",
   dynamicQrMode:      false,
@@ -173,12 +172,12 @@ export default function SettingsPage() {
         <Section icon={Store} title="Store Identity" color="text-primary bg-primary/10">
           <Field label="Shop Name" hint="Shown on bills, login screen & sidebar">
             <input value={form.name} onChange={(e) => set("name", e.target.value)}
-              placeholder="e.g. Hira & Sons Gift Shop"
+              placeholder="e.g. Acme Gift Shop"
               className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-bold" />
           </Field>
           <Field label="Tagline" hint="One-line description shown on bills">
             <input value={form.tagline} onChange={(e) => set("tagline", e.target.value)}
-              placeholder="e.g. The Complete Toy Store"
+              placeholder="e.g. Quality goods, fair prices"
               className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </Field>
           <Field label="App Subtitle" hint="Shown below your shop name in sidebar & login">
@@ -431,6 +430,11 @@ export default function SettingsPage() {
             }}
           />
           <RecentScanEvents />
+        </Section>
+
+        {/* ── License ── */}
+        <Section icon={KeyRound} title="License" color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30">
+          <LicensePanel />
         </Section>
 
         {/* ── Telegram Notifications ── */}
@@ -764,6 +768,107 @@ function RecentScanEvents() {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+interface LicenseStatus {
+  valid: boolean;
+  mode: "licensed" | "trial" | "expired" | "invalid" | "trial_expired";
+  shop: string | null;
+  edition: string | null;
+  expiry: string | null;
+  daysRemaining: number | null;
+  trialEndsAt: string | null;
+  reason: string | null;
+}
+
+function LicensePanel() {
+  const [status, setStatus] = useState<LicenseStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/license/status`);
+      if (r.ok) setStatus(await r.json());
+    } catch { /* offline — keep prior status */ }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetch(`${API}/license/refresh`, { method: "POST" });
+      await load();
+      toast.success("License re-checked.");
+    } catch {
+      toast.error("Could not reach server");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  if (loading && !status) {
+    return <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking license…</div>;
+  }
+  if (!status) {
+    return <p className="text-xs text-amber-600">License status unknown — server unreachable.</p>;
+  }
+
+  const isOk = status.valid;
+  const modeLabel: Record<LicenseStatus["mode"], string> = {
+    licensed:      "Licensed",
+    trial:         "Trial",
+    expired:       "License expired",
+    invalid:       "Invalid license",
+    trial_expired: "Trial ended",
+  };
+  const Icon = isOk ? ShieldCheck : ShieldAlert;
+  const color = isOk
+    ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+    : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800";
+
+  return (
+    <div className="space-y-3">
+      <div className={`flex items-center gap-3 p-3 rounded-xl border ${color}`}>
+        <Icon className="w-6 h-6 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-black">{modeLabel[status.mode]}</p>
+          <p className="text-[11px] opacity-90 truncate">
+            {status.mode === "licensed" && status.shop && `Issued to ${status.shop}`}
+            {status.mode === "trial" && status.daysRemaining != null && `${status.daysRemaining} day${status.daysRemaining === 1 ? "" : "s"} left in trial`}
+            {(status.mode === "expired" || status.mode === "trial_expired" || status.mode === "invalid") && (status.reason ?? "Enter a license key to restore service")}
+          </p>
+        </div>
+        <button
+          onClick={refresh}
+          disabled={refreshing}
+          className="px-2.5 py-1.5 rounded-lg bg-background border text-[11px] font-bold hover:bg-muted disabled:opacity-60 flex items-center gap-1.5"
+        >
+          {refreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+          Re-check
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-[11px]">
+        <Pill label="Edition" value={status.edition ?? "—"} />
+        <Pill label="Expiry"  value={status.expiry  ?? (status.trialEndsAt ? `Trial: ${status.trialEndsAt.slice(0, 10)}` : "—")} />
+      </div>
+      <p className="text-[11px] text-muted-foreground leading-relaxed">
+        License keys are configured in the server's <span className="font-mono bg-muted px-1 rounded">.env</span> file as <span className="font-mono bg-muted px-1 rounded">LICENSE_KEY</span>. Edit it then click Re-check, or restart the app.
+      </p>
+    </div>
+  );
+}
+
+function Pill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border bg-muted/20 px-2.5 py-1.5">
+      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">{label}</p>
+      <p className="text-xs font-mono truncate">{value}</p>
     </div>
   );
 }

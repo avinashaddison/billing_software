@@ -257,7 +257,7 @@ export default function Checkout() {
   }, 0);
   const isOnline = useOnline();
   const { pendingCount, enqueue, syncAll } = useOfflineQueue();
-  const { upiId, dynamicQrMode } = useStoreSettings();
+  const { upiId, dynamicQrMode, name: storeName } = useStoreSettings();
 
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
   const paymentModeRef = useRef<PaymentMode>("cash");
@@ -280,7 +280,7 @@ export default function Checkout() {
   const qrActive = dynamicQrMode && !!upiId && paymentMode === "upi";
 
   const upiUrl = qrActive
-    ? `upi://pay?pa=${encodeURIComponent(upiId)}&am=${finalTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Toy Mall Sale")}`
+    ? `upi://pay?pa=${encodeURIComponent(upiId)}&am=${finalTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`${storeName || "Shop"} Sale`)}`
     : "";
 
   const validatePhone = (v: string) =>

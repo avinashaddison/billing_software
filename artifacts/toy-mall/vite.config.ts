@@ -20,9 +20,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
-        name: "Hira & Sons Gift Shop",
-        short_name: "Hira & Sons",
-        description: "Toy Mall Inventory Management",
+        name: "Counter — Billing & Inventory",
+        short_name: "Counter",
+        description: "Modern billing & inventory for retail shops",
         theme_color: "#2563EB",
         background_color: "#ffffff",
         display: "standalone",

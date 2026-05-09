@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM Hira & Sons Billing — first-time client PC setup
+REM Counter Billing — first-time client PC setup
 REM Run this ONCE on the client's PC after cloning the repo.
 REM ============================================================================
 
@@ -9,7 +9,7 @@ cd /d "%~dp0"
 
 echo.
 echo ============================================================
-echo   Hira ^& Sons Billing — First-time Setup
+echo   Counter Billing — First-time Setup
 echo ============================================================
 echo.
 

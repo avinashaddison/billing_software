@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM Hira & Sons Billing - One-click update
+REM Counter Billing - One-click update
 REM Pulls latest from GitHub, reinstalls deps, rebuilds, syncs DB schema.
 REM Double-click this when the developer says "I shipped a fix".
 REM ============================================================================
@@ -9,7 +9,7 @@ cd /d "%~dp0"
 
 echo.
 echo  +------------------------------------------------------------+
-echo  ^|     Hira ^& Sons Billing - Update                           ^|
+echo  ^|     Counter Billing - Update                           ^|
 echo  +------------------------------------------------------------+
 echo.
 

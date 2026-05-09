@@ -132,10 +132,10 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading, items, stoc
   const phoneRef = useRef<HTMLInputElement>(null);
   useEffect(() => { phoneRef.current?.focus(); }, []);
 
-  const { upiId, dynamicQrMode } = useStoreSettings();
+  const { upiId, dynamicQrMode, name: storeName } = useStoreSettings();
   const qrActive = dynamicQrMode && !!upiId && paymentMode === "upi";
   const upiUrl   = qrActive
-    ? `upi://pay?pa=${encodeURIComponent(upiId)}&am=${total.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Toy Mall Sale")}`
+    ? `upi://pay?pa=${encodeURIComponent(upiId)}&am=${total.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`${storeName || "Shop"} Sale`)}`
     : "";
 
   const validatePhone = (v: string) => (!v || /^\d{10}$/.test(v)) ? "" : "Enter a valid 10-digit number";
