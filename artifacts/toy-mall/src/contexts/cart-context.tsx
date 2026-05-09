@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
 
+export type LineDiscountType = "percent" | "amount";
+
 export interface CartItem {
   productId: string;
   sku:       string;
@@ -7,8 +9,12 @@ export interface CartItem {
   quantity:  number;
   price:     number;
   mrp?:      number;
-  /** Per-line discount percent (0-100). Applied on top of any existing sale price. */
+  /** Per-line discount percent (0-100). Used when discountType is undefined or "percent". */
   discountPercent?: number;
+  /** Per-line FLAT discount in rupees, applied per unit. Used when discountType is "amount". */
+  discountAmount?: number;
+  /** Which discount mode is active for this line. Default: "percent". */
+  discountType?: LineDiscountType;
 }
 
 interface CartContextType {
@@ -18,13 +24,24 @@ interface CartContextType {
   addItem:          (item: Omit<CartItem, "quantity">) => void;
   removeItem:       (productId: string) => void;
   updateQty:        (productId: string, qty: number) => void;
-  setLineDiscount:  (productId: string, percent: number) => void;
+  setLineDiscount:  (productId: string, type: LineDiscountType, value: number) => void;
   clearCart:        () => void;
   syncFromServer:   (items: CartItem[]) => void;
 }
 
-/** Effective per-unit price after applying any line discount. */
-export function effectivePrice(item: { price: number; discountPercent?: number }): number {
+/** Effective per-unit price after applying any line discount (% or flat ₹). */
+export function effectivePrice(item: {
+  price: number;
+  discountPercent?: number;
+  discountAmount?: number;
+  discountType?: LineDiscountType;
+}): number {
+  const type = item.discountType ?? "percent";
+  if (type === "amount") {
+    const amt = item.discountAmount ?? 0;
+    if (amt <= 0) return item.price;
+    return Math.max(0, item.price - amt);
+  }
   const pct = item.discountPercent ?? 0;
   if (pct <= 0) return item.price;
   if (pct >= 100) return 0;
@@ -164,14 +181,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const setLineDiscount = useCallback((productId: string, percent: number) => {
-    const clamped = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
+  const setLineDiscount = useCallback((productId: string, type: LineDiscountType, value: number) => {
+    const v = Number.isFinite(value) ? value : 0;
     setItems((prev) =>
-      prev.map((i) =>
-        i.productId === productId
-          ? { ...i, discountPercent: clamped > 0 ? clamped : undefined }
-          : i,
-      )
+      prev.map((i) => {
+        if (i.productId !== productId) return i;
+        if (type === "amount") {
+          const amt = Math.max(0, Math.min(i.price, v));
+          return {
+            ...i,
+            discountType:    "amount",
+            discountAmount:  amt > 0 ? amt : undefined,
+            discountPercent: undefined,
+          };
+        }
+        const pct = Math.max(0, Math.min(100, v));
+        return {
+          ...i,
+          discountType:    "percent",
+          discountPercent: pct > 0 ? pct : undefined,
+          discountAmount:  undefined,
+        };
+      })
     );
     /* Line discount is local-only for now; not synced to shared cart since other
        devices wouldn't know to render it consistently. Bills capture it on checkout. */

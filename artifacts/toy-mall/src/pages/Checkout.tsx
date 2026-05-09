@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { playCheckoutSuccess, playError, playTick } from "@/lib/sounds";
-import { useCart, effectivePrice } from "@/contexts/cart-context";
+import { useCart, effectivePrice, type LineDiscountType } from "@/contexts/cart-context";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useOnline } from "@/hooks/use-online";
 import { useStoreSettings } from "@/lib/store-info";
@@ -89,17 +89,25 @@ function SuccessOverlay({ billId }: { billId: string }) {
 
 /* ── Memoized cart item row ─────────────────────────────────────── */
 interface CartItemRowProps {
-  item: { productId: string; name: string; sku: string; price: number; mrp?: number; quantity: number; discountPercent?: number };
+  item: {
+    productId: string; name: string; sku: string;
+    price: number; mrp?: number; quantity: number;
+    discountPercent?: number;
+    discountAmount?:  number;
+    discountType?:    LineDiscountType;
+  };
   onQtyChange: (productId: string, qty: number) => void;
   onRemove: (productId: string) => void;
-  onLineDiscount: (productId: string, percent: number) => void;
+  onLineDiscount: (productId: string, type: LineDiscountType, value: number) => void;
 }
 const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onLineDiscount }: CartItemRowProps) {
-  const onSale = item.mrp != null && item.mrp > item.price;
-  const pct    = item.discountPercent ?? 0;
-  const eff    = effectivePrice(item);
-  const hasLineDiscount = pct > 0;
-  const subtotal = eff * item.quantity;
+  const onSale     = item.mrp != null && item.mrp > item.price;
+  const eff        = effectivePrice(item);
+  const dType      = item.discountType ?? "percent";
+  const pct        = item.discountPercent ?? 0;
+  const amt        = item.discountAmount ?? 0;
+  const hasLineDiscount = (dType === "percent" ? pct : amt) > 0;
+  const subtotal   = eff * item.quantity;
   return (
     <div className={`rounded-2xl px-4 py-3 border bg-card transition-all ${
       hasLineDiscount ? "border-amber-300 dark:border-amber-700" : onSale ? "border-red-200 dark:border-red-800" : "border-border"
@@ -115,7 +123,7 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
             )}
             {hasLineDiscount && (
               <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 leading-none">
-                -{pct}%
+                {dType === "percent" ? `-${pct}%` : `-₹${amt}`}
               </span>
             )}
           </div>
@@ -158,32 +166,66 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
           <X className="w-3.5 h-3.5 text-red-500" />
         </button>
       </div>
-      {/* ── Per-line discount input ── */}
-      <div className="flex items-center gap-2 mt-2 pl-1">
+      {/* ── Per-line discount input (% or ₹) ── */}
+      <div className="flex items-center gap-2 mt-2 pl-1 flex-wrap">
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
           <Tag className="w-3 h-3" />
           Item discount
         </span>
-        <div className="relative flex-1 max-w-[140px]">
+        {/* %  /  ₹  toggle */}
+        <div className="inline-flex rounded-lg border bg-muted/30 overflow-hidden h-8">
+          <button
+            type="button"
+            onClick={() => onLineDiscount(item.productId, "percent", pct)}
+            className={`px-2.5 text-xs font-black transition-colors ${
+              dType === "percent"
+                ? "bg-amber-500 text-white"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            aria-label="Percent discount"
+          >
+            %
+          </button>
+          <button
+            type="button"
+            onClick={() => onLineDiscount(item.productId, "amount", amt)}
+            className={`px-2.5 text-xs font-black transition-colors border-l ${
+              dType === "amount"
+                ? "bg-amber-500 text-white"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            aria-label="Rupee discount"
+          >
+            ₹
+          </button>
+        </div>
+        {/* value input — meaning depends on toggle */}
+        <div className="relative flex-1 min-w-[100px] max-w-[160px]">
           <input
             type="number"
             min={0}
-            max={100}
-            step={1}
+            max={dType === "percent" ? 100 : item.price}
+            step={dType === "percent" ? 1 : 0.5}
             inputMode="decimal"
-            value={pct === 0 ? "" : String(pct)}
-            placeholder="0"
+            value={
+              dType === "percent"
+                ? pct === 0 ? "" : String(pct)
+                : amt === 0 ? "" : String(amt)
+            }
+            placeholder={dType === "percent" ? "0" : "0.00"}
             onChange={(e) => {
               const v = e.target.value === "" ? 0 : parseFloat(e.target.value);
-              onLineDiscount(item.productId, Number.isFinite(v) ? v : 0);
+              onLineDiscount(item.productId, dType, Number.isFinite(v) ? v : 0);
             }}
             className="w-full h-8 pl-2 pr-7 text-xs rounded-lg border bg-muted/40 focus:outline-none focus:ring-2 focus:ring-amber-400/40 font-bold tabular-nums"
           />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-black text-muted-foreground pointer-events-none">%</span>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-black text-muted-foreground pointer-events-none">
+            {dType === "percent" ? "%" : "₹/u"}
+          </span>
         </div>
         {hasLineDiscount && (
           <button
-            onClick={() => onLineDiscount(item.productId, 0)}
+            onClick={() => onLineDiscount(item.productId, dType, 0)}
             className="text-[10px] font-bold text-muted-foreground hover:text-foreground underline"
           >
             clear
@@ -253,8 +295,8 @@ export default function Checkout() {
   );
 
   const handleLineDiscount = useCallback(
-    (productId: string, percent: number) => {
-      setLineDiscount(productId, percent);
+    (productId: string, type: LineDiscountType, value: number) => {
+      setLineDiscount(productId, type, value);
     },
     [setLineDiscount],
   );
@@ -266,7 +308,7 @@ export default function Checkout() {
   const buildCheckoutItems = () =>
     items.map((i) => {
       const eff       = effectivePrice(i);
-      const hasLine   = (i.discountPercent ?? 0) > 0;
+      const hasLine   = eff < i.price - 0.001;
       const reference = i.mrp != null ? i.mrp : (hasLine ? i.price : undefined);
       return {
         productId: i.productId,
