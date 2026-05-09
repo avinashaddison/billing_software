@@ -155,6 +155,44 @@ export function SideNav() {
           {extraItems.map((item) => {
             const isActive = location === item.href || location.startsWith(item.href);
             const Icon = item.icon;
+
+            /* Special-case Today's Deals: red/orange/pink gradient pill so it
+               draws the eye and feels "hot". Smooth pulsing fire icon. */
+            if (item.resource === "deals") {
+              return (
+                <Link key={item.name} href={item.href}
+                  className={cn(
+                    "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-black text-sm overflow-hidden",
+                    "transition-all duration-300 ease-out my-1",
+                    isActive
+                      ? "bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 text-white shadow-lg shadow-rose-500/30 scale-[1.02]"
+                      : "bg-gradient-to-r from-red-500/[0.08] via-rose-500/[0.08] to-pink-500/[0.08] text-rose-600 dark:text-rose-300 hover:from-red-500/[0.18] hover:via-rose-500/[0.18] hover:to-pink-500/[0.18] hover:shadow-md hover:shadow-rose-500/20 hover:scale-[1.02]"
+                  )}>
+                  {/* Subtle ambient glow */}
+                  <span aria-hidden className={cn(
+                    "absolute inset-0 -z-0 rounded-xl bg-gradient-to-r from-red-400 via-rose-400 to-pink-400 blur-md transition-opacity duration-300",
+                    isActive ? "opacity-40" : "opacity-0 group-hover:opacity-25"
+                  )} />
+                  {/* Shimmer sweep on hover */}
+                  <span aria-hidden className="absolute inset-y-0 -inset-x-2 -z-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+
+                  <span className="relative">
+                    <Icon size={17} strokeWidth={2.5} className={cn("transition-transform duration-300", !isActive && "group-hover:scale-110 group-hover:rotate-6")} />
+                  </span>
+                  <span className="relative flex-1">{item.name}</span>
+                  {/* Live pulse dot */}
+                  <span className="relative flex h-1.5 w-1.5 shrink-0">
+                    <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full",
+                      isActive ? "bg-yellow-200 opacity-75" : "bg-rose-400 opacity-70"
+                    )} />
+                    <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full",
+                      isActive ? "bg-yellow-300" : "bg-rose-500"
+                    )} />
+                  </span>
+                </Link>
+              );
+            }
+
             return (
               <Link key={item.name} href={item.href}
                 className={cn(
