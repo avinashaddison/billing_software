@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, integer, numeric, timestamp, text } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { billsTable } from "./bills";
@@ -14,6 +14,17 @@ export const saleItemsTable = pgTable("sale_items", {
   quantity: integer("quantity").notNull(),
   price: numeric("price", { precision: 15, scale: 2 }).notNull(),
   mrp: numeric("mrp", { precision: 15, scale: 2 }),
+  /**
+   * The pre-discount unit price BEFORE the cashier applied an extra line
+   * discount (i.e. the sale price if the item was on sale, or the regular
+   * price otherwise). When this is greater than `price`, the difference is
+   * the cashier-applied "extra" discount per unit.
+   */
+  preDiscountPrice: numeric("pre_discount_price", { precision: 15, scale: 2 }),
+  /** "percent" or "amount" — how the cashier expressed the line discount. */
+  discountType:    text("discount_type"),
+  /** Raw value the cashier typed (e.g. 10 for "10%" or 50 for "₹50"). */
+  discountValue:   numeric("discount_value", { precision: 15, scale: 2 }),
   subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

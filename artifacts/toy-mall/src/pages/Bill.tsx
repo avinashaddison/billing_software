@@ -12,6 +12,9 @@ interface BillItem {
   quantity: number;
   price: number;
   mrp: number | null;
+  preDiscountPrice?: number | null;
+  discountType?:    "percent" | "amount" | null;
+  discountValue?:   number | null;
   subtotal: number;
 }
 
@@ -444,21 +447,47 @@ export default function Bill() {
               </thead>
               <tbody>
                 {items.map((item, idx) => {
-                  const mrp = item.mrp ?? item.price;
-                  const hasDiscount = mrp > item.price + 0.001;
-                  const pct = hasDiscount ? Math.round(((mrp - item.price) / mrp) * 100) : 0;
-                  const lineSavings = hasDiscount ? (mrp - item.price) * item.quantity : 0;
+                  const mrp           = item.mrp ?? item.price;
+                  const hasAnySaving  = mrp > item.price + 0.001;
+                  const totalSavedPct = hasAnySaving ? Math.round(((mrp - item.price) / mrp) * 100) : 0;
+                  const lineSavings   = hasAnySaving ? (mrp - item.price) * item.quantity : 0;
+
+                  /* Break the savings into "Sale" (auto MRP→preDiscountPrice)
+                     and "Extra" (cashier-applied preDiscountPrice→price). */
+                  const preDisc       = item.preDiscountPrice ?? null;
+                  const hasExtra      = preDisc != null && preDisc > item.price + 0.001;
+                  const saleFrom      = preDisc != null ? preDisc : mrp;
+                  const hasSale       = mrp > saleFrom + 0.001;
+                  const salePct       = hasSale  ? Math.round(((mrp - saleFrom) / mrp) * 100) : 0;
+                  const extraDisplay  = hasExtra
+                    ? (item.discountType === "amount"
+                        ? `-₹${(item.discountValue ?? (preDisc - item.price)).toFixed(2)}`
+                        : `${item.discountValue ?? Math.round(((preDisc - item.price) / preDisc) * 100)}% extra`)
+                    : "";
+
                   return (
                     <tr key={item.id} className="align-top">
                       <td className="px-1.5 py-1 tabular-nums border-r border-black/15">{idx + 1}.</td>
                       <td className="px-1.5 py-1 break-words leading-tight border-r border-black/15">
                         {item.productName}
-                        {hasDiscount && (
-                          <div className="text-[9px] font-bold mt-0.5 leading-tight">
-                            <span className="bg-black text-white px-1 py-px rounded-sm" style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any}>
-                              {pct}% OFF
-                            </span>
-                            <span className="text-black/60 ml-1">saved ₹{lineSavings.toFixed(2)}</span>
+                        {hasAnySaving && (
+                          <div className="text-[9px] font-bold mt-0.5 leading-tight flex flex-wrap items-center gap-1">
+                            {hasSale && (
+                              <span className="bg-black text-white px-1 py-px rounded-sm" style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any}>
+                                {salePct}% SALE
+                              </span>
+                            )}
+                            {hasExtra && (
+                              <span className="bg-amber-600 text-white px-1 py-px rounded-sm" style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact", backgroundColor: "#b45309" } as any}>
+                                {extraDisplay}
+                              </span>
+                            )}
+                            {!hasSale && !hasExtra && (
+                              <span className="bg-black text-white px-1 py-px rounded-sm" style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any}>
+                                {totalSavedPct}% OFF
+                              </span>
+                            )}
+                            <span className="text-black/60">saved ₹{lineSavings.toFixed(2)}</span>
                           </div>
                         )}
                       </td>

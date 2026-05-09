@@ -34,9 +34,18 @@ function isValidCheckoutBody(body: unknown): body is {
     const it = item as Record<string, unknown>;
     if (typeof it.productId !== "string") return false;
     if (typeof it.quantity !== "number" || (it.quantity as number) <= 0) return false;
-    if (typeof it.price !== "number" || (it.price as number) <= 0) return false;
+    if (typeof it.price !== "number" || (it.price as number) < 0) return false;
     if (it.mrp !== undefined && it.mrp !== null) {
       if (typeof it.mrp !== "number" || (it.mrp as number) <= 0) return false;
+    }
+    if (it.preDiscountPrice !== undefined && it.preDiscountPrice !== null) {
+      if (typeof it.preDiscountPrice !== "number" || (it.preDiscountPrice as number) < 0) return false;
+    }
+    if (it.discountType !== undefined && it.discountType !== null) {
+      if (it.discountType !== "percent" && it.discountType !== "amount") return false;
+    }
+    if (it.discountValue !== undefined && it.discountValue !== null) {
+      if (typeof it.discountValue !== "number" || (it.discountValue as number) < 0) return false;
     }
     return true;
   });
@@ -55,15 +64,18 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
   try {
     const result = await db.transaction(async (tx) => {
       const processedItems: {
-        productId:   string;
-        productName: string;
-        productSku:  string;
-        quantity:    number;
-        price:       number;
-        mrp?:        number;
-        subtotal:    number;
-        newStock:    number;
-        threshold:   number;
+        productId:        string;
+        productName:      string;
+        productSku:       string;
+        quantity:         number;
+        price:            number;
+        mrp?:             number;
+        preDiscountPrice?: number;
+        discountType?:    "percent" | "amount";
+        discountValue?:   number;
+        subtotal:         number;
+        newStock:         number;
+        threshold:        number;
       }[] = [];
 
       for (const item of items) {
@@ -93,15 +105,18 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         });
 
         processedItems.push({
-          productId:   item.productId,
-          productName: product.name,
-          productSku:  product.sku,
-          quantity:    item.quantity,
-          price:       item.price,
-          mrp:         item.mrp,
-          subtotal:    item.price * item.quantity,
-          newStock:    product.stock - item.quantity,
-          threshold:   product.lowStockThreshold,
+          productId:        item.productId,
+          productName:      product.name,
+          productSku:       product.sku,
+          quantity:         item.quantity,
+          price:            item.price,
+          mrp:              item.mrp,
+          preDiscountPrice: item.preDiscountPrice,
+          discountType:     item.discountType,
+          discountValue:    item.discountValue,
+          subtotal:         item.price * item.quantity,
+          newStock:         product.stock - item.quantity,
+          threshold:        product.lowStockThreshold,
         });
       }
 
@@ -134,12 +149,15 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         .insert(saleItemsTable)
         .values(
           processedItems.map((i) => ({
-            saleId:    bill.id,
-            productId: i.productId,
-            quantity:  i.quantity,
-            price:     String(i.price),
-            mrp:       i.mrp != null ? String(i.mrp) : null,
-            subtotal:  String(i.subtotal),
+            saleId:           bill.id,
+            productId:        i.productId,
+            quantity:         i.quantity,
+            price:            String(i.price),
+            mrp:              i.mrp != null ? String(i.mrp) : null,
+            preDiscountPrice: i.preDiscountPrice != null ? String(i.preDiscountPrice) : null,
+            discountType:     i.discountType ?? null,
+            discountValue:    i.discountValue != null ? String(i.discountValue) : null,
+            subtotal:         String(i.subtotal),
           }))
         )
         .returning();
@@ -202,14 +220,17 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
 
   const items = await db
     .select({
-      id:          saleItemsTable.id,
-      productId:   saleItemsTable.productId,
-      productName: productsTable.name,
-      productSku:  productsTable.sku,
-      quantity:    saleItemsTable.quantity,
-      price:       saleItemsTable.price,
-      mrp:         saleItemsTable.mrp,
-      subtotal:    saleItemsTable.subtotal,
+      id:               saleItemsTable.id,
+      productId:        saleItemsTable.productId,
+      productName:      productsTable.name,
+      productSku:       productsTable.sku,
+      quantity:         saleItemsTable.quantity,
+      price:            saleItemsTable.price,
+      mrp:              saleItemsTable.mrp,
+      preDiscountPrice: saleItemsTable.preDiscountPrice,
+      discountType:     saleItemsTable.discountType,
+      discountValue:    saleItemsTable.discountValue,
+      subtotal:         saleItemsTable.subtotal,
     })
     .from(saleItemsTable)
     .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
@@ -224,11 +245,14 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
     },
     items: items.map((i) => ({
       ...i,
-      productName: i.productName ?? "Deleted Product",
-      productSku:  i.productSku  ?? "—",
-      price:    Number(i.price),
-      mrp:      i.mrp != null ? Number(i.mrp) : null,
-      subtotal: Number(i.subtotal),
+      productName:      i.productName ?? "Deleted Product",
+      productSku:       i.productSku  ?? "—",
+      price:            Number(i.price),
+      mrp:              i.mrp != null ? Number(i.mrp) : null,
+      preDiscountPrice: i.preDiscountPrice != null ? Number(i.preDiscountPrice) : null,
+      discountType:     i.discountType ?? null,
+      discountValue:    i.discountValue != null ? Number(i.discountValue) : null,
+      subtotal:         Number(i.subtotal),
     })),
   });
 });

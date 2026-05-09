@@ -18,7 +18,12 @@ const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 type PaymentMode = "cash" | "upi";
 
 async function postCheckout(payload: {
-  items: { productId: string; quantity: number; price: number; mrp?: number }[];
+  items: {
+    productId: string; quantity: number; price: number; mrp?: number;
+    preDiscountPrice?: number;
+    discountType?:    LineDiscountType;
+    discountValue?:   number;
+  }[];
   paymentMode: PaymentMode;
   customerPhone?: string;
   discount?: number;
@@ -310,11 +315,20 @@ export default function Checkout() {
       const eff       = effectivePrice(i);
       const hasLine   = eff < i.price - 0.001;
       const reference = i.mrp != null ? i.mrp : (hasLine ? i.price : undefined);
+      const dType     = i.discountType ?? "percent";
+      const dValue    = dType === "amount" ? (i.discountAmount ?? 0) : (i.discountPercent ?? 0);
       return {
-        productId: i.productId,
-        quantity:  i.quantity,
-        price:     eff,
-        mrp:       reference,
+        productId:        i.productId,
+        quantity:         i.quantity,
+        price:            eff,
+        mrp:              reference,
+        // i.price is the sticker price (sale price if on sale), pre-cashier-discount.
+        // Only send the breakdown fields when the cashier actually applied a line discount.
+        ...(hasLine && dValue > 0 ? {
+          preDiscountPrice: i.price,
+          discountType:     dType,
+          discountValue:    dValue,
+        } : {}),
       };
     });
 
