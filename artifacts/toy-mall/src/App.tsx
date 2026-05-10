@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { LicenseLockout } from "@/components/layout/LicenseLockout";
 import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
+import { SnowOverlay } from "@/components/effects/SnowOverlay";
 import { CartProvider } from "@/contexts/cart-context";
 import { useEffect }           from "react";
 import { useRealtime }         from "@/hooks/use-realtime";
@@ -129,6 +130,7 @@ function App() {
         <CartProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <RealtimeProvider>
+              <SnowOverlay />
               <LicenseLockout>
                 <Router />
               </LicenseLockout>
