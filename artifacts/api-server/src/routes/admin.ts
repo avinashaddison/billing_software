@@ -9,11 +9,18 @@ const ADMIN_PASSWORD = process.env["ADMIN_PASSWORD"]?.trim();
 
 /**
  * Gate every admin route:
- *   1. If ADMIN_PASSWORD env is unset → 404 (admin features hidden completely
+ *   1. Skip entirely if the request isn't for an /admin/* path — this router
+ *      is mounted at "/" so without this guard, the middleware would 401
+ *      every other endpoint in the app.
+ *   2. If ADMIN_PASSWORD env is unset → 404 (admin features hidden completely
  *      from customer installs that don't opt in).
- *   2. Otherwise compare the X-Admin-Password header with constant-time check.
+ *   3. Otherwise compare the X-Admin-Password header with constant-time check.
  */
 function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (!req.path.startsWith("/admin/") && req.path !== "/admin") {
+    next(); return;
+  }
+
   if (!ADMIN_PASSWORD) { res.status(404).end(); return; }
 
   // Allow the existence-check route through (returns 401 instead of 404 so
