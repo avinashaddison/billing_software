@@ -24,6 +24,22 @@ import { spawnSync }  from "node:child_process";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../..");
 const SECRET_FILE = path.join(REPO_ROOT, ".license-secret");
+const VENDOR_MARKER = path.join(REPO_ROOT, ".vendor-mode");
+
+// Refuse to run unless the vendor-mode marker is present. Customer installs
+// don't have this file, so even if they find this script, it bails before
+// generating anything signable.
+if (!fs.existsSync(VENDOR_MARKER)) {
+  console.error("");
+  console.error("╔════════════════════════════════════════════════════════════════════╗");
+  console.error("║  This is a vendor-only tool. License generation is disabled.       ║");
+  console.error("║                                                                    ║");
+  console.error("║  Need a license key? Email addisonxmedia@gmail.com with your      ║");
+  console.error("║  shop name to request one.                                         ║");
+  console.error("╚════════════════════════════════════════════════════════════════════╝");
+  console.error("");
+  process.exit(1);
+}
 
 function loadSecret(): string {
   // Priority 1: LICENSE_SECRET env var (used by the api-server runtime too)

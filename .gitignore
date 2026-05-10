@@ -54,6 +54,7 @@ Thumbs.db
 .env.*.local
 .license-secret
 .license-history.json
+.vendor-mode
 
 # Claude Code harness state
 .claude/

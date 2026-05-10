@@ -1,11 +1,34 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import crypto from "node:crypto";
+import fs     from "node:fs";
+import path   from "node:path";
+import { fileURLToPath } from "node:url";
 import { generateLicense, verifyLicense } from "../lib/license";
 import { listLicenses, appendLicense, markRevoked, deleteRecord, type LicenseRecord } from "../lib/admin-store";
 
 const router: IRouter = Router();
 
 const ADMIN_PASSWORD = process.env["ADMIN_PASSWORD"]?.trim();
+
+/**
+ * Vendor marker file. Customers don't have this (gitignored), so even if
+ * they discover ADMIN_PASSWORD env var the admin surface stays disabled.
+ * The check happens at every request — adding the file at runtime works,
+ * removing it disables admin without restart.
+ */
+function vendorModeEnabled(): boolean {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    let dir = path.dirname(__filename);
+    for (let i = 0; i < 8; i++) {
+      if (fs.existsSync(path.join(dir, ".vendor-mode"))) return true;
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch { /* fall through */ }
+  return false;
+}
 
 /**
  * Gate every admin route:
@@ -21,7 +44,9 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
     next(); return;
   }
 
-  if (!ADMIN_PASSWORD) { res.status(404).end(); return; }
+  // Two-factor disable: customer installs lack BOTH the env var AND the
+  // .vendor-mode marker file. Either alone is not enough to enable admin.
+  if (!ADMIN_PASSWORD || !vendorModeEnabled()) { res.status(404).end(); return; }
 
   // Allow the existence-check route through (returns 401 instead of 404 so
   // the UI can show a login screen rather than "not found").
