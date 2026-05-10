@@ -38,11 +38,21 @@ export function LicenseLockout({ children }: { children: React.ReactNode }) {
   // Pages that must remain accessible regardless of license state
   const isExempt = location === "/license" || location.startsWith("/login");
 
-  // First load: while we're still checking, render children optimistically so
-  // we don't flash a lockout on a healthy install. After the first response,
-  // the gate decides.
-  if (checking || !status) return <>{children}</>;
-  if (status.valid || isExempt) return <>{children}</>;
+  // Exempt routes always render — even before the first status check, so the
+  // user can always reach /license to enter a key.
+  if (isExempt) return <>{children}</>;
+
+  // Until we've heard back once, show a quiet loading screen instead of
+  // letting children fire API requests that may hit a license-required 402
+  // and crash on bad-shape responses.
+  if (checking || !status) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (status.valid) return <>{children}</>;
 
   const titles: Record<LicenseStatus["mode"], string> = {
     licensed:      "Licensed",
