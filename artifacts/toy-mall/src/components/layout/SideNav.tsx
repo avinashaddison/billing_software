@@ -60,7 +60,7 @@ export function SideNav() {
 
   return (
     <aside className="hidden md:flex flex-col w-56 min-h-screen bg-background border-r border-border shrink-0 sticky top-0 h-screen">
-      <div className="relative px-4 pt-4 pb-3 overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 text-white">
+      <div className="relative px-3.5 pt-2.5 pb-2 overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 text-white">
         {/* Conic-style gradient sheen — premium ambient depth */}
         <div
           aria-hidden
@@ -97,16 +97,16 @@ export function SideNav() {
             {/* Soft outer glow */}
             <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-fuchsia-400 via-violet-400 to-cyan-400 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
             {/* Glass tile */}
-            <div className="relative w-11 h-11 rounded-2xl bg-white/95 backdrop-blur flex items-center justify-center shadow-xl shadow-indigo-950/40 ring-1 ring-white/50">
+            <div className="relative w-9 h-9 rounded-xl bg-white/95 backdrop-blur flex items-center justify-center shadow-xl shadow-indigo-950/40 ring-1 ring-white/50">
               {store.logoUrl ? (
-                <img src={store.logoUrl} alt="" className="w-7 h-7 object-contain drop-shadow-sm" />
+                <img src={store.logoUrl} alt="" className="w-6 h-6 object-contain drop-shadow-sm" />
               ) : (
-                <span className="text-xl leading-none transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 drop-shadow-sm">
+                <span className="text-lg leading-none transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 drop-shadow-sm">
                   {store.logoEmoji}
                 </span>
               )}
               {/* Glossy highlight */}
-              <span className="pointer-events-none absolute inset-x-1 top-0.5 h-1/3 rounded-t-xl bg-gradient-to-b from-white/70 to-transparent" />
+              <span className="pointer-events-none absolute inset-x-1 top-0.5 h-1/3 rounded-t-lg bg-gradient-to-b from-white/70 to-transparent" />
             </div>
           </div>
 
