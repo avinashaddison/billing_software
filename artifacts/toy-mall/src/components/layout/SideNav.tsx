@@ -111,7 +111,7 @@ export function SideNav() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <h1 className="text-[13px] font-black tracking-tight leading-[1.2] text-white drop-shadow-sm break-words">
+            <h1 className="text-[12px] font-black tracking-tight leading-[1.2] text-white drop-shadow-sm whitespace-nowrap truncate" title={store.name}>
               {store.name}
             </h1>
             <div className="flex items-center gap-1.5 mt-1">
