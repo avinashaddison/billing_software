@@ -111,17 +111,9 @@ export function SideNav() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-[13px] font-black tracking-tight leading-[1.15] text-white drop-shadow-sm truncate">
-                {store.name}
-              </h1>
-              {isLicensed && (
-                <span className="inline-flex items-center gap-0.5 px-1 py-px rounded-md bg-gradient-to-r from-amber-400 to-orange-500 text-[8px] font-black tracking-wider shadow-md shadow-amber-500/40 shrink-0">
-                  <Sparkles className="w-1.5 h-1.5" strokeWidth={3} />
-                  PRO
-                </span>
-              )}
-            </div>
+            <h1 className="text-[13px] font-black tracking-tight leading-[1.2] text-white drop-shadow-sm break-words">
+              {store.name}
+            </h1>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="relative flex h-1.5 w-1.5 shrink-0">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
