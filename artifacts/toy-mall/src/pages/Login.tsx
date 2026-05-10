@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth, type StaffRole } from "@/hooks/use-auth";
 import { type Permissions } from "@/lib/permissions";
-import { Loader2, Delete } from "lucide-react";
+import { Loader2, Delete, ShieldCheck, ShieldAlert, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { useStoreSettings, usePerStaffScannerPrefs } from "@/lib/store-info";
 
@@ -276,6 +276,9 @@ export default function Login() {
         </div>
       )}
 
+      {/* License status badge — silent when healthy + >7 days, loud otherwise */}
+      <LicenseBadge />
+
       {/* Developer credit */}
       <div className="mt-10 flex flex-col items-center gap-1">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Developed by</p>
@@ -285,6 +288,68 @@ export default function Login() {
             AddisonX Media
           </span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ───── License status badge (silent when healthy + >7 days) ───── */
+interface LicenseStatusResp {
+  valid: boolean;
+  mode: "licensed" | "trial" | "expired" | "invalid" | "trial_expired";
+  shop: string | null;
+  edition: string | null;
+  expiry: string | null;
+  daysRemaining: number | null;
+  trialEndsAt: string | null;
+  reason: string | null;
+}
+
+function LicenseBadge() {
+  const [s, setS] = useState<LicenseStatusResp | null>(null);
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/license/status`)
+      .then((r) => r.ok ? r.json() : null)
+      .then(setS)
+      .catch(() => { /* ignore — server unreachable, leave silent */ });
+  }, []);
+
+  if (!s) return null;
+
+  // Silent path: licensed AND (perpetual OR more than 7 days left)
+  if (s.mode === "licensed" && (s.expiry === "perpetual" || (s.daysRemaining ?? 0) > 7)) {
+    return null;
+  }
+
+  const isError = !s.valid;
+  const isWarn = s.mode === "trial" || (s.mode === "licensed" && (s.daysRemaining ?? 0) <= 7);
+
+  const cls = isError
+    ? "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300"
+    : isWarn
+    ? "border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
+    : "border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300";
+
+  const Icon = isError ? ShieldAlert : isWarn ? Clock : ShieldCheck;
+  const title =
+    s.mode === "trial"         ? "Trial Mode" :
+    s.mode === "trial_expired" ? "Trial ended" :
+    s.mode === "expired"       ? "License expired" :
+    s.mode === "invalid"       ? "License invalid" :
+                                  "Licensed";
+  const subtitle =
+    s.mode === "trial" && s.daysRemaining != null
+      ? `${s.daysRemaining} day${s.daysRemaining === 1 ? "" : "s"} remaining`
+      : s.mode === "licensed" && s.daysRemaining != null
+      ? `Renews in ${s.daysRemaining} day${s.daysRemaining === 1 ? "" : "s"}`
+      : s.reason ?? "Contact your vendor";
+
+  return (
+    <div className={`mt-6 mx-auto max-w-xs px-3 py-2 rounded-2xl border flex items-center gap-2.5 ${cls}`}>
+      <Icon className="w-4 h-4 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-black leading-tight">{title}</p>
+        <p className="text-[10px] opacity-80 leading-tight truncate">{subtitle}</p>
       </div>
     </div>
   );

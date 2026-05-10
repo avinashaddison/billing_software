@@ -3,6 +3,17 @@ import { logger } from "./lib/logger";
 import { startDailyReportScheduler } from "./lib/scheduler";
 import { bootstrapDefaultOwner } from "./lib/bootstrap";
 
+// Neon free-tier idle-suspends sockets, which fires async pg-client errors
+// AFTER the originating query handler has already returned. Without these
+// guards a transient ECONNRESET kills the whole process — and the cashier
+// PC has nothing to fall back on. Log loudly and keep serving.
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "uncaughtException — keeping process alive");
+});
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "unhandledRejection — keeping process alive");
+});
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
