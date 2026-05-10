@@ -86,38 +86,42 @@
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
+  /* Premium near-black base with a subtle cool tint (Linear / Vercel feel) */
+  --background: 222 18% 5%;
+  --foreground: 220 15% 96%;
 
-  --card: 224 71% 10%;
-  --card-foreground: 210 40% 98%;
-  --card-border: 217.2 32.6% 17.5%;
+  /* Cards sit one elevation above bg — visible but not jarring */
+  --card: 222 16% 8%;
+  --card-foreground: 220 15% 96%;
+  --card-border: 220 10% 15%;
 
-  --popover: 224 71% 10%;
-  --popover-foreground: 210 40% 98%;
-  --popover-border: 217.2 32.6% 17.5%;
+  --popover: 222 18% 7%;
+  --popover-foreground: 220 15% 96%;
+  --popover-border: 220 10% 15%;
 
-  --primary: 217.2 91.2% 59.8%;
-  --primary-foreground: 222.2 47.4% 11.2%;
+  /* Brand color slightly brighter in dark mode for the same perceived weight */
+  --primary: 217 92% 64%;
+  --primary-foreground: 222 47% 8%;
 
-  --secondary: 35 100% 55%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary: 35 100% 60%;
+  --secondary-foreground: 222 47% 8%;
 
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
+  /* Muted surfaces stay close to bg — depth comes from elevation, not color */
+  --muted: 220 14% 11%;
+  --muted-foreground: 220 9% 62%;
 
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
+  --accent: 220 14% 12%;
+  --accent-foreground: 220 15% 96%;
 
-  --destructive: 0 62.8% 30.6%;
+  --destructive: 0 72% 56%;
   --destructive-foreground: 210 40% 98%;
 
-  --success: 142 71% 35%;
-  --success-foreground: 210 40% 98%;
+  --success: 142 65% 50%;
+  --success-foreground: 222 47% 8%;
 
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 224.3 76.3% 48%;
+  --border: 220 10% 15%;
+  --input: 220 10% 15%;
+  --ring: 217 92% 64%;
 }
 
 @layer base {
@@ -127,6 +131,28 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+
+  /* Premium dark mode: subtle ambient gradients painted onto the body so the
+     background isn't flat. Almost imperceptible individually, makes the app
+     feel like polished software (think Linear, Arc, Raycast). */
+  .dark body {
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(at 0% 0%, hsla(217, 92%, 50%, 0.08) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(280, 80%, 50%, 0.06) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, hsla(180, 60%, 50%, 0.04) 0px, transparent 60%);
+    background-attachment: fixed;
+  }
+
+  /* Slightly thinner / cooler scrollbars in dark mode */
+  .dark ::-webkit-scrollbar { width: 10px; height: 10px; }
+  .dark ::-webkit-scrollbar-track { background: hsl(var(--background)); }
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(220 10% 18%);
+    border-radius: 8px;
+    border: 2px solid hsl(var(--background));
+  }
+  .dark ::-webkit-scrollbar-thumb:hover { background: hsl(220 10% 28%); }
 }
 
 @keyframes shake {
