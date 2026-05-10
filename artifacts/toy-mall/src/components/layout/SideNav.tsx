@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Plus, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, KeyRound } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -43,7 +43,6 @@ export function SideNav() {
     { name: "Suppliers",     href: "/suppliers",  icon: Truck,     resource: "suppliers" },
     { name: "Staff",         href: "/staff",      icon: Users2,    resource: "staff"     },
     ...(role === "owner" ? [{ name: "Settings", href: "/settings", icon: Settings2, resource: "staff" as const }] : []),
-    ...(role === "owner" ? [{ name: "License",  href: "/license",  icon: KeyRound,  resource: "staff" as const }] : []),
   ].filter((item) => visible(item.resource));
 
   return (
@@ -251,12 +250,12 @@ export function SideNav() {
           {isDark ? <Sun size={16} /> : <Moon size={16} />}
           {isDark ? "Light Mode" : "Dark Mode"}
         </button>
-        {visible("products") && perm("products") === "write" && (
-          <Link href="/products/new"
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted text-foreground font-semibold text-sm hover:bg-muted/70 transition-colors"
-            data-testid="nav-add-product">
-            <Plus size={16} />
-            Add Product
+        {role === "owner" && (
+          <Link href="/license"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-sm hover:from-emerald-500/20 hover:to-teal-500/20 transition-colors"
+            data-testid="nav-license">
+            <KeyRound size={16} />
+            License Key
           </Link>
         )}
 

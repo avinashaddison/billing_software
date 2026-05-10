@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { LicenseLockout } from "@/components/layout/LicenseLockout";
 import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 import { CartProvider } from "@/contexts/cart-context";
 import { useEffect }           from "react";
@@ -123,7 +124,9 @@ function App() {
         <CartProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <RealtimeProvider>
-              <Router />
+              <LicenseLockout>
+                <Router />
+              </LicenseLockout>
               <PwaInstallPrompt />
             </RealtimeProvider>
           </WouterRouter>

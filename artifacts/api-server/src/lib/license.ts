@@ -86,21 +86,26 @@ export function generateLicense(payload: LicensePayload): string {
 
 /* ───────── trial tracking ───────── */
 
-async function getOrCreateFirstBoot(): Promise<Date | null> {
+interface StatusRow {
+  firstBootAt: Date;
+  keyOverride: string | null;
+}
+
+async function getOrCreateStatusRow(): Promise<StatusRow | null> {
   try {
     const [existing] = await db
       .select()
       .from(licenseStatusTable)
       .where(eq(licenseStatusTable.id, 1))
       .limit(1);
-    if (existing) return existing.firstBootAt;
+    if (existing) return { firstBootAt: existing.firstBootAt, keyOverride: existing.keyOverride };
 
     const [created] = await db
       .insert(licenseStatusTable)
       .values({ id: 1 })
       .onConflictDoNothing()
       .returning();
-    if (created) return created.firstBootAt;
+    if (created) return { firstBootAt: created.firstBootAt, keyOverride: created.keyOverride };
 
     // Race: someone else inserted — re-read
     const [retry] = await db
@@ -108,10 +113,27 @@ async function getOrCreateFirstBoot(): Promise<Date | null> {
       .from(licenseStatusTable)
       .where(eq(licenseStatusTable.id, 1))
       .limit(1);
-    return retry?.firstBootAt ?? null;
+    return retry ? { firstBootAt: retry.firstBootAt, keyOverride: retry.keyOverride } : null;
   } catch (err) {
-    logger.error({ err }, "license: could not read/seed first_boot timestamp");
+    logger.error({ err }, "license: could not read/seed license_status row");
     return null;
+  }
+}
+
+/** Set or clear the in-app license key. Pass null to remove. */
+export async function setStoredLicenseKey(key: string | null): Promise<void> {
+  try {
+    await db
+      .insert(licenseStatusTable)
+      .values({ id: 1, keyOverride: key, keyUpdatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: licenseStatusTable.id,
+        set:    { keyOverride: key, keyUpdatedAt: new Date() },
+      });
+    invalidateLicenseCache();
+  } catch (err) {
+    logger.error({ err }, "license: could not persist key override");
+    throw new Error("Could not save license key — database unreachable");
   }
 }
 
@@ -126,7 +148,9 @@ export async function getLicenseStatus(forceRefresh = false): Promise<LicenseSta
     return cached;
   }
 
-  const key = process.env["LICENSE_KEY"]?.trim();
+  // Resolve the active key: in-app override (DB) wins over env
+  const row = await getOrCreateStatusRow();
+  const key = (row?.keyOverride ?? process.env["LICENSE_KEY"] ?? "").trim();
 
   if (key) {
     const result = verifyLicense(key);
@@ -170,14 +194,13 @@ export async function getLicenseStatus(forceRefresh = false): Promise<LicenseSta
   }
 
   // No key → trial mode
-  const firstBoot = await getOrCreateFirstBoot();
-  if (!firstBoot) {
+  if (!row) {
     // DB unreachable: fail open so the shop can still bill while we figure it out
     cached = { valid: true, mode: "trial", reason: "Trial DB row unavailable — failing open" };
     cachedAt = Date.now();
     return cached;
   }
-  const trialEnd = new Date(firstBoot.getTime() + TRIAL_DAYS * 86_400_000);
+  const trialEnd = new Date(row.firstBootAt.getTime() + TRIAL_DAYS * 86_400_000);
   const msLeft = trialEnd.getTime() - Date.now();
   if (msLeft <= 0) {
     cached = {
@@ -210,6 +233,9 @@ import type { Request, Response, NextFunction } from "express";
 
 const ALLOWED_PATHS = new Set([
   "/license/status",
+  "/license/activate",
+  "/license/remove",
+  "/license/refresh",
   "/health",
 ]);
 

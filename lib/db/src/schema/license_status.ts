@@ -14,6 +14,10 @@ export const licenseStatusTable = pgTable("license_status", {
     .defaultNow(),
   /** Last license key seen (for diagnostics, never used for verification) */
   lastKeyHash: text("last_key_hash"),
+  /** License key set via the in-app UI. Takes precedence over LICENSE_KEY env. */
+  keyOverride: text("key_override"),
+  /** When the in-app key was last updated */
+  keyUpdatedAt: timestamp("key_updated_at", { withTimezone: true }),
 });
 
 export type LicenseStatusRow = typeof licenseStatusTable.$inferSelect;
