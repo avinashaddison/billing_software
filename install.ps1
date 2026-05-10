@@ -1,5 +1,6 @@
 # =============================================================================
-# Counter Billing - One-shot client PC installer
+# AddisonX Billing Software - One-shot client PC installer
+# Installs to: C:\AddisonX Billing Software (override with $env:COUNTER_INSTALL_DIR)
 # =============================================================================
 # Universal one-liner (works in BOTH cmd.exe and PowerShell, must be Admin):
 #
@@ -15,7 +16,7 @@
 $ErrorActionPreference = "Stop"
 $REPO_URL    = "https://github.com/avinashaddison/billing_software.git"
 $INSTALL_DIR = $env:COUNTER_INSTALL_DIR
-if ([string]::IsNullOrWhiteSpace($INSTALL_DIR)) { $INSTALL_DIR = "C:\Counter" }
+if ([string]::IsNullOrWhiteSpace($INSTALL_DIR)) { $INSTALL_DIR = "C:\AddisonX Billing Software" }
 
 # Make sure the box-drawing + block characters render correctly
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
@@ -183,19 +184,19 @@ if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
 Write-Step "Fetching the latest code into $INSTALL_DIR"
 if (Test-Path "$INSTALL_DIR\.git") {
   Write-Ok "Repo already exists - pulling latest changes."
-  Push-Location $INSTALL_DIR
+  Push-Location "$INSTALL_DIR"
   git pull --ff-only
   Pop-Location
 } else {
-  if (Test-Path $INSTALL_DIR) {
+  if (Test-Path "$INSTALL_DIR") {
     Write-Err "$INSTALL_DIR exists but is not a git repo. Move/delete it and re-run."
     exit 1
   }
-  git clone $REPO_URL $INSTALL_DIR
+  git clone $REPO_URL "$INSTALL_DIR"
   Write-Ok "Cloned into $INSTALL_DIR"
 }
 
-Set-Location $INSTALL_DIR
+Set-Location "$INSTALL_DIR"
 
 # -----------------------------------------------------------------------------
 # 3. Collect secrets and write .env (only if .env doesn't already exist)
@@ -318,16 +319,16 @@ Write-Ok "NGROK_DOMAIN saved (value: $dom)."
 # -----------------------------------------------------------------------------
 Write-Step "Configuring auto-start on Windows boot"
 $startupDir = [Environment]::GetFolderPath("Startup")
-$shortcut = Join-Path $startupDir "Counter Billing.lnk"
+$shortcut = Join-Path $startupDir "AddisonX Billing.lnk"
 if (Test-Path $shortcut) {
   Write-Ok "Auto-start shortcut already in place."
 } else {
   $wshell = New-Object -ComObject WScript.Shell
   $lnk = $wshell.CreateShortcut($shortcut)
   $lnk.TargetPath       = (Resolve-Path "$INSTALL_DIR\start.bat").Path
-  $lnk.WorkingDirectory = $INSTALL_DIR
+  $lnk.WorkingDirectory = "$INSTALL_DIR"
   $lnk.WindowStyle      = 1
-  $lnk.Description      = "Counter Billing"
+  $lnk.Description      = "AddisonX Billing Software"
   $lnk.Save()
   Write-Ok "Shortcut created in $startupDir"
 }
@@ -339,7 +340,7 @@ Show-DoneBanner $dom
 
 $go = Read-Host "    Launch the app now? (y/n)"
 if ($go -eq "y" -or $go -eq "Y") {
-  Start-Process -FilePath "$INSTALL_DIR\start.bat" -WorkingDirectory $INSTALL_DIR
+  Start-Process -FilePath "$INSTALL_DIR\start.bat" -WorkingDirectory "$INSTALL_DIR"
   Write-Host ""
   Write-Hack "Launched. Two new windows should open shortly." "Cyan"
   Write-Host ""
