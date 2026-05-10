@@ -291,8 +291,8 @@ function GenerateView({ pwd, onCreated, setTab }: { pwd: string; onCreated: () =
   const [shop, setShop]       = useState("");
   const [expiry, setExpiry]   = useState("");
   const [perpetual, setPerpetual] = useState(false);
-  const [edition, setEdition] = useState<"standard" | "pro">("standard");
   const [notes, setNotes]     = useState("");
+  const edition = "pro" as const;
   const [submitting, setSubmitting] = useState(false);
   const [generated, setGenerated] = useState<LicenseRecord | null>(null);
 
@@ -390,16 +390,10 @@ function GenerateView({ pwd, onCreated, setTab }: { pwd: string; onCreated: () =
         </Field>
 
         <Field label="Edition">
-          <div className="grid grid-cols-2 gap-2">
-            {(["standard", "pro"] as const).map((e) => (
-              <button key={e} type="button" onClick={() => setEdition(e)}
-                className={`py-2.5 rounded-xl border text-sm font-bold capitalize transition-colors flex items-center justify-center gap-1.5 ${
-                  edition === e ? "border-violet-400 bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300" : "bg-card hover:bg-muted"
-                }`}>
-                {e === "pro" && <Sparkles className="w-3.5 h-3.5" />}
-                {e}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-violet-300 dark:border-violet-800 bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/40 dark:to-fuchsia-950/40">
+            <Sparkles className="w-4 h-4 text-violet-600" />
+            <span className="text-sm font-black text-violet-700 dark:text-violet-300">Pro</span>
+            <span className="text-[10px] text-muted-foreground ml-auto">Single edition</span>
           </div>
         </Field>
 

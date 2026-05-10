@@ -84,9 +84,7 @@ async function prompt(question: string, def?: string): Promise<string> {
   if (!expiry) {
     expiry = await prompt('Expiry date (YYYY-MM-DD or "perpetual" for lifetime)', "perpetual");
   }
-  if (!edition) {
-    edition = await prompt("Edition (standard / pro)", "standard");
-  }
+  if (!edition) edition = "pro";
 
   if (expiry !== "perpetual" && Number.isNaN(new Date(expiry).getTime())) {
     console.error(`✗ Invalid expiry "${expiry}". Use YYYY-MM-DD or "perpetual".`);
