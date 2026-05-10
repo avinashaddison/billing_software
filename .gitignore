@@ -53,6 +53,7 @@ Thumbs.db
 .env.local
 .env.*.local
 .license-secret
+.license-history.json
 
 # Claude Code harness state
 .claude/

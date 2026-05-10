@@ -34,6 +34,7 @@ import StaffManagement from "@/pages/StaffManagement";
 import Checkout        from "@/pages/Checkout";
 import SettingsPage    from "@/pages/Settings";
 import LicensePage     from "@/pages/License";
+import AdminPage       from "@/pages/Admin";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,6 +80,10 @@ function Protected({ resource, children }: { resource: ResourceKey; children: Re
 function Router() {
   const { isLoggedIn } = useAuth();
   const [location] = useLocation();
+
+  // /admin is the vendor's own panel — bypass staff login entirely.
+  // Server-side gate (ADMIN_PASSWORD) provides the real auth.
+  if (location === "/admin") return <AdminPage />;
 
   if (!isLoggedIn && location !== "/login") {
     return <Redirect to="/login" />;

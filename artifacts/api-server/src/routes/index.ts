@@ -17,9 +17,14 @@ import sharedCartRouter  from "./shared-cart";
 import telegramRouter    from "./telegram";
 import settingsRouter    from "./settings";
 import licenseRouter     from "./license";
+import adminRouter       from "./admin";
 import { licenseGate }   from "../lib/license";
 
 const router: IRouter = Router();
+
+// Admin routes mount BEFORE the license gate — vendor's admin tools must
+// keep working even when the install is "expired" or "invalid".
+router.use(adminRouter);
 
 // License gate runs first so unlicensed installs see 402 on every endpoint
 // EXCEPT /api/license/status and /api/health (whitelisted inside licenseGate).

@@ -36,7 +36,10 @@ export function LicenseLockout({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Pages that must remain accessible regardless of license state
-  const isExempt = location === "/license" || location.startsWith("/login");
+  const isExempt =
+    location === "/license" ||
+    location.startsWith("/login") ||
+    location.startsWith("/admin");
 
   // Exempt routes always render — even before the first status check, so the
   // user can always reach /license to enter a key.
