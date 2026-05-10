@@ -60,7 +60,7 @@ export function SideNav() {
 
   return (
     <aside className="hidden md:flex flex-col w-56 min-h-screen bg-background border-r border-border shrink-0 sticky top-0 h-screen">
-      <div className="relative px-3.5 pt-2.5 pb-2 overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 text-white">
+      <div className="relative m-2 mb-3 px-3.5 pt-2.5 pb-2.5 rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 text-white shadow-lg shadow-indigo-950/30 ring-1 ring-white/5">
         {/* Conic-style gradient sheen — premium ambient depth */}
         <div
           aria-hidden
@@ -129,8 +129,8 @@ export function SideNav() {
         {/* Decorative bottom edge */}
         <div aria-hidden className="absolute inset-x-0 bottom-0 h-3 bg-gradient-to-b from-transparent to-background/0" />
       </div>
-      {/* Hairline accent — premium thin metallic gradient */}
-      <div aria-hidden className="h-px bg-gradient-to-r from-transparent via-violet-400/70 to-transparent" />
+      {/* Hairline accent — sits inside the gap below the floating header card */}
+      <div aria-hidden className="mx-3 h-px bg-gradient-to-r from-transparent via-violet-400/40 to-transparent" />
 
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
