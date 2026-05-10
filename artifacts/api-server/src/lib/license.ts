@@ -264,6 +264,9 @@ const ALLOWED_PATHS = new Set([
   "/license/activate",
   "/license/remove",
   "/license/refresh",
+  "/updates/check",
+  "/updates/install",
+  "/updates/status",
   "/health",
 ]);
 

@@ -18,6 +18,7 @@ import telegramRouter    from "./telegram";
 import settingsRouter    from "./settings";
 import licenseRouter     from "./license";
 import adminRouter       from "./admin";
+import updatesRouter     from "./updates";
 import { licenseGate }   from "../lib/license";
 
 const router: IRouter = Router();
@@ -31,6 +32,7 @@ router.use(adminRouter);
 router.use(licenseGate);
 
 router.use(licenseRouter);
+router.use(updatesRouter);
 router.use(healthRouter);
 router.use(productsRouter);
 router.use(stockLogsRouter);

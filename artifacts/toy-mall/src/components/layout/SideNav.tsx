@@ -7,6 +7,7 @@ import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
 import { type Permissions } from "@/lib/permissions";
 import { useStoreSettings } from "@/lib/store-info";
+import { UpdateBanner } from "@/components/layout/UpdateBanner";
 
 function getLevel(role: string | null, permissions: Permissions, resource: string): "none" | "read" | "write" {
   if (role === "owner") return "write";
@@ -282,6 +283,8 @@ export function SideNav() {
           {isDark ? <Sun size={16} /> : <Moon size={16} />}
           {isDark ? "Light Mode" : "Dark Mode"}
         </button>
+        {role === "owner" && <UpdateBanner />}
+
         {role === "owner" && (
           <Link href="/license"
             className="relative flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-sm hover:from-emerald-500/20 hover:to-teal-500/20 transition-colors"
