@@ -1,4 +1,7 @@
 import crypto from "node:crypto";
+import fs     from "node:fs";
+import path   from "node:path";
+import { fileURLToPath } from "node:url";
 import { db, licenseStatusTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
@@ -6,16 +9,41 @@ import { logger } from "./logger";
 const TRIAL_DAYS = 14;
 
 /**
- * HMAC secret used to sign license keys. Must match the value in
- * scripts/src/gen-license.ts. Changing it invalidates all issued keys.
+ * HMAC secret used to sign + verify license keys. Loaded once at module
+ * init. Must match what scripts/gen-license.ts uses to sign new keys.
  *
- * Yes, baking it into the binary is not bulletproof — a determined buyer
- * can extract it. The point is to deter casual sharing of the install,
- * not to defeat a reverse engineer.
+ * Lookup order:
+ *   1. LICENSE_SECRET env var
+ *   2. .license-secret file at the repo root (auto-created by gen-key.bat)
+ *   3. Hardcoded default (placeholder — vendor MUST replace before sales)
+ *
+ * Yes, baking secrets into the binary is not bulletproof. The point is to
+ * deter casual sharing of the install, not to defeat reverse engineering.
  */
-const SECRET =
-  process.env["LICENSE_SECRET"] ||
-  "counter-billing-license-v1-do-not-leak-this-to-customers";
+function loadSigningSecret(): string {
+  const fromEnv = process.env["LICENSE_SECRET"]?.trim();
+  if (fromEnv) return fromEnv;
+
+  // Walk up from this file to find the repo root and look for .license-secret
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    let dir = path.dirname(__filename);
+    for (let i = 0; i < 8; i++) {
+      const candidate = path.join(dir, ".license-secret");
+      if (fs.existsSync(candidate)) {
+        const v = fs.readFileSync(candidate, "utf8").trim();
+        if (v) return v;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch { /* fall through */ }
+
+  return "counter-billing-license-v1-do-not-leak-this-to-customers";
+}
+
+const SECRET = loadSigningSecret();
 
 export interface LicensePayload {
   /** Shop identifier (slug, free-form) */
