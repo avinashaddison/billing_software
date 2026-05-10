@@ -7,7 +7,11 @@
     "hello": "tsx ./src/hello.ts",
     "dev": "tsx ./src/dev.ts",
     "gen-license": "tsx ./src/gen-license.ts",
+    "trial-expire": "tsx ./src/trial-expire.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@workspace/db": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

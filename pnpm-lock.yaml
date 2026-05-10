@@ -674,6 +674,10 @@ importers:
         version: 0.31.9
 
   scripts:
+    dependencies:
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../lib/db
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
