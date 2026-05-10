@@ -1,16 +1,11 @@
 import { Router, type IRouter } from "express";
-import { getLicenseStatus, invalidateLicenseCache, verifyLicense, setStoredLicenseKey } from "../lib/license";
+import { getLicenseStatus, invalidateLicenseCache, verifyLicense, setStoredLicenseKey, type LicenseStatus } from "../lib/license";
 
 const router: IRouter = Router();
 
-/**
- * GET /api/license/status
- * Always reachable — even when the license is invalid — so the UI can render
- * a "License expired / enter your key" screen instead of a blank 402.
- */
-router.get("/license/status", async (_req, res): Promise<void> => {
-  const status = await getLicenseStatus();
-  res.json({
+/** Flatten the internal LicenseStatus into the wire format the UI consumes. */
+function toWireFormat(status: LicenseStatus) {
+  return {
     valid:         status.valid,
     mode:          status.mode,
     shop:          status.payload?.shop ?? null,
@@ -20,7 +15,17 @@ router.get("/license/status", async (_req, res): Promise<void> => {
     daysRemaining: status.daysRemaining ?? null,
     trialEndsAt:   status.trialEndsAt ?? null,
     reason:        status.reason ?? null,
-  });
+  };
+}
+
+/**
+ * GET /api/license/status
+ * Always reachable — even when the license is invalid — so the UI can render
+ * a "License expired / enter your key" screen instead of a blank 402.
+ */
+router.get("/license/status", async (_req, res): Promise<void> => {
+  const status = await getLicenseStatus();
+  res.json(toWireFormat(status));
 });
 
 /**
@@ -30,7 +35,7 @@ router.get("/license/status", async (_req, res): Promise<void> => {
 router.post("/license/refresh", async (_req, res): Promise<void> => {
   invalidateLicenseCache();
   const status = await getLicenseStatus(true);
-  res.json({ ok: true, status });
+  res.json({ ok: true, status: toWireFormat(status) });
 });
 
 /**
@@ -62,7 +67,7 @@ router.post("/license/activate", async (req, res): Promise<void> => {
   try {
     await setStoredLicenseKey(key);
     const status = await getLicenseStatus(true);
-    res.json({ ok: true, status });
+    res.json({ ok: true, status: toWireFormat(status) });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Could not save key" });
   }
@@ -77,7 +82,7 @@ router.delete("/license/remove", async (_req, res): Promise<void> => {
   try {
     await setStoredLicenseKey(null);
     const status = await getLicenseStatus(true);
-    res.json({ ok: true, status });
+    res.json({ ok: true, status: toWireFormat(status) });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Could not remove key" });
   }
