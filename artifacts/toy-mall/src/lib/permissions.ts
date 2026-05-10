@@ -12,6 +12,7 @@ export const RESOURCES = [
   { key: "deals",      label: "Today's Deals",     description: "Set up daily offers customers see at checkout" },
   { key: "staff",      label: "Staff Management",  description: "Manage staff & access control" },
   { key: "settings",   label: "Settings",           description: "Configure shop settings" },
+  { key: "license",    label: "License",            description: "View software license status & details" },
 ] as const;
 
 export type ResourceKey = typeof RESOURCES[number]["key"];
@@ -69,4 +70,5 @@ export const PATH_RESOURCE: Record<string, ResourceKey> = {
   "/suppliers":  "suppliers",
   "/deals":      "deals",
   "/staff":      "staff",
+  "/license":    "license",
 };
