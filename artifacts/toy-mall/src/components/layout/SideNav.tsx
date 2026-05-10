@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Home, Package, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,19 @@ export function SideNav() {
 
   const handleLogout = () => { logout(); setLocation("/login"); };
   const store = useStoreSettings();
+
+  // Pull license status so the License Key button can show a Pro badge
+  // when activated. Re-fetches after navigation in case the user just
+  // activated a key on /license.
+  const [licenseMode, setLicenseMode] = useState<string | null>(null);
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+    fetch(`${base}/api/license/status`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => setLicenseMode(d?.mode ?? null))
+      .catch(() => { /* ignore */ });
+  }, [location]);
+  const isLicensed = licenseMode === "licensed";
 
   const perm    = (resource: string) => getLevel(role, permissions, resource);
   const visible = (resource: string) => perm(resource) !== "none";
@@ -252,10 +265,21 @@ export function SideNav() {
         </button>
         {role === "owner" && (
           <Link href="/license"
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-sm hover:from-emerald-500/20 hover:to-teal-500/20 transition-colors"
+            className={cn(
+              "relative flex items-center gap-2 px-3 py-2.5 rounded-xl border font-bold text-sm transition-all",
+              isLicensed
+                ? "bg-gradient-to-r from-violet-500/15 via-fuchsia-500/15 to-pink-500/15 border-violet-400/40 text-violet-700 dark:text-violet-300 hover:from-violet-500/25 hover:via-fuchsia-500/25 hover:to-pink-500/25 shadow-sm shadow-violet-500/20"
+                : "bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300 hover:from-emerald-500/20 hover:to-teal-500/20"
+            )}
             data-testid="nav-license">
             <KeyRound size={16} />
-            License Key
+            <span className="flex-1">License Key</span>
+            {isLicensed && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-violet-500/40">
+                <Sparkles className="w-2 h-2" strokeWidth={3} />
+                Pro
+              </span>
+            )}
           </Link>
         )}
 
