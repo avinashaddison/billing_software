@@ -54,15 +54,11 @@ router.post("/license/activate", async (req, res): Promise<void> => {
     return;
   }
 
-  // Reject expired keys at activation time so the user gets a clear error
-  // instead of a deceptive "Activated!" toast followed by a locked UI.
-  if (result.payload.expiry !== "perpetual") {
-    const expiry = new Date(result.payload.expiry);
-    if (Number.isFinite(expiry.getTime()) && expiry.getTime() < Date.now()) {
-      res.status(400).json({ error: `License expired ${result.payload.expiry}` });
-      return;
-    }
-  }
+  // We deliberately accept already-expired keys here — the license gate
+  // surfaces the "License expired" state on its own with a clear message
+  // and lockout, and a customer re-pasting an old key should land in that
+  // honest state rather than getting "Invalid license" (which suggests
+  // forgery). Useful for previewing/testing the expired UI too.
 
   try {
     await setStoredLicenseKey(key);
