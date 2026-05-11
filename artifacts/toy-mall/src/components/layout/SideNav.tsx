@@ -287,7 +287,7 @@ export function SideNav() {
 
         {role === "owner" && (
           <Link href="/license"
-            className="relative flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-sm hover:from-emerald-500/20 hover:to-teal-500/20 transition-colors"
+            className="relative flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-orange-500/15 to-amber-500/15 border border-orange-500/30 text-orange-700 dark:text-orange-300 font-bold text-sm hover:from-orange-500/25 hover:to-amber-500/25 transition-colors"
             data-testid="nav-license">
             <KeyRound size={16} />
             <span className="flex-1">License Key</span>
