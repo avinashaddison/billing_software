@@ -19,6 +19,13 @@ echo   Local URL:  http://localhost:%PORT%
 echo ============================================================
 echo.
 
+REM ── Free port %PORT% so a stale node from a previous run can't keep it ────
+echo Checking for leftover server processes on port %PORT%...
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":%PORT% " ^| findstr "LISTENING"') do (
+  echo Stopping leftover PID %%P
+  taskkill /F /PID %%P >nul 2>&1
+)
+
 REM ── Start the API server in a new window ────────────────────────────────────
 start "Billing Server" cmd /k node --enable-source-maps --env-file-if-exists=.env artifacts\api-server\dist\index.mjs
 

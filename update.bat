@@ -67,10 +67,27 @@ echo [OK] Build complete.
 
 echo.
 echo  +------------------------------------------------------------+
-echo  ^|     UPDATE DONE                                            ^|
+echo  ^|     UPDATE DONE - Restarting now...                        ^|
 echo  +------------------------------------------------------------+
 echo.
-echo   IMPORTANT: Close any running "Billing Server" / "Billing Tunnel"
-echo   windows, then double-click start.bat to relaunch with the new code.
+
+REM Kill the running server + tunnel so the new code can take over.
+REM /T also kills any child processes (vite, scripts) just in case.
+echo [..] Stopping old server windows...
+taskkill /F /IM node.exe /T >nul 2>&1
+taskkill /F /IM ngrok.exe /T >nul 2>&1
+
+REM Give the OS a moment to release port 3000 before start.bat rebinds
+timeout /t 2 /nobreak >nul
+
+echo [..] Launching new server...
+start "" "%~dp0start.bat"
+
 echo.
-pause
+echo  +------------------------------------------------------------+
+echo  ^|  ALL DONE                                                  ^|
+echo  ^|  The browser will refresh automatically. If you don't see  ^|
+echo  ^|  the new look, press Ctrl+F5 in the browser once.          ^|
+echo  +------------------------------------------------------------+
+echo.
+timeout /t 5 /nobreak >nul

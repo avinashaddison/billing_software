@@ -46,6 +46,16 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        // After an update, the new service worker activates immediately
+        // (skipWaiting) and takes control of every open tab (clientsClaim).
+        // Without these, customers see yesterday's UI until they manually
+        // close + reopen the tab — which they never figure out to do.
+        skipWaiting:  true,
+        clientsClaim: true,
+        // index.html is the entry point — always fetch fresh so changes
+        // to inline meta / preloaded chunks reach the user. The hashed
+        // /assets/* files remain pre-cached for offline speed.
+        navigateFallback: "/index.html",
         runtimeCaching: [
           {
             urlPattern: /^\/api\/.*/i,
@@ -53,6 +63,15 @@ export default defineConfig({
             options: {
               cacheName: "api-cache",
               networkTimeoutSeconds: 10,
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "html-cache",
+              networkTimeoutSeconds: 5,
               cacheableResponse: { statuses: [0, 200] },
             },
           },
