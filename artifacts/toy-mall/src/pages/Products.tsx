@@ -2,7 +2,7 @@ import { useState, useRef, memo, useCallback } from "react";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { Link, useSearch, useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
-import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2, ScanLine, Truck, Sparkles } from "lucide-react";
+import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2, ScanLine, Truck, Sparkles, Filter } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -586,6 +586,10 @@ export default function Products() {
   const [selected, setSelected]     = useState<Set<string>>(new Set());
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [pendingDeal, setPendingDeal] = useState<{ id: string; name: string; price: number; salePrice?: number | null; isTodayDeal?: boolean } | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const [stockFilter, setStockFilter] = useState<"all" | "in" | "low" | "out">("all");
+  const [addedDateFilter, setAddedDateFilter] = useState<string>("");
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
@@ -696,9 +700,30 @@ export default function Products() {
   });
   const supplierMap = new Map(suppliers.map((s) => [s.id, s.name]));
 
-  const products = filterLowStock
+  const baseProducts = filterLowStock
     ? allProducts?.filter((p) => p.stock <= p.lowStockThreshold)
     : allProducts;
+
+  const categoryOptions = Array.from(new Set((baseProducts ?? []).map((p) => p.category))).sort((a, b) => a.localeCompare(b));
+
+  const products = (baseProducts ?? []).filter((p) => {
+    const sid = "supplierId" in p ? (p.supplierId as string | null | undefined) : null;
+    const createdAt = (p as { createdAt?: string }).createdAt;
+    const categoryOk = categoryFilter === "all" || p.category === categoryFilter;
+    const supplierOk = supplierFilter === "all" || (supplierFilter === "__none__" ? !sid : sid === supplierFilter);
+    const stockOk =
+      stockFilter === "all" ? true :
+      stockFilter === "in" ? p.stock > 0 :
+      stockFilter === "out" ? p.stock <= 0 :
+      p.stock <= p.lowStockThreshold;
+    const dateOk =
+      !addedDateFilter ? true :
+      createdAt
+        ? new Date(createdAt).toISOString().slice(0, 10) === addedDateFilter
+        : true;
+
+    return categoryOk && supplierOk && stockOk && dateOk;
+  });
 
   const handleDelete = async () => {
     if (!pendingDelete) return;
@@ -779,6 +804,63 @@ export default function Products() {
               Scanning…
             </div>
           )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground px-2 py-1 rounded-md bg-muted/50 border">
+            <Filter className="w-3.5 h-3.5" />
+            Filters
+          </div>
+
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="h-9 rounded-lg border bg-background px-2.5 text-xs font-semibold"
+          >
+            <option value="all">All Categories</option>
+            {categoryOptions.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            className="h-9 rounded-lg border bg-background px-2.5 text-xs font-semibold"
+          >
+            <option value="all">All Suppliers</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+            <option value="__none__">No Supplier</option>
+          </select>
+
+          <select
+            value={stockFilter}
+            onChange={(e) => setStockFilter(e.target.value as "all" | "in" | "low" | "out")}
+            className="h-9 rounded-lg border bg-background px-2.5 text-xs font-semibold"
+          >
+            <option value="all">All Stock</option>
+            <option value="in">In Stock</option>
+            <option value="low">Low Stock</option>
+            <option value="out">Out of Stock</option>
+          </select>
+
+          <Input
+            type="date"
+            value={addedDateFilter}
+            onChange={(e) => setAddedDateFilter(e.target.value)}
+            className="h-9 w-[170px] rounded-lg text-xs"
+            title="Filter by product added date"
+          />
+
+          <button
+            type="button"
+            onClick={() => { setCategoryFilter("all"); setSupplierFilter("all"); setStockFilter("all"); setAddedDateFilter(""); }}
+            className="h-9 px-3 rounded-lg border text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted"
+          >
+            Clear
+          </button>
         </div>
       </div>
 

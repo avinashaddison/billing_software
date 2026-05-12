@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Tag, Printer, Loader2, Search, Check, Package, Eye, Plus, Minus, Info, DollarSign, Ruler, X, ZoomIn } from "lucide-react";
+import { Tag, Printer, Loader2, Search, Check, Package, Eye, Plus, Minus, Info, DollarSign, Ruler, X, ZoomIn, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LabelCard, type LabelProduct as Product } from "@/components/ui/LabelCard";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
@@ -21,6 +21,9 @@ export default function Labels() {
   const [showTip, setShowTip]         = useState(true);
   const [showSizePicker, setShowSizePicker] = useState(false);
   const [zoomedProduct, setZoomedProduct] = useState<(Product & { _key: string }) | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [stockFilter, setStockFilter] = useState<"all" | "in" | "low" | "out">("all");
+  const [addedDateFilter, setAddedDateFilter] = useState<string>("");
 
   const [labelSize, setLabelSizeState]   = useState<LabelSize>(loadLabelSize);
   const [customW, setCustomW]            = useState(String(labelSize.w));
@@ -53,11 +56,30 @@ export default function Labels() {
     };
   }, [printing]);
 
-  const filtered = products.filter(
-    (p) => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())
-  );
+  const categoryOptions = Array.from(new Set(products.map((p) => p.category))).sort((a, b) => a.localeCompare(b));
 
-  const getCopies    = (id: string) => copies[id] ?? 1;
+  const filtered = products.filter((p) => {
+    const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === "all" || p.category === categoryFilter;
+    const matchesStock =
+      stockFilter === "all" ? true :
+      stockFilter === "in" ? Number(p.stock ?? 0) > 0 :
+      stockFilter === "out" ? Number(p.stock ?? 0) <= 0 :
+      Number(p.stock ?? 0) <= Number(p.lowStockThreshold ?? 0);
+    const createdAt = (p as { createdAt?: string }).createdAt;
+    const matchesDate =
+      !addedDateFilter ? true :
+      createdAt ? new Date(createdAt).toISOString().slice(0, 10) === addedDateFilter : true;
+
+    return matchesSearch && matchesCategory && matchesStock && matchesDate;
+  });
+
+  const getDefaultCopies = (id: string) => {
+    const p = products.find((x) => x.id === id);
+    const stock = Number(p?.stock ?? 0);
+    return Math.max(1, Math.min(99, stock || 1));
+  };
+  const getCopies    = (id: string) => copies[id] ?? getDefaultCopies(id);
   const toggle       = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll    = () => {
     if (selected.size === filtered.length && filtered.length > 0) setSelected(new Set());
@@ -279,6 +301,51 @@ export default function Labels() {
             </button>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground px-2 py-1 rounded-md bg-muted/50 border">
+              <Filter className="w-3.5 h-3.5" />
+              Filters
+            </div>
+
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="h-9 rounded-lg border bg-background px-2.5 text-xs font-semibold"
+            >
+              <option value="all">All Categories</option>
+              {categoryOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <select
+              value={stockFilter}
+              onChange={(e) => setStockFilter(e.target.value as "all" | "in" | "low" | "out")}
+              className="h-9 rounded-lg border bg-background px-2.5 text-xs font-semibold"
+            >
+              <option value="all">All Stock</option>
+              <option value="in">In Stock</option>
+              <option value="low">Low Stock</option>
+              <option value="out">Out of Stock</option>
+            </select>
+
+            <Input
+              type="date"
+              value={addedDateFilter}
+              onChange={(e) => setAddedDateFilter(e.target.value)}
+              className="h-9 w-[170px] rounded-lg text-xs md:min-w-[170px]"
+              title="Filter by product added date"
+            />
+
+            <button
+              type="button"
+              onClick={() => { setCategoryFilter("all"); setStockFilter("all"); setAddedDateFilter(""); }}
+              className="h-9 px-3 rounded-lg border text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted"
+            >
+              Clear
+            </button>
+          </div>
+
           {selected.size > 0 && (
             <p className="text-xs text-primary font-bold mt-2">
               {selected.size} product{selected.size !== 1 ? "s" : ""} · {totalLabels} sticker{totalLabels !== 1 ? "s" : ""}
@@ -338,6 +405,8 @@ export default function Labels() {
                 const hex = getCategoryHex(p.category);
                 const emoji = getCategoryEmoji(p.category);
                 const n = getCopies(p.id);
+                const stock = Number(p.stock ?? 0);
+                const low = stock <= Number(p.lowStockThreshold ?? 0);
                 return (
                   <div
                     key={p.id}
@@ -361,6 +430,9 @@ export default function Labels() {
                           style={{ background: hex.badge, color: hex.text }}
                         >
                           {emoji} {p.category}
+                        </span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${low ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" : "bg-muted text-muted-foreground"}`}>
+                          Stock {stock}
                         </span>
                       </div>
                     </button>

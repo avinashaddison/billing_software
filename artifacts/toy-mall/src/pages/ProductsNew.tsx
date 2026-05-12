@@ -456,7 +456,7 @@ export default function CreateProduct() {
                     <FormItem>
                       <FormLabel className="font-bold text-muted-foreground">MRP / Regular Price (₹)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" className="h-14 text-lg rounded-xl font-mono" {...field} />
+                        <Input type="number" step="0.01" placeholder="0.00" className="h-14 text-lg rounded-xl font-mono" onWheel={(e) => e.currentTarget.blur()} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -468,6 +468,7 @@ export default function CreateProduct() {
                       <FormControl>
                         <Input type="number" step="0.01" placeholder="Leave blank if no sale" className="h-14 text-lg rounded-xl font-mono"
                           value={field.value === "" || field.value == null ? "" : String(field.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
                           onChange={(e) => field.onChange(e.target.value === "" ? "" : e.target.value)} />
                       </FormControl>
                       <FormMessage />
@@ -480,6 +481,7 @@ export default function CreateProduct() {
                       <FormControl>
                         <Input type="number" step="0.01" placeholder="Your cost from supplier" className="h-14 text-lg rounded-xl font-mono"
                           value={field.value === "" || field.value == null ? "" : String(field.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
                           onChange={(e) => field.onChange(e.target.value === "" ? "" : e.target.value)} />
                       </FormControl>
                       <p className="text-[11px] text-muted-foreground">Used for profit margin reports. Not shown on receipts.</p>
@@ -524,7 +526,7 @@ export default function CreateProduct() {
                       <FormItem>
                         <FormLabel className="font-bold text-muted-foreground">Initial Stock</FormLabel>
                         <FormControl>
-                          <Input type="number" className="h-14 text-lg rounded-xl font-mono" {...field} />
+                          <Input type="number" className="h-14 text-lg rounded-xl font-mono" onWheel={(e) => e.currentTarget.blur()} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -533,7 +535,7 @@ export default function CreateProduct() {
                       <FormItem>
                         <FormLabel className="font-bold text-muted-foreground">Alert At</FormLabel>
                         <FormControl>
-                          <Input type="number" className="h-14 text-lg rounded-xl font-mono" {...field} />
+                          <Input type="number" className="h-14 text-lg rounded-xl font-mono" onWheel={(e) => e.currentTarget.blur()} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
