@@ -296,6 +296,7 @@ const ALLOWED_PATHS = new Set([
   "/license/remove",
   "/license/refresh",
   "/auth/login",
+  "/auth/login-email",
   "/auth/logout",
   "/auth/me",
   "/updates/check",

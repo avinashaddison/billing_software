@@ -19,6 +19,7 @@ import settingsRouter    from "./settings";
 import licenseRouter     from "./license";
 import adminRouter       from "./admin";
 import updatesRouter     from "./updates";
+import authRouter        from "./auth";
 import { licenseGate }   from "../lib/license";
 
 const router: IRouter = Router();
@@ -33,6 +34,7 @@ router.use(licenseGate);
 
 router.use(licenseRouter);
 router.use(updatesRouter);
+router.use(authRouter);
 router.use(healthRouter);
 router.use(productsRouter);
 router.use(stockLogsRouter);

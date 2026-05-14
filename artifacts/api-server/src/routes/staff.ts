@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, asc, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, staffProfilesTable, staffPermissionsTable } from "@workspace/db";
+import { db, staffProfilesTable, staffPermissionsTable, authUsersTable } from "@workspace/db";
 import { tenantWhere } from "../lib/tenant";
 import {
   TENANT_COOKIE_NAME,
@@ -132,7 +132,11 @@ router.post("/auth/login", async (req, res): Promise<void> => {
        carries null and downstream queries match the IS-NULL branch. */
     res.cookie(
       TENANT_COOKIE_NAME,
-      signTenantCookie(member.tenantId ?? null, member.id),
+      signTenantCookie({
+        tenantId: member.tenantId ?? null,
+        staffId:  member.id,
+        kind:     "pin",
+      }),
       tenantCookieOptions(),
     );
 
@@ -154,6 +158,39 @@ router.post("/auth/logout", (_req, res): void => {
 
 /* ── GET /api/auth/me — who am I per the cookie? ───────────────── */
 router.get("/auth/me", async (req, res): Promise<void> => {
+  /* Email-login session → look up auth_users. */
+  if (req.authKind === "email" && req.userId) {
+    try {
+      const [user] = await db
+        .select({
+          id:       authUsersTable.id,
+          email:    authUsersTable.email,
+          role:     authUsersTable.role,
+          tenantId: authUsersTable.tenantId,
+          isActive: authUsersTable.isActive,
+        })
+        .from(authUsersTable)
+        .where(eq(authUsersTable.id, req.userId));
+      if (!user || !user.isActive) {
+        res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
+        res.status(401).json({ error: "Not authenticated" });
+        return;
+      }
+      res.json({
+        kind:     "email",
+        id:       user.id,
+        name:     user.email,
+        email:    user.email,
+        role:     user.role,
+        tenantId: user.tenantId,
+        /* email logins use role gating; no per-resource permissions map. */
+        permissions: {},
+      });
+      return;
+    } catch { res.status(500).json({ error: "Failed to load session" }); return; }
+  }
+
+  /* PIN-login session → look up staff_profiles. */
   if (!req.staffId) { res.status(401).json({ error: "Not authenticated" }); return; }
   try {
     const [member] = await db
@@ -177,7 +214,7 @@ router.get("/auth/me", async (req, res): Promise<void> => {
       .where(eq(staffPermissionsTable.staffId, member.id));
     const permissions: Record<string, string> = {};
     for (const p of perms) permissions[p.resource] = p.level;
-    res.json({ ...member, permissions });
+    res.json({ kind: "pin", ...member, permissions });
   } catch { res.status(500).json({ error: "Failed to load session" }); }
 });
 
