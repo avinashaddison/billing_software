@@ -159,32 +159,51 @@ frontend files were touched.
 
 ## Operating instructions (post-deploy)
 
-1. Set `SESSION_SECRET` env (any 32+ char random string). Optional — falls
-   back to `LICENSE_SECRET`.
-2. No `pnpm db push` is needed against this DB — schema is already aligned.
-   For other installs, run `node scripts/src/tenant-migrate-apply.mjs` with
-   `DATABASE_URL` set (idempotent, transactional).
-3. Hira & Sons workflows continue working immediately because every
-   existing row has `tenant_id IS NULL` and the OR-IS-NULL fallback
-   matches them.
-4. Onboard new tenants by inserting `tenants` rows + creating staff with
-   their `tenant_id` set:
-   ```sql
-   INSERT INTO tenants (id, name) VALUES ('acme-mart', 'Acme Mart');
-   INSERT INTO staff_profiles (name, pin, role, tenant_id)
-     VALUES ('Acme Owner', '<bcrypt-hash>', 'owner', 'acme-mart');
-   ```
-5. Once new-tenant data is verified isolated, optionally backfill legacy
-   rows:
-   ```sql
-   INSERT INTO tenants (id, name) VALUES ('hira-sons', 'Hira & Sons Gift Shop');
-   UPDATE products          SET tenant_id = 'hira-sons' WHERE tenant_id IS NULL;
-   UPDATE bills             SET tenant_id = 'hira-sons' WHERE tenant_id IS NULL;
-   -- repeat for: sales, sale_items, stock_logs, returns, categories,
-   -- suppliers, staff_profiles, staff_permissions, license_status,
-   -- store_settings
-   ```
-   Then flip `STRICT_TENANT=true` (env) and restart.
+> **Authoritative source: `/app/memory/DEPLOYMENT_RUNBOOK.md`**
+> The full runbook covers env vars, post-deploy smoke tests, the
+> hira-sons tenant creation, controlled per-table backfill (12
+> transactions, 332 rows), `STRICT_TENANT` flip, second-tenant
+> onboarding, and rollback. The notes below are a quick reference.
+
+### Required production env vars (only the new/changed)
+
+| Variable | Value |
+|---|---|
+| `SESSION_SECRET` | freshly generated 32+ char random (e.g. `openssl rand -base64 48`) |
+| `STRICT_TENANT` | **unset or `false`** until backfill is complete |
+| `CORS_ORIGIN` | optional comma-separated allowlist; omit for LAN POS |
+
+Existing prod env (`DATABASE_URL`, `LICENSE_SECRET`, `LICENSE_KEY`,
+`ADMIN_PASSWORD`, `TELEGRAM_*`, `CLOUDINARY_*`, `STORE_NAME`) is
+unchanged.
+
+### Deploy
+
+1. Push code. Platform build runs `pnpm install --frozen-lockfile && pnpm run build:prod`.
+2. Start: `node artifacts/api-server/dist/index.mjs` (unchanged).
+3. **Do NOT** run `pnpm --filter @workspace/db run push` — the DB is
+   already aligned via the additive SQL.
+
+### Post-deploy smoke pack (see runbook §3 for full commands)
+
+- `GET /api/healthz` → `{status:"ok"}`
+- `GET /api/license/status` → `valid:true, mode:"licensed"|"trial"`
+- Login cycle: login → me → logout (cookie is set + cleared)
+- `/api/products` → 126, `/api/bills` → 11, `/api/categories` → 3,
+  `/api/staff` → 2, `/api/dashboard/summary` totals match.
+- `node scripts/src/tenant-runtime-smoke.mjs` confirms isolation.
+
+### Then — controlled backfill
+
+- §5.1 — `INSERT INTO tenants ('hira-sons', 'Hira & Sons Gift Shop')`.
+- §5.2 — one transaction per priority table; `UPDATE … SET tenant_id =
+  'hira-sons' WHERE tenant_id IS NULL`. Total 332 rows.
+  **`staff_profiles` is updated LAST** (that's when new logins start
+  carrying the `hira-sons` tenant cookie).
+- §5.3 — re-inventory: 0 NULL-tenant rows remaining on priority tables.
+
+`STRICT_TENANT` stays `false` throughout. Flip to `true` only after
+re-verification (runbook §6).
 
 ## Known limitations (deliberate, documented)
 
