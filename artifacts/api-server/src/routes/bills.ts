@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
+import { tenantWhere } from "../lib/tenant";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 
 const router: IRouter = Router();
@@ -9,7 +10,15 @@ const router: IRouter = Router();
 type PaymentMode = "cash" | "upi";
 
 function isValidCheckoutBody(body: unknown): body is {
-  items: Array<{ productId: string; quantity: number; price: number; mrp?: number }>;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    price: number;
+    mrp?: number;
+    preDiscountPrice?: number;
+    discountType?: "percent" | "amount";
+    discountValue?: number;
+  }>;
   paymentMode: PaymentMode;
   customerPhone?: string;
   discount?: number;
@@ -60,6 +69,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
   }
 
   const { items, paymentMode, customerPhone, discount, discountType } = req.body;
+  const tenantId = req.tenantId;
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -82,7 +92,10 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         const [product] = await tx
           .select()
           .from(productsTable)
-          .where(eq(productsTable.id, item.productId));
+          .where(and(
+            eq(productsTable.id, item.productId),
+            tenantWhere(productsTable.tenantId, tenantId),
+          ));
 
         if (!product) throw new Error(`Product not found: ${item.productId}`);
 
@@ -98,10 +111,11 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           .where(eq(productsTable.id, item.productId));
 
         await tx.insert(stockLogsTable).values({
+          tenantId:  product.tenantId, // mirror the product's tenant (NULL stays NULL for legacy rows)
           productId: item.productId,
           type:      "OUT",
           quantity:  item.quantity,
-          userId:    null,
+          userId:    req.staffId ?? null,
         });
 
         processedItems.push({
@@ -136,6 +150,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
       const [bill] = await tx
         .insert(billsTable)
         .values({
+          tenantId,
           totalAmount:   String(totalAmount),
           itemsCount,
           paymentMode,
@@ -149,6 +164,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         .insert(saleItemsTable)
         .values(
           processedItems.map((i) => ({
+            tenantId:         tenantId,
             saleId:           bill.id,
             productId:        i.productId,
             quantity:         i.quantity,
@@ -169,14 +185,14 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
       };
     });
 
-    // Broadcast to all SSE clients (realtime)
+    // Broadcast to all SSE clients (realtime) — scoped to this tenant
     broadcast("bill_created", {
       billId:      result.bill.id,
       totalAmount: result.bill.totalAmount,
       itemsCount:  result.bill.itemsCount,
       paymentMode: result.bill.paymentMode,
       createdAt:   result.bill.createdAt,
-    });
+    }, tenantId);
 
     // Fire-and-forget Telegram sale alert (never blocks the response)
     sendSaleAlert(result.bill, result.items);
@@ -193,10 +209,11 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/bills", async (_req, res): Promise<void> => {
+router.get("/bills", async (req, res): Promise<void> => {
   const bills = await db
     .select()
     .from(billsTable)
+    .where(tenantWhere(billsTable.tenantId, req.tenantId))
     .orderBy(desc(billsTable.createdAt))
     .limit(50);
 
@@ -214,7 +231,10 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
   const [bill] = await db
     .select()
     .from(billsTable)
-    .where(eq(billsTable.id, id));
+    .where(and(
+      eq(billsTable.id, id),
+      tenantWhere(billsTable.tenantId, req.tenantId),
+    ));
 
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
 

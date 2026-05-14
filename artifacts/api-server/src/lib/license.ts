@@ -3,7 +3,7 @@ import fs     from "node:fs";
 import path   from "node:path";
 import { fileURLToPath } from "node:url";
 import { db, licenseStatusTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { logger } from "./logger";
 
 const TRIAL_DAYS = 14;
@@ -112,147 +112,178 @@ export function generateLicense(payload: LicensePayload): string {
   return `${b64}.${hmac}`;
 }
 
-/* ───────── trial tracking ───────── */
+/* ───────── trial tracking (tenant-aware) ───────── */
 
 interface StatusRow {
   firstBootAt: Date;
   keyOverride: string | null;
 }
 
-async function getOrCreateStatusRow(): Promise<StatusRow | null> {
+/** Resolve the license_status row for a given tenant (null = legacy/Hira & Sons). */
+async function getOrCreateStatusRow(tenantId: string | null): Promise<StatusRow | null> {
   try {
-    const [existing] = await db
-      .select()
-      .from(licenseStatusTable)
-      .where(eq(licenseStatusTable.id, 1))
-      .limit(1);
-    if (existing) return { firstBootAt: existing.firstBootAt, keyOverride: existing.keyOverride };
+    /* Look up existing row by tenant_id (or NULL for legacy install). */
+    const existingQuery = tenantId == null
+      ? db.select().from(licenseStatusTable).where(isNull(licenseStatusTable.tenantId)).limit(1)
+      : db.select().from(licenseStatusTable).where(eq(licenseStatusTable.tenantId, tenantId)).limit(1);
+    const [existing] = await existingQuery;
+    if (existing) {
+      return { firstBootAt: existing.firstBootAt, keyOverride: existing.keyOverride };
+    }
+
+    /* Insert a fresh row. Legacy NULL takes id=1 to match historic data;
+       per-tenant rows get the next available id so they don't collide
+       with the singleton. */
+    if (tenantId == null) {
+      const [created] = await db
+        .insert(licenseStatusTable)
+        .values({ id: 1 })
+        .onConflictDoNothing()
+        .returning();
+      if (created) return { firstBootAt: created.firstBootAt, keyOverride: created.keyOverride };
+      const [retry] = await db
+        .select()
+        .from(licenseStatusTable)
+        .where(isNull(licenseStatusTable.tenantId))
+        .limit(1);
+      return retry ? { firstBootAt: retry.firstBootAt, keyOverride: retry.keyOverride } : null;
+    }
+
+    const allRows = await db.select({ id: licenseStatusTable.id }).from(licenseStatusTable);
+    const maxId = allRows.reduce((m, r) => Math.max(m, r.id), 0);
+    const newId = Math.max(maxId + 1, 2);
 
     const [created] = await db
       .insert(licenseStatusTable)
-      .values({ id: 1 })
+      .values({ id: newId, tenantId })
       .onConflictDoNothing()
       .returning();
     if (created) return { firstBootAt: created.firstBootAt, keyOverride: created.keyOverride };
 
-    // Race: someone else inserted — re-read
     const [retry] = await db
       .select()
       .from(licenseStatusTable)
-      .where(eq(licenseStatusTable.id, 1))
+      .where(eq(licenseStatusTable.tenantId, tenantId))
       .limit(1);
     return retry ? { firstBootAt: retry.firstBootAt, keyOverride: retry.keyOverride } : null;
   } catch (err) {
-    logger.error({ err }, "license: could not read/seed license_status row");
+    logger.error({ err, tenantId }, "license: could not read/seed license_status row");
     return null;
   }
 }
 
-/** Set or clear the in-app license key. Pass null to remove. */
-export async function setStoredLicenseKey(key: string | null): Promise<void> {
+/** Set or clear the in-app license key for a given tenant. Pass null key to remove. */
+export async function setStoredLicenseKey(key: string | null, tenantId: string | null): Promise<void> {
   try {
-    await db
-      .insert(licenseStatusTable)
-      .values({ id: 1, keyOverride: key, keyUpdatedAt: new Date() })
-      .onConflictDoUpdate({
-        target: licenseStatusTable.id,
-        set:    { keyOverride: key, keyUpdatedAt: new Date() },
-      });
-    invalidateLicenseCache();
+    /* Ensure a row exists first (idempotent) so the UPDATE below has a
+       target — this also assigns a fresh id for new tenants. */
+    await getOrCreateStatusRow(tenantId);
+
+    if (tenantId == null) {
+      await db
+        .update(licenseStatusTable)
+        .set({ keyOverride: key, keyUpdatedAt: new Date() })
+        .where(isNull(licenseStatusTable.tenantId));
+    } else {
+      await db
+        .update(licenseStatusTable)
+        .set({ keyOverride: key, keyUpdatedAt: new Date() })
+        .where(eq(licenseStatusTable.tenantId, tenantId));
+    }
+    invalidateLicenseCache(tenantId);
   } catch (err) {
-    logger.error({ err }, "license: could not persist key override");
+    logger.error({ err, tenantId }, "license: could not persist key override");
     throw new Error("Could not save license key — database unreachable");
   }
 }
 
-/* ───────── current status ───────── */
+/* ───────── current status (per-tenant cache) ───────── */
 
-let cached: LicenseStatus | null = null;
-let cachedAt = 0;
+interface CacheEntry { status: LicenseStatus; at: number; }
+const cache = new Map<string, CacheEntry>();
 const CACHE_MS = 60_000; // re-check every minute
 
-export async function getLicenseStatus(forceRefresh = false): Promise<LicenseStatus> {
-  if (!forceRefresh && cached && Date.now() - cachedAt < CACHE_MS) {
-    return cached;
+function cacheKey(tenantId: string | null): string {
+  return tenantId ?? "__legacy_null__";
+}
+
+export async function getLicenseStatus(tenantId: string | null = null, forceRefresh = false): Promise<LicenseStatus> {
+  const key = cacheKey(tenantId);
+  if (!forceRefresh) {
+    const hit = cache.get(key);
+    if (hit && Date.now() - hit.at < CACHE_MS) return hit.status;
   }
 
   // Resolve the active key: in-app override (DB) wins over env
-  const row = await getOrCreateStatusRow();
-  const key = (row?.keyOverride ?? process.env["LICENSE_KEY"] ?? "").trim();
+  const row = await getOrCreateStatusRow(tenantId);
+  const activeKey = (row?.keyOverride ?? process.env["LICENSE_KEY"] ?? "").trim();
 
-  if (key) {
-    const result = verifyLicense(key);
+  const set = (status: LicenseStatus): LicenseStatus => {
+    cache.set(key, { status, at: Date.now() });
+    return status;
+  };
+
+  if (activeKey) {
+    const result = verifyLicense(activeKey);
     if (!result.ok) {
-      cached = { valid: false, mode: "invalid", reason: result.reason };
-      cachedAt = Date.now();
-      return cached;
+      return set({ valid: false, mode: "invalid", reason: result.reason });
     }
     const { payload } = result;
     if (payload.expiry !== "perpetual") {
       const expiryDate = new Date(payload.expiry);
       if (Number.isNaN(expiryDate.getTime())) {
-        cached = { valid: false, mode: "invalid", payload, reason: "Invalid expiry date in license" };
-        cachedAt = Date.now();
-        return cached;
+        return set({ valid: false, mode: "invalid", payload, reason: "Invalid expiry date in license" });
       }
       const now = Date.now();
       const msLeft = expiryDate.getTime() - now;
       if (msLeft < 0) {
-        cached = {
+        return set({
           valid: false,
           mode: "expired",
           payload,
           reason: `License expired ${expiryDate.toISOString().slice(0, 10)}`,
-        };
-        cachedAt = Date.now();
-        return cached;
+        });
       }
-      cached = {
+      return set({
         valid: true,
         mode: "licensed",
         payload,
         daysRemaining: Math.floor(msLeft / 86_400_000),
-      };
-      cachedAt = Date.now();
-      return cached;
+      });
     }
-    cached = { valid: true, mode: "licensed", payload };
-    cachedAt = Date.now();
-    return cached;
+    return set({ valid: true, mode: "licensed", payload });
   }
 
   // No key → trial mode
   if (!row) {
     // DB unreachable: fail open so the shop can still bill while we figure it out
-    cached = { valid: true, mode: "trial", reason: "Trial DB row unavailable — failing open" };
-    cachedAt = Date.now();
-    return cached;
+    return set({ valid: true, mode: "trial", reason: "Trial DB row unavailable — failing open" });
   }
   const trialEnd = new Date(row.firstBootAt.getTime() + TRIAL_DAYS * 86_400_000);
   const msLeft = trialEnd.getTime() - Date.now();
   if (msLeft <= 0) {
-    cached = {
+    return set({
       valid: false,
       mode: "trial_expired",
       trialEndsAt: trialEnd.toISOString(),
       reason: `Trial ended ${trialEnd.toISOString().slice(0, 10)}. Enter a license key to continue.`,
-    };
-    cachedAt = Date.now();
-    return cached;
+    });
   }
-  cached = {
+  return set({
     valid: true,
     mode: "trial",
     trialEndsAt: trialEnd.toISOString(),
     daysRemaining: Math.ceil(msLeft / 86_400_000),
-  };
-  cachedAt = Date.now();
-  return cached;
+  });
 }
 
-export function invalidateLicenseCache(): void {
-  cached = null;
-  cachedAt = 0;
+/** Clear the cached status for one tenant (or all if no tenantId given). */
+export function invalidateLicenseCache(tenantId?: string | null): void {
+  if (tenantId === undefined) {
+    cache.clear();
+    return;
+  }
+  cache.delete(cacheKey(tenantId));
 }
 
 /* ───────── express middleware ───────── */
@@ -264,17 +295,21 @@ const ALLOWED_PATHS = new Set([
   "/license/activate",
   "/license/remove",
   "/license/refresh",
+  "/auth/login",
+  "/auth/logout",
+  "/auth/me",
   "/updates/check",
   "/updates/install",
   "/updates/status",
   "/health",
+  "/healthz",
 ]);
 
 export async function licenseGate(req: Request, res: Response, next: NextFunction): Promise<void> {
-  // Always allow the status & health endpoints so the UI can show why it's down
+  // Always allow the status, auth & health endpoints so the UI can show why it's down
   if (ALLOWED_PATHS.has(req.path)) { next(); return; }
 
-  const status = await getLicenseStatus();
+  const status = await getLicenseStatus(req.tenantId ?? null);
   if (status.valid) { next(); return; }
 
   res.status(402).json({

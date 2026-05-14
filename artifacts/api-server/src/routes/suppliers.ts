@@ -1,14 +1,16 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, suppliersTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
+import { tenantWhere } from "../lib/tenant";
 
 const router: IRouter = Router();
 
-router.get("/suppliers", async (_req, res): Promise<void> => {
+router.get("/suppliers", async (req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(suppliersTable)
+    .where(tenantWhere(suppliersTable.tenantId, req.tenantId))
     .orderBy(desc(suppliersTable.createdAt));
   res.json(rows);
 });
@@ -21,15 +23,21 @@ router.post("/suppliers", async (req, res): Promise<void> => {
   }
   const [row] = await db
     .insert(suppliersTable)
-    .values({ name: name.trim(), contact, email, phone, address, notes })
+    .values({ tenantId: req.tenantId, name: name.trim(), contact, email, phone, address, notes })
     .returning();
-  broadcast("supplier_created", { id: row.id, name: row.name });
+  broadcast("supplier_created", { id: row.id, name: row.name }, req.tenantId);
   res.status(201).json(row);
 });
 
 router.get("/suppliers/:id", async (req, res): Promise<void> => {
   const { id } = req.params;
-  const [row] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, id));
+  const [row] = await db
+    .select()
+    .from(suppliersTable)
+    .where(and(
+      eq(suppliersTable.id, id),
+      tenantWhere(suppliersTable.tenantId, req.tenantId),
+    ));
   if (!row) { res.status(404).json({ error: "Supplier not found" }); return; }
   res.json(row);
 });
@@ -44,14 +52,27 @@ router.patch("/suppliers/:id", async (req, res): Promise<void> => {
   if (phone != null) updates.phone = phone;
   if (address != null) updates.address = address;
   if (notes != null) updates.notes = notes;
-  const [row] = await db.update(suppliersTable).set(updates).where(eq(suppliersTable.id, id)).returning();
+  const [row] = await db
+    .update(suppliersTable)
+    .set(updates)
+    .where(and(
+      eq(suppliersTable.id, id),
+      tenantWhere(suppliersTable.tenantId, req.tenantId),
+    ))
+    .returning();
   if (!row) { res.status(404).json({ error: "Supplier not found" }); return; }
   res.json(row);
 });
 
 router.delete("/suppliers/:id", async (req, res): Promise<void> => {
   const { id } = req.params;
-  const [row] = await db.delete(suppliersTable).where(eq(suppliersTable.id, id)).returning();
+  const [row] = await db
+    .delete(suppliersTable)
+    .where(and(
+      eq(suppliersTable.id, id),
+      tenantWhere(suppliersTable.tenantId, req.tenantId),
+    ))
+    .returning();
   if (!row) { res.status(404).json({ error: "Supplier not found" }); return; }
   res.sendStatus(204);
 });

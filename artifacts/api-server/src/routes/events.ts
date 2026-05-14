@@ -3,9 +3,9 @@ import { addClient, clientCount } from "../lib/sse";
 
 const router: IRouter = Router();
 
-/** GET /api/events  — SSE stream */
+/** GET /api/events  — SSE stream (tenant-scoped via cookie) */
 router.get("/events", (req, res) => {
-  const cleanup = addClient(res);
+  const cleanup = addClient(res, req.tenantId);
   req.on("close", cleanup);
 });
 

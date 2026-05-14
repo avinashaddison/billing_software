@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
-import { eq, asc, sql } from "drizzle-orm";
+import { eq, asc, sql, and } from "drizzle-orm";
 import { db, categoriesTable, productsTable } from "@workspace/db";
+import { tenantWhere } from "../lib/tenant";
 
 const router: IRouter = Router();
 
 /* ── GET /api/categories ── list all with product count ─────────── */
-router.get("/categories", async (_req, res): Promise<void> => {
+router.get("/categories", async (req, res): Promise<void> => {
   try {
     const rows = await db
       .select({
@@ -19,6 +20,7 @@ router.get("/categories", async (_req, res): Promise<void> => {
       })
       .from(categoriesTable)
       .leftJoin(productsTable, eq(productsTable.category, categoriesTable.name))
+      .where(tenantWhere(categoriesTable.tenantId, req.tenantId))
       .groupBy(categoriesTable.id)
       .orderBy(asc(categoriesTable.name));
     res.json(rows);
@@ -40,9 +42,10 @@ router.post("/categories", async (req, res): Promise<void> => {
   }
   try {
     const [row] = await db.insert(categoriesTable).values({
-      name:    name.trim(),
-      emoji:   (emoji ?? "🎁").toString(),
-      skuCode: skuCode.trim().toUpperCase().slice(0, 6),
+      tenantId: req.tenantId,
+      name:     name.trim(),
+      emoji:    (emoji ?? "🎁").toString(),
+      skuCode:  skuCode.trim().toUpperCase().slice(0, 6),
     }).returning();
     res.status(201).json(row);
   } catch (err: any) {
@@ -72,7 +75,10 @@ router.put("/categories/:id", async (req, res): Promise<void> => {
     const [row] = await db
       .update(categoriesTable)
       .set(updates)
-      .where(eq(categoriesTable.id, req.params.id))
+      .where(and(
+        eq(categoriesTable.id, req.params.id),
+        tenantWhere(categoriesTable.tenantId, req.tenantId),
+      ))
       .returning();
     if (!row) { res.status(404).json({ error: "Category not found" }); return; }
     res.json(row);
@@ -90,7 +96,10 @@ router.delete("/categories/:id", async (req, res): Promise<void> => {
   try {
     const [row] = await db
       .delete(categoriesTable)
-      .where(eq(categoriesTable.id, req.params.id))
+      .where(and(
+        eq(categoriesTable.id, req.params.id),
+        tenantWhere(categoriesTable.tenantId, req.tenantId),
+      ))
       .returning();
     if (!row) { res.status(404).json({ error: "Category not found" }); return; }
     res.json({ ok: true });

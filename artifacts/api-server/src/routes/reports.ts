@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { desc, gte, sql } from "drizzle-orm";
+import { desc, gte, sql, and } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable } from "@workspace/db";
+import { tenantWhere } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -19,9 +20,10 @@ router.get("/reports/revenue", async (req, res): Promise<void> => {
       itemsCount:  sql<number>`SUM(${billsTable.itemsCount})`.as("items_count"),
     })
     .from(billsTable)
-    .where(
-      gte(billsTable.createdAt, sql`NOW() - INTERVAL '${sql.raw(String(days))} days'`)
-    )
+    .where(and(
+      gte(billsTable.createdAt, sql`NOW() - INTERVAL '${sql.raw(String(days))} days'`),
+      tenantWhere(billsTable.tenantId, req.tenantId),
+    ))
     .groupBy(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`)
     .orderBy(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`);
 
@@ -62,7 +64,10 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
       upiSales:    sql<string>`COALESCE(SUM(CASE WHEN ${billsTable.paymentMode} = 'upi' THEN ${billsTable.totalAmount} ELSE 0 END), 0)`.as("upi_sales"),
     })
     .from(billsTable)
-    .where(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`);
+    .where(and(
+      sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`,
+      tenantWhere(billsTable.tenantId, req.tenantId),
+    ));
 
   // Top-selling products for the day
   const topProducts = await db
@@ -78,7 +83,10 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
     .from(saleItemsTable)
     .innerJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
     .innerJoin(billsTable, sql`${saleItemsTable.saleId} = ${billsTable.id}`)
-    .where(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`)
+    .where(and(
+      sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`,
+      tenantWhere(billsTable.tenantId, req.tenantId),
+    ))
     .groupBy(saleItemsTable.productId, productsTable.name, productsTable.sku, productsTable.purchasePrice)
     .orderBy(desc(sql`SUM(${saleItemsTable.quantity})`))
     .limit(10);
@@ -92,7 +100,10 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
     .from(saleItemsTable)
     .innerJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
     .innerJoin(billsTable, sql`${saleItemsTable.saleId} = ${billsTable.id}`)
-    .where(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`);
+    .where(and(
+      sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`,
+      tenantWhere(billsTable.tenantId, req.tenantId),
+    ));
 
   // Stock IN for the day
   const [stockIn] = await db
@@ -101,9 +112,10 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
       txCount:  sql<number>`COUNT(*)`.as("tx_count"),
     })
     .from(stockLogsTable)
-    .where(
-      sql`${stockLogsTable.type} = 'IN' AND DATE(${stockLogsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`
-    );
+    .where(and(
+      sql`${stockLogsTable.type} = 'IN' AND DATE(${stockLogsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`,
+      tenantWhere(stockLogsTable.tenantId, req.tenantId),
+    ));
 
   const totalRevenue = Number(salesSummary.totalAmount);
   const totalCost    = Number(profitSummary.totalCost);

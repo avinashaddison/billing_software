@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, salesTable, productsTable } from "@workspace/db";
 import { ListSalesQueryParams } from "@workspace/api-zod";
+import { tenantWhere } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -13,6 +14,9 @@ router.get("/sales", async (req, res): Promise<void> => {
   }
 
   const { productId, limit = 50, offset = 0 } = parsed.data;
+
+  const conditions = [tenantWhere(salesTable.tenantId, req.tenantId)];
+  if (productId) conditions.push(eq(salesTable.productId, productId));
 
   const rows = await db
     .select({
@@ -26,7 +30,7 @@ router.get("/sales", async (req, res): Promise<void> => {
     })
     .from(salesTable)
     .innerJoin(productsTable, eq(salesTable.productId, productsTable.id))
-    .where(productId ? eq(salesTable.productId, productId) : undefined)
+    .where(and(...conditions))
     .orderBy(desc(salesTable.createdAt))
     .limit(limit)
     .offset(offset);

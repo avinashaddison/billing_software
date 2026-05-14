@@ -23,8 +23,8 @@ function toWireFormat(status: LicenseStatus) {
  * Always reachable — even when the license is invalid — so the UI can render
  * a "License expired / enter your key" screen instead of a blank 402.
  */
-router.get("/license/status", async (_req, res): Promise<void> => {
-  const status = await getLicenseStatus();
+router.get("/license/status", async (req, res): Promise<void> => {
+  const status = await getLicenseStatus(req.tenantId ?? null);
   res.json(toWireFormat(status));
 });
 
@@ -32,9 +32,9 @@ router.get("/license/status", async (_req, res): Promise<void> => {
  * POST /api/license/refresh — clear the in-memory cache so a freshly-edited
  * .env LICENSE_KEY is picked up without restarting the server.
  */
-router.post("/license/refresh", async (_req, res): Promise<void> => {
-  invalidateLicenseCache();
-  const status = await getLicenseStatus(true);
+router.post("/license/refresh", async (req, res): Promise<void> => {
+  invalidateLicenseCache(req.tenantId ?? null);
+  const status = await getLicenseStatus(req.tenantId ?? null, true);
   res.json({ ok: true, status: toWireFormat(status) });
 });
 
@@ -61,8 +61,8 @@ router.post("/license/activate", async (req, res): Promise<void> => {
   // forgery). Useful for previewing/testing the expired UI too.
 
   try {
-    await setStoredLicenseKey(key);
-    const status = await getLicenseStatus(true);
+    await setStoredLicenseKey(key, req.tenantId ?? null);
+    const status = await getLicenseStatus(req.tenantId ?? null, true);
     res.json({ ok: true, status: toWireFormat(status) });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Could not save key" });
@@ -74,10 +74,10 @@ router.post("/license/activate", async (req, res): Promise<void> => {
  * After this, verification falls back to the .env LICENSE_KEY (if any),
  * else the trial window.
  */
-router.delete("/license/remove", async (_req, res): Promise<void> => {
+router.delete("/license/remove", async (req, res): Promise<void> => {
   try {
-    await setStoredLicenseKey(null);
-    const status = await getLicenseStatus(true);
+    await setStoredLicenseKey(null, req.tenantId ?? null);
+    const status = await getLicenseStatus(req.tenantId ?? null, true);
     res.json({ ok: true, status: toWireFormat(status) });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Could not remove key" });

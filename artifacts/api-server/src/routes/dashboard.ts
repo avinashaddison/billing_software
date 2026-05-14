@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
-import { lte, sql, eq, gte, and } from "drizzle-orm";
+import { lte, sql, gte, and } from "drizzle-orm";
 import { db, productsTable, stockLogsTable } from "@workspace/db";
+import { tenantWhere } from "../lib/tenant";
 
 const router: IRouter = Router();
 
-router.get("/dashboard/summary", async (_req, res): Promise<void> => {
+router.get("/dashboard/summary", async (req, res): Promise<void> => {
   const [summary] = await db
     .select({
       totalProducts: sql<number>`count(*)::int`,
@@ -12,7 +13,8 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
       totalStockValue: sql<number>`sum(${productsTable.stock}::numeric * ${productsTable.price})`,
       lowStockCount: sql<number>`count(case when ${productsTable.stock} <= ${productsTable.lowStockThreshold} then 1 end)::int`,
     })
-    .from(productsTable);
+    .from(productsTable)
+    .where(tenantWhere(productsTable.tenantId, req.tenantId));
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -23,7 +25,10 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
       todayOutCount: sql<number>`count(case when ${stockLogsTable.type} = 'OUT' then 1 end)::int`,
     })
     .from(stockLogsTable)
-    .where(gte(stockLogsTable.createdAt, todayStart));
+    .where(and(
+      gte(stockLogsTable.createdAt, todayStart),
+      tenantWhere(stockLogsTable.tenantId, req.tenantId),
+    ));
 
   res.json({
     totalProducts: summary?.totalProducts ?? 0,
@@ -35,17 +40,20 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
   });
 });
 
-router.get("/dashboard/low-stock", async (_req, res): Promise<void> => {
+router.get("/dashboard/low-stock", async (req, res): Promise<void> => {
   const products = await db
     .select()
     .from(productsTable)
-    .where(lte(productsTable.stock, productsTable.lowStockThreshold))
+    .where(and(
+      lte(productsTable.stock, productsTable.lowStockThreshold),
+      tenantWhere(productsTable.tenantId, req.tenantId),
+    ))
     .orderBy(productsTable.stock);
 
   res.json(products.map((p) => ({ ...p, price: Number(p.price) })));
 });
 
-router.get("/dashboard/today-activity", async (_req, res): Promise<void> => {
+router.get("/dashboard/today-activity", async (req, res): Promise<void> => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
@@ -57,7 +65,10 @@ router.get("/dashboard/today-activity", async (_req, res): Promise<void> => {
       outQuantity: sql<number>`coalesce(sum(case when ${stockLogsTable.type} = 'OUT' then ${stockLogsTable.quantity} else 0 end), 0)::int`,
     })
     .from(stockLogsTable)
-    .where(gte(stockLogsTable.createdAt, todayStart));
+    .where(and(
+      gte(stockLogsTable.createdAt, todayStart),
+      tenantWhere(stockLogsTable.tenantId, req.tenantId),
+    ));
 
   res.json({
     inCount: activity?.inCount ?? 0,
@@ -67,7 +78,7 @@ router.get("/dashboard/today-activity", async (_req, res): Promise<void> => {
   });
 });
 
-router.get("/dashboard/categories", async (_req, res): Promise<void> => {
+router.get("/dashboard/categories", async (req, res): Promise<void> => {
   const categories = await db
     .select({
       category: productsTable.category,
@@ -76,6 +87,7 @@ router.get("/dashboard/categories", async (_req, res): Promise<void> => {
       stockValue: sql<number>`sum(${productsTable.stock}::numeric * ${productsTable.price})`,
     })
     .from(productsTable)
+    .where(tenantWhere(productsTable.tenantId, req.tenantId))
     .groupBy(productsTable.category)
     .orderBy(productsTable.category);
 

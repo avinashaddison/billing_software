@@ -1,7 +1,13 @@
 import { Router, type IRouter } from "express";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, staffProfilesTable, staffPermissionsTable } from "@workspace/db";
+import { tenantWhere } from "../lib/tenant";
+import {
+  TENANT_COOKIE_NAME,
+  signTenantCookie,
+  tenantCookieOptions,
+} from "../middlewares/tenant";
 
 const router: IRouter = Router();
 
@@ -23,7 +29,7 @@ async function checkPin(plain: string, stored: string): Promise<boolean> {
 }
 
 /* ── GET /api/staff ─────────────────────────────────────────────── */
-router.get("/staff", async (_req, res): Promise<void> => {
+router.get("/staff", async (req, res): Promise<void> => {
   try {
     const staff = await db
       .select({
@@ -35,6 +41,7 @@ router.get("/staff", async (_req, res): Promise<void> => {
         createdAt: staffProfilesTable.createdAt,
       })
       .from(staffProfilesTable)
+      .where(tenantWhere(staffProfilesTable.tenantId, req.tenantId))
       .orderBy(asc(staffProfilesTable.createdAt));
     res.json(staff);
   } catch { res.status(500).json({ error: "Failed to fetch staff" }); }
@@ -47,6 +54,9 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   if (!/^\d{4}$/.test(String(pin))) { res.status(400).json({ error: "PIN must be 4 digits" }); return; }
 
   try {
+    /* Login does NOT pre-filter by req.tenantId — the staffId itself is
+       the routing key. The login result then ESTABLISHES the tenant
+       for subsequent requests by issuing the signed cookie. */
     const [member] = await db.select().from(staffProfilesTable).where(eq(staffProfilesTable.id, staffId));
     if (!member) { res.status(404).json({ error: "Staff member not found" }); return; }
     if (!member.isActive) { res.status(403).json({ error: "Account is inactive" }); return; }
@@ -117,8 +127,58 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     const permissions: Record<string, string> = {};
     for (const p of perms) permissions[p.resource] = p.level;
 
-    res.json({ id: member.id, name: member.name, role: member.role, permissions });
+    /* ── Issue signed tenant_session cookie ──
+       member.tenantId is null for legacy Hira & Sons staff → cookie
+       carries null and downstream queries match the IS-NULL branch. */
+    res.cookie(
+      TENANT_COOKIE_NAME,
+      signTenantCookie(member.tenantId ?? null, member.id),
+      tenantCookieOptions(),
+    );
+
+    res.json({
+      id: member.id,
+      name: member.name,
+      role: member.role,
+      tenantId: member.tenantId ?? null,
+      permissions,
+    });
   } catch { res.status(500).json({ error: "Login failed" }); }
+});
+
+/* ── POST /api/auth/logout ──────────────────────────────────────── */
+router.post("/auth/logout", (_req, res): void => {
+  res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
+  res.json({ ok: true });
+});
+
+/* ── GET /api/auth/me — who am I per the cookie? ───────────────── */
+router.get("/auth/me", async (req, res): Promise<void> => {
+  if (!req.staffId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  try {
+    const [member] = await db
+      .select({
+        id:       staffProfilesTable.id,
+        name:     staffProfilesTable.name,
+        role:     staffProfilesTable.role,
+        tenantId: staffProfilesTable.tenantId,
+        isActive: staffProfilesTable.isActive,
+      })
+      .from(staffProfilesTable)
+      .where(eq(staffProfilesTable.id, req.staffId));
+    if (!member || !member.isActive) {
+      res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
+      res.status(401).json({ error: "Not authenticated" });
+      return;
+    }
+    const perms = await db
+      .select()
+      .from(staffPermissionsTable)
+      .where(eq(staffPermissionsTable.staffId, member.id));
+    const permissions: Record<string, string> = {};
+    for (const p of perms) permissions[p.resource] = p.level;
+    res.json({ ...member, permissions });
+  } catch { res.status(500).json({ error: "Failed to load session" }); }
 });
 
 /* ── POST /api/staff ── create ──────────────────────────────────── */
@@ -136,7 +196,12 @@ router.post("/staff", async (req, res): Promise<void> => {
     const hashed = await hashPin(String(pin));
     const [member] = await db
       .insert(staffProfilesTable)
-      .values({ name: name.trim(), pin: hashed, role: safeRole })
+      .values({
+        name: name.trim(),
+        pin: hashed,
+        role: safeRole,
+        tenantId: req.tenantId, // new staff inherit the creator's tenant
+      })
       .returning({ id: staffProfilesTable.id, name: staffProfilesTable.name, role: staffProfilesTable.role, isActive: staffProfilesTable.isActive, createdAt: staffProfilesTable.createdAt });
     res.status(201).json(member);
   } catch { res.status(500).json({ error: "Failed to create staff member" }); }
@@ -167,7 +232,10 @@ router.put("/staff/:id", async (req, res): Promise<void> => {
     const [member] = await db
       .update(staffProfilesTable)
       .set(updates)
-      .where(eq(staffProfilesTable.id, req.params.id))
+      .where(and(
+        eq(staffProfilesTable.id, req.params.id),
+        tenantWhere(staffProfilesTable.tenantId, req.tenantId),
+      ))
       .returning({ id: staffProfilesTable.id, name: staffProfilesTable.name, role: staffProfilesTable.role, isActive: staffProfilesTable.isActive, createdAt: staffProfilesTable.createdAt });
     if (!member) { res.status(404).json({ error: "Staff member not found" }); return; }
     res.json(member);
@@ -179,7 +247,10 @@ router.delete("/staff/:id", async (req, res): Promise<void> => {
   try {
     const [member] = await db
       .delete(staffProfilesTable)
-      .where(eq(staffProfilesTable.id, req.params.id))
+      .where(and(
+        eq(staffProfilesTable.id, req.params.id),
+        tenantWhere(staffProfilesTable.tenantId, req.tenantId),
+      ))
       .returning();
     if (!member) { res.status(404).json({ error: "Staff member not found" }); return; }
     res.json({ ok: true });
@@ -189,6 +260,17 @@ router.delete("/staff/:id", async (req, res): Promise<void> => {
 /* ── GET /api/staff/:id/permissions ─────────────────────────────── */
 router.get("/staff/:id/permissions", async (req, res): Promise<void> => {
   try {
+    /* Ensure the staff row belongs to the caller's tenant before
+       returning permissions — prevents cross-tenant permission leaks. */
+    const [member] = await db
+      .select({ id: staffProfilesTable.id })
+      .from(staffProfilesTable)
+      .where(and(
+        eq(staffProfilesTable.id, req.params.id),
+        tenantWhere(staffProfilesTable.tenantId, req.tenantId),
+      ));
+    if (!member) { res.status(404).json({ error: "Staff member not found" }); return; }
+
     const perms = await db
       .select()
       .from(staffPermissionsTable)
@@ -207,14 +289,29 @@ router.put("/staff/:id/permissions", async (req, res): Promise<void> => {
   }
 
   try {
+    /* Confirm the staff row is in the caller's tenant before mutating. */
+    const [member] = await db
+      .select({ id: staffProfilesTable.id, tenantId: staffProfilesTable.tenantId })
+      .from(staffProfilesTable)
+      .where(and(
+        eq(staffProfilesTable.id, req.params.id),
+        tenantWhere(staffProfilesTable.tenantId, req.tenantId),
+      ));
+    if (!member) { res.status(404).json({ error: "Staff member not found" }); return; }
+
     for (const [resource, level] of Object.entries(permissions)) {
       if (!VALID_LEVELS.includes(level as typeof VALID_LEVELS[number])) continue;
       await db
         .insert(staffPermissionsTable)
-        .values({ staffId: req.params.id, resource, level: String(level) })
+        .values({
+          staffId: req.params.id,
+          resource,
+          level: String(level),
+          tenantId: member.tenantId, // mirror the staff row's tenant
+        })
         .onConflictDoUpdate({
           target: [staffPermissionsTable.staffId, staffPermissionsTable.resource],
-          set: { level: String(level) },
+          set: { level: String(level), tenantId: member.tenantId },
         });
     }
     const updated = await db

@@ -3,13 +3,20 @@ import { eq, desc, and } from "drizzle-orm";
 import { db, returnsTable, productsTable, billsTable, saleItemsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { logger } from "../lib/logger";
+import { tenantWhere } from "../lib/tenant";
 
 const router: IRouter = Router();
 
 /** GET /api/returns?billId=... */
 router.get("/returns", async (req, res): Promise<void> => {
   const { billId } = req.query;
-  let query = db
+
+  const conditions = [tenantWhere(returnsTable.tenantId, req.tenantId)];
+  if (billId && typeof billId === "string") {
+    conditions.push(eq(returnsTable.billId, billId));
+  }
+
+  const rows = await db
     .select({
       id:           returnsTable.id,
       billId:       returnsTable.billId,
@@ -24,13 +31,9 @@ router.get("/returns", async (req, res): Promise<void> => {
     })
     .from(returnsTable)
     .innerJoin(productsTable, eq(returnsTable.productId, productsTable.id))
-    .$dynamic();
+    .where(and(...conditions))
+    .orderBy(desc(returnsTable.createdAt));
 
-  if (billId && typeof billId === "string") {
-    query = query.where(eq(returnsTable.billId, billId));
-  }
-
-  const rows = await query.orderBy(desc(returnsTable.createdAt));
   res.json(rows.map((r) => ({ ...r, refundAmount: Number(r.refundAmount) })));
 });
 
@@ -65,8 +68,14 @@ router.post("/returns", async (req, res): Promise<void> => {
     return;
   }
 
-  /* Validate bill exists */
-  const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, billId));
+  /* Validate bill exists AND belongs to caller's tenant */
+  const [bill] = await db
+    .select()
+    .from(billsTable)
+    .where(and(
+      eq(billsTable.id, billId),
+      tenantWhere(billsTable.tenantId, req.tenantId),
+    ));
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
 
   /* Process each line item in a single transaction */
@@ -77,7 +86,13 @@ router.post("/returns", async (req, res): Promise<void> => {
     for (const line of lineItems) {
       if (!line.productId || !line.quantity || line.quantity < 1) continue;
 
-      const [product] = await tx.select().from(productsTable).where(eq(productsTable.id, line.productId));
+      const [product] = await tx
+        .select()
+        .from(productsTable)
+        .where(and(
+          eq(productsTable.id, line.productId),
+          tenantWhere(productsTable.tenantId, req.tenantId),
+        ));
       if (!product) continue;
 
       /* Refund at the HISTORICAL price the customer actually paid (from sale_items),
@@ -109,6 +124,7 @@ router.post("/returns", async (req, res): Promise<void> => {
       const [ret] = await tx
         .insert(returnsTable)
         .values({
+          tenantId:     bill.tenantId, // mirror the bill's tenant (NULL stays NULL for legacy)
           billId,
           productId:    line.productId,
           quantity:     line.quantity,
@@ -130,7 +146,7 @@ router.post("/returns", async (req, res): Promise<void> => {
         type:        "IN",
         quantity:    line.quantity,
         newStock:    product.stock + line.quantity,
-      });
+      }, product.tenantId);
 
       returnRows.push(ret);
     }

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, ilike, or, and, lte, inArray } from "drizzle-orm";
 import { db, productsTable, stockLogsTable, salesTable, saleItemsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
+import { tenantWhere } from "../lib/tenant";
 import {
   ListProductsQueryParams,
   CreateProductBody,
@@ -53,14 +54,14 @@ router.get("/products", async (req, res): Promise<void> => {
 
   let query = db.select().from(productsTable).$dynamic();
 
-  const conditions = [];
+  const conditions = [tenantWhere(productsTable.tenantId, req.tenantId)];
 
   if (search) {
     conditions.push(
       or(
         ilike(productsTable.name, `%${search}%`),
         ilike(productsTable.sku, `%${search}%`)
-      )
+      )!
     );
   }
 
@@ -72,9 +73,7 @@ router.get("/products", async (req, res): Promise<void> => {
     conditions.push(lte(productsTable.stock, productsTable.lowStockThreshold));
   }
 
-  if (conditions.length > 0) {
-    query = query.where(and(...conditions));
-  }
+  query = query.where(and(...conditions));
 
   const products = await query.orderBy(productsTable.name);
 
@@ -105,6 +104,7 @@ router.post("/products", async (req, res): Promise<void> => {
   const [product] = await db
     .insert(productsTable)
     .values({
+      tenantId: req.tenantId,
       name,
       sku,
       barcode: barcode?.trim() || null,
@@ -120,7 +120,7 @@ router.post("/products", async (req, res): Promise<void> => {
     })
     .returning();
 
-  broadcast("product_created", { productId: product.id, name: product.name, sku: product.sku });
+  broadcast("product_created", { productId: product.id, name: product.name, sku: product.sku }, req.tenantId);
 
   res.status(201).json(mapProduct(product));
 });
@@ -138,7 +138,10 @@ router.get("/products/next-sku", async (req, res): Promise<void> => {
   const products = await db
     .select({ sku: productsTable.sku })
     .from(productsTable)
-    .where(ilike(productsTable.sku, likePattern));
+    .where(and(
+      tenantWhere(productsTable.tenantId, req.tenantId),
+      ilike(productsTable.sku, likePattern),
+    ));
 
   let maxNum = 0;
   for (const p of products) {
@@ -161,7 +164,10 @@ router.get("/products/sku/:sku", async (req, res): Promise<void> => {
   const [product] = await db
     .select()
     .from(productsTable)
-    .where(eq(productsTable.sku, params.data.sku));
+    .where(and(
+      eq(productsTable.sku, params.data.sku),
+      tenantWhere(productsTable.tenantId, req.tenantId),
+    ));
 
   if (!product) {
     res.status(404).json({ error: "Product not found" });
@@ -183,14 +189,20 @@ router.get("/products/scan/:code", async (req, res): Promise<void> => {
   let [product] = await db
     .select()
     .from(productsTable)
-    .where(eq(productsTable.sku, code));
+    .where(and(
+      eq(productsTable.sku, code),
+      tenantWhere(productsTable.tenantId, req.tenantId),
+    ));
 
   // Fall back to barcode match (case-insensitive)
   if (!product) {
     [product] = await db
       .select()
       .from(productsTable)
-      .where(eq(productsTable.barcode, req.params.code.trim()));
+      .where(and(
+        eq(productsTable.barcode, req.params.code.trim()),
+        tenantWhere(productsTable.tenantId, req.tenantId),
+      ));
   }
 
   if (!product) {
@@ -211,7 +223,10 @@ router.get("/products/:id", async (req, res): Promise<void> => {
   const [product] = await db
     .select()
     .from(productsTable)
-    .where(eq(productsTable.id, params.data.id));
+    .where(and(
+      eq(productsTable.id, params.data.id),
+      tenantWhere(productsTable.tenantId, req.tenantId),
+    ));
 
   if (!product) {
     res.status(404).json({ error: "Product not found" });
@@ -240,7 +255,10 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   const [existing] = await db
     .select()
     .from(productsTable)
-    .where(eq(productsTable.id, params.data.id));
+    .where(and(
+      eq(productsTable.id, params.data.id),
+      tenantWhere(productsTable.tenantId, req.tenantId),
+    ));
 
   if (!existing) {
     res.status(404).json({ error: "Product not found" });
@@ -303,7 +321,10 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   const [product] = await db
     .update(productsTable)
     .set(updates)
-    .where(eq(productsTable.id, params.data.id))
+    .where(and(
+      eq(productsTable.id, params.data.id),
+      tenantWhere(productsTable.tenantId, req.tenantId),
+    ))
     .returning();
 
   if (!product) {
@@ -311,7 +332,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  broadcast("product_updated", { productId: product.id, name: product.name, sku: product.sku });
+  broadcast("product_updated", { productId: product.id, name: product.name, sku: product.sku }, req.tenantId);
 
   res.json(mapProduct(product));
 });
@@ -326,6 +347,17 @@ router.delete("/products/:id", async (req, res): Promise<void> => {
   const { id } = params.data;
 
   const [product] = await db.transaction(async (tx) => {
+    /* Confirm the product belongs to the caller's tenant before we delete
+       it (and its stock-log history). */
+    const [owned] = await tx
+      .select({ id: productsTable.id })
+      .from(productsTable)
+      .where(and(
+        eq(productsTable.id, id),
+        tenantWhere(productsTable.tenantId, req.tenantId),
+      ));
+    if (!owned) return [undefined];
+
     /* 1. Remove stock-movement logs (history has no value without the product) */
     await tx.delete(stockLogsTable).where(eq(stockLogsTable.productId, id));
 
@@ -368,7 +400,10 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
   const [product] = await db
     .select()
     .from(productsTable)
-    .where(eq(productsTable.id, params.data.id));
+    .where(and(
+      eq(productsTable.id, params.data.id),
+      tenantWhere(productsTable.tenantId, req.tenantId),
+    ));
 
   if (!product) {
     res.status(404).json({ error: "Product not found" });
@@ -398,6 +433,7 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
   const [log] = await db
     .insert(stockLogsTable)
     .values({
+      tenantId: product.tenantId, // inherit the product's tenant so legacy NULL rows stay NULL
       productId: params.data.id,
       type,
       quantity,
@@ -412,6 +448,7 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
     const [saleRecord] = await db
       .insert(salesTable)
       .values({
+        tenantId: product.tenantId,
         productId: params.data.id,
         quantity,
         totalPrice: String(price * quantity),
@@ -433,7 +470,7 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
     type,
     quantity,
     newStock,
-  });
+  }, product.tenantId);
 
   // Low-stock alert when stock falls to or below threshold
   if (newStock <= updatedProduct.lowStockThreshold) {
@@ -442,7 +479,7 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
       productName: product.name,
       stock:       newStock,
       threshold:   updatedProduct.lowStockThreshold,
-    });
+    }, product.tenantId);
   }
 
   res.json({
@@ -466,7 +503,10 @@ router.get("/products/:id/qr", async (req, res): Promise<void> => {
   const [product] = await db
     .select()
     .from(productsTable)
-    .where(eq(productsTable.id, params.data.id));
+    .where(and(
+      eq(productsTable.id, params.data.id),
+      tenantWhere(productsTable.tenantId, req.tenantId),
+    ));
 
   if (!product) {
     res.status(404).json({ error: "Product not found" });
@@ -508,17 +548,20 @@ router.post("/products/bulk-assign-supplier", async (req, res): Promise<void> =>
   const updated = await db
     .update(productsTable)
     .set({ supplierId })
-    .where(inArray(productsTable.id, productIds))
+    .where(and(
+      inArray(productsTable.id, productIds),
+      tenantWhere(productsTable.tenantId, req.tenantId),
+    ))
     .returning({ id: productsTable.id, name: productsTable.name, sku: productsTable.sku });
 
-  broadcast("product_updated", { bulk: true, count: updated.length });
+  broadcast("product_updated", { bulk: true, count: updated.length }, req.tenantId);
   res.json({ updated: updated.length, products: updated });
 });
 
 /**
  * POST /api/products/bulk-import
  * Body: { items: Array<{ sku, stock?, price?, salePrice?, name?, category?, lowStockThreshold? }> }
- * Matches by SKU — updates existing products.
+ * Matches by SKU (within the caller's tenant) — updates existing products.
  * If SKU is unknown but name + category + price are provided → creates a new product.
  */
 router.post("/products/bulk-import", async (req, res): Promise<void> => {
@@ -537,7 +580,10 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
     const [existing] = await db
       .select()
       .from(productsTable)
-      .where(eq(productsTable.sku, sku));
+      .where(and(
+        eq(productsTable.sku, sku),
+        tenantWhere(productsTable.tenantId, req.tenantId),
+      ));
 
     if (!existing) {
       /* Try to create if name + category + price are present */
@@ -559,6 +605,7 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
       }
 
       await db.insert(productsTable).values({
+        tenantId: req.tenantId,
         name,
         sku,
         category,
@@ -600,11 +647,17 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
 
     if (Object.keys(updates).length === 0) { results.skipped++; continue; }
 
-    await db.update(productsTable).set(updates).where(eq(productsTable.sku, sku));
+    await db
+      .update(productsTable)
+      .set(updates)
+      .where(and(
+        eq(productsTable.sku, sku),
+        tenantWhere(productsTable.tenantId, req.tenantId),
+      ));
     results.updated++;
   }
 
-  broadcast("product_updated", { bulk: true, updated: results.updated, created: results.created });
+  broadcast("product_updated", { bulk: true, updated: results.updated, created: results.created }, req.tenantId);
   res.json(results);
 });
 

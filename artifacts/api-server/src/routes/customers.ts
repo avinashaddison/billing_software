@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, sql, and, gte, isNotNull, inArray } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable } from "@workspace/db";
+import { tenantWhere } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -12,12 +13,15 @@ function parsePeriod(raw: unknown): Period {
 
 /**
  * GET /api/customers?period=all|week|month
- * Returns all unique customers (grouped by phone) with purchase stats.
+ * Returns all unique customers (grouped by phone) with purchase stats — scoped to the caller's tenant.
  */
 router.get("/customers", async (req, res): Promise<void> => {
   const period = parsePeriod(req.query.period);
 
-  const conditions = [isNotNull(billsTable.customerPhone)];
+  const conditions = [
+    isNotNull(billsTable.customerPhone),
+    tenantWhere(billsTable.tenantId, req.tenantId),
+  ];
   if (period === "week") {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     conditions.push(gte(billsTable.createdAt, weekAgo));
@@ -50,7 +54,8 @@ router.get("/customers", async (req, res): Promise<void> => {
 
 /**
  * GET /api/customers/:phone
- * Returns full purchase history + top products for a customer phone number.
+ * Returns full purchase history + top products for a customer phone number,
+ * scoped to bills owned by the caller's tenant.
  */
 router.get("/customers/:phone", async (req, res): Promise<void> => {
   const { phone } = req.params;
@@ -62,7 +67,10 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
   const bills = await db
     .select()
     .from(billsTable)
-    .where(eq(billsTable.customerPhone, phone))
+    .where(and(
+      eq(billsTable.customerPhone, phone),
+      tenantWhere(billsTable.tenantId, req.tenantId),
+    ))
     .orderBy(desc(billsTable.createdAt));
 
   if (bills.length === 0) {

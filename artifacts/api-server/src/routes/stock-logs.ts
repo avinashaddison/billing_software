@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, stockLogsTable, productsTable } from "@workspace/db";
 import { ListStockLogsQueryParams } from "@workspace/api-zod";
+import { tenantWhere } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -13,6 +14,10 @@ router.get("/stock-logs", async (req, res): Promise<void> => {
   }
 
   const { productId, type, limit = 50, offset = 0 } = parsed.data;
+
+  const conditions = [tenantWhere(stockLogsTable.tenantId, req.tenantId)];
+  if (productId) conditions.push(eq(stockLogsTable.productId, productId));
+  if (type) conditions.push(eq(stockLogsTable.type, type));
 
   const rows = await db
     .select({
@@ -27,15 +32,7 @@ router.get("/stock-logs", async (req, res): Promise<void> => {
     })
     .from(stockLogsTable)
     .innerJoin(productsTable, eq(stockLogsTable.productId, productsTable.id))
-    .where(
-      productId && type
-        ? eq(stockLogsTable.productId, productId) && eq(stockLogsTable.type, type)
-        : productId
-          ? eq(stockLogsTable.productId, productId)
-          : type
-            ? eq(stockLogsTable.type, type)
-            : undefined
-    )
+    .where(and(...conditions))
     .orderBy(desc(stockLogsTable.createdAt))
     .limit(limit)
     .offset(offset);

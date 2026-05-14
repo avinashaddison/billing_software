@@ -6,6 +6,8 @@ export const productsTable = pgTable(
   "products",
   {
     id:                uuid("id").primaryKey().defaultRandom(),
+    /** Tenant owner. NULL = legacy Hira & Sons row (visible to all during migration). */
+    tenantId:          uuid("tenant_id"),
     name:              text("name").notNull(),
     sku:               text("sku").notNull().unique(),
     barcode:           text("barcode").unique(),
@@ -26,6 +28,7 @@ export const productsTable = pgTable(
   (table) => [
     index("products_sku_idx").on(table.sku),
     index("products_barcode_idx").on(table.barcode),
+    index("products_tenant_idx").on(table.tenantId),
   ]
 );
 
