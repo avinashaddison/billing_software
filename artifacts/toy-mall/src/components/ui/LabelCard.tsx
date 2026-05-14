@@ -11,6 +11,7 @@ export type LabelProduct = {
   salePrice?: number | null;
   category: string;
   stock: number;
+  lowStockThreshold?: number | null;
 };
 
 interface LabelCardProps {
