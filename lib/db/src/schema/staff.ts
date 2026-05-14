@@ -9,7 +9,7 @@ export const staffProfilesTable = pgTable(
      * row belongs to exactly one business. NULL = legacy Hira & Sons staff
      * (still works during migration window via the OR-IS-NULL fallback).
      */
-    tenantId:       uuid("tenant_id"),
+    tenantId:       text("tenant_id"),
     name:           text("name").notNull(),
     pin:            text("pin").notNull(),               // bcrypt hash — never plain text
     role:           text("role").notNull().default("staff"),
@@ -32,7 +32,7 @@ export const staffPermissionsTable = pgTable(
      * staffProfiles.tenantId — denormalised here so a runaway query
      * cannot leak permissions across tenants without an explicit join.
      */
-    tenantId: uuid("tenant_id"),
+    tenantId: text("tenant_id"),
     staffId:  uuid("staff_id").notNull().references(() => staffProfilesTable.id, { onDelete: "cascade" }),
     resource: text("resource").notNull(),
     level:    text("level").notNull().default("read"),    // "none" | "read" | "write"

@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, numeric, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, integer, numeric, timestamp, text, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { productsTable } from "./products";
@@ -8,7 +8,7 @@ export const salesTable = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     /** Tenant owner. NULL = legacy Hira & Sons row. */
-    tenantId: uuid("tenant_id"),
+    tenantId: text("tenant_id"),
     productId: uuid("product_id")
       .notNull()
       .references(() => productsTable.id),

@@ -15,7 +15,7 @@ export const categoriesTable = pgTable(
   {
     id:        uuid("id").primaryKey().defaultRandom(),
     /** Tenant owner. NULL = legacy Hira & Sons row. */
-    tenantId:  uuid("tenant_id"),
+    tenantId:  text("tenant_id"),
     name:      text("name").notNull().unique(),
     emoji:     text("emoji").notNull().default("🎁"),
     skuCode:   text("sku_code").notNull(),

@@ -8,7 +8,7 @@ export const stockLogsTable = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     /** Tenant owner. NULL = legacy Hira & Sons row. */
-    tenantId: uuid("tenant_id"),
+    tenantId: text("tenant_id"),
     productId: uuid("product_id")
       .notNull()
       .references(() => productsTable.id),

@@ -7,7 +7,7 @@ export const suppliersTable = pgTable(
   {
     id:        uuid("id").primaryKey().defaultRandom(),
     /** Tenant owner. NULL = legacy Hira & Sons row. */
-    tenantId:  uuid("tenant_id"),
+    tenantId:  text("tenant_id"),
     name:      text("name").notNull(),
     contact:   text("contact"),
     email:     text("email"),

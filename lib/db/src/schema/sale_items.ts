@@ -9,7 +9,7 @@ export const saleItemsTable = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     /** Tenant owner. NULL = legacy Hira & Sons row. */
-    tenantId: uuid("tenant_id"),
+    tenantId: text("tenant_id"),
     saleId: uuid("sale_id")
       .notNull()
       .references(() => billsTable.id),

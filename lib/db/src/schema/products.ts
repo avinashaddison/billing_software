@@ -7,7 +7,7 @@ export const productsTable = pgTable(
   {
     id:                uuid("id").primaryKey().defaultRandom(),
     /** Tenant owner. NULL = legacy Hira & Sons row (visible to all during migration). */
-    tenantId:          uuid("tenant_id"),
+    tenantId:          text("tenant_id"),
     name:              text("name").notNull(),
     sku:               text("sku").notNull().unique(),
     barcode:           text("barcode").unique(),

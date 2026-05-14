@@ -7,7 +7,7 @@ export const billsTable = pgTable(
   {
     id:            uuid("id").primaryKey().defaultRandom(),
     /** Tenant owner. NULL = legacy Hira & Sons row. */
-    tenantId:      uuid("tenant_id"),
+    tenantId:      text("tenant_id"),
     billNumber:    serial("bill_number").notNull(),
     totalAmount:   numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
     itemsCount:    integer("items_count").notNull(),
