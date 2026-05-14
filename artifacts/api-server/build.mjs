@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { rm, mkdir, cp } from "node:fs/promises";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -120,7 +120,19 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   });
 }
 
-buildAll().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+buildAll()
+  .then(async () => {
+    /* Copy hand-written SQL migrations into dist/migrations/ so the
+       boot-time runner (`src/lib/migrate.ts`) can find them in the
+       packaged Render bundle next to dist/index.mjs. */
+    const distDir = path.resolve(artifactDir, "dist");
+    const srcMig  = path.resolve(artifactDir, "..", "..", "lib", "db", "migrations");
+    const dstMig  = path.join(distDir, "migrations");
+    await mkdir(dstMig, { recursive: true });
+    await cp(srcMig, dstMig, { recursive: true });
+    console.log(`Copied SQL migrations  ${srcMig} → ${dstMig}`);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

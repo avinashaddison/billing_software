@@ -58,3 +58,12 @@ Thumbs.db
 
 # Claude Code harness state
 .claude/
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials

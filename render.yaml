@@ -1,25 +1,76 @@
 services:
   - type: web
-    name: toy-mall
+    name: hira-sons
     runtime: node
     region: singapore
     plan: free
 
-    buildCommand: "corepack enable pnpm && pnpm install --frozen-lockfile && pnpm --filter @workspace/toy-mall run build && pnpm --filter @workspace/api-server run build"
+    # Single-service deploy: Express serves /api + the compiled React SPA on one port.
+    # Build runs frontend + backend in parallel via the workspace script.
+    buildCommand: "corepack enable pnpm && pnpm install --frozen-lockfile && pnpm run build:prod"
     startCommand: "node artifacts/api-server/dist/index.mjs"
 
+    # Tells Render to mark the service healthy as soon as /api/healthz responds.
+    healthCheckPath: /api/healthz
+
     envVars:
+      # ─── Platform / runtime ───────────────────────────────────────────
       - key: NODE_ENV
         value: production
       - key: PORT
         generateValue: true
+
+      # ─── Required ─────────────────────────────────────────────────────
+      # PostgreSQL connection string (Neon / Supabase / Railway / RDS).
       - key: DATABASE_URL
         sync: false
+
+      # HMAC secret used to sign + verify the HttpOnly tenant_session cookie.
+      # Auto-generated per service on first deploy. Rotating it invalidates
+      # all outstanding cookies (everyone has to log in again).
+      - key: SESSION_SECRET
+        generateValue: true
+
+      # ─── License / vendor ─────────────────────────────────────────────
+      # HMAC secret that signs LICENSE_KEY values. MUST match the secret
+      # that issued the customer's key. Leave blank to run in trial mode.
+      - key: LICENSE_SECRET
+        sync: false
+
+      # Customer's license key (`<base64payload>.<hmac>`). Optional — can
+      # also be set via the in-app /license/activate endpoint after deploy.
+      - key: LICENSE_KEY
+        sync: false
+
+      # Set ONLY on the vendor's deploy. Customer installs must leave blank.
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      # ─── Multi-tenant migration flag ──────────────────────────────────
+      # KEEP `false` (or unset) until the legacy Hira & Sons rows are
+      # backfilled to a tenant. Setting `true` removes the
+      # "tenant_id IS NULL" fallback and hides every legacy row from
+      # tenant-scoped requests.
+      - key: STRICT_TENANT
+        value: "false"
+
+      # ─── Optional: CORS allowlist ─────────────────────────────────────
+      # Comma-separated origins permitted to call the API with credentials.
+      # Leave unset to reflect the request origin (single-service deploys
+      # don't need this because frontend + API share the same origin).
+      - key: CORS_ORIGIN
+        sync: false
+
+      # ─── Optional: Telegram alerts ────────────────────────────────────
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_CHAT_ID
         sync: false
+      - key: STORE_NAME
+        sync: false
+
+      # ─── Optional: Cloudinary image hosting ──────────────────────────
       - key: CLOUDINARY_URL
         sync: false
-      - key: STORE_NAME
+      - key: CLOUDINARY_FOLDER
         sync: false

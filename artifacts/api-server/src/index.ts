@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startDailyReportScheduler } from "./lib/scheduler";
 import { bootstrapDefaultOwner } from "./lib/bootstrap";
+import { runBootMigrations } from "./lib/migrate";
 
 // Neon free-tier idle-suspends sockets, which fires async pg-client errors
 // AFTER the originating query handler has already returned. Without these
@@ -35,6 +36,16 @@ app.listen(port, async (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  /* Apply additive tenant + auth-user migrations to the live DB.
+     Idempotent — every statement is `IF NOT EXISTS`. Already-migrated
+     databases are unaffected. */
+  try {
+    await runBootMigrations();
+  } catch (err) {
+    logger.error({ err }, "Boot migrations failed — server will keep serving but DB schema may be stale");
+  }
+
   startDailyReportScheduler();
 
   // First-run: if the DB has no staff yet, create a default Owner so the
