@@ -5,6 +5,7 @@ import {
   ShieldCheck, Zap, MessageCircle, Phone, Mail, MapPin,
   ChevronDown, Check, ArrowRight, X, Star, Menu, Flame, Trophy,
   PartyPopper, Store, Smartphone, Heart, Headphones, Lock, Award,
+  Cloud,
 } from "lucide-react";
 
 /**
@@ -410,25 +411,140 @@ export default function Landing() {
             </h2>
           </div>
 
-          <div className="rounded-3xl border-2 border-orange-200 overflow-hidden bg-white shadow-xl shadow-orange-100/50">
-            <div className="grid grid-cols-[1.5fr_1fr_1fr] text-sm">
-              <div className="bg-orange-50 px-5 py-4 font-black uppercase text-[11px] tracking-widest text-slate-500">Feature</div>
-              <div className="bg-gradient-to-br from-rose-600 to-orange-600 px-5 py-4 font-black text-white text-center">AddisonX</div>
-              <div className="bg-slate-100 px-5 py-4 font-black text-slate-500 text-center">Tally / Vyapar</div>
-
-              {([
-                ["5-second bill from barcode",                     true,  "maybe"],
-                ["Dynamic UPI QR on checkout",                     true,  false],
-                ["Mobile + Desktop — same login",                  true,  "limited"],
-                ["Offline billing (WiFi गई तो भी चलेगा)",         true,  false],
-                ["WhatsApp + Telegram sale alerts",               true,  false],
-                ["Today's Deal — flash discount",                  true,  false],
-                ["UI जो शाम तक थकाए नहीं",                        true,  false],
-                ["Accounting / Balance sheet exports",             false, true],
-              ] as const).map(([feature, mine, theirs], i, arr) => (
-                <Row key={i} feature={feature} mine={mine} theirs={theirs} last={i === arr.length - 1} />
-              ))}
+          {/* Comparison card — softer palette, icons per feature, trophy header */}
+          <div className="relative rounded-[28px] border-2 border-orange-200 overflow-hidden bg-white shadow-2xl shadow-orange-100/60">
+            {/* Crown badge on the AddisonX header */}
+            <div className="absolute top-3 left-1/2 -translate-x-[14%] md:-translate-x-[10%] z-10 rotate-[-6deg] pointer-events-none">
+              <div className="bg-amber-400 text-amber-950 px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest shadow-md ring-2 ring-white">
+                🏆 WINNER
+              </div>
             </div>
+
+            <div className="grid grid-cols-[1.4fr_1fr_1fr] text-sm">
+              {/* Headers */}
+              <div className="bg-gradient-to-br from-orange-50 to-amber-50/50 px-4 md:px-6 py-5 border-b-2 border-orange-100 font-black uppercase text-[10px] md:text-[11px] tracking-widest text-slate-500">
+                Feature
+              </div>
+              <div className="bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 px-4 md:px-6 py-5 border-b-2 border-rose-300 text-center">
+                <p className="font-black text-white text-[13px] md:text-[15px] tracking-tight">AddisonX</p>
+                <p className="text-[10px] font-bold text-amber-100 mt-0.5">दुकानदारों के लिए</p>
+              </div>
+              <div className="bg-slate-100 px-4 md:px-6 py-5 border-b-2 border-slate-200 text-center">
+                <p className="font-black text-slate-600 text-[13px] md:text-[15px]">Tally / Vyapar</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">Accountants के लिए</p>
+              </div>
+
+              {/* Rows */}
+              {([
+                [Zap,          "5-second bill from barcode",          true,  "maybe"  ],
+                [IndianRupee,  "Dynamic UPI QR on checkout",          true,  false    ],
+                [Smartphone,   "Mobile + Desktop — same login",       true,  "limited"],
+                [Sparkles,     "Today's Deal — flash discount",       true,  false    ],
+                [MessageCircle,"WhatsApp + Telegram sale alerts",     true,  false    ],
+                [Heart,        "UI जो शाम तक थकाए नहीं",              true,  false    ],
+                [BarChart3,    "Accounting / Balance-sheet exports",  false, true     ],
+              ] as const).map(([Icon, feature, mine, theirs], i, arr) => (
+                <Row key={i} icon={Icon} feature={feature} mine={mine} theirs={theirs} last={i === arr.length - 1} />
+              ))}
+
+              {/* Verdict footer row */}
+              <div className="bg-orange-50 px-4 md:px-6 py-4 font-black text-[12px] md:text-[13px] text-slate-700">
+                Built for
+              </div>
+              <div className="bg-gradient-to-br from-rose-600 to-orange-600 px-4 md:px-6 py-4 text-center text-white">
+                <p className="text-[13px] md:text-[15px] font-black">दुकानदार</p>
+                <p className="text-[10px] font-bold text-white/80 mt-0.5">Shop counter</p>
+              </div>
+              <div className="bg-slate-100 px-4 md:px-6 py-4 text-center text-slate-600">
+                <p className="text-[13px] md:text-[15px] font-black">CA / Accountants</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">Back office</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Note about "Tally/Vyapar" rating — keeps us honest */}
+          <p className="mt-4 text-center text-[11px] text-slate-500">
+            * Comparison based on publicly-listed features of competitor products. Your mileage may vary.
+          </p>
+        </div>
+      </section>
+
+      {/* ── CLOUD + OFFLINE explainer ───────────────────────────── */}
+      <section className="py-16 md:py-20 bg-gradient-to-br from-emerald-50 via-[#fff8ee] to-amber-50 relative overflow-hidden">
+        <div aria-hidden className="pointer-events-none absolute -top-20 right-10 w-72 h-72 rounded-full bg-emerald-300/30 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-20 left-10 w-72 h-72 rounded-full bg-amber-300/30 blur-3xl" />
+
+        <div className="relative max-w-5xl mx-auto px-5 md:px-8">
+          <div className="text-center mb-12">
+            <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 border-2 border-emerald-300 text-emerald-700 text-[11px] font-black uppercase tracking-widest mb-3">
+              How it works
+            </span>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 leading-tight">
+              Cloud + Offline = <span className="text-emerald-600">कैसे?</span>
+            </h2>
+            <p className="mt-3 text-slate-600 max-w-2xl mx-auto text-[14px] md:text-[15px]">
+              हम cloud पर हैं, but WiFi गई तो भी billing चलती रहती है.
+              ये trick है — खुद देखो कैसे काम करता है.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {/* Step 1 */}
+            <div className="relative rounded-3xl bg-white border-2 border-orange-100 p-6 shadow-sm">
+              <div className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-white font-black flex items-center justify-center shadow-md ring-4 ring-white text-sm">
+                1
+              </div>
+              <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4">
+                <Cloud className="w-5 h-5" strokeWidth={2.4} />
+              </div>
+              <p className="text-[16px] font-black text-slate-900">App pre-loaded</p>
+              <p className="text-[12px] font-bold text-emerald-600 mt-0.5">पहले से ready है</p>
+              <p className="mt-3 text-[13.5px] text-slate-600 leading-relaxed">
+                पहली बार खोलते ही, पूरा app आपके browser में cache हो जाता है.
+                अगली बार WiFi न हो तब भी instantly खुलेगा.
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="relative rounded-3xl bg-white border-2 border-orange-100 p-6 shadow-sm">
+              <div className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-white font-black flex items-center justify-center shadow-md ring-4 ring-white text-sm">
+                2
+              </div>
+              <div className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mb-4">
+                <Receipt className="w-5 h-5" strokeWidth={2.4} />
+              </div>
+              <p className="text-[16px] font-black text-slate-900">Bills queue locally</p>
+              <p className="text-[12px] font-bold text-rose-600 mt-0.5">WiFi off → कोई dikkat नहीं</p>
+              <p className="mt-3 text-[13.5px] text-slate-600 leading-relaxed">
+                Internet चली गई? Bills आपके device पर securely save होते रहते हैं.
+                Customer wait नहीं करेगा — business चलता रहेगा.
+              </p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="relative rounded-3xl bg-white border-2 border-orange-100 p-6 shadow-sm">
+              <div className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white font-black flex items-center justify-center shadow-md ring-4 ring-white text-sm">
+                3
+              </div>
+              <div className="w-11 h-11 rounded-2xl bg-violet-100 text-violet-700 flex items-center justify-center mb-4">
+                <Zap className="w-5 h-5" strokeWidth={2.4} />
+              </div>
+              <p className="text-[16px] font-black text-slate-900">Auto-sync</p>
+              <p className="text-[12px] font-bold text-violet-600 mt-0.5">WiFi वापस → सब sync</p>
+              <p className="mt-3 text-[13.5px] text-slate-600 leading-relaxed">
+                Internet आते ही सारे offline bills अपने आप cloud पर sync हो जाते हैं.
+                कुछ manually नहीं करना — magic है.
+              </p>
+            </div>
+          </div>
+
+          {/* Honest fine print */}
+          <div className="mt-8 mx-auto max-w-2xl rounded-2xl bg-white/70 backdrop-blur-sm border border-emerald-200 px-4 py-3 text-center">
+            <p className="text-[12px] text-slate-600 leading-relaxed">
+              <span className="font-black text-emerald-700">Important:</span>{" "}
+              पहली बार setup करते समय internet चाहिए. उसके बाद daily billing offline-tolerant है.
+              Reports, customer lookups & live dashboard — ये cloud features हैं, internet ज़रूरी.
+            </p>
           </div>
         </div>
       </section>
@@ -832,21 +948,48 @@ function StepCard({ n, hindi, title, body, icon: Icon, tone }: {
   );
 }
 
-function Row({ feature, mine, theirs, last }: {
+function Row({ icon: Icon, feature, mine, theirs, last }: {
+  icon: React.ElementType;
   feature: string; mine: boolean | "maybe" | "limited"; theirs: boolean | "maybe" | "limited"; last: boolean;
 }) {
   const cell = (v: typeof mine, accent: boolean) => {
-    if (v === true)  return <Check className={`w-5 h-5 ${accent ? "text-emerald-200" : "text-emerald-600"}`} />;
-    if (v === false) return <X     className={`w-5 h-5 ${accent ? "text-white/40"   : "text-slate-300"}`} />;
-    return <span className={`text-[11px] font-black uppercase ${accent ? "text-white/85" : "text-slate-500"}`}>{v}</span>;
+    if (v === true) {
+      return (
+        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
+          accent ? "bg-white/95 text-rose-600" : "bg-emerald-100 text-emerald-700"
+        }`}>
+          <Check className="w-4 h-4" strokeWidth={3.5} />
+        </div>
+      );
+    }
+    if (v === false) {
+      return (
+        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
+          accent ? "bg-white/15 text-white/60" : "bg-slate-200 text-slate-400"
+        }`}>
+          <X className="w-4 h-4" strokeWidth={3} />
+        </div>
+      );
+    }
+    return (
+      <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
+        accent ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"
+      }`}>{v}</span>
+    );
   };
+  const borderClass = last ? "" : "border-b";
   return (
     <>
-      <div className={`px-5 py-4 text-slate-700 font-semibold ${last ? "" : "border-b border-orange-100"}`}>{feature}</div>
-      <div className={`px-5 py-4 flex justify-center bg-gradient-to-br from-rose-600 to-orange-600 ${last ? "" : "border-b border-white/20"}`}>
+      <div className={`flex items-center gap-2.5 px-4 md:px-6 py-4 text-slate-700 font-bold text-[13px] md:text-[14px] ${borderClass} border-orange-100 bg-white`}>
+        <span className="w-7 h-7 rounded-lg bg-orange-100 text-rose-600 flex items-center justify-center shrink-0">
+          <Icon className="w-3.5 h-3.5" strokeWidth={2.4} />
+        </span>
+        {feature}
+      </div>
+      <div className={`px-4 md:px-6 py-4 flex justify-center items-center bg-gradient-to-br from-rose-500/95 via-orange-500/95 to-amber-500/95 ${borderClass} border-rose-300/40`}>
         {cell(mine, true)}
       </div>
-      <div className={`px-5 py-4 flex justify-center bg-slate-50 ${last ? "" : "border-b border-orange-100"}`}>
+      <div className={`px-4 md:px-6 py-4 flex justify-center items-center bg-slate-50 ${borderClass} border-slate-200`}>
         {cell(theirs, false)}
       </div>
     </>
