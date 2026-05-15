@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import {
   ScanLine, Receipt, IndianRupee, BarChart3, Package, Sparkles,
-  ShieldCheck, Zap, MessageCircle, Phone,
+  ShieldCheck, Zap, MessageCircle, Phone, Mail, MapPin,
   ChevronDown, Check, ArrowRight, X, Star, Menu, Flame, Trophy,
-  PartyPopper, Store,
+  PartyPopper, Store, Smartphone, Heart, Headphones, Lock, Award,
 } from "lucide-react";
 
 /**
@@ -105,135 +105,209 @@ export default function Landing() {
       )}
 
       {/* ── HERO ──────────────────────────────────────────────────── */}
-      <section id="top" className="relative">
-        {/* Festival sparkle backdrop */}
-        <div aria-hidden className="pointer-events-none absolute -top-32 -right-20 w-[600px] h-[600px] rounded-full bg-gradient-to-br from-amber-300/50 via-orange-400/40 to-rose-400/30 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-40 -left-32 w-[520px] h-[520px] rounded-full bg-gradient-to-br from-fuchsia-300/40 via-rose-300/40 to-orange-300/30 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute top-10 left-1/2 text-amber-400/40 text-7xl select-none">✦</div>
-        <div aria-hidden className="pointer-events-none absolute bottom-32 right-12 text-rose-400/40 text-5xl select-none">✦</div>
+      <section id="top" className="relative overflow-hidden">
+        {/* Layered ambient backdrop — three blurred radial glows + a soft dotted grid + sparkles */}
+        <div aria-hidden className="pointer-events-none absolute -top-40 -right-32 w-[680px] h-[680px] rounded-full bg-gradient-to-br from-amber-300/55 via-orange-400/45 to-rose-400/35 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-48 -left-40 w-[600px] h-[600px] rounded-full bg-gradient-to-br from-fuchsia-300/45 via-rose-300/40 to-orange-300/30 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 w-[420px] h-[420px] rounded-full bg-emerald-300/15 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.22]"
+          style={{ backgroundImage: "radial-gradient(circle, #f97316 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+        <div aria-hidden className="pointer-events-none absolute top-12  left-[8%]  text-amber-400/50 text-[28px] select-none rotate-12">✦</div>
+        <div aria-hidden className="pointer-events-none absolute top-32  right-[12%] text-rose-400/40  text-5xl select-none">✦</div>
+        <div aria-hidden className="pointer-events-none absolute bottom-24 left-[14%] text-orange-400/45 text-3xl select-none -rotate-12">✦</div>
+        <div aria-hidden className="pointer-events-none absolute bottom-44 right-[8%] text-fuchsia-400/40 text-4xl select-none rotate-[20deg]">✦</div>
 
-        <div className="relative max-w-6xl mx-auto px-5 md:px-8 pt-12 pb-16 md:pt-20 md:pb-24 grid md:grid-cols-2 gap-12 items-center">
-          {/* Left: copy */}
+        <div className="relative max-w-6xl mx-auto px-5 md:px-8 pt-10 pb-20 md:pt-16 md:pb-28 grid lg:grid-cols-[1.05fr_1fr] gap-12 lg:gap-16 items-center">
+          {/* ─── Left: copy ─── */}
           <div>
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border-2 border-orange-300 text-orange-700 text-[12px] font-black shadow-sm">
-              <Flame className="w-3.5 h-3.5 text-rose-600" />
-              <span className="text-rose-600">Made in Bharat</span>
-              <span className="text-slate-400">·</span>
-              <span>GST + UPI Ready</span>
+            {/* Top trust pill row */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border-2 border-orange-300 text-rose-600 text-[11px] font-black shadow-sm">
+                <Flame className="w-3.5 h-3.5 text-rose-600" />
+                Made in Bharat 🇮🇳
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border-2 border-emerald-300 text-emerald-700 text-[11px] font-black">
+                GST + UPI Ready
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 border-2 border-violet-300 text-violet-700 text-[11px] font-black">
+                4.9 ⭐ · 100+ shops
+              </span>
             </div>
 
-            <h1 className="mt-5 text-[40px] md:text-[56px] lg:text-[68px] font-black tracking-tight leading-[0.95] text-slate-900">
+            <h1 className="mt-6 text-[44px] md:text-[60px] lg:text-[76px] font-black tracking-tight leading-[0.95] text-slate-900">
               <span className="block">दुकान चलाओ,</span>
-              <span className="block bg-gradient-to-r from-rose-600 via-orange-600 to-amber-500 bg-clip-text text-transparent">
-                सॉफ्टवेयर
+              <span className="relative inline-block">
+                <span className="bg-gradient-to-r from-rose-600 via-orange-600 to-amber-500 bg-clip-text text-transparent">
+                  सॉफ्टवेयर
+                </span>
+                {/* Hand-drawn underline */}
+                <svg aria-hidden viewBox="0 0 220 12" className="absolute -bottom-1 left-0 w-full h-3 text-amber-500">
+                  <path d="M2 8 Q 55 2, 110 7 T 218 6" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" />
+                </svg>
               </span>
               <span className="block">नहीं!</span>
             </h1>
 
-            <p className="mt-5 text-xl md:text-2xl font-bold text-slate-700 leading-snug">
-              <span className="bg-amber-200/70 px-1.5 rounded">5 second</span> में Bill.
-              UPI QR तैयार. Stock अपने आप count.
+            <p className="mt-6 text-xl md:text-2xl font-bold text-slate-700 leading-snug">
+              <span className="bg-amber-200/80 px-1.5 rounded shadow-sm">5 second</span> में Bill.
+              UPI QR तैयार. <br className="hidden md:block" />
+              Stock अपने आप count.
             </p>
 
-            <p className="mt-4 text-[15px] md:text-base text-slate-600 leading-relaxed max-w-lg">
+            <p className="mt-4 text-[15px] md:text-[17px] text-slate-600 leading-relaxed max-w-lg">
               भारत के लाला जी, kirana वाले, और gift shop walas के लिए बना सबसे आसान billing software.
-              Tally जैसा confusing नहीं, WhatsApp जैसा simple.
+              <span className="font-bold text-slate-800"> Tally जैसा confusing नहीं, WhatsApp जैसा simple.</span>
             </p>
 
             <div className="mt-7 flex flex-col sm:flex-row gap-3">
               <Link href="/login"
-                className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-gradient-to-br from-rose-600 via-orange-600 to-amber-500 text-white font-black text-[15px] shadow-2xl shadow-rose-500/40 ring-2 ring-white hover:scale-[1.03] active:scale-[0.98] transition-all">
-                अभी शुरू करें — Free
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                className="group relative inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-gradient-to-br from-rose-600 via-orange-600 to-amber-500 text-white font-black text-[15px] shadow-2xl shadow-rose-500/40 ring-2 ring-white hover:scale-[1.03] active:scale-[0.98] transition-all overflow-hidden">
+                {/* Shimmer sweep on hover */}
+                <span aria-hidden className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+                <span className="relative">अभी शुरू करें — Free</span>
+                <ArrowRight className="relative w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <a href="https://wa.me/?text=Hi%20AddisonX%2C%20demo%20chahiye"
                 target="_blank" rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-white text-emerald-700 font-black text-[15px] border-2 border-emerald-500 hover:bg-emerald-50 active:scale-[0.98] transition-all">
+                className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-white text-emerald-700 font-black text-[15px] border-2 border-emerald-500 hover:bg-emerald-50 hover:shadow-lg hover:shadow-emerald-500/20 active:scale-[0.98] transition-all">
                 <MessageCircle className="w-5 h-5 text-emerald-600" /> WhatsApp पर बात करें
               </a>
             </div>
 
-            <div className="mt-7 flex items-center gap-2.5 text-[12px] text-slate-600">
-              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Credit card नहीं चाहिए · 14 दिन Free · कभी भी cancel</span>
+            {/* Inline trust micro-row */}
+            <div className="mt-6 grid grid-cols-3 gap-3 max-w-md">
+              {[
+                ["Credit card", "नहीं चाहिए"],
+                ["14 दिन",       "Free Trial"],
+                ["कभी भी",       "Cancel"],
+              ].map(([a, b], i) => (
+                <div key={i} className="flex items-center gap-2 text-[11px] leading-tight">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" strokeWidth={3} />
+                  <span><span className="font-black text-slate-900">{a}</span><br /><span className="text-slate-500">{b}</span></span>
+                </div>
+              ))}
             </div>
 
-            {/* Social proof row */}
+            {/* Social proof footer row */}
             <div className="mt-8 flex items-center gap-5 pt-6 border-t-2 border-dashed border-orange-200">
               <div className="flex -space-x-2.5">
                 {["from-rose-500 to-pink-500", "from-amber-500 to-orange-500", "from-emerald-500 to-teal-500", "from-violet-500 to-fuchsia-500"].map((g, i) => (
-                  <div key={i} className={`w-9 h-9 rounded-full bg-gradient-to-br ${g} ring-2 ring-[#fff8ee] flex items-center justify-center text-white text-[10px] font-black`}>
+                  <div key={i} className={`w-10 h-10 rounded-full bg-gradient-to-br ${g} ring-2 ring-[#fff8ee] flex items-center justify-center text-white text-[11px] font-black shadow-sm`}>
                     {["HS", "KR", "MS", "AD"][i]}
                   </div>
                 ))}
+                <div className="w-10 h-10 rounded-full bg-slate-900 text-white text-[10px] font-black ring-2 ring-[#fff8ee] flex items-center justify-center">
+                  +95
+                </div>
               </div>
               <div>
                 <div className="flex items-center gap-0.5 text-amber-500">
                   {[0,1,2,3,4].map((i) => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
-                  <span className="ml-1.5 text-[13px] font-black text-slate-900">4.9</span>
+                  <span className="ml-1.5 text-[13px] font-black text-slate-900">4.9 / 5</span>
                 </div>
-                <p className="text-[11px] text-slate-600 font-medium">100+ दुकानें already running</p>
+                <p className="text-[12px] text-slate-600 font-bold mt-0.5">100+ दुकानें already running across India</p>
               </div>
             </div>
           </div>
 
-          {/* Right: phone mockup with dashboard */}
-          <div className="relative">
-            {/* Floating sticker — "GST ready" */}
-            <div className="absolute -top-3 -right-2 md:-right-6 z-20 rotate-[8deg]">
-              <div className="bg-emerald-500 text-white px-3 py-2 rounded-2xl shadow-xl ring-4 ring-white">
-                <p className="text-[10px] font-black tracking-widest">GST READY</p>
+          {/* ─── Right: phone-frame device mockup ─── */}
+          <div className="relative mx-auto w-full max-w-[420px]">
+            {/* Floating GST sticker */}
+            <div className="absolute -top-4 -right-2 md:-right-8 z-30 rotate-[8deg]">
+              <div className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl shadow-2xl ring-4 ring-white">
+                <p className="text-[11px] font-black tracking-widest">GST READY</p>
                 <p className="text-[9px] font-bold opacity-90">CGST + SGST auto</p>
               </div>
             </div>
-            {/* Floating sticker — "UPI" */}
-            <div className="absolute -bottom-3 -left-2 md:-left-6 z-20 -rotate-[6deg]">
-              <div className="bg-violet-600 text-white px-3 py-2 rounded-2xl shadow-xl ring-4 ring-white">
-                <p className="text-[10px] font-black tracking-widest">UPI QR</p>
+            {/* Floating UPI sticker */}
+            <div className="absolute -bottom-5 -left-2 md:-left-8 z-30 -rotate-[7deg]">
+              <div className="bg-violet-600 text-white px-3.5 py-2 rounded-2xl shadow-2xl ring-4 ring-white">
+                <p className="text-[11px] font-black tracking-widest">UPI QR</p>
                 <p className="text-[9px] font-bold opacity-90">Dynamic on every bill</p>
               </div>
             </div>
+            {/* Floating Telegram alert sticker */}
+            <div className="hidden md:block absolute top-1/2 -right-12 z-30 rotate-[5deg] animate-pulse">
+              <div className="bg-white px-3 py-2 rounded-2xl shadow-xl ring-4 ring-amber-100 border border-amber-200">
+                <p className="text-[10px] font-black text-rose-600">🔔 Telegram</p>
+                <p className="text-[9px] font-bold text-slate-700">Bill #12 · ₹520</p>
+              </div>
+            </div>
 
-            <div className="absolute -inset-4 rounded-[36px] bg-gradient-to-br from-amber-300/50 via-rose-300/40 to-fuchsia-300/40 blur-2xl" />
-            <div className="relative rounded-[28px] border-4 border-white bg-white shadow-2xl shadow-orange-900/20 overflow-hidden">
-              <div className="bg-gradient-to-br from-orange-50 via-amber-50 to-white p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-[19px] font-black tracking-tight">Hira &amp; Sons</p>
-                    <p className="text-[11px] text-slate-500 font-medium">आज का overview</p>
+            {/* Ambient halo behind the phone */}
+            <div className="absolute -inset-6 rounded-[44px] bg-gradient-to-br from-amber-300/60 via-rose-300/50 to-fuchsia-300/40 blur-3xl" />
+
+            {/* Phone frame */}
+            <div className="relative mx-auto rounded-[44px] bg-slate-900 p-2.5 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.35)]">
+              {/* Speaker / camera notch */}
+              <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-24 h-5 rounded-b-2xl bg-slate-900 z-10 flex items-center justify-center">
+                <div className="w-12 h-1.5 rounded-full bg-slate-700" />
+              </div>
+              <div className="rounded-[34px] overflow-hidden bg-[#fff8ee]">
+                {/* Status bar */}
+                <div className="h-8 bg-[#fff8ee] flex items-center justify-between px-5 text-[10px] font-black text-slate-700">
+                  <span>9:30 AM</span>
+                  <span className="flex items-center gap-1">📶 5G 100%</span>
+                </div>
+                {/* App content */}
+                <div className="bg-gradient-to-br from-orange-50 via-amber-50 to-white p-5 pb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-[20px] font-black tracking-tight">Hira &amp; Sons</p>
+                      <p className="text-[11px] text-slate-500 font-medium">आज का overview</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 border-2 border-emerald-300 text-emerald-700 text-[10px] font-black">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      LIVE
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 border-2 border-emerald-300 text-emerald-700 text-[10px] font-black">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    LIVE
+
+                  <div className="grid grid-cols-2 gap-2.5 mb-4">
+                    <StatTile label="आज की कमाई" value="₹14,380" tone="emerald" />
+                    <StatTile label="Bills बने"   value="23"      tone="rose"    />
+                    <StatTile label="Items बिके"  value="61"      tone="amber"   />
+                    <StatTile label="Stock"       value="1,284"   tone="violet"  />
+                  </div>
+
+                  <div className="rounded-2xl border-2 border-orange-100 p-3.5 bg-white">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Revenue · 7 days</p>
+                      <span className="text-[10px] font-black text-emerald-600">+34%</span>
+                    </div>
+                    <div className="flex items-end gap-1.5 h-16">
+                      {[55, 32, 78, 45, 90, 65, 100].map((h, i) => (
+                        <div key={i} className="flex-1 rounded-t-md bg-gradient-to-t from-rose-500 via-orange-500 to-amber-400" style={{ height: `${h}%` }} />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2 text-[11px] font-bold text-slate-600">
+                    <ScanLine className="w-3.5 h-3.5 text-rose-600" />
+                    Bill #11 · Aqua Star Steel · <span className="text-slate-900">₹439</span>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2.5 mb-4">
-                  <StatTile label="आज की कमाई" value="₹14,380" tone="emerald" />
-                  <StatTile label="Bills बने"   value="23"      tone="rose"    />
-                  <StatTile label="Items बिके"  value="61"      tone="amber"   />
-                  <StatTile label="Stock"       value="1,284"   tone="violet"  />
-                </div>
-
-                <div className="rounded-2xl border-2 border-orange-100 p-3.5 bg-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Revenue · 7 days</p>
-                    <span className="text-[10px] font-black text-emerald-600">+34%</span>
-                  </div>
-                  <div className="flex items-end gap-1.5 h-16">
-                    {[55, 32, 78, 45, 90, 65, 100].map((h, i) => (
-                      <div key={i} className="flex-1 rounded-t-md bg-gradient-to-t from-rose-500 via-orange-500 to-amber-400" style={{ height: `${h}%` }} />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center gap-2 text-[11px] font-bold text-slate-600">
-                  <ScanLine className="w-3.5 h-3.5 text-rose-600" />
-                  Bill #11 · Aqua Star Steel · <span className="text-slate-900">₹439</span>
+                {/* Home indicator */}
+                <div className="h-5 bg-[#fff8ee] flex items-center justify-center">
+                  <div className="w-28 h-1 rounded-full bg-slate-300" />
                 </div>
               </div>
             </div>
+
+            {/* "Works on mobile + desktop" caption */}
+            <p className="mt-6 text-center text-[12px] font-bold text-slate-500 flex items-center justify-center gap-1.5">
+              <Smartphone className="w-3.5 h-3.5" />
+              Mobile, tablet, desktop — same login, सब जगह
+            </p>
           </div>
+        </div>
+
+        {/* Scroll cue */}
+        <div className="relative pb-6 flex justify-center">
+          <a href="#features" aria-label="Scroll to features"
+            className="group flex flex-col items-center gap-1 text-[11px] font-black text-slate-500 hover:text-rose-600 transition-colors">
+            <span className="tracking-widest uppercase">Scroll</span>
+            <ChevronDown className="w-5 h-5 animate-bounce" />
+          </a>
         </div>
       </section>
 
@@ -526,67 +600,166 @@ export default function Landing() {
       </section>
 
       {/* ── Footer ──────────────────────────────────────────────── */}
-      <footer className="bg-slate-900 text-slate-300 py-12">
-        <div className="max-w-6xl mx-auto px-5 md:px-8 grid md:grid-cols-4 gap-8 text-sm">
-          <div className="md:col-span-2">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center text-white">
-                <Zap className="w-5 h-5" strokeWidth={2.8} />
+      <footer className="relative bg-slate-950 text-slate-300 overflow-hidden">
+        {/* Top wave divider */}
+        <div aria-hidden className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-600 via-orange-500 via-amber-500 to-emerald-500" />
+        {/* Ambient backdrop */}
+        <div aria-hidden className="pointer-events-none absolute -top-32 -left-32 w-[400px] h-[400px] rounded-full bg-rose-500/10 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-32 w-[400px] h-[400px] rounded-full bg-orange-500/10 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.04]"
+          style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+
+        {/* ─── Trust badges row ─── */}
+        <div className="relative border-b border-slate-800/80">
+          <div className="max-w-6xl mx-auto px-5 md:px-8 py-7 grid grid-cols-2 md:grid-cols-4 gap-5">
+            {[
+              { icon: ShieldCheck, label: "Bank-grade",  sub: "256-bit encryption", tone: "text-emerald-400" },
+              { icon: Award,       label: "GST Certified", sub: "Full compliance",  tone: "text-amber-400" },
+              { icon: Headphones,  label: "Live Support",  sub: "WhatsApp · 9-9",   tone: "text-rose-400" },
+              { icon: Store,       label: "Made in Bharat", sub: "Built in Ranchi", tone: "text-orange-400" },
+            ].map(({ icon: Icon, label, sub, tone }, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center ${tone}`}>
+                  <Icon className="w-5 h-5" strokeWidth={2.4} />
+                </div>
+                <div>
+                  <p className="text-[13px] font-black text-white leading-tight">{label}</p>
+                  <p className="text-[11px] text-slate-500 leading-tight mt-0.5">{sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ─── Main footer ─── */}
+        <div className="relative max-w-6xl mx-auto px-5 md:px-8 py-14 grid lg:grid-cols-[2fr_1fr_1fr_1.3fr] gap-10 text-sm">
+          {/* Brand block */}
+          <div>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 ring-2 ring-slate-800">
+                <Zap className="w-6 h-6" strokeWidth={2.8} />
               </div>
               <div>
-                <p className="text-base font-black text-white">AddisonX Software</p>
+                <p className="text-lg font-black text-white tracking-tight">AddisonX</p>
                 <p className="text-[10px] font-bold text-orange-300 tracking-widest uppercase">दुकान का सॉफ्टवेयर</p>
               </div>
             </div>
-            <p className="text-slate-400 leading-relaxed max-w-sm">
-              India का सबसे आसान billing &amp; inventory software. Built in Ranchi · used in दुकानें across Bharat.
+
+            <p className="text-slate-400 leading-relaxed text-[13.5px] max-w-sm">
+              भारत का सबसे आसान billing &amp; inventory software. Built with love in Ranchi, used in दुकानें across Bharat.
             </p>
-            <div className="mt-5 flex items-center gap-2 text-[12px]">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Bank-grade encryption · Audit log · 256-bit sessions</span>
-            </div>
-            <div className="mt-3 flex items-center gap-2 text-[12px]">
-              <Store className="w-4 h-4 text-amber-400" />
-              <span>Made in Bharat · with <span className="text-rose-400">♥</span></span>
+
+            {/* Newsletter */}
+            <div className="mt-6 max-w-sm">
+              <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-2">
+                हर हफ्ते tips पाएं
+              </p>
+              <form
+                onSubmit={(e) => e.preventDefault()}
+                className="flex gap-2"
+              >
+                <input
+                  type="email"
+                  placeholder="aap@dukaan.com"
+                  className="flex-1 px-3.5 h-11 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50"
+                />
+                <button type="submit"
+                  className="px-4 h-11 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 text-white font-black text-sm shadow-md shadow-orange-500/30 hover:scale-[1.03] active:scale-95 transition-all flex items-center gap-1">
+                  Subscribe <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </form>
+              <p className="mt-2 text-[11px] text-slate-500">
+                Spam नहीं. Unsubscribe कभी भी.
+              </p>
             </div>
           </div>
 
+          {/* Product links */}
           <div>
-            <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-3">Product</p>
-            <ul className="space-y-2">
-              <li><a href="#features"  className="hover:text-white transition-colors">Features</a></li>
-              <li><a href="#how"       className="hover:text-white transition-colors">कैसे काम करता है</a></li>
-              <li><a href="#pricing"   className="hover:text-white transition-colors">Pricing</a></li>
-              <li><a href="#faq"       className="hover:text-white transition-colors">FAQ</a></li>
-              <li><Link href="/login"  className="hover:text-white transition-colors">Sign In</Link></li>
+            <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-4">Product</p>
+            <ul className="space-y-2.5">
+              <li><a href="#features"  className="text-slate-400 hover:text-white transition-colors">Features</a></li>
+              <li><a href="#how"       className="text-slate-400 hover:text-white transition-colors">कैसे काम करता है</a></li>
+              <li><a href="#pricing"   className="text-slate-400 hover:text-white transition-colors">Pricing</a></li>
+              <li><a href="#faq"       className="text-slate-400 hover:text-white transition-colors">FAQ</a></li>
+              <li><Link href="/login"  className="text-slate-400 hover:text-white transition-colors">Sign In</Link></li>
             </ul>
           </div>
 
+          {/* Company / Resources */}
           <div>
-            <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-3">हमसे बात करें</p>
-            <ul className="space-y-2">
+            <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-4">Company</p>
+            <ul className="space-y-2.5">
+              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">About us</a></li>
+              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Blog</a></li>
+              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Careers</a></li>
+              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Privacy Policy</a></li>
+              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Terms of Service</a></li>
+            </ul>
+          </div>
+
+          {/* Contact */}
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-4">हमसे बात करें</p>
+            <ul className="space-y-3">
               <li>
-                <a href="tel:+919999999999" className="hover:text-white transition-colors flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5" /> +91 99999 99999
+                <a href="tel:+919999999999" className="group flex items-start gap-2.5 hover:text-white transition-colors">
+                  <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0 group-hover:border-emerald-500/50">
+                    <Phone className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Call us</p>
+                    <p className="text-[13px] font-bold text-white">+91 99999 99999</p>
+                  </div>
                 </a>
               </li>
               <li>
-                <a href="https://wa.me/" target="_blank" rel="noreferrer" className="hover:text-emerald-300 transition-colors flex items-center gap-1.5">
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400" /> WhatsApp
+                <a href="https://wa.me/" target="_blank" rel="noreferrer"
+                  className="group flex items-start gap-2.5 hover:text-white transition-colors">
+                  <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0 group-hover:border-emerald-500/50">
+                    <MessageCircle className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">WhatsApp</p>
+                    <p className="text-[13px] font-bold text-emerald-300">Chat with us</p>
+                  </div>
                 </a>
               </li>
               <li>
-                <a href="mailto:addisonxmedia@gmail.com" className="hover:text-white transition-colors break-all">
-                  addisonxmedia@gmail.com
+                <a href="mailto:addisonxmedia@gmail.com"
+                  className="group flex items-start gap-2.5 hover:text-white transition-colors">
+                  <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-amber-400 shrink-0 group-hover:border-amber-500/50">
+                    <Mail className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Email</p>
+                    <p className="text-[12.5px] font-bold text-white break-all">addisonxmedia@gmail.com</p>
+                  </div>
                 </a>
+              </li>
+              <li>
+                <div className="flex items-start gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-rose-400 shrink-0">
+                    <MapPin className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Office</p>
+                    <p className="text-[12.5px] font-bold text-white">Ranchi, Jharkhand 🇮🇳</p>
+                  </div>
+                </div>
               </li>
             </ul>
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto px-5 md:px-8 mt-10 pt-6 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-2 text-[12px] text-slate-500">
-          <p>© {new Date().getFullYear()} AddisonX Media. All rights reserved.</p>
-          <p>हम भारत के लिए बनाते हैं · Made in India</p>
+        {/* ─── Bottom bar ─── */}
+        <div className="relative border-t border-slate-800/80">
+          <div className="max-w-6xl mx-auto px-5 md:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-[12px] text-slate-500">
+            <p>© {new Date().getFullYear()} AddisonX Media. All rights reserved.</p>
+            <p className="flex items-center gap-1.5">
+              हम भारत के लिए बनाते हैं · Made with <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500" /> in India 🇮🇳
+            </p>
+          </div>
         </div>
       </footer>
 
