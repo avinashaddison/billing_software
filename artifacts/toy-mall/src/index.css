@@ -164,3 +164,27 @@
   75% { transform: translateX(-4px); }
   90% { transform: translateX(4px); }
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Print stylesheet
+   ──────────────────────────────────────────────────────────────────────
+   Default behaviour for any page's browser-print: hide the app chrome
+   (side nav, bottom nav, offline banner) and any element explicitly
+   opted out via class="no-print". The Bill / Labels / ProductDetail
+   pages define their OWN scoped print CSS (they take over the whole
+   sheet for a receipt or label layout) and aren't affected by these. */
+@media print {
+  /* App chrome — never useful on paper */
+  aside,                 /* SideNav root element */
+  nav[data-app-nav],     /* BottomNav (tagged in BottomNav.tsx) */
+  .no-print              /* opt-out hook for per-page print buttons */
+  { display: none !important; }
+
+  /* Reset the AppLayout's mobile bottom padding (which exists only so
+     the scrollable content sits above the bottom nav). Without this
+     every print starts with ~128px of blank space at the bottom. */
+  main { padding-bottom: 0 !important; }
+
+  /* Drop background colours so dark mode doesn't waste ink */
+  body { background: white !important; color: black !important; }
+}

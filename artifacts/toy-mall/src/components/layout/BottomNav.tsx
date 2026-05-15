@@ -38,7 +38,7 @@ export function BottomNav() {
         aria-hidden={count === 0}
         tabIndex={count === 0 ? -1 : 0}
         className={cn(
-          "md:hidden fixed left-0 right-0 z-[49] flex items-center gap-3 px-4 py-3",
+          "no-print md:hidden fixed left-0 right-0 z-[49] flex items-center gap-3 px-4 py-3",
           "transition-all duration-300 ease-in-out",
           count > 0
             ? "opacity-100 translate-y-0 pointer-events-auto"
@@ -71,6 +71,7 @@ export function BottomNav() {
 
       {/* ── Main bottom nav ── */}
       <nav
+        data-app-nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >

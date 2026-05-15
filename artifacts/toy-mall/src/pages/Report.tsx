@@ -68,7 +68,7 @@ export default function Report() {
             <FileText className="w-6 h-6 text-primary" /> Reports
           </h1>
           <button onClick={() => window.print()}
-            className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-bold rounded-full hover:bg-neutral-800 active:scale-95 transition-all">
+            className="no-print flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-bold rounded-full hover:bg-neutral-800 active:scale-95 transition-all">
             <Printer className="w-4 h-4" /> Print
           </button>
         </div>
