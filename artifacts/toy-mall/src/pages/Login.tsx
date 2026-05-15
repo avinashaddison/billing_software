@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth, type StaffRole } from "@/hooks/use-auth";
 import { type Permissions } from "@/lib/permissions";
-import { Loader2, Delete, Mail, Lock, Eye, EyeOff, LogOut } from "lucide-react";
+import { Loader2, Delete, Mail, Lock, Eye, EyeOff, LogOut, Flame, MessageCircle, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { useStoreSettings, usePerStaffScannerPrefs } from "@/lib/store-info";
 
@@ -230,175 +230,209 @@ export default function Login() {
   ];
 
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center p-6 overflow-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-black dark:via-zinc-950 dark:to-zinc-900">
-      {/* Apple-style ambient backdrop: two huge, soft, blurred radial glows */}
-      <div aria-hidden className="pointer-events-none absolute -top-40 -left-40 w-[480px] h-[480px] rounded-full bg-blue-400/20 dark:bg-blue-500/15 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-40 -right-40 w-[520px] h-[520px] rounded-full bg-violet-400/20 dark:bg-violet-500/15 blur-3xl" />
+    <div className="min-h-screen relative flex flex-col items-center justify-center p-6 overflow-hidden bg-[#fff8ee]">
+      {/* Ambient saffron/rose backdrop (matches landing) */}
+      <div aria-hidden className="pointer-events-none absolute -top-40 -right-32 w-[560px] h-[560px] rounded-full bg-gradient-to-br from-amber-300/55 via-orange-400/45 to-rose-400/35 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-40 -left-32 w-[520px] h-[520px] rounded-full bg-gradient-to-br from-fuchsia-300/40 via-rose-300/40 to-orange-300/30 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.20]"
+        style={{ backgroundImage: "radial-gradient(circle, #f97316 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+      <div aria-hidden className="pointer-events-none absolute top-8  left-[10%] text-amber-400/50 text-3xl select-none rotate-12">✦</div>
+      <div aria-hidden className="pointer-events-none absolute top-24 right-[8%] text-rose-400/40  text-5xl select-none">✦</div>
+      <div aria-hidden className="pointer-events-none absolute bottom-24 right-[14%] text-orange-400/40 text-3xl select-none">✦</div>
 
-      {/* Header — generic SaaS brand pre-login, tenant brand post-email-auth. */}
-      <div className="relative mb-10 text-center">
-        <div className="w-20 h-20 mx-auto mb-5 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-xl shadow-blue-500/25 ring-1 ring-black/5">
-          <span className="text-3xl drop-shadow-sm">{emailUser ? store.logoEmoji : "⚡"}</span>
+      {/* Brand header — saffron logo tile + dukaan tagline */}
+      <div className="relative mb-8 text-center">
+        <div className="relative inline-block">
+          <div className="absolute -inset-3 rounded-[28px] bg-gradient-to-br from-rose-400/40 via-orange-400/40 to-amber-300/40 blur-xl" />
+          <div className="relative w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-2xl shadow-orange-500/40 ring-4 ring-white">
+            <span className="text-3xl drop-shadow-md">{emailUser ? store.logoEmoji : "⚡"}</span>
+          </div>
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="mt-5 text-3xl md:text-4xl font-black tracking-tight text-slate-900">
           {emailUser ? store.name : "AddisonX Software"}
         </h1>
-        <p className="text-[15px] text-slate-500 dark:text-zinc-400 mt-1">
-          {emailUser ? (store.appSubtitle || "Billing & Inventory") : "Billing & Inventory"}
+        <p className="text-[12px] font-black uppercase tracking-[0.18em] text-rose-600 mt-1">
+          {emailUser ? (store.appSubtitle || "Billing & Inventory") : "दुकान का सॉफ्टवेयर"}
         </p>
       </div>
 
       {!emailUser ? (
-        /* ── Step 1: Email + password — Apple-style glass card ── */
+        /* ── Step 1: Email + password — saffron card ───────────────── */
         <form
           onSubmit={handleEmailLogin}
-          className="relative w-full max-w-[380px] rounded-[28px] border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] backdrop-blur-2xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.15)] p-6 space-y-3"
+          className="relative w-full max-w-[400px] rounded-[28px] border-2 border-orange-200 bg-white shadow-2xl shadow-orange-900/10 p-6 md:p-7 space-y-3.5"
         >
-          <p className="text-center text-[13px] text-slate-500 dark:text-zinc-400 mb-1">
-            Sign in to your shop
+          {/* Sticker — "Made in Bharat" */}
+          <div className="absolute -top-3.5 -right-3 rotate-[6deg]">
+            <div className="bg-emerald-500 text-white px-2.5 py-1 rounded-xl shadow-lg ring-2 ring-white text-[10px] font-black tracking-widest">
+              MADE IN BHARAT 🇮🇳
+            </div>
+          </div>
+
+          <p className="text-center text-[13px] font-bold text-rose-600 uppercase tracking-[0.18em]">
+            दुकान में login करें
           </p>
 
           {emailError && (
-            <div className="rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 px-3 py-2.5 text-center">
-              <p className="text-[13px] text-red-600 dark:text-red-400">{emailError}</p>
+            <div className="rounded-2xl bg-rose-50 border-2 border-rose-200 px-3 py-2.5 text-center">
+              <p className="text-[13px] font-bold text-rose-700">{emailError}</p>
             </div>
           )}
 
           {/* Email field */}
-          <div className="relative">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500" />
-            <input
-              type="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
-              placeholder="Email Address"
-              disabled={submittingEmail}
-              className="w-full pl-11 pr-4 h-12 rounded-2xl bg-white dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/10 text-[15px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all disabled:opacity-60"
-            />
-          </div>
+          <label className="block">
+            <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5 block">Email</span>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
+              <input
+                type="email"
+                autoComplete="email"
+                autoFocus
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
+                placeholder="aap@dukaan.com"
+                disabled={submittingEmail}
+                className="w-full pl-11 pr-4 h-12 rounded-2xl bg-orange-50/40 border-2 border-orange-100 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400/30 focus:border-rose-400 focus:bg-white transition-all disabled:opacity-60"
+              />
+            </div>
+          </label>
 
           {/* Password field */}
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500" />
-            <input
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setEmailError(null); }}
-              placeholder="Password"
-              disabled={submittingEmail}
-              className="w-full pl-11 pr-11 h-12 rounded-2xl bg-white dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/10 text-[15px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all disabled:opacity-60"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:text-zinc-500 dark:hover:text-zinc-200 transition-colors"
-              tabIndex={-1}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
+          <label className="block">
+            <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5 block">Password</span>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
+              <input
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setEmailError(null); }}
+                placeholder="••••••••"
+                disabled={submittingEmail}
+                className="w-full pl-11 pr-11 h-12 rounded-2xl bg-orange-50/40 border-2 border-orange-100 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400/30 focus:border-rose-400 focus:bg-white transition-all disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-600 transition-colors"
+                tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </label>
 
           <button
             type="submit"
             disabled={submittingEmail}
-            className="w-full h-12 rounded-2xl bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white font-medium text-[15px] tracking-[-0.01em] shadow-lg shadow-blue-500/30 ring-1 ring-blue-700/20 active:scale-[0.985] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1"
-          >
-            {submittingEmail ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</> : "Continue"}
+            className="group w-full h-12 rounded-2xl bg-gradient-to-br from-rose-600 via-orange-600 to-amber-500 text-white font-black text-[15px] shadow-xl shadow-rose-500/40 ring-2 ring-white hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2 relative overflow-hidden">
+            {/* Shimmer sweep */}
+            <span aria-hidden className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+            {submittingEmail ? <><Loader2 className="w-4 h-4 animate-spin relative" /><span className="relative">Signing in…</span></> : <><span className="relative">Continue</span><ArrowRight className="w-4 h-4 relative group-hover:translate-x-1 transition-transform" /></>}
           </button>
+
+          {/* WhatsApp helper */}
+          <a href="https://wa.me/?text=Hi%20AddisonX%2C%20login%20issue%20hai"
+            target="_blank" rel="noreferrer"
+            className="block text-center pt-1 text-[12px] font-bold text-emerald-700 hover:text-emerald-800 transition-colors">
+            <MessageCircle className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+            Login में दिक्कत? WhatsApp पर बात करें
+          </a>
         </form>
       ) : !selected ? (
-        /* ── Step 2: Staff selection — Apple list-card style ── */
-        <div className="relative w-full max-w-[380px] space-y-3">
+        /* ── Step 2: Staff selection — kirana-counter list card ───── */
+        <div className="relative w-full max-w-[400px] space-y-3">
           {/* Signed-in pill */}
-          <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl border-2 border-orange-200 bg-white shadow-sm">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center text-white flex-shrink-0">
                 <Mail className="w-3.5 h-3.5" />
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-none">Signed in as</p>
-                <p className="text-[13px] font-medium text-slate-900 dark:text-white truncate mt-0.5">{emailUser.email}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 leading-none">Signed in as</p>
+                <p className="text-[13px] font-bold text-slate-900 truncate mt-0.5">{emailUser.email}</p>
               </div>
             </div>
             <button
               onClick={exitEmail}
-              className="text-[13px] text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex items-center gap-1 flex-shrink-0"
+              className="text-[12px] font-black text-rose-600 hover:text-rose-700 transition-colors flex items-center gap-1 flex-shrink-0 uppercase tracking-wider"
             >
+              <LogOut className="w-3.5 h-3.5" />
               Switch
             </button>
           </div>
 
-          <p className="text-center text-[13px] text-slate-500 dark:text-zinc-400 pt-2 pb-1">
-            Who are you?
+          <p className="text-center text-[12px] font-black uppercase tracking-[0.18em] text-rose-600 pt-2 pb-1">
+            कौन हैं आप?
           </p>
           {loadingStaff ? (
-            <div className="flex items-center justify-center p-10 text-slate-400 dark:text-zinc-500">
+            <div className="flex items-center justify-center p-10 text-orange-400">
               <Loader2 className="w-6 h-6 animate-spin" />
             </div>
           ) : staff.length === 0 ? (
-            <div className="text-center text-slate-500 dark:text-zinc-400 p-10 border border-dashed border-black/10 dark:border-white/10 rounded-2xl">
-              <p className="text-[15px] font-medium text-slate-700 dark:text-zinc-300">No staff accounts found</p>
+            <div className="text-center text-slate-600 p-10 border-2 border-dashed border-orange-200 rounded-2xl bg-white">
+              <p className="text-[15px] font-black text-slate-800">No staff accounts found</p>
               <p className="text-[13px] mt-1">Contact your administrator</p>
             </div>
           ) : (
-            /* Group as one rounded card with internal dividers — iOS Settings vibe */
-            <div className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] backdrop-blur-xl overflow-hidden divide-y divide-black/5 dark:divide-white/10">
+            <div className="rounded-2xl border-2 border-orange-200 bg-white shadow-lg overflow-hidden divide-y-2 divide-orange-100">
               {staff.map((s) => (
                 <button
                   key={s.id}
                   onClick={() => setSelected(s)}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] active:bg-black/[0.06] dark:active:bg-white/[0.08] transition-colors group text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-orange-50 active:bg-orange-100 transition-colors group text-left"
                 >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[13px] font-semibold text-white shadow-sm">
+                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center text-[13px] font-black text-white shadow-md ring-2 ring-white">
                     {s.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[15px] font-medium text-slate-900 dark:text-white truncate">{s.name}</p>
-                    <p className="text-[12px] text-slate-500 dark:text-zinc-400 capitalize">{s.role === "owner" ? "Owner" : "Staff"}</p>
+                    <p className="text-[15px] font-black text-slate-900 truncate">{s.name}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-rose-600">{s.role === "owner" ? "Owner · मालिक" : "Staff · कर्मचारी"}</p>
                   </div>
-                  <div className="text-slate-400 dark:text-zinc-500 text-xl group-hover:translate-x-0.5 transition-transform">›</div>
+                  <div className="text-orange-400 text-2xl group-hover:translate-x-0.5 group-hover:text-rose-600 transition-all">›</div>
                 </button>
               ))}
             </div>
           )}
         </div>
       ) : (
-        /* ── PIN entry — Apple-style numeric keypad ── */
-        <div className="relative w-full max-w-[300px]">
+        /* ── PIN entry — saffron keypad ───────────────────────────── */
+        <div className="relative w-full max-w-[320px]">
           {/* Back + user header */}
           <div className="flex items-center gap-3 mb-7">
             <button onClick={() => { setSelected(null); setPin(""); setAttemptsLeft(null); setLockedUntil(null); }}
-              className="w-9 h-9 rounded-full bg-white/70 dark:bg-white/[0.06] border border-black/5 dark:border-white/10 hover:bg-white dark:hover:bg-white/[0.1] backdrop-blur-xl flex items-center justify-center text-slate-600 dark:text-zinc-300 transition-colors text-lg">
+              className="w-10 h-10 rounded-full bg-white border-2 border-orange-200 hover:border-rose-400 hover:bg-orange-50 flex items-center justify-center text-rose-600 transition-colors text-xl font-black">
               ‹
             </button>
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[12px] font-semibold text-white shadow-sm">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center text-[12px] font-black text-white shadow-md ring-2 ring-white">
                 {selected.name.slice(0, 2).toUpperCase()}
               </div>
               <div>
-                <p className="text-[14px] font-medium text-slate-900 dark:text-white leading-none">{selected.name}</p>
-                <p className="text-[12px] text-slate-500 dark:text-zinc-400 capitalize mt-0.5">{selected.role === "owner" ? "Owner" : "Staff"}</p>
+                <p className="text-[15px] font-black text-slate-900 leading-none">{selected.name}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-rose-600 mt-1">
+                  {selected.role === "owner" ? "Owner · मालिक" : "Staff · कर्मचारी"}
+                </p>
               </div>
             </div>
           </div>
 
-          <p className="text-center text-[13px] text-slate-500 dark:text-zinc-400 mb-5">Enter your passcode</p>
+          <p className="text-center text-[12px] font-black uppercase tracking-[0.18em] text-rose-600 mb-5">
+            4-digit PIN डालें
+          </p>
 
           {/* Lock / attempt-left banners */}
           {lockedUntil ? (
-            <div className="mb-5 p-3 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 rounded-2xl text-center">
-              <p className="text-[13px] font-medium text-red-700 dark:text-red-400">Account Locked</p>
-              <p className="text-[12px] text-red-600/80 dark:text-red-500/80 mt-0.5">Too many wrong PINs. Try again in</p>
-              <p className="text-2xl font-semibold text-red-700 dark:text-red-400 mt-1 font-mono tracking-tight">{lockCountdown}</p>
+            <div className="mb-5 p-3.5 bg-rose-50 border-2 border-rose-200 rounded-2xl text-center">
+              <p className="text-[13px] font-black text-rose-700">Account Locked</p>
+              <p className="text-[11px] text-rose-600/80 mt-0.5">गलत PIN बहुत बार · थोड़ी देर रुकें</p>
+              <p className="text-3xl font-black text-rose-700 mt-1 font-mono tracking-tight">{lockCountdown}</p>
             </div>
           ) : attemptsLeft !== null && (
-            <div className="mb-4 p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/50 rounded-2xl text-center">
-              <p className="text-[12px] text-amber-700 dark:text-amber-400">
-                Wrong PIN — {attemptsLeft} attempt{attemptsLeft !== 1 ? "s" : ""} remaining
+            <div className="mb-4 p-2.5 bg-amber-50 border-2 border-amber-200 rounded-2xl text-center">
+              <p className="text-[12px] font-bold text-amber-700">
+                Wrong PIN · {attemptsLeft} attempt{attemptsLeft !== 1 ? "s" : ""} बचे हैं
               </p>
             </div>
           )}
@@ -413,8 +447,8 @@ export default function Login() {
             ))}
           </div>
 
-          {/* iOS-style circular keypad */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* Keypad */}
+          <div className="grid grid-cols-3 gap-3">
             {keypad.flat().map((key, idx) => {
               if (key === "") return <div key={idx} />;
               return (
@@ -422,10 +456,10 @@ export default function Login() {
                   key={idx}
                   onClick={() => key === "⌫" ? removeDigit() : addDigit(key)}
                   disabled={checking || !!lockedUntil}
-                  className={`h-16 w-16 mx-auto rounded-full text-2xl font-light tracking-tight transition-all active:scale-90 ${
+                  className={`h-16 w-16 mx-auto rounded-full text-2xl font-black tracking-tight transition-all active:scale-90 ${
                     key === "⌫"
-                      ? "bg-transparent text-slate-500 dark:text-zinc-400 hover:bg-black/5 dark:hover:bg-white/10"
-                      : "bg-white/70 dark:bg-white/[0.06] border border-black/5 dark:border-white/10 hover:bg-white dark:hover:bg-white/[0.12] backdrop-blur-xl shadow-sm text-slate-900 dark:text-white"
+                      ? "bg-transparent text-rose-500 hover:bg-rose-50"
+                      : "bg-white border-2 border-orange-200 hover:border-rose-400 hover:bg-orange-50 shadow-md text-slate-900"
                   } disabled:opacity-40 disabled:cursor-not-allowed`}
                 >
                   {key === "⌫" ? <Delete className="w-5 h-5 mx-auto" /> : key}
@@ -435,24 +469,24 @@ export default function Login() {
           </div>
 
           {checking && (
-            <div className="flex items-center justify-center gap-2 mt-5 text-[13px] text-slate-500 dark:text-zinc-400">
+            <div className="flex items-center justify-center gap-2 mt-5 text-[13px] font-bold text-rose-600">
               <Loader2 className="w-4 h-4 animate-spin" /> Verifying…
             </div>
           )}
           {!lockedUntil && !checking && pin.length === 0 && attemptsLeft === null && (
-            <p className="text-center text-[12px] text-slate-400 dark:text-zinc-500 mt-5">
-              Submits automatically after 4 digits
+            <p className="text-center text-[11px] text-slate-500 mt-5 font-medium">
+              4 digits के बाद auto submit होगा
             </p>
           )}
         </div>
       )}
 
       {/* Footer */}
-      <div className="relative mt-12 flex flex-col items-center gap-1.5">
-        <p className="text-[11px] text-slate-400 dark:text-zinc-500 tracking-wide">Developed by</p>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[13px]">⚡</span>
-          <span className="text-[13px] font-medium bg-gradient-to-r from-violet-500 via-blue-500 to-cyan-400 bg-clip-text text-transparent">
+      <div className="relative mt-10 flex flex-col items-center gap-1.5">
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/60 border border-orange-200 backdrop-blur-sm">
+          <Flame className="w-3 h-3 text-rose-600" />
+          <span className="text-[11px] font-bold text-slate-700">Made in Bharat · with</span>
+          <span className="text-[11px] font-black bg-gradient-to-r from-rose-600 via-orange-600 to-amber-500 bg-clip-text text-transparent">
             AddisonX Media
           </span>
         </div>
