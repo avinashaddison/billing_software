@@ -452,59 +452,42 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-5 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto items-stretch">
             <PriceCard
-              name="Starter"
-              tagline="1 counter · 1 cashier"
-              hindi="छोटी दुकान के लिए"
-              originalPrice="₹499"
-              price="₹399"
-              period="/month"
+              name="Free Trial"
+              tagline="कोई card नहीं चाहिए"
+              hindi="पहले इस्तेमाल करो, फिर पैसे दो"
+              originalPrice=""
+              price="14 दिन"
+              period="Free"
               features={[
-                "500 तक products",
-                "Cash + UPI billing",
-                "GST invoice print",
-                "Daily sales report",
-                "Email + chat support",
+                "पूरा software · कोई limit नहीं",
+                "Unlimited products + bills",
+                "GST invoice + UPI QR",
+                "Email + WhatsApp support",
+                "कभी भी upgrade करें",
               ]}
               cta="अभी शुरू करें"
               highlighted={false}
             />
             <PriceCard
-              name="Pro"
-              tagline="3 staff PIN · ज़्यादा दुकानें इस पर"
-              hindi="MOST POPULAR · सबसे ज़्यादा चलने वाला"
-              originalPrice="₹999"
-              price="₹799"
-              period="/month"
+              name="1 Year Plan"
+              tagline="साल भर का सबसे अच्छा deal"
+              hindi="MOST POPULAR · 2 महीने FREE"
+              originalPrice="₹4,788"
+              price="₹2,999"
+              period="/year"
               features={[
-                "Unlimited products",
+                "Unlimited products + bills",
+                "GST invoice + UPI QR तुरंत",
                 "Telegram + WhatsApp alerts",
-                "Today's Deal + bulk pricing",
-                "Customer name + phone capture",
+                "Today's Deal + customer database",
                 "Priority WhatsApp support",
+                "Free onboarding + training",
               ]}
-              cta="अभी शुरू करें"
+              cta="अभी subscribe करें"
               highlighted={true}
               badge="🔥 BESTSELLER"
-            />
-            <PriceCard
-              name="Chain"
-              tagline="Multi-store · जल्दी आ रहा है"
-              hindi="कई दुकानों के लिए"
-              originalPrice=""
-              price="—"
-              period=""
-              features={[
-                "Multiple outlets, one dashboard",
-                "Inter-store stock transfer",
-                "Consolidated reports",
-                "Per-store cashier accounts",
-                "Dedicated account manager",
-              ]}
-              cta="हमसे बात करें"
-              highlighted={false}
-              comingSoon
             />
           </div>
 
