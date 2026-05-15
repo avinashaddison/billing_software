@@ -26,6 +26,7 @@ interface BillData {
     itemsCount: number;
     createdAt: string;
     paymentMode?: string;
+    customerName?: string | null;
     customerPhone?: string | null;
     discount?: number | null;
     discountType?: string | null;
@@ -402,6 +403,13 @@ export default function Bill() {
             {/* ── CUSTOMER + BILL META ── */}
             <div className="border border-black grid grid-cols-2 text-[10.5px] leading-[1.55]">
               <div className="p-1.5 border-r border-black space-y-0.5 flex flex-col justify-center">
+                <div className="flex">
+                  <span className="w-[58px] shrink-0">Name</span>
+                  <span>:&nbsp;</span>
+                  <span className="flex-1 border-b border-dotted border-black/40 font-semibold">
+                    {bill.customerName ? bill.customerName : <span className="text-black/30">—</span>}
+                  </span>
+                </div>
                 <div className="flex">
                   <span className="w-[58px] shrink-0">Mobile</span>
                   <span>:&nbsp;</span>

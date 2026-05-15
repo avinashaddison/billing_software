@@ -5,7 +5,7 @@ import { useScanFlash, ScanFlash, useLowStockFlash, LowStockFlash } from "@/comp
 import {
   ScanLine, ArrowRight, Trash2, Plus, Minus,
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
-  Phone, Wallet, Banknote, Smartphone,
+  Phone, User, Wallet, Banknote, Smartphone,
   PackagePlus, ShoppingBag, ArrowUpCircle, RotateCcw, Camera, CameraOff,
   Volume2, VolumeX, QrCode, BadgeCheck, Usb,
 } from "lucide-react";
@@ -40,6 +40,7 @@ async function lookupBySku(sku: string): Promise<ScannedProduct> {
 async function postCheckout(payload: {
   items: { productId: string; quantity: number; price: number }[];
   paymentMode: PaymentMode;
+  customerName?: string;
   customerPhone?: string;
 }) {
   const res = await fetch(`${BASE_URL}/api/bills/checkout`, {
@@ -114,7 +115,7 @@ function SuccessOverlay({ billId }: { billId: string }) {
 interface CheckoutModalProps {
   total: number; count: number;
   onCancel: () => void;
-  onConfirm: (pm: PaymentMode, phone: string) => void;
+  onConfirm: (pm: PaymentMode, phone: string, customerName: string) => void;
   loading: boolean;
   items: { name: string; sku: string; quantity: number }[];
   stockMap: Map<string, number>;
@@ -127,6 +128,7 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading, items, stoc
      (React 18 batches those events; the closure would capture the old state) */
   const paymentModeRef = useRef<PaymentMode>("cash");
 
+  const [customerName, setCustomerName] = useState("");
   const [phone, setPhone]             = useState("");
   const [phoneError, setPhoneError]   = useState("");
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -167,7 +169,7 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading, items, stoc
   const handleSubmit = () => {
     const err = validatePhone(phone);
     if (err) { setPhoneError(err); return; }
-    onConfirm(paymentModeRef.current, phone);  // use ref, not state
+    onConfirm(paymentModeRef.current, phone, customerName.trim());  // use ref, not state
   };
 
   return (
@@ -292,6 +294,22 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading, items, stoc
               </div>
             </div>
           )}
+
+          {/* Customer name */}
+          <div>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5" /> Customer Name
+              <span className="normal-case text-muted-foreground/60 font-medium">(optional)</span>
+            </p>
+            <input
+              type="text"
+              maxLength={80}
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Walk-in customer"
+              className="w-full h-12 px-3.5 rounded-xl bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
+            />
+          </div>
 
           {/* Customer phone */}
           <div>
@@ -783,7 +801,7 @@ export default function Scan() {
     playTick(); updateQty(productId, newQty);
   }, [updateQty]);
 
-  const handleConfirmCheckout = async (paymentMode: PaymentMode, customerPhone: string) => {
+  const handleConfirmCheckout = async (paymentMode: PaymentMode, customerPhone: string, customerName: string) => {
     if (!items.length) return;
 
     /* ── Offline: queue the bill locally, sync later ── */
@@ -791,6 +809,7 @@ export default function Scan() {
       enqueue({
         items:         items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
         paymentMode,
+        customerName:  customerName || undefined,
         customerPhone: customerPhone || undefined,
         total,
         itemsCount:    count,
@@ -806,6 +825,7 @@ export default function Scan() {
       const result = await postCheckout({
         items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
         paymentMode, customerPhone: customerPhone || undefined,
+        customerName: customerName || undefined,
       });
       playCheckoutSuccess(); clearCart(); setShowModal(false);
       setSuccessBillId(result.bill.id);

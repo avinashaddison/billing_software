@@ -11,6 +11,8 @@ export const billsTable = pgTable(
     billNumber:    serial("bill_number").notNull(),
     totalAmount:   numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
     itemsCount:    integer("items_count").notNull(),
+    /** Optional customer name captured at checkout. Printed on the receipt. */
+    customerName:  text("customer_name"),
     customerPhone: varchar("customer_phone", { length: 10 }),
     paymentMode:   varchar("payment_mode", { length: 10 }).notNull().default("cash"),
     discount:      numeric("discount", { precision: 10, scale: 2 }),

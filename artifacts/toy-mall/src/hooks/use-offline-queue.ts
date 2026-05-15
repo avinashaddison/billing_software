@@ -12,6 +12,7 @@ export interface QueuedBill {
   localId:      string;
   items:        { productId: string; quantity: number; price: number; mrp?: number }[];
   paymentMode:  string;
+  customerName?: string;
   customerPhone?: string;
   discount?:    number;
   discountType?: "percent" | "amount";
@@ -73,6 +74,7 @@ export function useOfflineQueue() {
           body:    JSON.stringify({
             items:         bill.items,
             paymentMode:   bill.paymentMode,
+            customerName:  bill.customerName,
             customerPhone: bill.customerPhone,
             discount:      bill.discount,
             discountType:  bill.discountType,

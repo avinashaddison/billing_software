@@ -20,6 +20,7 @@ function isValidCheckoutBody(body: unknown): body is {
     discountValue?: number;
   }>;
   paymentMode: PaymentMode;
+  customerName?: string;
   customerPhone?: string;
   discount?: number;
   discountType?: "percent" | "amount";
@@ -28,6 +29,12 @@ function isValidCheckoutBody(body: unknown): body is {
   const b = body as Record<string, unknown>;
   if (!Array.isArray(b.items) || b.items.length === 0) return false;
   if (b.paymentMode !== "cash" && b.paymentMode !== "upi") return false;
+  if (b.customerName !== undefined && b.customerName !== "") {
+    if (typeof b.customerName !== "string") return false;
+    /* Length cap matches the receipt column width — keeps the printed
+       layout from wrapping awkwardly on the 80mm thermal roll. */
+    if (b.customerName.trim().length > 80) return false;
+  }
   if (b.customerPhone !== undefined && b.customerPhone !== "") {
     if (typeof b.customerPhone !== "string") return false;
     if (!/^\d{10}$/.test(b.customerPhone)) return false;
@@ -68,7 +75,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
     return;
   }
 
-  const { items, paymentMode, customerPhone, discount, discountType } = req.body;
+  const { items, paymentMode, customerName, customerPhone, discount, discountType } = req.body;
   const tenantId = req.tenantId;
 
   try {
@@ -154,6 +161,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           totalAmount:   String(totalAmount),
           itemsCount,
           paymentMode,
+          customerName:  customerName?.trim() || null,
           customerPhone: customerPhone || null,
           discount:      discount && discount > 0 ? String(discount) : null,
           discountType:  discount && discount > 0 && discountType ? discountType : null,

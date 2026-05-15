@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useLocation } from "wouter";
 import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
-  Phone, Wallet, Banknote, Smartphone, Minus, Plus,
+  Phone, User, Wallet, Banknote, Smartphone, Minus, Plus,
   Trash2, ScanLine, WifiOff, RefreshCw, QrCode, BadgeCheck, Tag,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ async function postCheckout(payload: {
     discountValue?:   number;
   }[];
   paymentMode: PaymentMode;
+  customerName?: string;
   customerPhone?: string;
   discount?: number;
   discountType?: "percent" | "amount";
@@ -261,6 +262,7 @@ export default function Checkout() {
 
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
   const paymentModeRef = useRef<PaymentMode>("cash");
+  const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -341,6 +343,7 @@ export default function Checkout() {
       enqueue({
         items: buildCheckoutItems(),
         paymentMode: paymentModeRef.current,
+        customerName: customerName.trim() || undefined,
         customerPhone: phone || undefined,
         discount:     discountNum > 0 ? discountNum : undefined,
         discountType: discountNum > 0 ? discountType : undefined,
@@ -357,6 +360,7 @@ export default function Checkout() {
       const result = await postCheckout({
         items: buildCheckoutItems(),
         paymentMode: paymentModeRef.current,
+        customerName: customerName.trim() || undefined,
         customerPhone: phone || undefined,
         discount:     discountNum > 0 ? discountNum : undefined,
         discountType: discountNum > 0 ? discountType : undefined,
@@ -632,8 +636,24 @@ export default function Checkout() {
               </div>
             )}
 
+            {/* Customer name */}
+            <div className="px-4 pt-4">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" /> Customer Name
+                <span className="normal-case font-medium text-muted-foreground/60">(optional)</span>
+              </p>
+              <input
+                type="text"
+                maxLength={80}
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Walk-in customer"
+                className="w-full h-12 px-3.5 rounded-xl bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
+              />
+            </div>
+
             {/* Customer phone */}
-            <div className="px-4 pt-4 pb-4">
+            <div className="px-4 pt-3 pb-4">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5" /> Customer Mobile
                 <span className="normal-case font-medium text-muted-foreground/60">(optional)</span>
