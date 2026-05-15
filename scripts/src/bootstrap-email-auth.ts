@@ -1,59 +1,52 @@
 /**
- * Bootstrap owner user for email/password authentication.
- * 
- * Run this once during initial setup to create the first owner account.
- * Usage: pnpm run bootstrap-email-auth
+ * Bootstrap an initial tenant + owner user (email/password login).
+ *
+ * Usage:
+ *   pnpm --filter @workspace/scripts run bootstrap-email-auth
+ *
+ * Uses raw SQL through `pool` (not drizzle's query builder) so this script
+ * doesn't need drizzle-orm as a direct dep — it only relies on @workspace/db.
  */
-
 import bcrypt from "bcryptjs";
-import { db, tenantsTable, authUsersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { pool } from "@workspace/db";
 
-const OWNER_EMAIL = "admin@example.com";
+const OWNER_EMAIL    = "admin@example.com";
 const OWNER_PASSWORD = "admin123";
-const SHOP_NAME = "Default Shop";
+const TENANT_ID      = "default";
+const TENANT_NAME    = "Default Shop";
 
-async function main() {
+async function main(): Promise<void> {
   console.log("Bootstrapping email/password owner user...");
-  
-  // Check if we already have an owner user
-  const existing = await db
-    .select()
-    .from(authUsersTable)
-    .where(eq(authUsersTable.email, OWNER_EMAIL.toLowerCase()));
-  
-  if (existing.length > 0) {
-    console.log("Owner user already exists:", existing[0].email);
+
+  /* Bail early if this email already has a row — re-runs are safe but noisy. */
+  const existing = await pool.query<{ email: string }>(
+    "SELECT email FROM auth_users WHERE lower(email) = lower($1) LIMIT 1",
+    [OWNER_EMAIL],
+  );
+  if (existing.rows.length > 0) {
+    console.log("Owner user already exists:", existing.rows[0].email);
     process.exit(0);
   }
-  
-  // Create tenant first
-  const tenantId = "default";
-  const [tenant] = await db
-    .insert(tenantsTable)
-    .values({ id: tenantId, name: SHOP_NAME })
-    .onConflictDoNothing()
-    .returning();
-  
-  console.log("Tenant:", tenant?.name || SHOP_NAME);
-  
-  // Hash password
+
+  /* Tenant first (ON CONFLICT DO NOTHING so re-running with a different
+     OWNER_EMAIL above still works once the tenant exists). */
+  await pool.query(
+    "INSERT INTO tenants (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+    [TENANT_ID, TENANT_NAME],
+  );
+  console.log("Tenant:", TENANT_NAME);
+
   const hash = await bcrypt.hash(OWNER_PASSWORD, 10);
-  
-  // Create owner user
-  const [user] = await db
-    .insert(authUsersTable)
-    .values({
-      tenantId,
-      email: OWNER_EMAIL.toLowerCase(),
-      passwordHash: hash,
-      role: "owner",
-    })
-    .returning();
-  
-  console.log("Created owner user:", user.email, "role:", user.role);
+  const inserted = await pool.query<{ email: string; role: string }>(
+    `INSERT INTO auth_users (tenant_id, email, password_hash, role)
+     VALUES ($1, $2, $3, 'owner')
+     RETURNING email, role`,
+    [TENANT_ID, OWNER_EMAIL.toLowerCase(), hash],
+  );
+  console.log("Created owner user:", inserted.rows[0].email, "role:", inserted.rows[0].role);
   console.log("Password:", OWNER_PASSWORD);
-  console.log("You can now log in at http://localhost:3000/login");
+  console.log("You can now log in at /login");
+  process.exit(0);
 }
 
 main().catch((err) => {
