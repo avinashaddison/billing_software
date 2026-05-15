@@ -312,10 +312,18 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     }
   }
   /* isTodayDeal: when explicitly sent in the body, write it through. Outside
-     of the OpenAPI schema right now, so accept directly off req.body too. */
+     of the OpenAPI schema right now, so accept directly off req.body too.
+     When flipped to FALSE we also wipe salePrice + salePriceUntil so the
+     product's offer state fully resets — taking a product off Today's
+     Deals shouldn't leave a phantom MRP strikethrough on the card. */
   const rawIsTodayDeal = (req.body as Record<string, unknown>)?.["isTodayDeal"];
   if (rawIsTodayDeal !== undefined) {
-    updates.isTodayDeal = Boolean(rawIsTodayDeal);
+    const next = Boolean(rawIsTodayDeal);
+    updates.isTodayDeal = next;
+    if (!next) {
+      updates.salePrice      = null;
+      updates.salePriceUntil = null;
+    }
   }
 
   const [product] = await db

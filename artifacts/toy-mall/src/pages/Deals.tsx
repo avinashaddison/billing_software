@@ -272,9 +272,9 @@ export default function Deals() {
   const handleEndDeal = async (p: DealProduct) => {
     if (!confirm(`End the deal on "${p.name}"?`)) return;
     try {
-      // Remove from Today's Deals page. We keep salePrice intact in case the
-      // owner wants the discount to remain elsewhere; toggling the flag is
-      // enough to take it off this page.
+      // Remove from Today's Deals. The server also clears salePrice +
+      // salePriceUntil when isTodayDeal flips to false, so the product
+      // card stops showing the strikethrough MRP and "Sale ends" line.
       const res = await fetch(`${BASE_URL}/api/products/${p.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

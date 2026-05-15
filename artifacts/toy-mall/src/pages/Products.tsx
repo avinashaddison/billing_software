@@ -627,10 +627,11 @@ export default function Products() {
   const searchInputRef              = useRef<HTMLInputElement>(null);
 
   /* Today's Deal toggle handler.
-     - If product is currently active → instantly deactivate (sets isTodayDeal=false,
-       preserves salePrice so any other context still applies).
-     - If inactive → open the DealQuickModal so the cashier can enter discount + end date,
-       then activate. */
+     - If product is currently active → instantly deactivate. The server
+       wipes salePrice + salePriceUntil on the same call so the offer is
+       fully reset, not just hidden from the Deals page.
+     - If inactive → open the DealQuickModal so the cashier can enter
+       discount + end date, then activate. */
   const handleToggleDeal = useCallback(async (product: { id: string; name: string; price: number; salePrice?: number | null; isTodayDeal?: boolean }) => {
     if (product.isTodayDeal) {
       try {
