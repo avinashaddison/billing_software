@@ -3,13 +3,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { LicenseLockout } from "@/components/layout/LicenseLockout";
 import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 import { SnowOverlay } from "@/components/effects/SnowOverlay";
 import { CartProvider } from "@/contexts/cart-context";
 import { useEffect }           from "react";
 import { useRealtime }         from "@/hooks/use-realtime";
-import { useInactivityLogout } from "@/hooks/use-inactivity";
 import { useAuth, usePermission } from "@/hooks/use-auth";
 import { useStoreSettings }    from "@/lib/store-info";
 import { type ResourceKey } from "@/lib/permissions";
@@ -34,7 +32,6 @@ import Login          from "@/pages/Login";
 import StaffManagement from "@/pages/StaffManagement";
 import Checkout        from "@/pages/Checkout";
 import SettingsPage    from "@/pages/Settings";
-import LicensePage     from "@/pages/License";
 import AdminPage       from "@/pages/Admin";
 
 const queryClient = new QueryClient({
@@ -50,7 +47,6 @@ const queryClient = new QueryClient({
 
 function RealtimeProvider({ children }: { children: React.ReactNode }) {
   useRealtime();
-  useInactivityLogout();
   // One-shot: pull settings from the server so they persist across devices
   // and survive browser cache clears.
   const hydrate = useStoreSettings((s) => s.hydrateFromServer);
@@ -82,8 +78,9 @@ function Router() {
   const { isLoggedIn } = useAuth();
   const [location] = useLocation();
 
-  // /admin is the vendor's own panel — bypass staff login entirely.
-  // Server-side gate (ADMIN_PASSWORD) provides the real auth.
+  // /admin is the vendor's platform admin — completely separate from tenant
+  // login. Its own page handles auth via the platform_admin role; bypass the
+  // tenant-login redirect and the AppLayout so it can render full-screen.
   if (location === "/admin") return <AdminPage />;
 
   if (!isLoggedIn && location !== "/login") {
@@ -114,7 +111,6 @@ function Router() {
             <Route path="/staff"        component={() => <Protected resource="staff"><StaffManagement /></Protected>} />
             <Route path="/checkout"     component={() => <Protected resource="scan"><Checkout /></Protected>} />
             <Route path="/settings"     component={() => <Protected resource="settings"><SettingsPage /></Protected>} />
-            <Route path="/license"      component={() => <Protected resource="license"><LicensePage /></Protected>} />
             <Route                      component={NotFound} />
           </Switch>
         </AppLayout>
@@ -131,9 +127,7 @@ function App() {
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <RealtimeProvider>
               <SnowOverlay />
-              <LicenseLockout>
-                <Router />
-              </LicenseLockout>
+              <Router />
               <PwaInstallPrompt />
             </RealtimeProvider>
           </WouterRouter>

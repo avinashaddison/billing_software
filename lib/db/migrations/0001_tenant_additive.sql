@@ -25,6 +25,41 @@
 BEGIN;
 
 ------------------------------------------------------------------------------
+-- 0. Create tables that may not exist (for fresh installs)
+------------------------------------------------------------------------------
+-- license_status table (singleton for license/trial tracking)
+CREATE TABLE IF NOT EXISTS license_status (
+  id          integer PRIMARY KEY NOT NULL DEFAULT 1,
+  tenant_id   text,
+  first_boot_at timestamp with time zone NOT NULL DEFAULT now(),
+  last_key_hash text,
+  key_override text,
+  key_updated_at timestamp with time zone
+);
+
+-- staff_profiles table (PIN-based auth)
+CREATE TABLE IF NOT EXISTS staff_profiles (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   text,
+  name        text NOT NULL,
+  pin         text NOT NULL,
+  role        text NOT NULL DEFAULT 'staff',
+  is_active   boolean NOT NULL DEFAULT true,
+  failed_attempts integer NOT NULL DEFAULT 0,
+  locked_until timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- staff_permissions table
+CREATE TABLE IF NOT EXISTS staff_permissions (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   text,
+  staff_id   uuid NOT NULL,
+  resource   text NOT NULL,
+  level      text NOT NULL DEFAULT 'read'
+);
+
+------------------------------------------------------------------------------
 -- 1. tenants table
 ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS tenants (

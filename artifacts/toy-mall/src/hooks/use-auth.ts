@@ -60,6 +60,10 @@ export const useAuth = create<AuthState>()(
           priorScannerThresholdMs: null,
           userId:      "user-1",
         });
+        /* Drop the persisted store-settings cache so the next sign-in (possibly
+           a different tenant on the same browser) hydrates from scratch
+           instead of flashing the previous tenant's name/logo/etc. */
+        try { localStorage.removeItem("toy-mall-store-settings-v1"); } catch { /* ignore */ }
       },
     }),
     { name: "toy-mall-auth-v2" }

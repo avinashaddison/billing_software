@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth, type StaffRole } from "@/hooks/use-auth";
 import { type Permissions } from "@/lib/permissions";
-import { Loader2, Delete, ShieldCheck, ShieldAlert, Clock } from "lucide-react";
+import { Loader2, Delete, Mail, Lock, Eye, EyeOff, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { useStoreSettings, usePerStaffScannerPrefs } from "@/lib/store-info";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 interface StaffMember { id: string; name: string; role: string; isActive: boolean }
+interface EmailUser    { id: string; email: string; role: string; tenantId: string | null }
 
 function PinDot({ filled }: { filled: boolean }) {
   return (
@@ -21,8 +22,17 @@ export default function Login() {
   const { login, isLoggedIn } = useAuth();
   const store = useStoreSettings();
 
+  /* Email-login state (step 1) */
+  const [emailUser, setEmailUser]   = useState<EmailUser | null>(null);
+  const [email, setEmail]           = useState("");
+  const [password, setPassword]     = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [submittingEmail, setSubmittingEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  /* Staff-list + PIN state (steps 2 + 3) */
   const [staff, setStaff]           = useState<StaffMember[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [loadingStaff, setLoadingStaff] = useState(false);
   const [selected, setSelected]     = useState<StaffMember | null>(null);
   const [pin, setPin]               = useState("");
   const [shaking, setShaking]       = useState(false);
@@ -37,14 +47,36 @@ export default function Login() {
     if (isLoggedIn) setLocation("/");
   }, [isLoggedIn, setLocation]);
 
-  /* Load staff list */
+  /* Rehydrate the email-login step from the server cookie on mount, so a
+     page refresh between Step 1 (email/password) and Step 3 (PIN) keeps
+     the user at the staff-selection screen instead of bouncing them back
+     to re-enter their password. */
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`${BASE_URL}/api/auth/me`);
+        if (!r.ok) return;
+        const me = await r.json();
+        if (cancelled) return;
+        if (me?.kind === "email" && me.id) {
+          setEmailUser({ id: me.id, email: me.email, role: me.role, tenantId: me.tenantId ?? null });
+        }
+      } catch { /* offline — silently leave the email form visible */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  /* Load staff list AFTER email login succeeds (server filters by tenant cookie) */
+  useEffect(() => {
+    if (!emailUser) return;
+    setLoadingStaff(true);
     fetch(`${BASE_URL}/api/staff`)
       .then((r) => r.json())
-      .then((data) => setStaff(data.filter((s: StaffMember) => s.isActive)))
+      .then((data) => setStaff(Array.isArray(data) ? data.filter((s: StaffMember) => s.isActive) : []))
       .catch(() => toast.error("Could not load staff list"))
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => setLoadingStaff(false));
+  }, [emailUser]);
 
   /* Auto-submit when 4 digits entered */
   useEffect(() => {
@@ -84,6 +116,52 @@ export default function Login() {
   };
 
   const removeDigit = () => setPin((p) => p.slice(0, -1));
+
+  /* ── Step 1: email + password login ─────────────────────────────── */
+  const handleEmailLogin = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (submittingEmail) return;
+    const trimmed = email.trim();
+    if (!trimmed || !password) {
+      setEmailError("Enter your email and password");
+      return;
+    }
+    setSubmittingEmail(true);
+    setEmailError(null);
+    try {
+      const r = await fetch(`${BASE_URL}/api/auth/login-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed, password }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        setEmailError(data?.error || "Invalid email or password");
+        setPassword("");
+        return;
+      }
+      setEmailUser({ id: data.id, email: data.email, role: data.role, tenantId: data.tenantId });
+      setPassword("");
+    } catch {
+      setEmailError("Could not reach server. Check connection.");
+    } finally {
+      setSubmittingEmail(false);
+    }
+  };
+
+  /* Reset back to the email step (e.g. "switch account"). Also clear the
+     server-side session cookie so a subsequent refresh doesn't immediately
+     re-enter the staff-selection step. */
+  const exitEmail = () => {
+    fetch(`${BASE_URL}/api/auth/logout`, { method: "POST" }).catch(() => { /* ignore */ });
+    setEmailUser(null);
+    setSelected(null);
+    setStaff([]);
+    setPin("");
+    setAttemptsLeft(null);
+    setLockedUntil(null);
+    setEmailError(null);
+  };
 
   const handleLogin = async () => {
     if (checking || !selected || lockedUntil) return;
@@ -143,97 +221,182 @@ export default function Login() {
     ["","0","⌫"],
   ];
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen relative flex flex-col items-center justify-center p-6 overflow-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-black dark:via-zinc-950 dark:to-zinc-900">
+      {/* Apple-style ambient backdrop: two huge, soft, blurred radial glows */}
+      <div aria-hidden className="pointer-events-none absolute -top-40 -left-40 w-[480px] h-[480px] rounded-full bg-blue-400/20 dark:bg-blue-500/15 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-40 -right-40 w-[520px] h-[520px] rounded-full bg-violet-400/20 dark:bg-violet-500/15 blur-3xl" />
 
-      {/* Logo */}
-      <div className="mb-8 text-center">
-        <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-primary/20">
-          <span className="text-2xl">{store.logoEmoji}</span>
+      {/* Header — generic SaaS brand pre-login, tenant brand post-email-auth. */}
+      <div className="relative mb-10 text-center">
+        <div className="w-20 h-20 mx-auto mb-5 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-xl shadow-blue-500/25 ring-1 ring-black/5">
+          <span className="text-3xl drop-shadow-sm">{emailUser ? store.logoEmoji : "⚡"}</span>
         </div>
-        <h1 className="text-2xl font-black text-foreground">{store.name}</h1>
-        <p className="text-sm text-muted-foreground">{store.appSubtitle}</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          {emailUser ? store.name : "AddisonX Software"}
+        </h1>
+        <p className="text-[15px] text-slate-500 dark:text-zinc-400 mt-1">
+          {emailUser ? (store.appSubtitle || "Billing & Inventory") : "Billing & Inventory"}
+        </p>
       </div>
 
-      {!selected ? (
-        /* ── Staff selection ── */
-        <div className="w-full max-w-sm space-y-3">
-          <p className="text-center text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4">
+      {!emailUser ? (
+        /* ── Step 1: Email + password — Apple-style glass card ── */
+        <form
+          onSubmit={handleEmailLogin}
+          className="relative w-full max-w-[380px] rounded-[28px] border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] backdrop-blur-2xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.15)] p-6 space-y-3"
+        >
+          <p className="text-center text-[13px] text-slate-500 dark:text-zinc-400 mb-1">
+            Sign in to your shop
+          </p>
+
+          {emailError && (
+            <div className="rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 px-3 py-2.5 text-center">
+              <p className="text-[13px] text-red-600 dark:text-red-400">{emailError}</p>
+            </div>
+          )}
+
+          {/* Email field */}
+          <div className="relative">
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500" />
+            <input
+              type="email"
+              autoComplete="email"
+              autoFocus
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
+              placeholder="Email Address"
+              disabled={submittingEmail}
+              className="w-full pl-11 pr-4 h-12 rounded-2xl bg-white dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/10 text-[15px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all disabled:opacity-60"
+            />
+          </div>
+
+          {/* Password field */}
+          <div className="relative">
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500" />
+            <input
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setEmailError(null); }}
+              placeholder="Password"
+              disabled={submittingEmail}
+              className="w-full pl-11 pr-11 h-12 rounded-2xl bg-white dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/10 text-[15px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:text-zinc-500 dark:hover:text-zinc-200 transition-colors"
+              tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submittingEmail}
+            className="w-full h-12 rounded-2xl bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white font-medium text-[15px] tracking-[-0.01em] shadow-lg shadow-blue-500/30 ring-1 ring-blue-700/20 active:scale-[0.985] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1"
+          >
+            {submittingEmail ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</> : "Continue"}
+          </button>
+        </form>
+      ) : !selected ? (
+        /* ── Step 2: Staff selection — Apple list-card style ── */
+        <div className="relative w-full max-w-[380px] space-y-3">
+          {/* Signed-in pill */}
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] backdrop-blur-xl">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 flex-shrink-0">
+                <Mail className="w-3.5 h-3.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-none">Signed in as</p>
+                <p className="text-[13px] font-medium text-slate-900 dark:text-white truncate mt-0.5">{emailUser.email}</p>
+              </div>
+            </div>
+            <button
+              onClick={exitEmail}
+              className="text-[13px] text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex items-center gap-1 flex-shrink-0"
+            >
+              Switch
+            </button>
+          </div>
+
+          <p className="text-center text-[13px] text-slate-500 dark:text-zinc-400 pt-2 pb-1">
             Who are you?
           </p>
-          {staff.length === 0 ? (
-            <div className="text-center text-muted-foreground p-8 border border-dashed rounded-2xl">
-              <p className="font-bold">No staff accounts found</p>
-              <p className="text-sm mt-1">Contact your administrator</p>
+          {loadingStaff ? (
+            <div className="flex items-center justify-center p-10 text-slate-400 dark:text-zinc-500">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : staff.length === 0 ? (
+            <div className="text-center text-slate-500 dark:text-zinc-400 p-10 border border-dashed border-black/10 dark:border-white/10 rounded-2xl">
+              <p className="text-[15px] font-medium text-slate-700 dark:text-zinc-300">No staff accounts found</p>
+              <p className="text-[13px] mt-1">Contact your administrator</p>
             </div>
           ) : (
-            staff.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSelected(s)}
-                className="w-full flex items-center gap-4 p-4 bg-card border rounded-2xl hover:border-primary hover:bg-primary/5 active:scale-[0.98] transition-all group"
-              >
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-lg font-black text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                  {s.name.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="font-bold text-foreground">{s.name}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{s.role === "owner" ? "🔑 Owner" : "👤 Staff"}</p>
-                </div>
-                <div className="text-muted-foreground group-hover:text-primary transition-colors text-xl">›</div>
-              </button>
-            ))
+            /* Group as one rounded card with internal dividers — iOS Settings vibe */
+            <div className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] backdrop-blur-xl overflow-hidden divide-y divide-black/5 dark:divide-white/10">
+              {staff.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setSelected(s)}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] active:bg-black/[0.06] dark:active:bg-white/[0.08] transition-colors group text-left"
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[13px] font-semibold text-white shadow-sm">
+                    {s.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] font-medium text-slate-900 dark:text-white truncate">{s.name}</p>
+                    <p className="text-[12px] text-slate-500 dark:text-zinc-400 capitalize">{s.role === "owner" ? "Owner" : "Staff"}</p>
+                  </div>
+                  <div className="text-slate-400 dark:text-zinc-500 text-xl group-hover:translate-x-0.5 transition-transform">›</div>
+                </button>
+              ))}
+            </div>
           )}
         </div>
       ) : (
-        /* ── PIN entry ── */
-        <div className="w-full max-w-xs">
-          {/* Back + user name */}
-          <div className="flex items-center gap-3 mb-6">
+        /* ── PIN entry — Apple-style numeric keypad ── */
+        <div className="relative w-full max-w-[300px]">
+          {/* Back + user header */}
+          <div className="flex items-center gap-3 mb-7">
             <button onClick={() => { setSelected(null); setPin(""); setAttemptsLeft(null); setLockedUntil(null); }}
-              className="w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground transition-colors text-lg">
+              className="w-9 h-9 rounded-full bg-white/70 dark:bg-white/[0.06] border border-black/5 dark:border-white/10 hover:bg-white dark:hover:bg-white/[0.1] backdrop-blur-xl flex items-center justify-center text-slate-600 dark:text-zinc-300 transition-colors text-lg">
               ‹
             </button>
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-sm font-black text-primary">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[12px] font-semibold text-white shadow-sm">
                 {selected.name.slice(0, 2).toUpperCase()}
               </div>
               <div>
-                <p className="font-bold text-sm leading-none">{selected.name}</p>
-                <p className="text-xs text-muted-foreground capitalize">{selected.role === "owner" ? "Owner" : "Staff"}</p>
+                <p className="text-[14px] font-medium text-slate-900 dark:text-white leading-none">{selected.name}</p>
+                <p className="text-[12px] text-slate-500 dark:text-zinc-400 capitalize mt-0.5">{selected.role === "owner" ? "Owner" : "Staff"}</p>
               </div>
             </div>
           </div>
 
-          <p className="text-center text-sm font-bold text-muted-foreground mb-5">Enter your 4-digit PIN</p>
+          <p className="text-center text-[13px] text-slate-500 dark:text-zinc-400 mb-5">Enter your passcode</p>
 
-          {/* Lock banner */}
+          {/* Lock / attempt-left banners */}
           {lockedUntil ? (
-            <div className="mb-5 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-2xl text-center">
-              <p className="text-sm font-bold text-red-700 dark:text-red-400">Account Locked</p>
-              <p className="text-xs text-red-600 dark:text-red-500 mt-0.5">
-                Too many wrong PINs. Try again in
-              </p>
-              <p className="text-2xl font-black text-red-700 dark:text-red-400 mt-1 font-mono">{lockCountdown}</p>
+            <div className="mb-5 p-3 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 rounded-2xl text-center">
+              <p className="text-[13px] font-medium text-red-700 dark:text-red-400">Account Locked</p>
+              <p className="text-[12px] text-red-600/80 dark:text-red-500/80 mt-0.5">Too many wrong PINs. Try again in</p>
+              <p className="text-2xl font-semibold text-red-700 dark:text-red-400 mt-1 font-mono tracking-tight">{lockCountdown}</p>
             </div>
           ) : attemptsLeft !== null && (
-            <div className="mb-4 p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-center">
-              <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                Wrong PIN — {attemptsLeft} attempt{attemptsLeft !== 1 ? "s" : ""} remaining before lockout
+            <div className="mb-4 p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/50 rounded-2xl text-center">
+              <p className="text-[12px] text-amber-700 dark:text-amber-400">
+                Wrong PIN — {attemptsLeft} attempt{attemptsLeft !== 1 ? "s" : ""} remaining
               </p>
             </div>
           )}
 
-          {/* Dots */}
-          <div className={`flex justify-center gap-5 mb-8 ${shaking ? "animate-[shake_0.5s_ease]" : ""}`}>
+          {/* PIN dots */}
+          <div className={`flex justify-center gap-4 mb-8 ${shaking ? "animate-[shake_0.5s_ease]" : ""}`}>
             {[0,1,2,3].map((i) => (
               <PinDot
                 key={i}
@@ -242,8 +405,8 @@ export default function Login() {
             ))}
           </div>
 
-          {/* Keypad — disabled while locked */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* iOS-style circular keypad */}
+          <div className="grid grid-cols-3 gap-4">
             {keypad.flat().map((key, idx) => {
               if (key === "") return <div key={idx} />;
               return (
@@ -251,10 +414,10 @@ export default function Login() {
                   key={idx}
                   onClick={() => key === "⌫" ? removeDigit() : addDigit(key)}
                   disabled={checking || !!lockedUntil}
-                  className={`h-16 rounded-2xl text-xl font-bold transition-all active:scale-95 ${
+                  className={`h-16 w-16 mx-auto rounded-full text-2xl font-light tracking-tight transition-all active:scale-90 ${
                     key === "⌫"
-                      ? "bg-muted text-muted-foreground hover:bg-muted/70"
-                      : "bg-card border hover:bg-muted shadow-sm text-foreground"
+                      ? "bg-transparent text-slate-500 dark:text-zinc-400 hover:bg-black/5 dark:hover:bg-white/10"
+                      : "bg-white/70 dark:bg-white/[0.06] border border-black/5 dark:border-white/10 hover:bg-white dark:hover:bg-white/[0.12] backdrop-blur-xl shadow-sm text-slate-900 dark:text-white"
                   } disabled:opacity-40 disabled:cursor-not-allowed`}
                 >
                   {key === "⌫" ? <Delete className="w-5 h-5 mx-auto" /> : key}
@@ -264,27 +427,24 @@ export default function Login() {
           </div>
 
           {checking && (
-            <div className="flex items-center justify-center gap-2 mt-4 text-sm text-muted-foreground">
+            <div className="flex items-center justify-center gap-2 mt-5 text-[13px] text-slate-500 dark:text-zinc-400">
               <Loader2 className="w-4 h-4 animate-spin" /> Verifying…
             </div>
           )}
           {!lockedUntil && !checking && pin.length === 0 && attemptsLeft === null && (
-            <p className="text-center text-xs text-muted-foreground mt-4">
-              PIN submits automatically after 4 digits
+            <p className="text-center text-[12px] text-slate-400 dark:text-zinc-500 mt-5">
+              Submits automatically after 4 digits
             </p>
           )}
         </div>
       )}
 
-      {/* License status badge — silent when healthy + >7 days, loud otherwise */}
-      <LicenseBadge />
-
-      {/* Developer credit */}
-      <div className="mt-10 flex flex-col items-center gap-1">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Developed by</p>
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-violet-500/20 bg-gradient-to-r from-violet-500/8 via-blue-500/8 to-cyan-500/8">
-          <span className="text-sm">⚡</span>
-          <span className="text-[13px] font-black bg-gradient-to-r from-violet-500 via-blue-500 to-cyan-400 bg-clip-text text-transparent tracking-wide">
+      {/* Footer */}
+      <div className="relative mt-12 flex flex-col items-center gap-1.5">
+        <p className="text-[11px] text-slate-400 dark:text-zinc-500 tracking-wide">Developed by</p>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[13px]">⚡</span>
+          <span className="text-[13px] font-medium bg-gradient-to-r from-violet-500 via-blue-500 to-cyan-400 bg-clip-text text-transparent">
             AddisonX Media
           </span>
         </div>
@@ -293,64 +453,3 @@ export default function Login() {
   );
 }
 
-/* ───── License status badge (silent when healthy + >7 days) ───── */
-interface LicenseStatusResp {
-  valid: boolean;
-  mode: "licensed" | "trial" | "expired" | "invalid" | "trial_expired";
-  shop: string | null;
-  edition: string | null;
-  expiry: string | null;
-  daysRemaining: number | null;
-  trialEndsAt: string | null;
-  reason: string | null;
-}
-
-function LicenseBadge() {
-  const [s, setS] = useState<LicenseStatusResp | null>(null);
-  useEffect(() => {
-    fetch(`${BASE_URL}/api/license/status`)
-      .then((r) => r.ok ? r.json() : null)
-      .then(setS)
-      .catch(() => { /* ignore — server unreachable, leave silent */ });
-  }, []);
-
-  if (!s) return null;
-
-  // Silent path: licensed AND (perpetual OR more than 7 days left)
-  if (s.mode === "licensed" && (s.expiry === "perpetual" || (s.daysRemaining ?? 0) > 7)) {
-    return null;
-  }
-
-  const isError = !s.valid;
-  const isWarn = s.mode === "trial" || (s.mode === "licensed" && (s.daysRemaining ?? 0) <= 7);
-
-  const cls = isError
-    ? "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300"
-    : isWarn
-    ? "border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
-    : "border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300";
-
-  const Icon = isError ? ShieldAlert : isWarn ? Clock : ShieldCheck;
-  const title =
-    s.mode === "trial"         ? "Trial Mode" :
-    s.mode === "trial_expired" ? "Trial ended" :
-    s.mode === "expired"       ? "License expired" :
-    s.mode === "invalid"       ? "License invalid" :
-                                  "Licensed";
-  const subtitle =
-    s.mode === "trial" && s.daysRemaining != null
-      ? `${s.daysRemaining} day${s.daysRemaining === 1 ? "" : "s"} remaining`
-      : s.mode === "licensed" && s.daysRemaining != null
-      ? `Renews in ${s.daysRemaining} day${s.daysRemaining === 1 ? "" : "s"}`
-      : s.reason ?? "Contact your vendor";
-
-  return (
-    <div className={`mt-6 mx-auto max-w-xs px-3 py-2 rounded-2xl border flex items-center gap-2.5 ${cls}`}>
-      <Icon className="w-4 h-4 shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-black leading-tight">{title}</p>
-        <p className="text-[10px] opacity-80 leading-tight truncate">{subtitle}</p>
-      </div>
-    </div>
-  );
-}

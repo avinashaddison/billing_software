@@ -144,6 +144,17 @@ router.post("/auth/login-email", async (req, res): Promise<void> => {
       return;
     }
 
+    /* Platform admins are vendor-side accounts. They have no tenant context
+       and the staff/settings queries scoped by their NULL tenant would
+       surface legacy data — so refuse them here and point them at /admin. */
+    if (user.role === "platform_admin") {
+      res.status(403).json({
+        error: "platform_admin_login",
+        message: "Platform admin accounts must sign in at /admin, not /login.",
+      });
+      return;
+    }
+
     /* Record successful login (best-effort, never blocks the response). */
     db.update(authUsersTable)
       .set({ lastLoginAt: new Date(), updatedAt: new Date() })

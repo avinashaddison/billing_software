@@ -1,4 +1,6 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { eq } from "drizzle-orm";
+import { db, tenantsTable } from "@workspace/db";
 import healthRouter      from "./health";
 import productsRouter    from "./products";
 import stockLogsRouter   from "./stock-logs";
@@ -16,23 +18,68 @@ import uploadRouter      from "./upload";
 import sharedCartRouter  from "./shared-cart";
 import telegramRouter    from "./telegram";
 import settingsRouter    from "./settings";
-import licenseRouter     from "./license";
-import adminRouter       from "./admin";
+import platformRouter    from "./platform";
 import updatesRouter     from "./updates";
 import authRouter        from "./auth";
-import { licenseGate }   from "../lib/license";
 
 const router: IRouter = Router();
 
-// Admin routes mount BEFORE the license gate — vendor's admin tools must
-// keep working even when the install is "expired" or "invalid".
-router.use(adminRouter);
+/**
+ * Tenant-active gate for the cloud SaaS model. Replaces the old per-install
+ * licenseGate: instead of checking a signed license key, we honour the
+ * `tenants.is_active` flag the platform admin toggles from /admin.
+ *
+ * Anonymous requests (tenantId null) pass through — auth/login/health
+ * endpoints must remain reachable before a session exists.
+ */
+const TENANT_PUBLIC_PATHS = new Set([
+  "/auth/login",
+  "/auth/login-email",
+  "/auth/logout",
+  "/auth/me",
+  "/health",
+  "/healthz",
+]);
 
-// License gate runs first so unlicensed installs see 402 on every endpoint
-// EXCEPT /api/license/status and /api/health (whitelisted inside licenseGate).
-router.use(licenseGate);
+async function tenantActiveGate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (TENANT_PUBLIC_PATHS.has(req.path)) { next(); return; }
+  if (!req.tenantId) { next(); return; }
+  try {
+    const [t] = await db
+      .select({
+        isActive:  tenantsTable.isActive,
+        expiresAt: tenantsTable.expiresAt,
+      })
+      .from(tenantsTable)
+      .where(eq(tenantsTable.id, req.tenantId));
+    if (t && !t.isActive) {
+      res.status(403).json({ error: "Tenant suspended", message: "Your account has been suspended. Contact your vendor." });
+      return;
+    }
+    if (t?.expiresAt && t.expiresAt.getTime() < Date.now()) {
+      res.status(403).json({
+        error:   "Tenant expired",
+        expired: true,
+        message: "Your access has expired. Contact your vendor to renew.",
+        expiredAt: t.expiresAt.toISOString(),
+      });
+      return;
+    }
+    next();
+  } catch {
+    /* Fail open on DB blips so a transient Neon hiccup can't lock everyone
+       out. The same DB will reject downstream queries if it's really down. */
+    next();
+  }
+}
 
-router.use(licenseRouter);
+// Platform admin routes mount FIRST — the vendor's control plane must stay
+// reachable regardless of any per-tenant state.
+router.use(platformRouter);
+
+// Per-tenant suspend gate (the cloud equivalent of the old license gate).
+router.use(tenantActiveGate);
+
 router.use(updatesRouter);
 router.use(authRouter);
 router.use(healthRouter);

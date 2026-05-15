@@ -1,6 +1,6 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, KeyRound } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -22,19 +22,6 @@ export function SideNav() {
 
   const handleLogout = () => { logout(); setLocation("/login"); };
   const store = useStoreSettings();
-
-  // Pull license status so the License Key button can show a Pro badge
-  // when activated. Re-fetches after navigation in case the user just
-  // activated a key on /license.
-  const [licenseMode, setLicenseMode] = useState<string | null>(null);
-  useEffect(() => {
-    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-    fetch(`${base}/api/license/status`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => setLicenseMode(d?.mode ?? null))
-      .catch(() => { /* ignore */ });
-  }, [location]);
-  const isLicensed = licenseMode === "licensed";
 
   const perm    = (resource: string) => getLevel(role, permissions, resource);
   const visible = (resource: string) => perm(resource) !== "none";
@@ -284,21 +271,6 @@ export function SideNav() {
           {isDark ? "Light Mode" : "Dark Mode"}
         </button>
         {role === "owner" && <UpdateBanner />}
-
-        {role === "owner" && (
-          <Link href="/license"
-            className="relative flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-orange-500/15 to-amber-500/15 border border-orange-500/30 text-orange-700 dark:text-orange-300 font-bold text-sm hover:from-orange-500/25 hover:to-amber-500/25 transition-colors"
-            data-testid="nav-license">
-            <KeyRound size={16} />
-            <span className="flex-1">License Key</span>
-            {isLicensed && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-violet-500/40">
-                <Sparkles className="w-2 h-2" strokeWidth={3} />
-                Pro
-              </span>
-            )}
-          </Link>
-        )}
 
         {/* Developer credit */}
         <div className="mt-1 px-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-500/10 via-blue-500/10 to-cyan-500/10 border border-violet-500/20">

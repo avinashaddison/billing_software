@@ -33,28 +33,34 @@ interface StoreSettingsStore extends StoreSettings {
   hydrateFromServer: () => Promise<void>;
 }
 
+/**
+ * Field-level defaults used as the base of every fresh hydration. Hydration
+ * always REPLACES (not merges) so leftover state from a previous tenant's
+ * session can't leak through into a new client's Settings screen.
+ */
+const SETTINGS_DEFAULTS: StoreSettings = {
+  name:               "Your Shop Name",
+  tagline:            "",
+  phone:              "",
+  email:              "",
+  address:            "",
+  gst:                "",
+  logoEmoji:          "🏪",
+  logoUrl:            "",
+  appSubtitle:        "",
+  footerNote:         "",
+  termsAndConditions: [],
+  upiId:              "",
+  dynamicQrMode:      false,
+  labelShowPrice:     true,
+  scannerThresholdMs: 100,
+  receiptPaperWidth:  "80mm",
+};
+
 export const useStoreSettings = create<StoreSettingsStore>()(
   persist(
     (set, get) => ({
-      name:          "Your Shop Name",
-      tagline:       "Set your tagline in Settings",
-      phone:         "",
-      email:         "",
-      address:       "",
-      gst:           "",
-      logoEmoji:     "🏪",
-      logoUrl:       "",
-      appSubtitle:   "Billing & Inventory",
-      footerNote:    "Thank you for your business.",
-      termsAndConditions: [
-        "No Cash Refund.",
-        "Goods once sold will not be returned or exchanged.",
-      ],
-      upiId:         "",
-      dynamicQrMode: false,
-      labelShowPrice: true,
-      scannerThresholdMs: 100,
-      receiptPaperWidth: "80mm",
+      ...SETTINGS_DEFAULTS,
 
       _hydrated: false,
       applyServerPatch: (patch) => set({ ...patch, _hydrated: true }),
@@ -83,10 +89,13 @@ export const useStoreSettings = create<StoreSettingsStore>()(
           if (!res.ok) return;
           const body = await res.json();
           if (body && body.data && typeof body.data === "object") {
-            // Merge server values on top of local — server is authoritative
-            set({ ...body.data, _hydrated: true });
+            /* REPLACE (not merge) — start from defaults so any field missing
+               from the server response goes back to its default instead of
+               keeping a value cached from the previous tenant's session. */
+            set({ ...SETTINGS_DEFAULTS, ...body.data, _hydrated: true });
           } else {
-            set({ _hydrated: true });
+            /* No row yet for this tenant → reset to defaults entirely. */
+            set({ ...SETTINGS_DEFAULTS, _hydrated: true });
           }
         } catch {
           // Server unreachable — keep local cache, no error to the user

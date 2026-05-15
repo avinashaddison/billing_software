@@ -1,211 +1,285 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ShieldCheck, KeyRound, Plus, Search, RefreshCw, Trash2, Copy, Check,
-  Building2, Calendar, Tag, Sparkles, AlertTriangle, Lock, LogOut,
-  Activity, CheckCircle2, XCircle, Clock, Infinity as InfinityIcon, Ban, Loader2,
-  StickyNote,
+  ShieldCheck, LogOut, RefreshCw, Plus, Search, Building2, Users, Package,
+  Receipt, Loader2, AlertTriangle, Mail, Lock, KeyRound, Power, PowerOff,
+  CheckCircle2, CalendarClock, Infinity,
 } from "lucide-react";
 import { toast } from "sonner";
 
-const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
-const STORAGE_KEY = "counter-admin-pwd-v1";
+const BASE = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
+const API  = `${BASE}/api`;
 
-interface LicenseRecord {
+interface PlatformMe { id: string; email: string; role: string }
+interface TenantRow {
   id: string;
-  shop: string;
-  edition: string;
-  expiry: string;
-  issued: string;
-  key: string;
-  notes?: string;
+  name: string;
+  isActive: boolean;
+  /** ISO timestamp. NULL = lifetime / no expiry. */
+  expiresAt: string | null;
   createdAt: string;
-  revokedAt?: string | null;
-  isRevoked: boolean;
-  isExpired: boolean;
-  isPerpetual: boolean;
-  daysRemaining: number | null;
+  ownerEmail: string | null;
+  userCount: number;
+  staffCount: number;
+  productCount: number;
+  saleCount: number;
 }
 
+/** Access duration choices used in both the create dialog and Extend menu. */
+const ACCESS_PRESETS = [
+  { key: "7d",       label: "7 days"     },
+  { key: "30d",      label: "1 month"    },
+  { key: "90d",      label: "3 months"   },
+  { key: "180d",     label: "6 months"   },
+  { key: "365d",     label: "1 year"     },
+  { key: "lifetime", label: "Lifetime"   },
+] as const;
+type AccessKey = (typeof ACCESS_PRESETS)[number]["key"];
+
+/** Friendly "Expires in 12d" / "Expired 3d ago" / "Lifetime" formatter. */
+function expiryLabel(iso: string | null): { text: string; tone: "ok" | "warn" | "bad" | "lifetime" } {
+  if (!iso) return { text: "Lifetime", tone: "lifetime" };
+  const ms = new Date(iso).getTime() - Date.now();
+  const days = Math.round(ms / 86_400_000);
+  if (days < 0)  return { text: `Expired ${Math.abs(days)}d ago`, tone: "bad"  };
+  if (days <= 7) return { text: `${days}d left`,                  tone: "warn" };
+  return            { text: `${days}d left`,                       tone: "ok"   };
+}
 interface Stats {
-  total: number; active: number; expired: number;
-  expiringSoon: number; perpetual: number; revoked: number;
+  totalTenants:  number;
+  activeTenants: number;
+  totalUsers:    number;
+  legacyUsers:   number;
 }
-
-type Tab = "stats" | "generate" | "history" | "verify";
 
 export default function AdminPage() {
-  const [adminEnabled, setAdminEnabled] = useState<boolean | null>(null);
-  const [pwd, setPwd] = useState<string>(() => sessionStorage.getItem(STORAGE_KEY) || "");
-  const [authed, setAuthed] = useState(false);
-  const [loginError, setLoginError] = useState("");
-  const [tab, setTab] = useState<Tab>("stats");
+  const [me, setMe]       = useState<PlatformMe | null>(null);
+  const [checking, setChecking] = useState(true);
 
-  /* Check admin mode is enabled on this server */
   useEffect(() => {
-    fetch(`${API}/admin/check-mode`)
-      .then((r) => r.ok ? r.json() : { enabled: false })
-      .then((d) => setAdminEnabled(!!d.enabled))
-      .catch(() => setAdminEnabled(false));
+    fetch(`${API}/platform/me`, { credentials: "include" })
+      .then(async (r) => (r.ok ? (await r.json()) as PlatformMe : null))
+      .then(setMe)
+      .catch(() => setMe(null))
+      .finally(() => setChecking(false));
   }, []);
 
-  /* Auto-login if we have a saved password */
-  useEffect(() => {
-    if (!adminEnabled || !pwd) return;
-    void tryLogin(pwd, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminEnabled]);
-
-  const tryLogin = async (password: string, silent = false) => {
-    try {
-      const r = await fetch(`${API}/admin/login`, {
-        method: "POST",
-        headers: { "x-admin-password": password },
-      });
-      if (r.ok) {
-        sessionStorage.setItem(STORAGE_KEY, password);
-        setPwd(password);
-        setAuthed(true);
-        setLoginError("");
-        return true;
-      }
-      if (!silent) setLoginError("Wrong password");
-      sessionStorage.removeItem(STORAGE_KEY);
-      return false;
-    } catch {
-      if (!silent) setLoginError("Server unreachable");
-      return false;
-    }
-  };
-
-  const logout = () => {
-    sessionStorage.removeItem(STORAGE_KEY);
-    setPwd("");
-    setAuthed(false);
-  };
-
-  if (adminEnabled === null) {
+  if (checking) {
     return (
-      <div className="flex flex-col h-full items-center justify-center gap-3">
+      <div className="min-h-[100dvh] flex items-center justify-center">
         <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  if (!adminEnabled) {
-    return (
-      <div className="flex flex-col h-full items-center justify-center gap-3 px-6 text-center">
-        <Ban className="w-12 h-12 text-muted-foreground" />
-        <p className="text-sm font-black">Admin mode is not enabled on this server</p>
-        <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
-          Set <code className="font-mono bg-muted px-1.5 py-0.5 rounded">ADMIN_PASSWORD</code> in the server's <code className="font-mono bg-muted px-1.5 py-0.5 rounded">.env</code> file and restart to enable the vendor admin panel. Customer installs should leave this unset.
-        </p>
-      </div>
-    );
-  }
-
-  if (!authed) {
-    return <LoginScreen onSubmit={tryLogin} error={loginError} />;
-  }
-
-  return <AdminDashboard pwd={pwd} tab={tab} setTab={setTab} onLogout={logout} />;
+  if (!me) return <LoginScreen onAuthed={setMe} />;
+  return <Dashboard me={me} onLogout={() => setMe(null)} />;
 }
 
-/* ───────────── Login Screen ───────────── */
-function LoginScreen({ onSubmit, error }: { onSubmit: (pwd: string) => void; error: string }) {
-  const [val, setVal] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+/* ───────── Login ───────── */
+function LoginScreen({ onAuthed }: { onAuthed: (m: PlatformMe) => void }) {
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError]       = useState("");
+  const [busy, setBusy]         = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    await onSubmit(val);
-    setSubmitting(false);
+    setBusy(true); setError("");
+    try {
+      const r = await fetch(`${API}/platform/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        setError(data.error || "Invalid platform admin credentials");
+        return;
+      }
+      onAuthed(await r.json());
+    } catch {
+      setError("Server unreachable");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-black p-6">
-      <form onSubmit={submit} className="w-full max-w-sm">
-        <div className="relative">
-          <div aria-hidden className="absolute -inset-2 rounded-3xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-500 opacity-30 blur-2xl" />
-          <div className="relative rounded-3xl border border-white/10 bg-slate-900/90 backdrop-blur-md p-8 shadow-2xl">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/40">
-                <ShieldCheck className="w-6 h-6 text-white" strokeWidth={2.5} />
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-white">Vendor Admin</h1>
-                <p className="text-xs text-slate-400">Counter Billing license control</p>
-              </div>
-            </div>
+    <div className="min-h-[100dvh] relative flex flex-col items-center justify-center p-6 overflow-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-black dark:via-zinc-950 dark:to-zinc-900">
+      {/* Apple-style ambient backdrop */}
+      <div aria-hidden className="pointer-events-none absolute -top-40 -left-40 w-[480px] h-[480px] rounded-full bg-blue-400/20 dark:bg-blue-500/15 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-40 -right-40 w-[520px] h-[520px] rounded-full bg-violet-400/20 dark:bg-violet-500/15 blur-3xl" />
 
-            <label className="block">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</span>
-              <div className="relative mt-1.5">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input
-                  autoFocus
-                  type="password"
-                  value={val}
-                  onChange={(e) => setVal(e.target.value)}
-                  placeholder="Enter ADMIN_PASSWORD"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
-                />
-              </div>
-            </label>
+      {/* Brand header */}
+      <div className="relative mb-10 text-center">
+        <div className="w-20 h-20 mx-auto mb-5 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-xl shadow-blue-500/25 ring-1 ring-black/5">
+          <ShieldCheck className="w-9 h-9 text-white drop-shadow-sm" strokeWidth={2.2} />
+        </div>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          AddisonX Admin
+        </h1>
+        <p className="text-[15px] text-slate-500 dark:text-zinc-400 mt-1">
+          Manage all client tenants
+        </p>
+      </div>
 
-            {error && (
-              <p className="mt-3 text-xs text-rose-400 font-bold flex items-center gap-1.5">
-                <AlertTriangle className="w-3 h-3" /> {error}
-              </p>
-            )}
+      <form
+        onSubmit={submit}
+        className="relative w-full max-w-[380px] rounded-[28px] border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] backdrop-blur-2xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.15)] p-6 space-y-3"
+      >
+        <p className="text-center text-[13px] text-slate-500 dark:text-zinc-400 mb-1">
+          Sign in to your vendor account
+        </p>
 
-            <button
-              type="submit"
-              disabled={!val || submitting}
-              className="mt-5 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 transition-all active:scale-[0.98] disabled:opacity-50"
-            >
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
-              Sign In
-            </button>
-
-            <p className="text-[10px] text-slate-500 mt-4 text-center leading-relaxed">
-              The password is the value of <span className="font-mono">ADMIN_PASSWORD</span> in your server's <span className="font-mono">.env</span>.
+        {error && (
+          <div className="rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 px-3 py-2.5 text-center">
+            <p className="text-[13px] text-red-600 dark:text-red-400 flex items-center justify-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" /> {error}
             </p>
           </div>
+        )}
+
+        {/* Email */}
+        <div className="relative">
+          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500" />
+          <input
+            autoFocus
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email Address"
+            className="w-full pl-11 pr-4 h-12 rounded-2xl bg-white dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/10 text-[15px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
+          />
         </div>
+
+        {/* Password */}
+        <div className="relative">
+          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500" />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            className="w-full pl-11 pr-4 h-12 rounded-2xl bg-white dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/10 text-[15px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={!email || !password || busy}
+          className="w-full h-12 rounded-2xl bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white font-medium text-[15px] tracking-[-0.01em] shadow-lg shadow-blue-500/30 ring-1 ring-blue-700/20 active:scale-[0.985] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1"
+        >
+          {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</> : "Sign In"}
+        </button>
+
+        <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-3 text-center">
+          Vendor-only access. Accounts with role <span className="font-mono text-slate-500 dark:text-zinc-400">platform_admin</span> only.
+        </p>
       </form>
+
+      {/* Footer */}
+      <div className="relative mt-10 flex flex-col items-center gap-1.5">
+        <p className="text-[11px] text-slate-400 dark:text-zinc-500 tracking-wide">Developed by</p>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[13px]">⚡</span>
+          <span className="text-[13px] font-medium bg-gradient-to-r from-violet-500 via-blue-500 to-cyan-400 bg-clip-text text-transparent">
+            AddisonX Media
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
 
-/* ───────────── Dashboard ───────────── */
-function AdminDashboard({ pwd, tab, setTab, onLogout }: {
-  pwd: string; tab: Tab; setTab: (t: Tab) => void; onLogout: () => void;
-}) {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [records, setRecords] = useState<LicenseRecord[]>([]);
+/* ───────── Dashboard ───────── */
+function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
+  const [tenants, setTenants] = useState<TenantRow[]>([]);
+  const [stats, setStats]     = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const headers = { "x-admin-password": pwd, "Content-Type": "application/json" };
+  const [creating, setCreating] = useState(false);
+  const [search, setSearch]   = useState("");
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const [statsR, listR] = await Promise.all([
-        fetch(`${API}/admin/stats`, { headers }),
-        fetch(`${API}/admin/licenses`, { headers }),
+      const [t, s] = await Promise.all([
+        fetch(`${API}/platform/tenants`, { credentials: "include" }).then((r) => r.json()),
+        fetch(`${API}/platform/stats`,   { credentials: "include" }).then((r) => r.json()),
       ]);
-      if (statsR.ok) setStats(await statsR.json());
-      if (listR.ok) setRecords((await listR.json()).records);
-    } catch { toast.error("Could not load admin data"); }
-    finally { setLoading(false); }
+      setTenants(t.tenants ?? []);
+      setStats(s);
+    } catch {
+      toast.error("Could not load tenants");
+    } finally { setLoading(false); }
   };
 
-  useEffect(() => { void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void refresh(); }, []);
+
+  const logout = async () => {
+    await fetch(`${API}/platform/logout`, { method: "POST", credentials: "include" }).catch(() => {});
+    onLogout();
+  };
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return tenants;
+    const q = search.toLowerCase();
+    return tenants.filter((t) => t.id.toLowerCase().includes(q) || t.name.toLowerCase().includes(q));
+  }, [tenants, search]);
+
+  const toggleActive = async (t: TenantRow) => {
+    const next = !t.isActive;
+    if (!confirm(`${next ? "Activate" : "Suspend"} ${t.name}?`)) return;
+    const r = await fetch(`${API}/platform/tenants/${t.id}`, {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: next }),
+    });
+    if (r.ok) { toast.success(next ? "Activated" : "Suspended"); void refresh(); }
+    else toast.error("Failed");
+  };
+
+  /* Per-tenant menu state: which tenant has the "Extend" popover open? */
+  const [extendOpenFor, setExtendOpenFor] = useState<string | null>(null);
+
+  const extend = async (t: TenantRow, duration: AccessKey) => {
+    setExtendOpenFor(null);
+    const r = await fetch(`${API}/platform/tenants/${t.id}/extend`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ duration }),
+    });
+    if (r.ok) {
+      toast.success(duration === "lifetime"
+        ? `${t.name}: set to lifetime access`
+        : `${t.name}: extended by ${ACCESS_PRESETS.find((p) => p.key === duration)?.label}`);
+      void refresh();
+    } else {
+      const data = await r.json().catch(() => ({}));
+      toast.error(data.error || "Failed to extend");
+    }
+  };
+
+  const resetOwnerPwd = async (t: TenantRow) => {
+    const newPwd = prompt(`New password for the owner of ${t.name} (8–128 chars):`);
+    if (!newPwd) return;
+    if (newPwd.length < 8) { toast.error("Password too short"); return; }
+    const r = await fetch(`${API}/platform/tenants/${t.id}/owner-password`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: newPwd }),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      toast.success(`Password reset for ${data.ownerEmail}`);
+    } else {
+      const data = await r.json().catch(() => ({}));
+      toast.error(data.error || "Failed");
+    }
+  };
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-white to-violet-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-violet-950/20">
-      {/* Header */}
       <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -213,425 +287,319 @@ function AdminDashboard({ pwd, tab, setTab, onLogout }: {
               <ShieldCheck className="w-5 h-5" strokeWidth={2.5} />
             </div>
             <div>
-              <h1 className="text-lg font-black tracking-tight">Vendor Admin</h1>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Counter Billing · License Control</p>
+              <h1 className="text-lg font-black tracking-tight">AddisonX Admin</h1>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{me.email}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={refresh} className="p-2 rounded-xl bg-card border hover:bg-muted transition-colors" title="Refresh">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
-            <button onClick={onLogout} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted">
+            <button onClick={logout} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted">
               <LogOut className="w-3.5 h-3.5" /> Sign out
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Tabs */}
-        <div className="max-w-6xl mx-auto px-4 md:px-8 flex items-center gap-1 -mb-px overflow-x-auto">
-          {([
-            { id: "stats",    label: "Overview",  icon: Activity   },
-            { id: "generate", label: "Generate",  icon: Plus       },
-            { id: "history",  label: "History",   icon: Building2  },
-            { id: "verify",   label: "Verify",    icon: Search     },
-          ] as { id: Tab; label: string; icon: React.ElementType }[]).map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`relative px-4 py-2.5 text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-colors ${
-                tab === t.id ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}>
-              <t.icon className="w-3.5 h-3.5" />
-              {t.label}
-              {tab === t.id && <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500" />}
-            </button>
-          ))}
+      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 space-y-5">
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Total Tenants"  value={stats?.totalTenants ?? 0}  gradient="from-violet-500 to-fuchsia-500" icon={Building2} />
+          <StatCard label="Active Tenants" value={stats?.activeTenants ?? 0} gradient="from-emerald-500 to-teal-500" icon={CheckCircle2} />
+          <StatCard label="Auth Users"     value={stats?.totalUsers ?? 0}    gradient="from-blue-500 to-cyan-500" icon={Users} />
+          <StatCard label="Legacy NULL"    value={stats?.legacyUsers ?? 0}   gradient="from-amber-500 to-orange-500" icon={AlertTriangle} />
         </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6">
-        {tab === "stats"    && <StatsView stats={stats} loading={loading} />}
-        {tab === "generate" && <GenerateView pwd={pwd} onCreated={refresh} setTab={setTab} />}
-        {tab === "history"  && <HistoryView records={records} pwd={pwd} loading={loading} onChange={refresh} />}
-        {tab === "verify"   && <VerifyView pwd={pwd} />}
-      </div>
-    </div>
-  );
-}
-
-/* ───────────── Stats tab ───────────── */
-function StatsView({ stats, loading }: { stats: Stats | null; loading: boolean }) {
-  if (loading || !stats) {
-    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
-  }
-  const cards = [
-    { label: "Total Issued",   value: stats.total,        icon: KeyRound,    gradient: "from-violet-500 to-fuchsia-500" },
-    { label: "Active",         value: stats.active,       icon: CheckCircle2, gradient: "from-emerald-500 to-teal-500" },
-    { label: "Expiring ≤7d",   value: stats.expiringSoon, icon: Clock,       gradient: "from-amber-500 to-orange-500" },
-    { label: "Expired",        value: stats.expired,      icon: XCircle,     gradient: "from-rose-500 to-red-500" },
-    { label: "Lifetime",       value: stats.perpetual,    icon: InfinityIcon, gradient: "from-blue-500 to-cyan-500" },
-    { label: "Revoked",        value: stats.revoked,      icon: Ban,         gradient: "from-slate-500 to-slate-700" },
-  ];
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-      {cards.map((c) => (
-        <div key={c.label} className="rounded-2xl border bg-card p-4 relative overflow-hidden">
-          <div aria-hidden className={`absolute -top-8 -right-8 w-20 h-20 rounded-full bg-gradient-to-br ${c.gradient} opacity-10 blur-xl`} />
-          <div className={`relative inline-flex w-9 h-9 rounded-xl bg-gradient-to-br ${c.gradient} items-center justify-center text-white shadow-lg`}>
-            <c.icon className="w-4 h-4" strokeWidth={2.5} />
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tenants by name or id…"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
           </div>
-          <p className="mt-3 text-3xl font-black tabular-nums">{c.value}</p>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">{c.label}</p>
+          <button
+            onClick={() => setCreating(true)}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30 flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> New Tenant
+          </button>
         </div>
-      ))}
+
+        {/* Tenants table */}
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">
+            {tenants.length === 0 ? "No tenants yet — click 'New Tenant' to onboard your first client." : "No tenants match this search."}
+          </div>
+        ) : (
+          <div className="rounded-2xl border bg-card overflow-hidden divide-y">
+            {filtered.map((t) => (
+              <div key={t.id} className="p-4 hover:bg-muted/30 transition-colors">
+                <div className="flex items-start gap-3 flex-wrap">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 bg-gradient-to-br ${t.isActive ? "from-violet-500 to-fuchsia-500" : "from-slate-400 to-slate-600"}`}>
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-black text-sm">{t.name}</p>
+                      <span className="px-2 py-0.5 rounded-full bg-muted text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">{t.id}</span>
+                      {t.isActive
+                        ? <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider">Active</span>
+                        : <span className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-black uppercase tracking-wider">Suspended</span>
+                      }
+                      {(() => {
+                        const lbl = expiryLabel(t.expiresAt);
+                        const tone =
+                          lbl.tone === "lifetime" ? "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300" :
+                          lbl.tone === "ok"       ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300" :
+                          lbl.tone === "warn"     ? "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300" :
+                                                    "bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300";
+                        return (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${tone}`}
+                            title={t.expiresAt ? `Expires ${new Date(t.expiresAt).toLocaleString()}` : "No expiry set"}>
+                            {lbl.text}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    {t.ownerEmail && (
+                      <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1 truncate">
+                        <Mail className="w-3 h-3 shrink-0" />
+                        <span className="font-mono truncate" title={t.ownerEmail}>{t.ownerEmail}</span>
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1 flex-wrap">
+                      <span className="flex items-center gap-1"><Users    className="w-3 h-3" /> {t.userCount} user{t.userCount === 1 ? "" : "s"}</span>
+                      <span className="flex items-center gap-1"><Users    className="w-3 h-3" /> {t.staffCount} staff</span>
+                      <span className="flex items-center gap-1"><Package  className="w-3 h-3" /> {t.productCount} products</span>
+                      <span className="flex items-center gap-1"><Receipt  className="w-3 h-3" /> {t.saleCount} sales</span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 flex-wrap relative">
+                      <button onClick={() => resetOwnerPwd(t)} className="px-2.5 py-1.5 rounded-lg border bg-card text-[11px] font-bold flex items-center gap-1.5 hover:bg-muted">
+                        <KeyRound className="w-3 h-3" /> Reset Owner Password
+                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={() => setExtendOpenFor(extendOpenFor === t.id ? null : t.id)}
+                          className="px-2.5 py-1.5 rounded-lg border bg-card text-[11px] font-bold flex items-center gap-1.5 hover:bg-muted text-violet-700 dark:text-violet-300"
+                        >
+                          <CalendarClock className="w-3 h-3" /> Extend
+                        </button>
+                        {extendOpenFor === t.id && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setExtendOpenFor(null)} />
+                            <div className="absolute left-0 top-full mt-1 z-20 w-44 rounded-xl border bg-card shadow-xl overflow-hidden">
+                              <p className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b">
+                                Extend access
+                              </p>
+                              {ACCESS_PRESETS.map((p) => (
+                                <button
+                                  key={p.key}
+                                  onClick={() => extend(t, p.key)}
+                                  className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-muted flex items-center justify-between"
+                                >
+                                  <span>{p.label}</span>
+                                  {p.key === "lifetime" && <Infinity className="w-3 h-3 text-blue-500" />}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <button onClick={() => toggleActive(t)} className={`px-2.5 py-1.5 rounded-lg border bg-card text-[11px] font-bold flex items-center gap-1.5 ${t.isActive ? "text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"}`}>
+                        {t.isActive ? <><PowerOff className="w-3 h-3" /> Suspend</> : <><Power className="w-3 h-3" /> Activate</>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {creating && <CreateTenantDialog onClose={() => setCreating(false)} onCreated={() => { setCreating(false); void refresh(); }} />}
     </div>
   );
 }
 
-/* ───────────── Generate tab ───────────── */
-function GenerateView({ pwd, onCreated, setTab }: { pwd: string; onCreated: () => void; setTab: (t: Tab) => void }) {
-  const [shop, setShop]       = useState("");
-  const [expiry, setExpiry]   = useState("");
-  const [perpetual, setPerpetual] = useState(false);
-  const [notes, setNotes]     = useState("");
-  const edition = "pro" as const;
-  const [submitting, setSubmitting] = useState(false);
-  const [generated, setGenerated] = useState<LicenseRecord | null>(null);
+function StatCard({ label, value, gradient, icon: Icon }: {
+  label: string; value: number; gradient: string; icon: React.ElementType;
+}) {
+  return (
+    <div className="rounded-2xl border bg-card p-4 relative overflow-hidden">
+      <div aria-hidden className={`absolute -top-8 -right-8 w-20 h-20 rounded-full bg-gradient-to-br ${gradient} opacity-10 blur-xl`} />
+      <div className={`relative inline-flex w-9 h-9 rounded-xl bg-gradient-to-br ${gradient} items-center justify-center text-white shadow-lg`}>
+        <Icon className="w-4 h-4" strokeWidth={2.5} />
+      </div>
+      <p className="mt-3 text-3xl font-black tabular-nums">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">{label}</p>
+    </div>
+  );
+}
 
-  const submit = async () => {
-    if (!shop.trim()) { toast.error("Shop name is required"); return; }
-    if (!perpetual && !expiry) { toast.error("Pick an expiry date or tick lifetime"); return; }
-    setSubmitting(true);
+/* ───────── Create Tenant Dialog ───────── */
+function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [id, setId] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  /* Access duration — drives `expiresAt` on the server. Default to 1 year
+     since that's the most common paid SaaS subscription length. */
+  const [access, setAccess] = useState<AccessKey>("365d");
+  /* Track whether the user has manually edited the tenant id. Until they do,
+     we keep regenerating it from the shop name on every keystroke. The moment
+     they touch the id field we stop syncing so we don't clobber their edit. */
+  const [idTouched, setIdTouched] = useState(false);
+
+  /* Slugify: lowercase, strip diacritics, replace runs of non-alnum with "-",
+     trim leading/trailing "-", cap at 40 chars (server-side rule). */
+  const slugify = (s: string) =>
+    s.toLowerCase()
+      .normalize("NFKD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40);
+
+  const onNameChange = (next: string) => {
+    setName(next);
+    if (!idTouched) setId(slugify(next));
+  };
+
+  const onIdChange = (next: string) => {
+    setIdTouched(true);
+    setId(next);
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
     try {
-      const r = await fetch(`${API}/admin/licenses`, {
+      const r = await fetch(`${API}/platform/tenants`, {
         method: "POST",
-        headers: { "x-admin-password": pwd, "Content-Type": "application/json" },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          shop: shop.trim(),
-          expiry: perpetual ? "perpetual" : expiry,
-          edition,
-          notes: notes.trim() || undefined,
+          id: id.trim().toLowerCase(),
+          name: name.trim(),
+          ownerEmail: email.trim(),
+          ownerPassword: password,
+          expiresAt: access,
         }),
       });
-      const data = await r.json();
-      if (!r.ok) { toast.error(data.error || "Failed"); return; }
-      setGenerated(data.record);
-      // Auto-copy to clipboard
-      navigator.clipboard.writeText(data.record.key).catch(() => {});
-      toast.success("License generated and copied to clipboard");
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        toast.error(data.error || "Could not create tenant");
+        return;
+      }
+      toast.success("Tenant created");
       onCreated();
-    } catch { toast.error("Could not reach server"); }
-    finally { setSubmitting(false); }
+    } catch { toast.error("Server unreachable"); }
+    finally { setBusy(false); }
   };
 
-  if (generated) {
-    return (
-      <div className="max-w-2xl">
-        <div className="rounded-3xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30">
-              <CheckCircle2 className="w-6 h-6" strokeWidth={2.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-black">License Generated</h2>
-              <p className="text-xs text-muted-foreground">For <b className="text-foreground">{generated.shop}</b> · {generated.edition} · {generated.expiry === "perpetual" ? "Lifetime" : `expires ${generated.expiry}`}</p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-card p-3 font-mono text-[11px] break-all leading-relaxed mb-3">
-            {generated.key}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <CopyButton text={generated.key} label="Copy Key" />
-            <button onClick={() => { setGenerated(null); setShop(""); setExpiry(""); setNotes(""); }}
-              className="px-4 py-2 rounded-xl border bg-card text-xs font-bold hover:bg-muted">Generate another</button>
-            <button onClick={() => setTab("history")}
-              className="px-4 py-2 rounded-xl border bg-card text-xs font-bold hover:bg-muted">View history</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-2xl space-y-4">
-      <div className="rounded-3xl border bg-card p-5 md:p-6 space-y-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white">
-            <Plus className="w-4 h-4" strokeWidth={2.5} />
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-3xl border bg-card p-6 space-y-4 shadow-2xl">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white">
+            <Plus className="w-5 h-5" strokeWidth={2.5} />
           </div>
           <div>
-            <h2 className="text-base font-black">Generate License</h2>
-            <p className="text-[11px] text-muted-foreground">Creates a signed key + saves it to your local registry.</p>
+            <h2 className="text-lg font-black">Onboard New Client</h2>
+            <p className="text-xs text-muted-foreground">Creates the tenant + an owner login.</p>
           </div>
         </div>
 
-        <Field label="Shop Name" hint="Shows in the customer's License page as 'Issued To'">
-          <div className="relative">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input value={shop} onChange={(e) => setShop(e.target.value)}
-              placeholder="e.g. Hira & Sons Gift Shop"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl border bg-muted/30 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/40" />
-          </div>
+        <Field label="Shop Name">
+          <input
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="Hira & Sons Gift Shop"
+            className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
         </Field>
 
-        <Field label="Expiry">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input type="date" value={expiry} onChange={(e) => { setExpiry(e.target.value); if (e.target.value) setPerpetual(false); }}
-                disabled={perpetual}
-                className="w-full pl-9 pr-3 py-2.5 rounded-xl border bg-muted/30 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50" />
-            </div>
-            <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold cursor-pointer transition-colors ${perpetual ? "bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300" : "bg-card hover:bg-muted"}`}>
-              <input type="checkbox" checked={perpetual} onChange={(e) => { setPerpetual(e.target.checked); if (e.target.checked) setExpiry(""); }} className="sr-only" />
-              <InfinityIcon className="w-4 h-4" /> Lifetime
-            </label>
-          </div>
+        <Field
+          label="Tenant ID"
+          hint={idTouched
+            ? "Lowercase letters, digits, hyphens. Used in the URL and DB."
+            : "Auto-generated from the shop name. Type here to override."}
+        >
+          <input
+            value={id}
+            onChange={(e) => onIdChange(e.target.value)}
+            placeholder="hira-sons"
+            className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
         </Field>
 
-        <Field label="Edition">
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-violet-300 dark:border-violet-800 bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/40 dark:to-fuchsia-950/40">
-            <Sparkles className="w-4 h-4 text-violet-600" />
-            <span className="text-sm font-black text-violet-700 dark:text-violet-300">Pro</span>
-            <span className="text-[10px] text-muted-foreground ml-auto">Single edition</span>
-          </div>
+        <Field label="Owner Email">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="owner@shop.com"
+            className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
         </Field>
 
-        <Field label="Notes" hint="Private — visible only in your admin panel.">
-          <div className="relative">
-            <StickyNote className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-              placeholder="e.g. Paid ₹20,000 advance via UPI on 2026-05-09"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
-          </div>
-        </Field>
-
-        <button onClick={submit} disabled={submitting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 transition-all active:scale-[0.98] disabled:opacity-50">
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
-          Generate License
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ───────────── History tab ───────────── */
-function HistoryView({ records, pwd, loading, onChange }: {
-  records: LicenseRecord[]; pwd: string; loading: boolean; onChange: () => void;
-}) {
-  const [q, setQ] = useState("");
-  const [filter, setFilter] = useState<"all" | "active" | "expired" | "revoked">("all");
-
-  const filtered = useMemo(() => {
-    return records.filter((r) => {
-      if (q && !r.shop.toLowerCase().includes(q.toLowerCase())) return false;
-      if (filter === "active"  && (r.isExpired || r.isRevoked)) return false;
-      if (filter === "expired" && !r.isExpired) return false;
-      if (filter === "revoked" && !r.isRevoked) return false;
-      return true;
-    });
-  }, [records, q, filter]);
-
-  const remove = async (id: string) => {
-    if (!confirm("Delete this record from your local history? This cannot be undone.\n\n(The customer's already-installed key keeps working — you can only stop tracking it here.)")) return;
-    try {
-      const r = await fetch(`${API}/admin/licenses/${id}`, { method: "DELETE", headers: { "x-admin-password": pwd } });
-      if (r.ok) { toast.success("Deleted from registry"); onChange(); } else toast.error("Failed");
-    } catch { toast.error("Could not reach server"); }
-  };
-
-  const revoke = async (id: string) => {
-    if (!confirm("Mark this license as revoked in your history?\n\nThis is just a vendor note — it does NOT remotely disable the customer's app. To actually stop them, generate a new short-expiry key or wait for expiry.")) return;
-    try {
-      const r = await fetch(`${API}/admin/licenses/${id}/revoke`, { method: "POST", headers: { "x-admin-password": pwd } });
-      if (r.ok) { toast.success("Marked as revoked"); onChange(); } else toast.error("Failed");
-    } catch { toast.error("Could not reach server"); }
-  };
-
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by shop name…"
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
-        </div>
-        <div className="flex gap-1 bg-card border rounded-xl p-1">
-          {(["all", "active", "expired", "revoked"] as const).map((f) => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-colors ${
-                filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}>{f}</button>
-          ))}
-        </div>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">
-          {records.length === 0 ? "No licenses generated yet — create your first one in the Generate tab." : "No licenses match this filter."}
-        </div>
-      ) : (
-        <div className="rounded-2xl border bg-card overflow-hidden">
-          <div className="divide-y">
-            {filtered.map((r) => <LicenseRow key={r.id} r={r} onRevoke={revoke} onDelete={remove} />)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function LicenseRow({ r, onRevoke, onDelete }: {
-  r: LicenseRecord; onRevoke: (id: string) => void; onDelete: (id: string) => void;
-}) {
-  const status = r.isRevoked
-    ? { label: "Revoked", color: "bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300" }
-    : r.isExpired
-    ? { label: "Expired", color: "bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300" }
-    : r.isPerpetual
-    ? { label: "Lifetime", color: "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300" }
-    : (r.daysRemaining ?? 0) <= 7
-    ? { label: `${r.daysRemaining}d left`, color: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300" }
-    : { label: `${r.daysRemaining}d left`, color: "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300" };
-
-  return (
-    <div className="p-4 hover:bg-muted/30 transition-colors">
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400 shrink-0">
-          <Building2 className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-black text-sm truncate">{r.shop}</p>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${status.color}`}>{status.label}</span>
-            <span className="px-2 py-0.5 rounded-full bg-muted text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{r.edition}</span>
-          </div>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1 flex-wrap">
-            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Issued {r.issued}</span>
-            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {r.expiry === "perpetual" ? "Never expires" : `Expires ${r.expiry}`}</span>
-          </div>
-          {r.notes && <p className="text-[11px] text-muted-foreground mt-1.5 italic">"{r.notes}"</p>}
-          <div className="mt-2 flex items-center gap-2">
-            <CopyButton text={r.key} label="Copy Key" small />
-            {!r.isRevoked && (
-              <button onClick={() => onRevoke(r.id)}
-                className="px-2.5 py-1.5 rounded-lg border bg-card text-[11px] font-bold flex items-center gap-1.5 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30">
-                <Ban className="w-3 h-3" /> Mark Revoked
+        <Field label="Access Duration" hint="When the client's access expires. You can change this later from the tenant row.">
+          <div className="grid grid-cols-3 gap-1.5">
+            {ACCESS_PRESETS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setAccess(p.key)}
+                className={`px-2.5 py-2 rounded-xl border text-[12px] font-bold transition-colors ${
+                  access === p.key
+                    ? "bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white border-transparent shadow-sm shadow-violet-500/30"
+                    : "bg-card hover:bg-muted"
+                }`}
+              >
+                {p.label}
               </button>
-            )}
-            <button onClick={() => onDelete(r.id)}
-              className="px-2.5 py-1.5 rounded-lg border bg-card text-[11px] font-bold flex items-center gap-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30">
-              <Trash2 className="w-3 h-3" /> Delete
-            </button>
+            ))}
           </div>
+        </Field>
+
+        <Field label="Owner Password" hint="They'll use this with their email at /login. 8+ chars.">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </Field>
+
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border bg-card text-sm font-bold hover:bg-muted">
+            Cancel
+          </button>
+          <button type="submit" disabled={busy || !id || !name || !email || password.length < 8}
+            className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30 disabled:opacity-50">
+            {busy ? "Creating…" : "Create Tenant"}
+          </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
 
-/* ───────────── Verify tab ───────────── */
-function VerifyView({ pwd }: { pwd: string }) {
-  const [key, setKey] = useState("");
-  const [result, setResult] = useState<null | { valid: boolean; reason?: string; payload?: { shop: string; expiry: string; issued: string; edition?: string }; isPerpetual?: boolean; isExpired?: boolean; daysRemaining?: number | null }>(null);
-  const [checking, setChecking] = useState(false);
-
-  const verify = async () => {
-    if (!key.trim()) return;
-    setChecking(true);
-    try {
-      const r = await fetch(`${API}/admin/verify`, {
-        method: "POST",
-        headers: { "x-admin-password": pwd, "Content-Type": "application/json" },
-        body: JSON.stringify({ key: key.trim() }),
-      });
-      setResult(await r.json());
-    } catch { toast.error("Could not reach server"); }
-    finally { setChecking(false); }
-  };
-
-  return (
-    <div className="max-w-2xl space-y-4">
-      <div className="rounded-3xl border bg-card p-5 md:p-6 space-y-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white">
-            <Search className="w-4 h-4" strokeWidth={2.5} />
-          </div>
-          <div>
-            <h2 className="text-base font-black">Verify Key</h2>
-            <p className="text-[11px] text-muted-foreground">Paste any key to inspect its decoded payload + signature validity.</p>
-          </div>
-        </div>
-        <textarea value={key} onChange={(e) => setKey(e.target.value)} rows={3}
-          placeholder="Paste a license key…"
-          className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
-        <button onClick={verify} disabled={checking || !key.trim()}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-primary-foreground font-black text-sm hover:opacity-90 transition-opacity disabled:opacity-50">
-          {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-          Verify
-        </button>
-      </div>
-
-      {result && (
-        <div className={`rounded-3xl border p-5 ${
-          result.valid && !result.isExpired
-            ? "border-emerald-200 dark:border-emerald-900 bg-emerald-50/30 dark:bg-emerald-950/20"
-            : "border-rose-200 dark:border-rose-900 bg-rose-50/30 dark:bg-rose-950/20"
-        }`}>
-          <div className="flex items-center gap-2 mb-3">
-            {result.valid ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <XCircle className="w-5 h-5 text-rose-600" />}
-            <h3 className="font-black">
-              {result.valid
-                ? (result.isExpired ? "Valid Signature — But Expired" : "Valid License")
-                : "Invalid"}
-            </h3>
-          </div>
-          {result.valid && result.payload ? (
-            <dl className="grid grid-cols-2 gap-3 text-sm">
-              <div><dt className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Shop</dt><dd className="font-bold">{result.payload.shop}</dd></div>
-              <div><dt className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Edition</dt><dd className="font-bold">{result.payload.edition ?? "—"}</dd></div>
-              <div><dt className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Issued</dt><dd className="font-bold">{result.payload.issued}</dd></div>
-              <div><dt className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Expiry</dt><dd className="font-bold">{result.payload.expiry}</dd></div>
-              {result.daysRemaining != null && (
-                <div className="col-span-2"><dt className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Days Remaining</dt><dd className={`font-black text-lg ${result.daysRemaining < 0 ? "text-rose-600" : result.daysRemaining < 8 ? "text-amber-600" : "text-emerald-600"}`}>{result.daysRemaining}</dd></div>
-              )}
-            </dl>
-          ) : (
-            <p className="text-sm text-rose-700 dark:text-rose-300">{result.reason ?? "Not a valid license key"}</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ───────────── Reusable bits ───────────── */
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
-      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</label>
+    <label className="block space-y-1.5">
+      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</span>
       {children}
-      {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
-
-function CopyButton({ text, label, small }: { text: string; label: string; small?: boolean }) {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(text)
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
-      .catch(() => toast.error("Could not copy"));
-  };
-  const Icon = copied ? Check : Copy;
-  return (
-    <button onClick={copy}
-      className={`${small ? "px-2.5 py-1.5 text-[11px]" : "px-4 py-2 text-xs"} rounded-xl border bg-card font-bold hover:bg-muted flex items-center gap-1.5 ${copied ? "text-emerald-600 border-emerald-300" : ""}`}>
-      <Icon className={small ? "w-3 h-3" : "w-3.5 h-3.5"} />
-      {copied ? "Copied!" : label}
-    </button>
+      {hint && <span className="text-[10px] text-muted-foreground block">{hint}</span>}
+    </label>
   );
 }
