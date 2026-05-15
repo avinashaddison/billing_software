@@ -35,6 +35,10 @@ declare global {
       /** Platform-admin auth_users.id when the platform_session cookie is
        *  present and valid. Independent of tenant_session above. */
       platformUserId?: string;
+      /** Set by requirePlatformAdmin after the role check passes. Carries
+       *  the actor's auth_users row so handlers can log audit events
+       *  without re-querying the DB. */
+      platformActor?: { id: string; email: string };
     }
   }
 }

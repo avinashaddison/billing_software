@@ -2,6 +2,8 @@ import express, { type Express } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import path from "path";
 import { fileURLToPath } from "url";
 import router from "./routes";
@@ -12,6 +14,43 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
 const app: Express = express();
+
+/* Trust the platform's reverse proxy so req.ip and rate-limit keys reflect
+   the real client IP (Render injects X-Forwarded-For). Without this every
+   limiter would see the proxy's single IP and shared-limit every user. */
+app.set("trust proxy", 1);
+
+/**
+ * Security headers — defaults are sensible for a JSON API + same-origin SPA.
+ * CSP is loosened on `'unsafe-inline'` styles because Tailwind utility
+ * classes inject inline styles for runtime variants; tightening it later
+ * requires a hashed/nonce-based pass.
+ */
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc:  ["'self'"],
+        styleSrc:   ["'self'", "'unsafe-inline'"],
+        imgSrc:     ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'", "https:", "wss:"],
+        fontSrc:    ["'self'", "data:"],
+        objectSrc:  ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    /* Disable HSTS in dev (http://localhost would otherwise be blocked
+       after first visit). Helmet auto-enables it in production. */
+    hsts: process.env.NODE_ENV === "production"
+      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+      : false,
+    /* The SPA's PWA service worker + cross-origin image hosts need the
+       same-origin embedder policy relaxed — flip to "require-corp" only
+       after every <img> source is COEP-compatible. */
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
 app.use(
   pinoHttp({
@@ -65,6 +104,40 @@ app.use(express.urlencoded({ extended: true }));
 /* Resolve req.tenantId from the signed cookie on every request. Runs
    BEFORE the API router so every downstream handler can rely on it. */
 app.use(tenantContext);
+
+/**
+ * Rate limiting — burns credential-stuffing attacks before they reach the
+ * bcrypt compare. The PIN flow already has DB-backed per-account lockout;
+ * these limiters add a per-IP ceiling on the email/platform endpoints.
+ *
+ * Disabled entirely when NODE_ENV !== "production" so dev tests aren't
+ * accidentally rate-limited by hot-reload retries.
+ */
+const isProd = process.env.NODE_ENV === "production";
+
+const loginLimiter = rateLimit({
+  windowMs:  15 * 60 * 1000,  // 15 minutes
+  limit:     20,              // 20 attempts per IP per window
+  standardHeaders: "draft-8",
+  legacyHeaders:   false,
+  skip: () => !isProd,
+  message: { error: "Too many login attempts. Try again in a few minutes." },
+});
+
+/* Wider net for everything else under /api — generous so legitimate POS
+   usage isn't throttled but catches scrape/scan attacks. */
+const apiLimiter = rateLimit({
+  windowMs:  60 * 1000,       // 1 minute
+  limit:     300,             // 5 req/sec sustained per IP
+  standardHeaders: "draft-8",
+  legacyHeaders:   false,
+  skip: () => !isProd,
+});
+
+app.use("/api/auth/login",        loginLimiter);
+app.use("/api/auth/login-email",  loginLimiter);
+app.use("/api/platform/login",    loginLimiter);
+app.use("/api",                   apiLimiter);
 
 app.use("/api", router);
 

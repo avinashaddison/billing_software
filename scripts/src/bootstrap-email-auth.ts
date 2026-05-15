@@ -36,7 +36,7 @@ async function main(): Promise<void> {
   );
   console.log("Tenant:", TENANT_NAME);
 
-  const hash = await bcrypt.hash(OWNER_PASSWORD, 10);
+  const hash = await bcrypt.hash(OWNER_PASSWORD, 12);
   const inserted = await pool.query<{ email: string; role: string }>(
     `INSERT INTO auth_users (tenant_id, email, password_hash, role)
      VALUES ($1, $2, $3, 'owner')

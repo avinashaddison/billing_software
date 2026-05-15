@@ -13,6 +13,10 @@ const router: IRouter = Router();
 
 const VALID_LEVELS = ["none", "read", "write"] as const;
 const VALID_ROLES  = ["owner", "staff"] as const;
+/* PINs are 4 digits → entropy is bounded at 10,000 regardless of bcrypt
+   cost. The DB-backed lockout (MAX_ATTEMPTS below) is the real defense,
+   so we leave PIN at 10 rounds instead of paying the 4x latency for zero
+   marginal security. Password hashing (auth.ts, platform.ts) uses 12. */
 const BCRYPT_ROUNDS = 10;
 const MAX_ATTEMPTS  = 5;
 const LOCK_MINUTES  = 30;

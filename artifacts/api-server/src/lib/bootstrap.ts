@@ -4,7 +4,7 @@ import { logger } from "./logger";
 
 const DEFAULT_OWNER_NAME = "Owner";
 const DEFAULT_OWNER_PIN  = "1234";
-const BCRYPT_ROUNDS      = 10;
+const BCRYPT_ROUNDS      = 12;
 
 /**
  * Idempotent first-run setup for an empty database.

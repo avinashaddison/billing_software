@@ -33,7 +33,7 @@ async function main() {
     process.exit(1);
   }
 
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await bcrypt.hash(password, 12);
 
   /* Check for existing row by email (case-insensitive). */
   const existing = await pool.query<{ id: string; email: string }>(

@@ -26,6 +26,7 @@ import {
   salesTable,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { recordAudit } from "../lib/audit";
 import {
   PLATFORM_COOKIE_NAME,
   signTenantCookie,
@@ -46,7 +47,7 @@ const OWNER_RESOURCES = [
 
 const router: IRouter = Router();
 
-const BCRYPT_ROUNDS = 10;
+const BCRYPT_ROUNDS = 12;
 const MIN_PASSWORD_LEN = 8;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SLUG_RE  = /^[a-z][a-z0-9-]{1,38}[a-z0-9]$/;
@@ -97,7 +98,12 @@ async function requirePlatformAdmin(req: Request, res: Response, next: NextFunct
   }
   try {
     const [me] = await db
-      .select({ role: authUsersTable.role, isActive: authUsersTable.isActive })
+      .select({
+        id:       authUsersTable.id,
+        email:    authUsersTable.email,
+        role:     authUsersTable.role,
+        isActive: authUsersTable.isActive,
+      })
       .from(authUsersTable)
       .where(eq(authUsersTable.id, req.platformUserId));
     if (!me || !me.isActive) {
@@ -108,6 +114,8 @@ async function requirePlatformAdmin(req: Request, res: Response, next: NextFunct
       res.status(403).json({ error: "Platform admin access required" });
       return;
     }
+    /* Cache the actor on the request so audit logging doesn't re-query. */
+    req.platformActor = { id: me.id, email: me.email };
     next();
   } catch {
     res.status(500).json({ error: "Authorization check failed" });
@@ -153,6 +161,12 @@ router.post("/platform/login", async (req, res): Promise<void> => {
       signTenantCookie({ tenantId: null, userId: user.id, kind: "email" }),
       tenantCookieOptions(),
     );
+    void recordAudit({
+      action:     "platform.login",
+      actorId:    user.id,
+      actorEmail: user.email,
+      ip:         req.ip,
+    });
     res.json({ id: user.id, email: user.email, role: user.role });
   } catch {
     res.status(500).json({ error: "Login failed" });
@@ -383,6 +397,19 @@ router.post("/platform/tenants", requirePlatformAdmin, async (req, res): Promise
       })
       .onConflictDoNothing();
 
+    void recordAudit({
+      action:       "tenant.create",
+      actorId:      req.platformActor!.id,
+      actorEmail:   req.platformActor!.email,
+      targetTenant: tenant.id,
+      ip:           req.ip,
+      metadata: {
+        name:       tenant.name,
+        ownerEmail: owner.email,
+        expiresAt:  tenant.expiresAt,
+      },
+    });
+
     res.status(201).json({
       tenant,
       owner: { id: owner.id, email: owner.email, role: owner.role },
@@ -419,6 +446,20 @@ router.patch("/platform/tenants/:id", requirePlatformAdmin, async (req, res): Pr
       .where(eq(tenantsTable.id, id))
       .returning();
     if (!tenant) { res.status(404).json({ error: "Tenant not found" }); return; }
+    /* Split the audit verb so suspend/activate show up distinctly in the
+       log instead of being lumped under a generic "tenant.update". */
+    const action =
+      updates.isActive === false ? "tenant.suspend" :
+      updates.isActive === true  ? "tenant.activate" :
+                                    "tenant.update";
+    void recordAudit({
+      action,
+      actorId:      req.platformActor!.id,
+      actorEmail:   req.platformActor!.email,
+      targetTenant: tenant.id,
+      ip:           req.ip,
+      metadata:     updates,
+    });
     res.json({ tenant });
   } catch {
     res.status(500).json({ error: "Failed to update tenant" });
@@ -446,6 +487,14 @@ router.post("/platform/tenants/:id/extend", requirePlatformAdmin, async (req, re
         .where(eq(tenantsTable.id, id))
         .returning();
       if (!tenant) { res.status(404).json({ error: "Tenant not found" }); return; }
+      void recordAudit({
+        action:       "tenant.extend",
+        actorId:      req.platformActor!.id,
+        actorEmail:   req.platformActor!.email,
+        targetTenant: tenant.id,
+        ip:           req.ip,
+        metadata:     { duration: "lifetime", newExpiresAt: null },
+      });
       res.json({ tenant });
     } catch { res.status(500).json({ error: "Failed to update tenant" }); }
     return;
@@ -474,6 +523,18 @@ router.post("/platform/tenants/:id/extend", requirePlatformAdmin, async (req, re
       .set({ expiresAt: newExpiry })
       .where(eq(tenantsTable.id, id))
       .returning();
+    void recordAudit({
+      action:       "tenant.extend",
+      actorId:      req.platformActor!.id,
+      actorEmail:   req.platformActor!.email,
+      targetTenant: tenant.id,
+      ip:           req.ip,
+      metadata: {
+        duration,
+        previousExpiresAt: existing.expiresAt,
+        newExpiresAt:      newExpiry,
+      },
+    });
     res.json({ tenant });
   } catch {
     res.status(500).json({ error: "Failed to extend tenant" });
@@ -518,6 +579,14 @@ router.post("/platform/tenants/:id/owner-password", requirePlatformAdmin, async 
       .update(authUsersTable)
       .set({ passwordHash: hashed, updatedAt: new Date() })
       .where(eq(authUsersTable.id, owner.id));
+    void recordAudit({
+      action:       "tenant.owner_password_reset",
+      actorId:      req.platformActor!.id,
+      actorEmail:   req.platformActor!.email,
+      targetTenant: tenantId,
+      ip:           req.ip,
+      metadata:     { ownerId: owner.id, ownerEmail: owner.email },
+    });
     res.json({ ok: true, ownerEmail: owner.email });
   } catch {
     res.status(500).json({ error: "Failed to reset owner password" });

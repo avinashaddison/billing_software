@@ -36,7 +36,7 @@ const router: IRouter = Router();
 const VALID_ROLES = ["owner", "admin", "manager", "cashier"] as const;
 type Role = typeof VALID_ROLES[number];
 
-const BCRYPT_ROUNDS    = 10;
+const BCRYPT_ROUNDS    = 12;
 const MIN_PASSWORD_LEN = 8;
 const MAX_PASSWORD_LEN = 128;
 const EMAIL_RE         = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

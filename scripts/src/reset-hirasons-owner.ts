@@ -13,7 +13,7 @@ const NEW_PASSWORD = "admin123";
 const TENANT_ID    = "hira-sons";
 
 async function main(): Promise<void> {
-  const hash = await bcrypt.hash(NEW_PASSWORD, 10);
+  const hash = await bcrypt.hash(NEW_PASSWORD, 12);
 
   const existing = await pool.query<{ id: string; email: string }>(
     "SELECT id, email FROM auth_users WHERE tenant_id = $1 LIMIT 1",
