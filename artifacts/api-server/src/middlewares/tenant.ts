@@ -17,7 +17,11 @@
 import type { Request, Response, NextFunction } from "express";
 import crypto from "node:crypto";
 
-export const TENANT_COOKIE_NAME = "tenant_session";
+export const TENANT_COOKIE_NAME   = "tenant_session";
+/** Separate cookie so the vendor can stay signed into /admin while ALSO
+ *  signing into a tenant's /login on the same browser to test that shop.
+ *  Without this, both flows would clobber a single tenant_session cookie. */
+export const PLATFORM_COOKIE_NAME = "platform_session";
 
 /* ── augment Express types so req.tenantId/staffId/userId are recognised ── */
 declare global {
@@ -28,6 +32,9 @@ declare global {
       staffId?: string;
       userId?: string;
       authKind?: "pin" | "email";
+      /** Platform-admin auth_users.id when the platform_session cookie is
+       *  present and valid. Independent of tenant_session above. */
+      platformUserId?: string;
     }
   }
 }
@@ -35,12 +42,6 @@ declare global {
 function loadSecret(): string {
   const fromEnv = process.env["SESSION_SECRET"]?.trim();
   if (fromEnv) return fromEnv;
-  // Fall back to LICENSE_SECRET so existing single-tenant installs keep
-  // booting without an extra env var. Both are HMAC inputs only; rotating
-  // them invalidates outstanding tenant cookies (acceptable — users just
-  // re-login with their existing staffId+PIN or email).
-  const fromLicense = process.env["LICENSE_SECRET"]?.trim();
-  if (fromLicense) return `tenant:${fromLicense}`;
   return "tenant-session-default-secret-do-not-leak";
 }
 
@@ -133,11 +134,21 @@ export function verifyTenantCookie(raw: string | undefined): DecodedSession | nu
 /** Express middleware — sets the session fields on every request. */
 export function tenantContext(req: Request, _res: Response, next: NextFunction): void {
   const cookies = (req as Request & { cookies?: Record<string, string> }).cookies ?? {};
+
+  /* Tenant session — drives /login + everything in the tenant SPA. */
   const decoded = verifyTenantCookie(cookies[TENANT_COOKIE_NAME]);
   req.tenantId = decoded?.tenantId ?? null;
   if (decoded?.staffId) req.staffId = decoded.staffId;
   if (decoded?.userId)  req.userId  = decoded.userId;
   if (decoded?.kind)    req.authKind = decoded.kind;
+
+  /* Platform session — independent cookie so the vendor can be signed into
+     /admin while ALSO logged into a tenant via /login on the same browser.
+     The cookie payload is reused (same shape, just a different name on the
+     wire); platformUserId is extracted from the `userId` field. */
+  const platform = verifyTenantCookie(cookies[PLATFORM_COOKIE_NAME]);
+  if (platform?.userId) req.platformUserId = platform.userId;
+
   next();
 }
 
@@ -154,6 +165,6 @@ export function tenantCookieOptions(): {
     sameSite: "lax",
     secure:   process.env.NODE_ENV === "production",
     path:     "/",
-    maxAge:   30 * 24 * 60 * 60 * 1000, // 30 days
+    maxAge:   365 * 24 * 60 * 60 * 1000, // 1 year
   };
 }

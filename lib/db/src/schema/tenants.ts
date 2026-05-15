@@ -24,6 +24,8 @@ export const tenantsTable = pgTable(
     id:        text("id").primaryKey(),
     name:      text("name").notNull(),
     isActive:  boolean("is_active").notNull().default(true),
+    /** Access expiry. NULL = lifetime; past = blocked by tenantActiveGate. */
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

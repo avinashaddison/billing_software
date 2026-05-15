@@ -8,12 +8,16 @@
     "dev": "tsx ./src/dev.ts",
     "gen-license": "tsx ./src/gen-license.ts",
     "trial-expire": "tsx ./src/trial-expire.ts",
+    "bootstrap-email-auth": "tsx ./src/bootstrap-email-auth.ts",
+    "bootstrap-platform-admin": "tsx ./src/bootstrap-platform-admin.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@workspace/db": "workspace:*"
+    "@workspace/db": "workspace:*",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "catalog:",
     "tsx": "catalog:"
   }

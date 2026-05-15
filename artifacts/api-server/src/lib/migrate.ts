@@ -45,6 +45,7 @@ const SEARCH_DIRS = [
 const MIGRATION_FILES = [
   "0001_tenant_additive.sql",
   "0002_auth_users.sql",
+  "0003_tenant_expiry.sql",
 ];
 
 function findMigration(name: string): string | null {
