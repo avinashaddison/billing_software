@@ -27,7 +27,7 @@ export function SideNav() {
   const visible = (resource: string) => perm(resource) !== "none";
 
   const navItems = [
-    { name: "Dashboard", href: "/",          icon: Home,     highlight: false, resource: "dashboard" },
+    { name: "Dashboard", href: "/dashboard", icon: Home,     highlight: false, resource: "dashboard" },
     { name: "Products",  href: "/products",  icon: Package,  highlight: false, resource: "products"  },
     { name: "Scan",      href: "/scan",      icon: ScanLine, highlight: true,  resource: "scan"      },
     { name: "Billing",   href: "/billing",   icon: IndianRupee,  highlight: false, resource: "billing"   },

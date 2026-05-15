@@ -44,7 +44,7 @@ export default function Login() {
 
   /* Redirect if already logged in */
   useEffect(() => {
-    if (isLoggedIn) setLocation("/");
+    if (isLoggedIn) setLocation("/dashboard");
   }, [isLoggedIn, setLocation]);
 
   /* Rehydrate the email-login step from the server cookie on mount, so a
@@ -213,7 +213,7 @@ export default function Login() {
         toast.success(`Scanner set to ${pref.thresholdMs} ms (your saved preference)`);
       }
 
-      setLocation("/");
+      setLocation("/dashboard");
     } catch {
       toast.error("Login failed. Check connection.");
       setPin("");

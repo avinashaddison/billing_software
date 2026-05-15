@@ -18,7 +18,7 @@ export function BottomNav() {
   const visible = (resource: string) => getLevel(role, permissions, resource) !== "none";
 
   const allItems = [
-    { name: "Home",    href: "/",        icon: Home,       resource: "dashboard" },
+    { name: "Home",    href: "/dashboard", icon: Home,       resource: "dashboard" },
     { name: "Products",href: "/products", icon: Package,    resource: "products"  },
     { name: "Scan",    href: "/scan",     icon: ScanLine,   resource: "scan",    highlight: true },
     { name: "Billing", href: "/billing",  icon: IndianRupee,resource: "billing"  },

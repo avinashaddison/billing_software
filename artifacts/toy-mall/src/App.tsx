@@ -33,6 +33,7 @@ import StaffManagement from "@/pages/StaffManagement";
 import Checkout        from "@/pages/Checkout";
 import SettingsPage    from "@/pages/Settings";
 import AdminPage       from "@/pages/Admin";
+import Landing         from "@/pages/Landing";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,22 +79,28 @@ function Router() {
   const { isLoggedIn } = useAuth();
   const [location] = useLocation();
 
-  // /admin is the vendor's platform admin — completely separate from tenant
-  // login. Its own page handles auth via the platform_admin role; bypass the
-  // tenant-login redirect and the AppLayout so it can render full-screen.
+  /* Vendor platform admin — handles its own auth, full-screen, no AppLayout. */
   if (location === "/admin") return <AdminPage />;
 
-  if (!isLoggedIn && location !== "/login") {
-    return <Redirect to="/login" />;
+  /* "/" is the public marketing landing page. Logged-in users skip past it
+     into the app dashboard so the landing doesn't waste their tap. */
+  if (location === "/") {
+    if (isLoggedIn) return <Redirect to="/dashboard" />;
+    return <Landing />;
   }
+
+  /* Login screen — public, no AppLayout. */
+  if (location === "/login") return <Login />;
+
+  /* Everything below requires auth. */
+  if (!isLoggedIn) return <Redirect to="/login" />;
 
   return (
     <Switch>
-      <Route path="/login" component={Login} />
       <Route>
         <AppLayout>
           <Switch>
-            <Route path="/"             component={() => <Protected resource="dashboard"><Dashboard /></Protected>} />
+            <Route path="/dashboard"    component={() => <Protected resource="dashboard"><Dashboard /></Protected>} />
             <Route path="/products"     component={() => <Protected resource="products"><Products /></Protected>} />
             <Route path="/products/new" component={() => <Protected resource="products"><ProductsNew /></Protected>} />
             <Route path="/product"      component={() => <Protected resource="products"><ProductDetail /></Protected>} />
