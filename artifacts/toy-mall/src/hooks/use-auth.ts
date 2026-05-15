@@ -44,6 +44,11 @@ export const useAuth = create<AuthState>()(
           permissions: role === "owner" ? OWNER_PERMISSIONS : permissions,
           priorScannerThresholdMs: currentThreshold,
         });
+        /* Cookie scope just changed — re-fetch the tenant's store settings
+           so the Dashboard header doesn't flash "Your Shop Name" before
+           the user manually refreshes. Fire-and-forget; if it fails the
+           persisted defaults stay visible. */
+        void useStoreSettings.getState().hydrateFromServer();
       },
 
       logout: () => {

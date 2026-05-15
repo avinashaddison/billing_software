@@ -61,6 +61,10 @@ export default function Login() {
         if (cancelled) return;
         if (me?.kind === "email" && me.id) {
           setEmailUser({ id: me.id, email: me.email, role: me.role, tenantId: me.tenantId ?? null });
+          /* Cookie says we're already attached to a tenant — pull that
+             tenant's settings (name/logo/etc.) so the picker shows the
+             real shop branding instead of the persisted defaults. */
+          void useStoreSettings.getState().hydrateFromServer();
         }
       } catch { /* offline — silently leave the email form visible */ }
     })();
@@ -142,6 +146,10 @@ export default function Login() {
       }
       setEmailUser({ id: data.id, email: data.email, role: data.role, tenantId: data.tenantId });
       setPassword("");
+      /* Server cookie now scopes us to this tenant — re-fetch settings so
+         the header switches from "Your Shop Name" to the real shop name
+         before the user even picks their staff profile. */
+      void useStoreSettings.getState().hydrateFromServer();
     } catch {
       setEmailError("Could not reach server. Check connection.");
     } finally {
