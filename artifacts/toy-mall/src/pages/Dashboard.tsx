@@ -6,6 +6,7 @@ import {
 import {
   Package, IndianRupee, AlertTriangle, ArrowDownToLine, ArrowUpToLine,
   TrendingUp, FileText, Users, Tag, Truck, ChevronRight, Activity,
+  CalendarClock, Infinity as InfinityIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -100,6 +101,67 @@ function RevenueChart() {
           </ResponsiveContainer>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ── Valid Till badge ────────────────────────────────────────────────
+ *
+ * Pulls the current tenant's expires_at from /api/tenant/me and shows it
+ * as a pill. Colours:
+ *   - Lifetime (no expiry)  → blue
+ *   - > 7 days remaining    → emerald
+ *   - ≤ 7 days remaining    → amber
+ *   - expired               → rose (rare — the gate 403's first, but
+ *                                    surfaces if user reaches Dashboard) */
+interface TenantMe {
+  id: string;
+  name: string;
+  isActive: boolean;
+  expiresAt: string | null;
+}
+
+function ValidTillBadge() {
+  const [t, setT] = useState<TenantMe | null>(null);
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/tenant/me`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setT)
+      .catch(() => { /* silently absent — better than a noisy red badge */ });
+  }, []);
+  if (!t) return null;
+
+  const lifetime = !t.expiresAt;
+  const daysLeft = t.expiresAt
+    ? Math.ceil((new Date(t.expiresAt).getTime() - Date.now()) / 86_400_000)
+    : null;
+
+  let label: string;
+  let tone:  string;
+  let Icon  = CalendarClock as React.ElementType;
+  if (lifetime) {
+    label = "Lifetime";
+    tone  = "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25";
+    Icon  = InfinityIcon;
+  } else if (daysLeft! < 0) {
+    label = `Expired ${Math.abs(daysLeft!)}d ago`;
+    tone  = "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25";
+  } else if (daysLeft! <= 7) {
+    label = `${daysLeft}d left`;
+    tone  = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25";
+  } else {
+    /* Format as "Valid till 14 May 2027" so the owner can plan renewal */
+    label = `Valid till ${new Date(t.expiresAt!).toLocaleDateString("en-IN", {
+      day: "numeric", month: "short", year: "numeric",
+    })}`;
+    tone  = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25";
+  }
+
+  return (
+    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border ${tone}`}
+      title={t.expiresAt ? `Tenant access expires ${new Date(t.expiresAt).toLocaleString()}` : "No expiry set"}>
+      <Icon className="w-3 h-3" />
+      {label}
     </div>
   );
 }
@@ -200,7 +262,10 @@ export default function Dashboard() {
           <h1 className="text-2xl font-black text-foreground tracking-tight hidden md:block">Dashboard</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Overview of your inventory · updates in real time</p>
         </div>
-        <LiveBadge />
+        <div className="flex items-center gap-2 flex-wrap">
+          <ValidTillBadge />
+          <LiveBadge />
+        </div>
       </div>
 
       {/* ── Stat cards ── */}

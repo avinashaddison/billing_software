@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, asc, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, staffProfilesTable, staffPermissionsTable, authUsersTable } from "@workspace/db";
+import { db, staffProfilesTable, staffPermissionsTable, authUsersTable, tenantsTable } from "@workspace/db";
 import { tenantWhere } from "../lib/tenant";
 import {
   TENANT_COOKIE_NAME,
@@ -158,6 +158,33 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 router.post("/auth/logout", (_req, res): void => {
   res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
   res.json({ ok: true });
+});
+
+/* ── GET /api/tenant/me — current tenant metadata for the cookie ──
+ *
+ * Returns { id, name, isActive, expiresAt }. Used by the Dashboard's
+ * "Valid till" badge so a tenant owner can see when their access ends
+ * without having to ping the vendor.
+ *
+ * Returns 204 when there's no tenant context (legacy NULL or anonymous)
+ * — the UI treats that as "no badge" instead of an error. */
+router.get("/tenant/me", async (req, res): Promise<void> => {
+  if (!req.tenantId) { res.status(204).end(); return; }
+  try {
+    const [tenant] = await db
+      .select({
+        id:        tenantsTable.id,
+        name:      tenantsTable.name,
+        isActive:  tenantsTable.isActive,
+        expiresAt: tenantsTable.expiresAt,
+      })
+      .from(tenantsTable)
+      .where(eq(tenantsTable.id, req.tenantId));
+    if (!tenant) { res.status(404).json({ error: "Tenant not found" }); return; }
+    res.json(tenant);
+  } catch {
+    res.status(500).json({ error: "Lookup failed" });
+  }
 });
 
 /* ── GET /api/auth/me — who am I per the cookie? ───────────────── */
