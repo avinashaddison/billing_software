@@ -229,8 +229,8 @@ export default function Landing() {
             {/* Floating Telegram alert sticker */}
             <div className="hidden md:block absolute top-1/2 -right-12 z-30 rotate-[5deg] animate-pulse">
               <div className="bg-white px-3 py-2 rounded-2xl shadow-xl ring-4 ring-amber-100 border border-amber-200">
-                <p className="text-[10px] font-black text-rose-600">🔔 Telegram</p>
-                <p className="text-[9px] font-bold text-slate-700">Bill #12 · ₹520</p>
+                <p className="text-[10px] font-black text-rose-600">🔔 New sale!</p>
+                <p className="text-[9px] font-bold text-slate-700">Bill #47 · ₹890</p>
               </div>
             </div>
 
@@ -253,8 +253,8 @@ export default function Landing() {
                 <div className="bg-gradient-to-br from-orange-50 via-amber-50 to-white p-5 pb-8">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <p className="text-[20px] font-black tracking-tight">Hira &amp; Sons</p>
-                      <p className="text-[11px] text-slate-500 font-medium">आज का overview</p>
+                      <p className="text-[20px] font-black tracking-tight">आपकी दुकान</p>
+                      <p className="text-[11px] text-slate-500 font-medium">आज का overview · सबसे अच्छा दिन! 🎉</p>
                     </div>
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 border-2 border-emerald-300 text-emerald-700 text-[10px] font-black">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -263,19 +263,19 @@ export default function Landing() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2.5 mb-4">
-                    <StatTile label="आज की कमाई" value="₹14,380" tone="emerald" />
-                    <StatTile label="Bills बने"   value="23"      tone="rose"    />
-                    <StatTile label="Items बिके"  value="61"      tone="amber"   />
-                    <StatTile label="Stock"       value="1,284"   tone="violet"  />
+                    <StatTile label="आज की कमाई" value="₹28,450" tone="emerald" />
+                    <StatTile label="Bills बने"   value="47"      tone="rose"    />
+                    <StatTile label="Items बिके"  value="134"     tone="amber"   />
+                    <StatTile label="Stock"       value="2,140"   tone="violet"  />
                   </div>
 
                   <div className="rounded-2xl border-2 border-orange-100 p-3.5 bg-white">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Revenue · 7 days</p>
-                      <span className="text-[10px] font-black text-emerald-600">+34%</span>
+                      <span className="text-[10px] font-black text-emerald-600">+52% ↗</span>
                     </div>
                     <div className="flex items-end gap-1.5 h-16">
-                      {[55, 32, 78, 45, 90, 65, 100].map((h, i) => (
+                      {[40, 55, 48, 72, 65, 88, 100].map((h, i) => (
                         <div key={i} className="flex-1 rounded-t-md bg-gradient-to-t from-rose-500 via-orange-500 to-amber-400" style={{ height: `${h}%` }} />
                       ))}
                     </div>
@@ -283,7 +283,7 @@ export default function Landing() {
 
                   <div className="mt-3 flex items-center gap-2 text-[11px] font-bold text-slate-600">
                     <ScanLine className="w-3.5 h-3.5 text-rose-600" />
-                    Bill #11 · Aqua Star Steel · <span className="text-slate-900">₹439</span>
+                    Just sold · Steel Tiffin Set · <span className="text-slate-900">₹890</span>
                   </div>
                 </div>
                 {/* Home indicator */}
@@ -514,11 +514,11 @@ export default function Landing() {
           </p>
           <div className="mt-8 inline-flex items-center gap-4 bg-white/15 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/30">
             <div className="w-14 h-14 rounded-full bg-white text-rose-600 flex items-center justify-center font-black text-lg shadow-lg">
-              HS
+              SK
             </div>
             <div className="text-left">
-              <p className="font-black text-base">Hira &amp; Sons Gift Shop</p>
-              <p className="text-[12px] opacity-90">Ranchi · Jharkhand</p>
+              <p className="font-black text-base">Sharma Kirana Store</p>
+              <p className="text-[12px] opacity-90">India · Verified shopkeeper</p>
             </div>
           </div>
         </div>
