@@ -25,26 +25,12 @@ services:
       - key: DATABASE_URL
         sync: false
 
-      # HMAC secret used to sign + verify the HttpOnly tenant_session cookie.
-      # Auto-generated per service on first deploy. Rotating it invalidates
-      # all outstanding cookies (everyone has to log in again).
+      # HMAC secret used to sign + verify the HttpOnly tenant_session +
+      # platform_session cookies. Auto-generated per service on first
+      # deploy. Rotating it invalidates all outstanding cookies (everyone
+      # has to log in again).
       - key: SESSION_SECRET
         generateValue: true
-
-      # ─── License / vendor ─────────────────────────────────────────────
-      # HMAC secret that signs LICENSE_KEY values. MUST match the secret
-      # that issued the customer's key. Leave blank to run in trial mode.
-      - key: LICENSE_SECRET
-        sync: false
-
-      # Customer's license key (`<base64payload>.<hmac>`). Optional — can
-      # also be set via the in-app /license/activate endpoint after deploy.
-      - key: LICENSE_KEY
-        sync: false
-
-      # Set ONLY on the vendor's deploy. Customer installs must leave blank.
-      - key: ADMIN_PASSWORD
-        sync: false
 
       # ─── Multi-tenant migration flag ──────────────────────────────────
       # KEEP `false` (or unset) until the legacy Hira & Sons rows are

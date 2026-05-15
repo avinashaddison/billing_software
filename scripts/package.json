@@ -6,8 +6,6 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "dev": "tsx ./src/dev.ts",
-    "gen-license": "tsx ./src/gen-license.ts",
-    "trial-expire": "tsx ./src/trial-expire.ts",
     "bootstrap-email-auth": "tsx ./src/bootstrap-email-auth.ts",
     "bootstrap-platform-admin": "tsx ./src/bootstrap-platform-admin.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
