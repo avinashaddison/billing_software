@@ -52,6 +52,10 @@ export default function ProductDetail() {
   const [printing, setPrinting]             = useState(false);
   const [printCopies, setPrintCopies]       = useState(1);
   const [labelSize]                          = useState(loadLabelSize);
+  /* Track which product we've already auto-seeded the copy count for so
+     we don't keep stomping on the cashier's manual +/- adjustments every
+     time the product query revalidates. Reset on navigation. */
+  const seededCopiesForRef                  = useRef<string | null>(null);
 
   /* Load suppliers for the edit panel */
   const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<ApiSupplier[]>({
@@ -81,6 +85,19 @@ export default function ProductDetail() {
       setLocation("/products");
     }
   }, [isError, setLocation]);
+
+  /* Default the print-label copy count to the product's current stock so
+     a fresh shipment can be re-tagged in one tap. We only seed once per
+     product visit — the ref guards against a query revalidation (after a
+     stock-in / stock-out) wiping the cashier's manual +/- adjustment.
+     Stock of 0 falls back to 1 (printing zero labels is pointless). */
+  useEffect(() => {
+    if (!product) return;
+    if (seededCopiesForRef.current === product.id) return;
+    const fromStock = Math.max(1, Math.min(999, product.stock));
+    setPrintCopies(fromStock);
+    seededCopiesForRef.current = product.id;
+  }, [product]);
 
   const { flash, triggerFlash } = useScanFlash();
   const scanCacheRef = useRef<Map<string, { id: string; sku: string; name: string; price: number }>>(new Map());
@@ -726,7 +743,7 @@ export default function ProductDetail() {
                   >−</button>
                   <span className="w-8 text-center text-sm font-black tabular-nums">{printCopies}</span>
                   <button
-                    onClick={() => setPrintCopies((c) => Math.min(99, c + 1))}
+                    onClick={() => setPrintCopies((c) => Math.min(999, c + 1))}
                     className="w-7 h-7 rounded-lg border flex items-center justify-center text-base font-black hover:bg-muted transition-colors active:scale-90"
                   >+</button>
                 </div>
