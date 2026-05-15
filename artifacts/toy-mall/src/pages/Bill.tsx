@@ -554,6 +554,30 @@ export default function Bill() {
                   <span className="text-black font-bold">You Saved (Total)</span>
                   <span className="text-right tabular-nums font-bold text-green-700">−₹{fmt(totalSavings)}</span>
                 </div>
+
+                {/* ── GST breakdown ──
+                    Shown only when the owner has set a non-zero GST rate
+                    in Settings. Treats the GRAND TOTAL as inclusive of
+                    GST and splits the tax 50/50 into CGST + SGST (the
+                    standard intra-state pattern for retail SMB). */}
+                {(store.gstRatePercent ?? 0) > 0 && (() => {
+                  const rate     = store.gstRatePercent!;
+                  const taxable  = bill.totalAmount / (1 + rate / 100);
+                  const totalTax = bill.totalAmount - taxable;
+                  const halfRate = rate / 2;
+                  const halfTax  = totalTax / 2;
+                  return (
+                    <div className="border-t border-dashed border-black/60 mt-1.5 pt-1.5 grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 leading-tight text-[10.5px]">
+                      <span className="text-black/80">Taxable Value</span>
+                      <span className="text-right tabular-nums">₹{fmt(taxable)}</span>
+                      <span className="text-black/80">CGST @ {halfRate}%</span>
+                      <span className="text-right tabular-nums">₹{fmt(halfTax)}</span>
+                      <span className="text-black/80">SGST @ {halfRate}%</span>
+                      <span className="text-right tabular-nums">₹{fmt(halfTax)}</span>
+                    </div>
+                  );
+                })()}
+
                 <div className="border-t border-dashed border-black/60 mt-1.5 pt-1.5 grid grid-cols-[1fr_auto] gap-x-2 leading-tight text-[12px] font-black">
                   <span>NET TOTAL</span>
                   <span className="text-right tabular-nums">₹{fmt(bill.totalAmount)}</span>

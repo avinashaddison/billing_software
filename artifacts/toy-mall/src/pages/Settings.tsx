@@ -18,6 +18,7 @@ const DEFAULTS: StoreSettings = {
   email:              "",
   address:            "",
   gst:                "",
+  gstRatePercent:     0,
   logoEmoji:          "🏪",
   logoUrl:            "",
   appSubtitle:        "Billing & Inventory",
@@ -52,6 +53,7 @@ export default function SettingsPage() {
     email:              store.email ?? "",
     address:            store.address,
     gst:                store.gst,
+    gstRatePercent:     store.gstRatePercent ?? 0,
     logoEmoji:          store.logoEmoji,
     logoUrl:            store.logoUrl ?? "",
     appSubtitle:        store.appSubtitle,
@@ -111,7 +113,9 @@ export default function SettingsPage() {
 
   const isDirty = JSON.stringify(form) !== JSON.stringify({
     name: store.name, tagline: store.tagline, phone: store.phone,
-    address: store.address, gst: store.gst, logoEmoji: store.logoEmoji,
+    address: store.address, gst: store.gst,
+    gstRatePercent: store.gstRatePercent ?? 0,
+    logoEmoji: store.logoEmoji,
     logoUrl: store.logoUrl ?? "",
     appSubtitle: store.appSubtitle, footerNote: store.footerNote,
     upiId: store.upiId, dynamicQrMode: store.dynamicQrMode,
@@ -244,6 +248,28 @@ export default function SettingsPage() {
             <input value={form.gst} onChange={(e) => set("gst", e.target.value)}
               placeholder="e.g. 27AAPFU0939F1ZV"
               className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono" />
+          </Field>
+          <Field
+            label="GST Tax Rate (%)"
+            hint="Treated as inclusive in product prices. Receipt splits this into CGST + SGST. Set 0 to hide the tax block from receipts."
+          >
+            <div className="relative">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={28}
+                step={0.01}
+                value={form.gstRatePercent || ""}
+                onChange={(e) => {
+                  const n = parseFloat(e.target.value);
+                  setForm((f) => ({ ...f, gstRatePercent: Number.isFinite(n) ? Math.max(0, Math.min(28, n)) : 0 }));
+                }}
+                placeholder="0"
+                className="w-full px-3 py-2.5 pr-9 rounded-xl border bg-muted/30 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground select-none">%</span>
+            </div>
           </Field>
         </Section>
 

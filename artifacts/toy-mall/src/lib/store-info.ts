@@ -10,6 +10,10 @@ export interface StoreSettings {
   email: string;
   address: string;
   gst: string;
+  /** GST tax rate as a percentage (e.g. 5, 12, 18, 28). Treated as
+   *  inclusive tax — the bill total already contains it. Set to 0 to
+   *  hide the breakdown from receipts entirely. */
+  gstRatePercent: number;
   logoEmoji: string;
   logoUrl: string;
   appSubtitle: string;
@@ -45,6 +49,7 @@ const SETTINGS_DEFAULTS: StoreSettings = {
   email:              "",
   address:            "",
   gst:                "",
+  gstRatePercent:     0,
   logoEmoji:          "🏪",
   logoUrl:            "",
   appSubtitle:        "",
