@@ -1,49 +1,52 @@
+/**
+ * Reset the Hira & Sons tenant's owner-email account to a known
+ * email + password. Idempotent: re-running picks up the existing row.
+ *
+ * Uses raw SQL through `pool` so the script doesn't need drizzle-orm as
+ * a direct dep — only @workspace/db.
+ */
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
-import { db, authUsersTable } from "@workspace/db";
+import { pool } from "@workspace/db";
 
 const NEW_EMAIL    = "owner@hirasons.com";
 const NEW_PASSWORD = "admin123";
 const TENANT_ID    = "hira-sons";
 
-async function main() {
+async function main(): Promise<void> {
   const hash = await bcrypt.hash(NEW_PASSWORD, 10);
 
-  const [existing] = await db
-    .select()
-    .from(authUsersTable)
-    .where(eq(authUsersTable.tenantId, TENANT_ID));
+  const existing = await pool.query<{ id: string; email: string }>(
+    "SELECT id, email FROM auth_users WHERE tenant_id = $1 LIMIT 1",
+    [TENANT_ID],
+  );
 
-  if (!existing) {
-    const [created] = await db
-      .insert(authUsersTable)
-      .values({
-        tenantId:     TENANT_ID,
-        email:        NEW_EMAIL,
-        passwordHash: hash,
-        role:         "owner",
-      })
-      .returning();
-    console.log("Created new owner:", created.email);
+  if (existing.rows.length === 0) {
+    const created = await pool.query<{ email: string }>(
+      `INSERT INTO auth_users (tenant_id, email, password_hash, role)
+       VALUES ($1, $2, $3, 'owner')
+       RETURNING email`,
+      [TENANT_ID, NEW_EMAIL, hash],
+    );
+    console.log("Created new owner:", created.rows[0].email);
   } else {
-    const [updated] = await db
-      .update(authUsersTable)
-      .set({
-        email:        NEW_EMAIL,
-        passwordHash: hash,
-        isActive:     true,
-        updatedAt:    new Date(),
-      })
-      .where(eq(authUsersTable.id, existing.id))
-      .returning();
+    const wasEmail = existing.rows[0].email;
+    await pool.query(
+      `UPDATE auth_users
+         SET email         = $2,
+             password_hash = $3,
+             is_active     = true,
+             updated_at    = now()
+       WHERE id = $1`,
+      [existing.rows[0].id, NEW_EMAIL, hash],
+    );
     console.log("Updated owner row:");
-    console.log("  was:", existing.email);
-    console.log("  now:", updated.email);
+    console.log("  was:", wasEmail);
+    console.log("  now:", NEW_EMAIL);
   }
 
   console.log("\nLogin credentials:");
-  console.log("  Email:    " + NEW_EMAIL);
-  console.log("  Password: " + NEW_PASSWORD);
+  console.log("  Email:   ", NEW_EMAIL);
+  console.log("  Password:", NEW_PASSWORD);
   process.exit(0);
 }
 
