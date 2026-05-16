@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { DEFAULT_LOGO_BG_THEME, type LogoBgTheme } from "@/lib/sidebar-themes";
 
 const BASE_URL = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
 
@@ -16,6 +17,8 @@ export interface StoreSettings {
   gstRatePercent: number;
   logoEmoji: string;
   logoUrl: string;
+  /** Background theme for the sidebar header logo card. */
+  logoBgTheme: LogoBgTheme;
   appSubtitle: string;
   footerNote: string;
   termsAndConditions: string[];
@@ -52,6 +55,7 @@ const SETTINGS_DEFAULTS: StoreSettings = {
   gstRatePercent:     0,
   logoEmoji:          "🏪",
   logoUrl:            "",
+  logoBgTheme:        DEFAULT_LOGO_BG_THEME,
   appSubtitle:        "",
   footerNote:         "",
   termsAndConditions: [],

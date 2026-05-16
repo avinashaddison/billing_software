@@ -7,6 +7,7 @@ import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
 import { type Permissions } from "@/lib/permissions";
 import { useStoreSettings } from "@/lib/store-info";
+import { getSidebarTheme } from "@/lib/sidebar-themes";
 import { UpdateBanner } from "@/components/layout/UpdateBanner";
 
 function getLevel(role: string | null, permissions: Permissions, resource: string): "none" | "read" | "write" {
@@ -22,6 +23,7 @@ export function SideNav() {
 
   const handleLogout = () => { logout(); setLocation("/login"); };
   const store = useStoreSettings();
+  const theme = getSidebarTheme(store.logoBgTheme);
 
   const perm    = (resource: string) => getLevel(role, permissions, resource);
   const visible = (resource: string) => perm(resource) !== "none";
@@ -48,21 +50,16 @@ export function SideNav() {
 
   return (
     <aside className="hidden md:flex flex-col w-56 min-h-screen bg-background border-r border-border shrink-0 sticky top-0 h-screen">
-      <div className="relative m-2 mb-3 px-3.5 pt-2.5 pb-2.5 rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 text-white shadow-lg shadow-indigo-950/30 ring-1 ring-white/5">
+      <div className={`relative m-2 mb-3 px-3.5 pt-2.5 pb-2.5 rounded-2xl overflow-hidden bg-gradient-to-br ${theme.outer} text-white shadow-lg shadow-indigo-950/30 ring-1 ring-white/5`}>
         {/* Conic-style gradient sheen — premium ambient depth */}
         <div
           aria-hidden
           className="pointer-events-none absolute -inset-px opacity-90"
-          style={{
-            background:
-              "radial-gradient(120% 80% at 0% 0%, rgba(139,92,246,0.45) 0%, transparent 50%), " +
-              "radial-gradient(100% 70% at 100% 100%, rgba(56,189,248,0.30) 0%, transparent 55%), " +
-              "radial-gradient(60% 60% at 80% 0%, rgba(236,72,153,0.20) 0%, transparent 60%)",
-          }}
+          style={{ background: theme.radial }}
         />
         {/* Soft animated breathing blob */}
-        <div className="pointer-events-none absolute -top-12 -left-10 w-32 h-32 rounded-full bg-violet-500/40 blur-3xl animate-pulse" style={{ animationDuration: "6s" }} />
-        <div className="pointer-events-none absolute -bottom-10 -right-8 w-28 h-28 rounded-full bg-cyan-400/25 blur-3xl animate-pulse" style={{ animationDuration: "7s", animationDelay: "1.5s" }} />
+        <div className={`pointer-events-none absolute -top-12 -left-10 w-32 h-32 rounded-full ${theme.blob1} blur-3xl animate-pulse`} style={{ animationDuration: "6s" }} />
+        <div className={`pointer-events-none absolute -bottom-10 -right-8 w-28 h-28 rounded-full ${theme.blob2} blur-3xl animate-pulse`} style={{ animationDuration: "7s", animationDelay: "1.5s" }} />
 
         {/* Subtle grid overlay (premium dashboard vibe) */}
         <div
@@ -77,13 +74,13 @@ export function SideNav() {
         />
 
         {/* Sparkle accent */}
-        <span aria-hidden className="absolute top-2.5 right-3 text-amber-200/70 text-[9px] animate-pulse" style={{ animationDuration: "3.5s" }}>✦</span>
+        <span aria-hidden className={`absolute top-2.5 right-3 ${theme.sparkle} text-[9px] animate-pulse`} style={{ animationDuration: "3.5s" }}>✦</span>
 
         <div className="relative flex items-center gap-3 group">
           {/* Logo — glass card */}
           <div className="relative shrink-0">
             {/* Soft outer glow */}
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-fuchsia-400 via-violet-400 to-cyan-400 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
+            <div className={`absolute -inset-1 rounded-2xl bg-gradient-to-br ${theme.glow} opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80`} />
             {/* Glass tile */}
             <div className="relative w-9 h-9 rounded-xl bg-white/95 backdrop-blur flex items-center justify-center shadow-xl shadow-indigo-950/40 ring-1 ring-white/50">
               {store.logoUrl ? (
@@ -107,7 +104,7 @@ export function SideNav() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300" />
               </span>
-              <p className="text-[9px] font-black tracking-[0.18em] uppercase truncate bg-gradient-to-r from-violet-200 via-fuchsia-200 to-cyan-200 bg-clip-text text-transparent">
+              <p className={`text-[9px] font-black tracking-[0.18em] uppercase truncate bg-gradient-to-r ${theme.accentText} bg-clip-text text-transparent`}>
                 AddisonX Media
               </p>
             </div>
@@ -118,7 +115,7 @@ export function SideNav() {
         <div aria-hidden className="absolute inset-x-0 bottom-0 h-3 bg-gradient-to-b from-transparent to-background/0" />
       </div>
       {/* Hairline accent — sits inside the gap below the floating header card */}
-      <div aria-hidden className="mx-3 h-px bg-gradient-to-r from-transparent via-violet-400/40 to-transparent" />
+      <div aria-hidden className={`mx-3 h-px bg-gradient-to-r from-transparent ${theme.hairline} to-transparent`} />
 
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {

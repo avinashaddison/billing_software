@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette } from "lucide-react";
 import { useStoreSettings, usePerStaffScannerPrefs, type StoreSettings } from "@/lib/store-info";
+import { SIDEBAR_THEMES, DEFAULT_LOGO_BG_THEME, getSidebarTheme, type LogoBgTheme } from "@/lib/sidebar-themes";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { useAuth } from "@/hooks/use-auth";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
@@ -21,6 +22,7 @@ const DEFAULTS: StoreSettings = {
   gstRatePercent:     0,
   logoEmoji:          "🏪",
   logoUrl:            "",
+  logoBgTheme:        DEFAULT_LOGO_BG_THEME,
   appSubtitle:        "Billing & Inventory",
   footerNote:         "Thank you for your business.",
   termsAndConditions: [
@@ -56,6 +58,7 @@ export default function SettingsPage() {
     gstRatePercent:     store.gstRatePercent ?? 0,
     logoEmoji:          store.logoEmoji,
     logoUrl:            store.logoUrl ?? "",
+    logoBgTheme:        store.logoBgTheme ?? DEFAULT_LOGO_BG_THEME,
     appSubtitle:        store.appSubtitle,
     footerNote:         store.footerNote,
     termsAndConditions: store.termsAndConditions ?? [],
@@ -117,6 +120,7 @@ export default function SettingsPage() {
     gstRatePercent: store.gstRatePercent ?? 0,
     logoEmoji: store.logoEmoji,
     logoUrl: store.logoUrl ?? "",
+    logoBgTheme: store.logoBgTheme ?? DEFAULT_LOGO_BG_THEME,
     appSubtitle: store.appSubtitle, footerNote: store.footerNote,
     upiId: store.upiId, dynamicQrMode: store.dynamicQrMode,
     labelShowPrice: store.labelShowPrice ?? true,
@@ -153,7 +157,14 @@ export default function SettingsPage() {
 
         {/* ── Live Preview ── */}
         <div className="bg-card border rounded-2xl p-4 space-y-3">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Logo Preview</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Sidebar Header Preview</p>
+          <SidebarHeaderPreview
+            theme={form.logoBgTheme}
+            name={form.name}
+            logoEmoji={form.logoEmoji}
+            logoUrl={form.logoUrl}
+          />
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2">Logo Tile (other places)</p>
           <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-xl shadow-sm shadow-primary/20 shrink-0">
               {form.logoEmoji || "🏪"}
@@ -229,6 +240,44 @@ export default function SettingsPage() {
                 className="w-24 px-3 py-2.5 rounded-xl border bg-muted/30 text-center text-lg focus:outline-none focus:ring-2 focus:ring-primary/30" />
               <p className="text-xs text-muted-foreground">Or paste / type any emoji</p>
             </div>
+          </Field>
+        </Section>
+
+        {/* ── Sidebar Header Theme ── */}
+        <Section icon={Palette} title="Sidebar Header Theme" color="text-fuchsia-600 bg-fuchsia-50 dark:bg-fuchsia-950/30">
+          <Field label="Background style" hint="The gradient behind your shop name in the sidebar. Click a swatch — preview updates above. Press Save to apply.">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {(Object.keys(SIDEBAR_THEMES) as LogoBgTheme[]).map((key) => {
+                const t = SIDEBAR_THEMES[key];
+                const isActive = form.logoBgTheme === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => set("logoBgTheme", key)}
+                    className={`group relative rounded-xl overflow-hidden ring-2 transition-all text-left ${
+                      isActive
+                        ? "ring-primary scale-[1.02] shadow-md"
+                        : "ring-border hover:ring-primary/50 hover:scale-[1.01]"
+                    }`}
+                    aria-pressed={isActive}
+                  >
+                    <div
+                      className="h-12 w-full"
+                      style={{ background: t.swatch }}
+                      aria-hidden
+                    />
+                    <div className="px-2.5 py-1.5 bg-card flex items-center justify-between gap-1">
+                      <span className="text-[11px] font-black truncate">{t.label}</span>
+                      {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-3">
+              The theme applies only to the sidebar's logo card. Bills, receipts, and other surfaces stay neutral.
+            </p>
           </Field>
         </Section>
 
@@ -818,6 +867,63 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       <label className="text-xs font-bold text-foreground">{label}</label>
       {children}
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+/**
+ * Live miniature of the SideNav logo card — re-uses the same theme tokens
+ * so what the owner sees in Settings is exactly what they'll get.
+ */
+function SidebarHeaderPreview({
+  theme: themeKey,
+  name,
+  logoEmoji,
+  logoUrl,
+}: {
+  theme: LogoBgTheme;
+  name: string;
+  logoEmoji: string;
+  logoUrl: string;
+}) {
+  const t = getSidebarTheme(themeKey);
+  return (
+    <div className="rounded-xl bg-muted/40 p-3">
+      <div className={`relative px-3.5 pt-2.5 pb-2.5 rounded-2xl overflow-hidden bg-gradient-to-br ${t.outer} text-white shadow-lg ring-1 ring-white/5`}>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -inset-px opacity-90"
+          style={{ background: t.radial }}
+        />
+        <div className={`pointer-events-none absolute -top-12 -left-10 w-32 h-32 rounded-full ${t.blob1} blur-3xl`} />
+        <div className={`pointer-events-none absolute -bottom-10 -right-8 w-28 h-28 rounded-full ${t.blob2} blur-3xl`} />
+        <span aria-hidden className={`absolute top-2.5 right-3 ${t.sparkle} text-[9px]`}>✦</span>
+
+        <div className="relative flex items-center gap-3">
+          <div className="relative shrink-0">
+            <div className={`absolute -inset-1 rounded-2xl bg-gradient-to-br ${t.glow} opacity-50 blur-md`} />
+            <div className="relative w-9 h-9 rounded-xl bg-white/95 backdrop-blur flex items-center justify-center shadow-xl ring-1 ring-white/50">
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="w-6 h-6 object-contain drop-shadow-sm" />
+              ) : (
+                <span className="text-lg leading-none drop-shadow-sm">{logoEmoji || "🏪"}</span>
+              )}
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[12px] font-black tracking-tight leading-[1.2] text-white truncate">
+              {name || "Your Shop Name"}
+            </h1>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+              <p className={`text-[9px] font-black tracking-[0.18em] uppercase truncate bg-gradient-to-r ${t.accentText} bg-clip-text text-transparent`}>
+                AddisonX Media
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div aria-hidden className={`mt-1 mx-3 h-px bg-gradient-to-r from-transparent ${t.hairline} to-transparent`} />
     </div>
   );
 }
