@@ -105,11 +105,21 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react":  ["react", "react-dom"],
-          "vendor-query":  ["@tanstack/react-query"],
-          "vendor-charts": ["recharts"],
-          "vendor-ui":     ["lucide-react"],
+        /**
+         * Function form (not object form) — the object form
+         * `{ "vendor-react": ["react", "react-dom"] }` produced an empty
+         * vendor-react.js because Rollup couldn't link react-dom's
+         * dynamic resolution into it, then tree-shook the apparently
+         * unused bundle. Function form picks chunks per module path,
+         * which survives Rollup's optimizations.
+         */
+        manualChunks: (id: string) => {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("/react-dom/") || id.includes("/scheduler/")) return "vendor-react";
+          if (/[\\/]node_modules[\\/]react[\\/]/.test(id))               return "vendor-react";
+          if (id.includes("/@tanstack/react-query/"))                    return "vendor-query";
+          if (id.includes("/recharts/"))                                 return "vendor-charts";
+          if (id.includes("/lucide-react/"))                             return "vendor-ui";
         },
       },
     },
