@@ -15,6 +15,13 @@ export const billsTable = pgTable(
     customerName:  text("customer_name"),
     customerPhone: varchar("customer_phone", { length: 10 }),
     paymentMode:   varchar("payment_mode", { length: 10 }).notNull().default("cash"),
+    /** How much of `totalAmount` has been collected. Equals totalAmount for
+     *  fully-paid cash/UPI bills; 0 for fresh credit sales; somewhere in
+     *  between for partial payments. */
+    amountPaid:    numeric("amount_paid", { precision: 15, scale: 2 }).notNull().default("0"),
+    /** Derived from amountPaid vs totalAmount but stored so the receivables
+     *  query can hit a partial index instead of computing on every row. */
+    paymentStatus: varchar("payment_status", { length: 10 }).notNull().default("paid"),
     discount:      numeric("discount", { precision: 10, scale: 2 }),
     discountType:  text("discount_type"),
     createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -22,6 +29,7 @@ export const billsTable = pgTable(
   (table) => [
     index("bills_tenant_idx").on(table.tenantId),
     index("bills_tenant_created_idx").on(table.tenantId, table.createdAt),
+    index("bills_tenant_status_idx").on(table.tenantId, table.paymentStatus),
   ],
 );
 

@@ -4,6 +4,7 @@ import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
   Phone, User, Wallet, Banknote, Smartphone, Minus, Plus,
   Trash2, ScanLine, WifiOff, RefreshCw, QrCode, BadgeCheck, Tag,
+  HandCoins,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -15,7 +16,7 @@ import { useStoreSettings } from "@/lib/store-info";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type PaymentMode = "cash" | "upi";
+type PaymentMode = "cash" | "upi" | "credit";
 
 async function postCheckout(payload: {
   items: {
@@ -339,6 +340,15 @@ export default function Checkout() {
     if (err) { setPhoneError(err); return; }
     if (!items.length) return;
 
+    // Credit sales need an identifiable debtor. Without a phone, the receivable
+    // would never be collectible — block early with a clear toast.
+    if (paymentModeRef.current === "credit" && !/^\d{10}$/.test(phone)) {
+      setPhoneError("Required for credit sale");
+      toast.error("Add the customer's mobile to record a credit sale");
+      playError();
+      return;
+    }
+
     if (!isOnline) {
       enqueue({
         items: buildCheckoutItems(),
@@ -551,7 +561,7 @@ export default function Checkout() {
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
                 <Wallet className="w-3.5 h-3.5" /> Payment Mode
               </p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {(
                   [
                     {
@@ -570,6 +580,14 @@ export default function Checkout() {
                       iconClass: "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400",
                       textClass: "text-blue-700 dark:text-blue-300",
                     },
+                    {
+                      value: "credit" as PaymentMode,
+                      label: "Credit",
+                      Icon: HandCoins,
+                      activeClass: "bg-rose-50 dark:bg-rose-950/30 border-rose-400 dark:border-rose-600",
+                      iconClass: "bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400",
+                      textClass: "text-rose-700 dark:text-rose-300",
+                    },
                   ] as const
                 ).map(({ value, label, Icon, activeClass, iconClass, textClass }) => {
                   const active = paymentMode === value;
@@ -578,7 +596,7 @@ export default function Checkout() {
                       key={value}
                       type="button"
                       onClick={() => selectPaymentMode(value)}
-                      className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 ${
+                      className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-2xl border-2 transition-all active:scale-95 ${
                         active ? activeClass : "border-border bg-muted/40 hover:bg-muted"
                       }`}
                     >
@@ -589,18 +607,24 @@ export default function Checkout() {
                       >
                         <Icon className="w-4 h-4" />
                       </div>
-                      <div className="text-left">
-                        <p className={`font-black text-sm ${active ? textClass : "text-muted-foreground"}`}>
+                      <div className="text-center leading-tight">
+                        <p className={`font-black text-xs ${active ? textClass : "text-muted-foreground"}`}>
                           {label}
                         </p>
                         {active && (
-                          <p className={`text-[10px] font-bold ${textClass}`}>Selected ✓</p>
+                          <p className={`text-[9px] font-bold ${textClass}`}>Selected ✓</p>
                         )}
                       </div>
                     </button>
                   );
                 })}
               </div>
+              {paymentMode === "credit" && (
+                <p className="mt-2 text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                  <HandCoins className="w-3 h-3" />
+                  Recorded as unpaid. Customer mobile is required so you can collect later.
+                </p>
+              )}
             </div>
 
             {/* ── Dynamic UPI QR panel — auto-shows when UPI selected ── */}
@@ -656,7 +680,11 @@ export default function Checkout() {
             <div className="px-4 pt-3 pb-4">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5" /> Customer Mobile
-                <span className="normal-case font-medium text-muted-foreground/60">(optional)</span>
+                {paymentMode === "credit" ? (
+                  <span className="normal-case font-bold text-rose-600 dark:text-rose-400">(required for credit)</span>
+                ) : (
+                  <span className="normal-case font-medium text-muted-foreground/60">(optional)</span>
+                )}
               </p>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground select-none">
@@ -692,15 +720,22 @@ export default function Checkout() {
               onClick={handleCheckout}
               disabled={loading || (!!phone && !!validatePhone(phone))}
               className={`w-full py-4 rounded-2xl font-black text-base text-white flex items-center justify-center gap-2.5 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 ${
-                qrActive
-                  ? "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20"
-                  : "bg-green-600 hover:bg-green-500 shadow-green-500/20"
+                paymentMode === "credit"
+                  ? "bg-rose-600 hover:bg-rose-500 shadow-rose-500/20"
+                  : qrActive
+                    ? "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20"
+                    : "bg-green-600 hover:bg-green-500 shadow-green-500/20"
               }`}
               data-testid="btn-complete-sale"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" /> Processing…
+                </>
+              ) : paymentMode === "credit" ? (
+                <>
+                  <HandCoins className="w-5 h-5" />
+                  Save as Credit · ₹{finalTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                 </>
               ) : qrActive ? (
                 <>

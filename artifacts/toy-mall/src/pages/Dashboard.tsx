@@ -1,12 +1,14 @@
 import {
   useGetDashboardSummary, useGetTodayActivity, useGetLowStockProducts, useGetCategoryBreakdown,
+  useGetReceivablesSummary,
   getGetDashboardSummaryQueryKey, getGetTodayActivityQueryKey,
   getGetLowStockProductsQueryKey, getGetCategoryBreakdownQueryKey,
+  getGetReceivablesSummaryQueryKey,
 } from "@workspace/api-client-react";
 import {
   Package, IndianRupee, AlertTriangle, ArrowDownToLine, ArrowUpToLine,
   TrendingUp, FileText, Users, Tag, Truck, ChevronRight, Activity,
-  CalendarClock, Infinity as InfinityIcon,
+  CalendarClock, Infinity as InfinityIcon, HandCoins,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -235,6 +237,108 @@ function StatCard({
   );
 }
 
+/* ── Receivables (money customers owe) ──────────────────────────── */
+function fmtRupees(n: number) {
+  return n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+}
+function fmtDebtorLabel(d: { customerName?: string | null; customerPhone?: string | null }) {
+  if (d.customerName) return d.customerName;
+  if (d.customerPhone) return d.customerPhone;
+  return "Walk-in";
+}
+
+function ReceivablesCard() {
+  const { data, isLoading } = useGetReceivablesSummary({
+    query: { queryKey: getGetReceivablesSummaryQueryKey() },
+  });
+
+  const total      = data?.totalOutstanding ?? 0;
+  const billCount  = data?.billCount ?? 0;
+  const topDebtors = data?.topDebtors ?? [];
+  const hasDues    = total > 0;
+
+  return (
+    <div className={`relative bg-card border rounded-2xl overflow-hidden shadow-sm ${hasDues ? "shadow-rose-500/10" : ""}`}>
+      <div className={`absolute inset-0 bg-gradient-to-br ${hasDues ? "from-rose-500/8 via-rose-500/3" : "from-emerald-500/8 via-emerald-500/3"} to-transparent pointer-events-none`} />
+
+      <div className="relative p-4 pb-3">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className={`w-7 h-7 rounded-xl flex items-center justify-center shadow-sm ${hasDues ? "bg-rose-500" : "bg-emerald-500"}`}>
+              <HandCoins className="w-3.5 h-3.5 text-white" />
+            </div>
+            <h2 className="text-sm font-black text-foreground">Customers Owe You</h2>
+          </div>
+          <Link
+            href="/customers"
+            className={`flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-full transition-colors ${
+              hasDues
+                ? "text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20"
+                : "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+            }`}
+          >
+            View all <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
+
+        {isLoading ? (
+          <Skeleton className="h-9 w-40 mt-1" />
+        ) : (
+          <div className="flex items-baseline gap-2">
+            <span className={`text-3xl font-black tracking-tight ${hasDues ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+              ₹{fmtRupees(total)}
+            </span>
+            {hasDues && (
+              <span className="text-xs text-muted-foreground font-semibold">
+                across {billCount} bill{billCount !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+        )}
+        {!isLoading && !hasDues && (
+          <p className="text-xs text-muted-foreground mt-1 font-medium">
+            All settled — no outstanding credit sales.
+          </p>
+        )}
+      </div>
+
+      {/* Top debtors list — only when there's something to chase */}
+      {hasDues && topDebtors.length > 0 && (
+        <div className="relative px-3 pb-3 space-y-1.5">
+          {topDebtors.slice(0, 3).map((d, i) => {
+            const phone = d.customerPhone;
+            const label = fmtDebtorLabel(d);
+            const row = (
+              <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-background/60 border hover:bg-rose-50/60 dark:hover:bg-rose-950/20 transition-colors">
+                <div className="w-7 h-7 rounded-full bg-rose-500/10 flex items-center justify-center shrink-0">
+                  <span className="text-[10px] font-black text-rose-600 dark:text-rose-400">{i + 1}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-sm truncate">{label}</p>
+                  {d.customerName && d.customerPhone && (
+                    <p className="text-[10px] text-muted-foreground font-mono">{d.customerPhone}</p>
+                  )}
+                  {!d.customerName && (
+                    <p className="text-[10px] text-muted-foreground">{d.billCount} unpaid bill{d.billCount !== 1 ? "s" : ""}</p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-base font-black text-rose-600 dark:text-rose-400 leading-none tabular-nums">
+                    ₹{fmtRupees(d.outstanding)}
+                  </p>
+                </div>
+              </div>
+            );
+            return phone
+              ? <Link key={`${phone}-${i}`} href={`/customers?phone=${phone}`}>{row}</Link>
+              : <div key={`anon-${i}`}>{row}</div>;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Quick-tile ──────────────────────────────────────────────────── */
 const quickTiles = [
   { href: "/report",    icon: FileText, label: "Reports",   desc: "EOD & trends",     iconBg: "bg-blue-500",    gradient: "from-blue-500/8"   },
@@ -285,8 +389,11 @@ export default function Dashboard() {
           loading={loadingActivity} testid="stat-today-out" />
       </div>
 
-      {/* ── Revenue chart ── */}
-      <RevenueChart />
+      {/* ── Revenue + Receivables (money in / money owed) ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <RevenueChart />
+        <ReceivablesCard />
+      </div>
 
       {/* ── Quick-access tiles ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

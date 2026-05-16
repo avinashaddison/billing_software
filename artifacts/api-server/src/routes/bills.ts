@@ -1,13 +1,47 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and } from "drizzle-orm";
-import { db, billsTable, saleItemsTable, productsTable, stockLogsTable } from "@workspace/db";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
+import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { tenantWhere } from "../lib/tenant";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 
 const router: IRouter = Router();
 
-type PaymentMode = "cash" | "upi";
+/* ───────────────────────────────────────────────────────────────────
+ * Receivable math, in one place so server and clients agree:
+ *   outstanding = max(0, totalAmount − amountPaid − totalReturns)
+ *   status      = paid    if outstanding === 0
+ *                 partial if amountPaid > 0 OR totalReturns > 0
+ *                 unpaid  otherwise
+ * Returns refund cash on a paid bill so it never opens up a receivable;
+ * the math just clamps to zero. On a credit bill it shrinks what's due.
+ * ─────────────────────────────────────────────────────────────────── */
+export function computeBillStatus(
+  totalAmount: number,
+  amountPaid:  number,
+  refunded:    number,
+): "paid" | "partial" | "unpaid" {
+  const outstanding = Math.max(0, totalAmount - amountPaid - refunded);
+  if (outstanding === 0) return "paid";
+  if (amountPaid > 0 || refunded > 0) return "partial";
+  return "unpaid";
+}
+
+/** Fetch refundedAmount totals for a set of bill ids in one query. */
+export async function refundsByBill(billIds: string[]): Promise<Map<string, number>> {
+  if (billIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      billId:   returnsTable.billId,
+      refunded: sql<string>`coalesce(sum(${returnsTable.refundAmount}), 0)`.as("refunded"),
+    })
+    .from(returnsTable)
+    .where(inArray(returnsTable.billId, billIds))
+    .groupBy(returnsTable.billId);
+  return new Map(rows.map((r) => [r.billId, Number(r.refunded)]));
+}
+
+type PaymentMode = "cash" | "upi" | "credit";
 
 function isValidCheckoutBody(body: unknown): body is {
   items: Array<{
@@ -28,7 +62,12 @@ function isValidCheckoutBody(body: unknown): body is {
   if (!body || typeof body !== "object") return false;
   const b = body as Record<string, unknown>;
   if (!Array.isArray(b.items) || b.items.length === 0) return false;
-  if (b.paymentMode !== "cash" && b.paymentMode !== "upi") return false;
+  if (b.paymentMode !== "cash" && b.paymentMode !== "upi" && b.paymentMode !== "credit") return false;
+  // Credit sales must identify the debtor — otherwise the shop can never
+  // collect. Cash/UPI can still be anonymous walk-in customers.
+  if (b.paymentMode === "credit" && (!b.customerPhone || typeof b.customerPhone !== "string" || !/^\d{10}$/.test(b.customerPhone))) {
+    return false;
+  }
   if (b.customerName !== undefined && b.customerName !== "") {
     if (typeof b.customerName !== "string") return false;
     /* Length cap matches the receipt column width — keeps the printed
@@ -154,6 +193,10 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
       }
       const totalAmount = subtotal - discountAmount;
 
+      const isCredit = paymentMode === "credit";
+      const amountPaid    = isCredit ? 0 : totalAmount;
+      const paymentStatus = isCredit ? "unpaid" : "paid";
+
       const [bill] = await tx
         .insert(billsTable)
         .values({
@@ -161,6 +204,8 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           totalAmount:   String(totalAmount),
           itemsCount,
           paymentMode,
+          amountPaid:    String(amountPaid),
+          paymentStatus,
           customerName:  customerName?.trim() || null,
           customerPhone: customerPhone || null,
           discount:      discount && discount > 0 ? String(discount) : null,
@@ -225,11 +270,15 @@ router.get("/bills", async (req, res): Promise<void> => {
     .orderBy(desc(billsTable.createdAt))
     .limit(50);
 
+  const refunds = await refundsByBill(bills.map((b) => b.id));
+
   res.json(bills.map((b) => ({
     ...b,
-    totalAmount:  Number(b.totalAmount),
-    discount:     b.discount != null ? Number(b.discount) : null,
-    discountType: b.discountType ?? null,
+    totalAmount:    Number(b.totalAmount),
+    amountPaid:     Number(b.amountPaid),
+    refundedAmount: refunds.get(b.id) ?? 0,
+    discount:       b.discount != null ? Number(b.discount) : null,
+    discountType:   b.discountType ?? null,
   })));
 });
 
@@ -245,6 +294,9 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
     ));
 
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+
+  const refundsMap    = await refundsByBill([bill.id]);
+  const refundedAmount = refundsMap.get(bill.id) ?? 0;
 
   const items = await db
     .select({
@@ -267,9 +319,11 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
   res.json({
     bill: {
       ...bill,
-      totalAmount:  Number(bill.totalAmount),
-      discount:     bill.discount != null ? Number(bill.discount) : null,
-      discountType: bill.discountType ?? null,
+      totalAmount:    Number(bill.totalAmount),
+      amountPaid:     Number(bill.amountPaid),
+      refundedAmount,
+      discount:       bill.discount != null ? Number(bill.discount) : null,
+      discountType:   bill.discountType ?? null,
     },
     items: items.map((i) => ({
       ...i,
@@ -283,6 +337,80 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
       subtotal:         Number(i.subtotal),
     })),
   });
+});
+
+/**
+ * POST /api/bills/:id/payment
+ * Record a payment against an outstanding bill. Body: { amount, paymentMode? }.
+ * Updates amountPaid (clamped to totalAmount) and recomputes paymentStatus.
+ */
+router.post("/bills/:id/payment", async (req, res): Promise<void> => {
+  const { id } = req.params;
+  const body = req.body as { amount?: unknown; paymentMode?: unknown };
+
+  const amount = typeof body.amount === "number" ? body.amount : NaN;
+  if (!Number.isFinite(amount) || amount <= 0) {
+    res.status(400).json({ error: "amount must be a positive number" });
+    return;
+  }
+  const newPaymentMode =
+    body.paymentMode === "cash" || body.paymentMode === "upi"
+      ? (body.paymentMode as "cash" | "upi")
+      : undefined;
+
+  try {
+    const updated = await db.transaction(async (tx) => {
+      const [bill] = await tx
+        .select()
+        .from(billsTable)
+        .where(and(
+          eq(billsTable.id, id),
+          tenantWhere(billsTable.tenantId, req.tenantId),
+        ));
+      if (!bill) throw new Error("Bill not found");
+
+      const total       = Number(bill.totalAmount);
+      const prevPaid    = Number(bill.amountPaid);
+      // Pull refund totals inside the transaction so we don't race a return.
+      const [refundRow] = await tx
+        .select({ refunded: sql<string>`coalesce(sum(${returnsTable.refundAmount}), 0)` })
+        .from(returnsTable)
+        .where(eq(returnsTable.billId, id));
+      const refunded    = Number(refundRow?.refunded ?? 0);
+      const cap         = Math.max(0, total - refunded);
+      const newPaid     = Math.min(cap, prevPaid + amount);
+      const status      = computeBillStatus(total, newPaid, refunded);
+
+      const [row] = await tx
+        .update(billsTable)
+        .set({
+          amountPaid:    String(newPaid),
+          paymentStatus: status,
+          // If the bill was credit and is now settled, reflect the actual
+          // mode the customer used to pay it off (cash/upi).
+          ...(status === "paid" && newPaymentMode ? { paymentMode: newPaymentMode } : {}),
+        })
+        .where(eq(billsTable.id, id))
+        .returning();
+      return row;
+    });
+
+    broadcast("bill_payment", {
+      billId:     updated.id,
+      amountPaid: Number(updated.amountPaid),
+      status:     updated.paymentStatus,
+    }, req.tenantId);
+
+    res.json({
+      ...updated,
+      totalAmount: Number(updated.totalAmount),
+      amountPaid:  Number(updated.amountPaid),
+      discount:    updated.discount != null ? Number(updated.discount) : null,
+    });
+  } catch (err: any) {
+    const msg = err?.message || "Failed to record payment";
+    res.status(msg === "Bill not found" ? 404 : 400).json({ error: msg });
+  }
 });
 
 export default router;

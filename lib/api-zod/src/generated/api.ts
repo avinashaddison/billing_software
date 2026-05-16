@@ -361,6 +361,23 @@ export const GetCategoryBreakdownResponse = zod.array(
 );
 
 /**
+ * @summary Outstanding money owed to the shop, with top debtors
+ */
+export const GetReceivablesSummaryResponse = zod.object({
+  totalOutstanding: zod.number(),
+  billCount: zod.number(),
+  topDebtors: zod.array(
+    zod.object({
+      customerName: zod.string().nullish(),
+      customerPhone: zod.string().nullish(),
+      outstanding: zod.number(),
+      billCount: zod.number(),
+      lastBillAt: zod.string(),
+    }),
+  ),
+});
+
+/**
  * @summary Create a new bill at checkout
  */
 export const CheckoutBody = zod.object({
@@ -372,7 +389,12 @@ export const CheckoutBody = zod.object({
       mrp: zod.number().optional(),
     }),
   ),
-  paymentMode: zod.enum(["cash", "upi"]),
+  paymentMode: zod
+    .enum(["cash", "upi", "credit"])
+    .describe(
+      "Mode of payment. `credit` records the bill as unpaid (receivable); requires `customerPhone` so the debtor is identifiable.",
+    ),
+  customerName: zod.string().optional(),
   customerPhone: zod.string().optional(),
   discount: zod
     .number()
@@ -391,8 +413,13 @@ export const ListBillsResponseItem = zod.object({
   id: zod.string(),
   billNumber: zod.number().optional(),
   totalAmount: zod.number(),
+  amountPaid: zod
+    .number()
+    .describe("Cumulative amount collected against this bill."),
+  paymentStatus: zod.enum(["paid", "partial", "unpaid"]),
   itemsCount: zod.number(),
   paymentMode: zod.string(),
+  customerName: zod.string().nullish(),
   customerPhone: zod.string().nullish(),
   discount: zod.number().nullish(),
   discountType: zod.string().nullish(),
@@ -412,8 +439,13 @@ export const GetBillResponse = zod.object({
     id: zod.string(),
     billNumber: zod.number().optional(),
     totalAmount: zod.number(),
+    amountPaid: zod
+      .number()
+      .describe("Cumulative amount collected against this bill."),
+    paymentStatus: zod.enum(["paid", "partial", "unpaid"]),
     itemsCount: zod.number(),
     paymentMode: zod.string(),
+    customerName: zod.string().nullish(),
     customerPhone: zod.string().nullish(),
     discount: zod.number().nullish(),
     discountType: zod.string().nullish(),
@@ -431,4 +463,38 @@ export const GetBillResponse = zod.object({
       subtotal: zod.number(),
     }),
   ),
+});
+
+/**
+ * @summary Record a payment against an outstanding (credit) bill
+ */
+export const RecordBillPaymentParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const RecordBillPaymentBody = zod.object({
+  amount: zod
+    .number()
+    .describe("Amount being collected now (clamped to outstanding balance)"),
+  paymentMode: zod
+    .enum(["cash", "upi"])
+    .optional()
+    .describe("How the customer paid this installment"),
+});
+
+export const RecordBillPaymentResponse = zod.object({
+  id: zod.string(),
+  billNumber: zod.number().optional(),
+  totalAmount: zod.number(),
+  amountPaid: zod
+    .number()
+    .describe("Cumulative amount collected against this bill."),
+  paymentStatus: zod.enum(["paid", "partial", "unpaid"]),
+  itemsCount: zod.number(),
+  paymentMode: zod.string(),
+  customerName: zod.string().nullish(),
+  customerPhone: zod.string().nullish(),
+  discount: zod.number().nullish(),
+  discountType: zod.string().nullish(),
+  createdAt: zod.string(),
 });

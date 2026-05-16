@@ -11,7 +11,9 @@ import type { CheckoutItem } from "./checkoutItem";
 
 export interface CheckoutInput {
   items: CheckoutItem[];
+  /** Mode of payment. `credit` records the bill as unpaid (receivable); requires `customerPhone` so the debtor is identifiable. */
   paymentMode: CheckoutInputPaymentMode;
+  customerName?: string;
   customerPhone?: string;
   /** Raw discount value (e.g. 10 for 10% or 200 for ₹200) */
   discount?: number;

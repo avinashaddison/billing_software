@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { db, returnsTable, productsTable, billsTable, saleItemsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { logger } from "../lib/logger";
 import { tenantWhere } from "../lib/tenant";
+import { computeBillStatus } from "./bills";
 
 const router: IRouter = Router();
 
@@ -151,8 +152,34 @@ router.post("/returns", async (req, res): Promise<void> => {
       returnRows.push(ret);
     }
 
-    return { returns: returnRows, totalRefund };
+    /* Recompute the bill's paymentStatus now that refunds may have shrunk
+     * the outstanding amount. Without this, a credit bill stays "unpaid"
+     * even after the customer returns enough goods to settle it. */
+    const [refundTotalRow] = await tx
+      .select({ refunded: sql<string>`coalesce(sum(${returnsTable.refundAmount}), 0)` })
+      .from(returnsTable)
+      .where(eq(returnsTable.billId, billId));
+    const refunded   = Number(refundTotalRow?.refunded ?? 0);
+    const totalAmt   = Number(bill.totalAmount);
+    const paidAmt    = Number(bill.amountPaid);
+    const newStatus  = computeBillStatus(totalAmt, paidAmt, refunded);
+    if (newStatus !== bill.paymentStatus) {
+      await tx
+        .update(billsTable)
+        .set({ paymentStatus: newStatus })
+        .where(eq(billsTable.id, billId));
+    }
+
+    return { returns: returnRows, totalRefund, newStatus, refunded };
   });
+
+  /* Tell live dashboards the receivable just shifted so the tile / debtor
+   * list re-fetch instead of waiting for a manual refresh. */
+  broadcast("bill_payment", {
+    billId,
+    amountPaid: Number(bill.amountPaid),
+    status:     result.newStatus,
+  }, bill.tenantId);
 
   res.status(201).json({
     returns:     result.returns.map((r) => ({ ...r, refundAmount: Number(r.refundAmount) })),

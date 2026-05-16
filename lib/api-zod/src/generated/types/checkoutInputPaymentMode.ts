@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Mode of payment. `credit` records the bill as unpaid (receivable); requires `customerPhone` so the debtor is identifiable.
+ */
 export type CheckoutInputPaymentMode =
   (typeof CheckoutInputPaymentMode)[keyof typeof CheckoutInputPaymentMode];
 
 export const CheckoutInputPaymentMode = {
   cash: "cash",
   upi: "upi",
+  credit: "credit",
 } as const;

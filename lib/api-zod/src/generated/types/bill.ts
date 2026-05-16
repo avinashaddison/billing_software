@@ -5,13 +5,19 @@
  * Toy Mall Inventory Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { BillPaymentStatus } from "./billPaymentStatus";
 
 export interface Bill {
   id: string;
   billNumber?: number;
   totalAmount: number;
+  /** Cumulative amount collected against this bill. */
+  amountPaid: number;
+  paymentStatus: BillPaymentStatus;
   itemsCount: number;
   paymentMode: string;
+  /** @nullable */
+  customerName?: string | null;
   /** @nullable */
   customerPhone?: string | null;
   /** @nullable */

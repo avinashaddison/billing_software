@@ -376,6 +376,19 @@ paths:
                 items:
                   $ref: "#/components/schemas/CategoryStat"
 
+  /dashboard/receivables:
+    get:
+      operationId: getReceivablesSummary
+      tags: [dashboard]
+      summary: Outstanding money owed to the shop, with top debtors
+      responses:
+        "200":
+          description: Receivables summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceivablesSummary"
+
   /bills/checkout:
     post:
       operationId: checkout
@@ -434,6 +447,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BillDetail"
+        "404":
+          description: Bill not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bills/{id}/payment:
+    post:
+      operationId: recordBillPayment
+      tags: [bills]
+      summary: Record a payment against an outstanding (credit) bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordPaymentInput"
+      responses:
+        "200":
+          description: Updated bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+        "400":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Bill not found
           content:
@@ -736,7 +786,12 @@ components:
             $ref: "#/components/schemas/CheckoutItem"
         paymentMode:
           type: string
-          enum: [cash, upi]
+          enum: [cash, upi, credit]
+          description: >-
+            Mode of payment. `credit` records the bill as unpaid (receivable);
+            requires `customerPhone` so the debtor is identifiable.
+        customerName:
+          type: string
         customerPhone:
           type: string
         discount:
@@ -759,10 +814,18 @@ components:
           type: integer
         totalAmount:
           type: number
+        amountPaid:
+          type: number
+          description: Cumulative amount collected against this bill.
+        paymentStatus:
+          type: string
+          enum: [paid, partial, unpaid]
         itemsCount:
           type: integer
         paymentMode:
           type: string
+        customerName:
+          type: ["string", "null"]
         customerPhone:
           type: ["string", "null"]
         discount:
@@ -774,6 +837,8 @@ components:
       required:
         - id
         - totalAmount
+        - amountPaid
+        - paymentStatus
         - itemsCount
         - paymentMode
         - createdAt
@@ -831,3 +896,50 @@ components:
       required:
         - bill
         - items
+
+    RecordPaymentInput:
+      type: object
+      properties:
+        amount:
+          type: number
+          description: Amount being collected now (clamped to outstanding balance)
+        paymentMode:
+          type: string
+          enum: [cash, upi]
+          description: How the customer paid this installment
+      required:
+        - amount
+
+    Debtor:
+      type: object
+      properties:
+        customerName:
+          type: ["string", "null"]
+        customerPhone:
+          type: ["string", "null"]
+        outstanding:
+          type: number
+        billCount:
+          type: integer
+        lastBillAt:
+          type: string
+      required:
+        - outstanding
+        - billCount
+        - lastBillAt
+
+    ReceivablesSummary:
+      type: object
+      properties:
+        totalOutstanding:
+          type: number
+        billCount:
+          type: integer
+        topDebtors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Debtor"
+      required:
+        - totalOutstanding
+        - billCount
+        - topDebtors

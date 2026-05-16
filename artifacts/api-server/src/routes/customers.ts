@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, sql, and, gte, isNotNull, inArray } from "drizzle-orm";
-import { db, billsTable, saleItemsTable, productsTable } from "@workspace/db";
+import { db, billsTable, saleItemsTable, productsTable, returnsTable } from "@workspace/db";
 import { tenantWhere } from "../lib/tenant";
 
 const router: IRouter = Router();
@@ -30,24 +30,44 @@ router.get("/customers", async (req, res): Promise<void> => {
     conditions.push(gte(billsTable.createdAt, monthStart));
   }
 
+  /* Refunds reduce what the customer owes. We left-join the per-bill refund
+   * totals so a bill with no returns yields NULL → coalesced to 0. */
+  const refundsSubquery = db
+    .select({
+      billId:   returnsTable.billId,
+      refunded: sql<string>`sum(${returnsTable.refundAmount})`.as("refunded"),
+    })
+    .from(returnsTable)
+    .groupBy(returnsTable.billId)
+    .as("refunds_sq");
+
   const rows = await db
     .select({
       customerPhone: billsTable.customerPhone,
+      customerName:  sql<string | null>`MAX(${billsTable.customerName})`.as("customer_name"),
       totalSpent:    sql<string>`SUM(${billsTable.totalAmount})`.as("total_spent"),
+      /* Outstanding clamps per-bill at 0 so an over-refunded bill (refund
+       * larger than the unpaid portion) doesn't become a negative receivable. */
+      outstanding:   sql<string>`SUM(GREATEST(0, ${billsTable.totalAmount} - ${billsTable.amountPaid} - COALESCE(${refundsSubquery.refunded}, 0)))`.as("outstanding"),
+      unpaidCount:   sql<number>`SUM(CASE WHEN ${billsTable.totalAmount} - ${billsTable.amountPaid} - COALESCE(${refundsSubquery.refunded}, 0) > 0 THEN 1 ELSE 0 END)`.as("unpaid_count"),
       visitCount:    sql<number>`COUNT(*)`.as("visit_count"),
       lastVisit:     sql<string>`MAX(${billsTable.createdAt})`.as("last_visit"),
     })
     .from(billsTable)
+    .leftJoin(refundsSubquery, eq(refundsSubquery.billId, billsTable.id))
     .where(and(...conditions))
     .groupBy(billsTable.customerPhone)
     .orderBy(desc(sql`SUM(${billsTable.totalAmount})`));
 
   res.json(
     rows.map((r) => ({
-      phone:      r.customerPhone,
-      totalSpent: Number(r.totalSpent),
-      visitCount: Number(r.visitCount),
-      lastVisit:  r.lastVisit,
+      phone:        r.customerPhone,
+      name:         r.customerName ?? null,
+      totalSpent:   Number(r.totalSpent),
+      outstanding:  Number(r.outstanding),
+      unpaidCount:  Number(r.unpaidCount),
+      visitCount:   Number(r.visitCount),
+      lastVisit:    r.lastVisit,
     }))
   );
 });
@@ -113,6 +133,28 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
     return acc;
   }, {});
 
+  /* Pull every return for these bills so the UI can show "Returned ₹X" inline
+   * and the receivable calc subtracts refunds correctly. */
+  const returnRows = await db
+    .select({
+      billId:       returnsTable.billId,
+      productName:  productsTable.name,
+      productSku:   productsTable.sku,
+      quantity:     returnsTable.quantity,
+      refundAmount: returnsTable.refundAmount,
+      reason:       returnsTable.reason,
+      createdAt:    returnsTable.createdAt,
+    })
+    .from(returnsTable)
+    .leftJoin(productsTable, eq(returnsTable.productId, productsTable.id))
+    .where(inArray(returnsTable.billId, billIds))
+    .orderBy(desc(returnsTable.createdAt));
+
+  const returnsByBill = returnRows.reduce<Record<string, typeof returnRows>>((acc, r) => {
+    (acc[r.billId] ??= []).push(r);
+    return acc;
+  }, {});
+
   const totalSpent = bills.reduce((s, b) => s + Number(b.totalAmount), 0);
 
   res.json({
@@ -123,17 +165,31 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
       productName: p.productName ?? "Deleted Product",
       totalQty:    Number(p.totalQty),
     })),
-    bills: bills.map((b) => ({
-      ...b,
-      totalAmount: Number(b.totalAmount),
-      items: (itemsByBill[b.id] ?? []).map((i) => ({
-        ...i,
-        productName: i.productName ?? "Deleted Product",
-        productSku:  i.productSku  ?? "—",
-        price:       Number(i.price),
-        subtotal:    Number(i.subtotal),
-      })),
-    })),
+    bills: bills.map((b) => {
+      const refunds         = returnsByBill[b.id] ?? [];
+      const refundedAmount  = refunds.reduce((s, r) => s + Number(r.refundAmount), 0);
+      return {
+        ...b,
+        totalAmount:    Number(b.totalAmount),
+        amountPaid:     Number(b.amountPaid),
+        refundedAmount,
+        items: (itemsByBill[b.id] ?? []).map((i) => ({
+          ...i,
+          productName: i.productName ?? "Deleted Product",
+          productSku:  i.productSku  ?? "—",
+          price:       Number(i.price),
+          subtotal:    Number(i.subtotal),
+        })),
+        returns: refunds.map((r) => ({
+          productName:  r.productName ?? "Deleted Product",
+          productSku:   r.productSku  ?? "—",
+          quantity:     r.quantity,
+          refundAmount: Number(r.refundAmount),
+          reason:       r.reason,
+          createdAt:    r.createdAt,
+        })),
+      };
+    }),
   });
 });
 

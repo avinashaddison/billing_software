@@ -168,12 +168,16 @@ export interface CheckoutItem {
   mrp?: number;
 }
 
+/**
+ * Mode of payment. `credit` records the bill as unpaid (receivable); requires `customerPhone` so the debtor is identifiable.
+ */
 export type CheckoutInputPaymentMode =
   (typeof CheckoutInputPaymentMode)[keyof typeof CheckoutInputPaymentMode];
 
 export const CheckoutInputPaymentMode = {
   cash: "cash",
   upi: "upi",
+  credit: "credit",
 } as const;
 
 /**
@@ -189,7 +193,9 @@ export const CheckoutInputDiscountType = {
 
 export interface CheckoutInput {
   items: CheckoutItem[];
+  /** Mode of payment. `credit` records the bill as unpaid (receivable); requires `customerPhone` so the debtor is identifiable. */
   paymentMode: CheckoutInputPaymentMode;
+  customerName?: string;
   customerPhone?: string;
   /** Raw discount value (e.g. 10 for 10% or 200 for ₹200) */
   discount?: number;
@@ -197,12 +203,26 @@ export interface CheckoutInput {
   discountType?: CheckoutInputDiscountType;
 }
 
+export type BillPaymentStatus =
+  (typeof BillPaymentStatus)[keyof typeof BillPaymentStatus];
+
+export const BillPaymentStatus = {
+  paid: "paid",
+  partial: "partial",
+  unpaid: "unpaid",
+} as const;
+
 export interface Bill {
   id: string;
   billNumber?: number;
   totalAmount: number;
+  /** Cumulative amount collected against this bill. */
+  amountPaid: number;
+  paymentStatus: BillPaymentStatus;
   itemsCount: number;
   paymentMode: string;
+  /** @nullable */
+  customerName?: string | null;
   /** @nullable */
   customerPhone?: string | null;
   /** @nullable */
@@ -232,6 +252,40 @@ export interface BillDetail {
 export interface CheckoutResponse {
   bill: Bill;
   items: BillItem[];
+}
+
+/**
+ * How the customer paid this installment
+ */
+export type RecordPaymentInputPaymentMode =
+  (typeof RecordPaymentInputPaymentMode)[keyof typeof RecordPaymentInputPaymentMode];
+
+export const RecordPaymentInputPaymentMode = {
+  cash: "cash",
+  upi: "upi",
+} as const;
+
+export interface RecordPaymentInput {
+  /** Amount being collected now (clamped to outstanding balance) */
+  amount: number;
+  /** How the customer paid this installment */
+  paymentMode?: RecordPaymentInputPaymentMode;
+}
+
+export interface Debtor {
+  /** @nullable */
+  customerName?: string | null;
+  /** @nullable */
+  customerPhone?: string | null;
+  outstanding: number;
+  billCount: number;
+  lastBillAt: string;
+}
+
+export interface ReceivablesSummary {
+  totalOutstanding: number;
+  billCount: number;
+  topDebtors: Debtor[];
 }
 
 export type ListProductsParams = {

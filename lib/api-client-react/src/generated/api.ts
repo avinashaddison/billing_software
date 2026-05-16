@@ -31,6 +31,8 @@ import type {
   ListStockLogsParams,
   Product,
   QrCodeResponse,
+  ReceivablesSummary,
+  RecordPaymentInput,
   Sale,
   StockLog,
   StockUpdateBody,
@@ -1312,6 +1314,81 @@ export function useGetCategoryBreakdown<
 }
 
 /**
+ * @summary Outstanding money owed to the shop, with top debtors
+ */
+export const getGetReceivablesSummaryUrl = () => {
+  return `/api/dashboard/receivables`;
+};
+
+export const getReceivablesSummary = async (
+  options?: RequestInit,
+): Promise<ReceivablesSummary> => {
+  return customFetch<ReceivablesSummary>(getGetReceivablesSummaryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetReceivablesSummaryQueryKey = () => {
+  return [`/api/dashboard/receivables`] as const;
+};
+
+export const getGetReceivablesSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getReceivablesSummary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getReceivablesSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetReceivablesSummaryQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getReceivablesSummary>>
+  > = ({ signal }) => getReceivablesSummary({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getReceivablesSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetReceivablesSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getReceivablesSummary>>
+>;
+export type GetReceivablesSummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Outstanding money owed to the shop, with top debtors
+ */
+
+export function useGetReceivablesSummary<
+  TData = Awaited<ReturnType<typeof getReceivablesSummary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getReceivablesSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetReceivablesSummaryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Create a new bill at checkout
  */
 export const getCheckoutUrl = () => {
@@ -1538,3 +1615,90 @@ export function useGetBill<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Record a payment against an outstanding (credit) bill
+ */
+export const getRecordBillPaymentUrl = (id: string) => {
+  return `/api/bills/${id}/payment`;
+};
+
+export const recordBillPayment = async (
+  id: string,
+  recordPaymentInput: RecordPaymentInput,
+  options?: RequestInit,
+): Promise<Bill> => {
+  return customFetch<Bill>(getRecordBillPaymentUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(recordPaymentInput),
+  });
+};
+
+export const getRecordBillPaymentMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof recordBillPayment>>,
+    TError,
+    { id: string; data: BodyType<RecordPaymentInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof recordBillPayment>>,
+  TError,
+  { id: string; data: BodyType<RecordPaymentInput> },
+  TContext
+> => {
+  const mutationKey = ["recordBillPayment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof recordBillPayment>>,
+    { id: string; data: BodyType<RecordPaymentInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return recordBillPayment(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RecordBillPaymentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof recordBillPayment>>
+>;
+export type RecordBillPaymentMutationBody = BodyType<RecordPaymentInput>;
+export type RecordBillPaymentMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Record a payment against an outstanding (credit) bill
+ */
+export const useRecordBillPayment = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof recordBillPayment>>,
+    TError,
+    { id: string; data: BodyType<RecordPaymentInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof recordBillPayment>>,
+  TError,
+  { id: string; data: BodyType<RecordPaymentInput> },
+  TContext
+> => {
+  return useMutation(getRecordBillPaymentMutationOptions(options));
+};
