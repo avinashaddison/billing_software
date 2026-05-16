@@ -28,13 +28,15 @@ export function SideNav() {
   const perm    = (resource: string) => getLevel(role, permissions, resource);
   const visible = (resource: string) => perm(resource) !== "none";
 
+  /* Profile intentionally NOT here — it lives in the footer chip (clickable),
+   * which both avoids the two-paths-to-same-page redundancy and frees a slot
+   * in the main nav for the busier daily-driver pages. */
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: Home,     highlight: false, resource: "dashboard" },
-    { name: "Products",  href: "/products",  icon: Package,  highlight: false, resource: "products"  },
-    { name: "Scan",      href: "/scan",      icon: ScanLine, highlight: true,  resource: "scan"      },
+    { name: "Dashboard", href: "/dashboard", icon: Home,         highlight: false, resource: "dashboard" },
+    { name: "Products",  href: "/products",  icon: Package,      highlight: false, resource: "products"  },
+    { name: "Scan",      href: "/scan",      icon: ScanLine,     highlight: true,  resource: "scan"      },
     { name: "Billing",   href: "/billing",   icon: IndianRupee,  highlight: false, resource: "billing"   },
-    { name: "Logs",      href: "/logs",      icon: Clock,    highlight: false, resource: "logs"      },
-    { name: "Profile",   href: "/profile",   icon: User,     highlight: false, resource: null        },
+    { name: "Logs",      href: "/logs",      icon: Clock,        highlight: false, resource: "logs"      },
   ].filter((item) => !item.resource || visible(item.resource));
 
   const extraItems = [
@@ -125,14 +127,27 @@ export function SideNav() {
           const Icon = item.icon;
 
           if (item.highlight) {
+            /* Scan is a primary CTA but it must NEVER outshine the actually
+             * active page. When you're elsewhere we use a soft "primary
+             * outline" treatment — still distinctive, no longer claims to be
+             * the current page. Full bright fill only when location matches. */
+            const scanActive = location === item.href || location.startsWith(item.href);
             return (
               <Link key={item.name} href={item.href}
-                className="flex items-center gap-3 px-3 py-3 rounded-xl bg-primary text-primary-foreground font-bold shadow-md hover:opacity-90 active:scale-[0.98] transition-all my-2 relative"
+                className={cn(
+                  "flex items-center gap-3 px-3 py-3 rounded-xl font-bold transition-all my-2 relative active:scale-[0.98]",
+                  scanActive
+                    ? "bg-primary text-primary-foreground shadow-md hover:opacity-90"
+                    : "bg-primary/10 text-primary ring-1 ring-primary/20 hover:bg-primary/15"
+                )}
                 data-testid={`nav-${item.name.toLowerCase()}`}>
-                <Icon size={20} />
+                <Icon size={20} strokeWidth={scanActive ? 2.5 : 2} />
                 <span className="flex-1">{item.name}</span>
                 {count > 0 && (
-                  <span className="min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
+                  <span className={cn(
+                    "min-w-[20px] h-5 text-[10px] font-black rounded-full flex items-center justify-center px-1",
+                    scanActive ? "bg-red-500 text-white" : "bg-primary text-primary-foreground"
+                  )}>
                     {count > 99 ? "99+" : count}
                   </span>
                 )}
@@ -186,41 +201,38 @@ export function SideNav() {
           );
         })}
 
-        {/* Divider + extra pages */}
-        <div className="pt-2">
-          <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">More</p>
+        {/* Real divider + extra pages — the old single-label group was too easy
+         * to miss visually. A hairline + a confident label reads as a section. */}
+        <div className="pt-3 mt-2 border-t border-border/60">
+          <p className="px-3 pt-2 pb-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground/80">More</p>
           {extraItems.map((item) => {
             const isActive = location === item.href || location.startsWith(item.href);
             const Icon = item.icon;
 
-            /* Special-case Today's Deals: red/orange/pink gradient pill so it
-               draws the eye and feels "hot". Smooth pulsing fire icon. */
+            /* Today's Deals: full red gradient ONLY when on /deals. Otherwise
+             * a quiet rose-tinted link that doesn't compete with the active
+             * page (the old design read as an alert because of the bright
+             * always-on gradient). The pulse dot stays — it's the actual
+             * "something new" signal and earns its red. */
             if (item.resource === "deals") {
               return (
                 <Link key={item.name} href={item.href}
                   className={cn(
-                    "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-black text-sm overflow-hidden",
-                    "transition-all duration-300 ease-out my-1",
+                    "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all",
                     isActive
-                      ? "bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 text-white shadow-lg shadow-rose-500/30 scale-[1.02]"
-                      : "bg-gradient-to-r from-red-500/[0.08] via-rose-500/[0.08] to-pink-500/[0.08] text-rose-600 dark:text-rose-300 hover:from-red-500/[0.18] hover:via-rose-500/[0.18] hover:to-pink-500/[0.18] hover:shadow-md hover:shadow-rose-500/20 hover:scale-[1.02]"
+                      ? "bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 text-white font-black shadow-md shadow-rose-500/25"
+                      : "text-rose-600 dark:text-rose-300 hover:bg-rose-500/10"
                   )}>
-                  {/* Subtle ambient glow */}
-                  <span aria-hidden className={cn(
-                    "absolute inset-0 -z-0 rounded-xl bg-gradient-to-r from-red-400 via-rose-400 to-pink-400 blur-md transition-opacity duration-300",
-                    isActive ? "opacity-40" : "opacity-0 group-hover:opacity-25"
-                  )} />
-                  {/* Shimmer sweep on hover */}
-                  <span aria-hidden className="absolute inset-y-0 -inset-x-2 -z-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
-
-                  <span className="relative">
-                    <Icon size={17} strokeWidth={2.5} className={cn("transition-transform duration-300", !isActive && "group-hover:scale-110 group-hover:rotate-6")} />
-                  </span>
-                  <span className="relative flex-1">{item.name}</span>
-                  {/* Live pulse dot */}
+                  <Icon size={17} strokeWidth={isActive ? 2.5 : 2}
+                    className={cn(
+                      "transition-transform duration-200",
+                      !isActive && "group-hover:scale-110"
+                    )} />
+                  <span className="flex-1">{item.name}</span>
+                  {/* Live pulse dot — the only "alert" element left */}
                   <span className="relative flex h-1.5 w-1.5 shrink-0">
-                    <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full",
-                      isActive ? "bg-yellow-200 opacity-75" : "bg-rose-400 opacity-70"
+                    <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                      isActive ? "bg-yellow-200" : "bg-rose-400"
                     )} />
                     <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full",
                       isActive ? "bg-yellow-300" : "bg-rose-500"
@@ -245,15 +257,41 @@ export function SideNav() {
       </nav>
 
       <div className="px-3 py-4 border-t border-border space-y-2">
-        {/* Logged-in user + Sign Out */}
-        <div className="flex items-center gap-2.5 px-3 py-2">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-black shrink-0 ${role === "owner" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300" : "bg-primary/10 text-primary"}`}>
-            {staffName ? staffName.slice(0, 2).toUpperCase() : <User size={14} />}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-foreground truncate">{staffName || "Unknown"}</p>
-            <p className="text-[10px] text-muted-foreground capitalize">{role === "owner" ? "Owner" : "Staff"}</p>
-          </div>
+        {/* Logged-in user — clickable chip becomes the Profile entry point
+         * (we removed Profile from main nav). Sign-out stays as a small icon
+         * on the right so it doesn't get triggered by the chip tap. */}
+        <div className="flex items-center gap-1">
+          <Link href="/profile"
+            className={cn(
+              "flex-1 flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-colors min-w-0",
+              location === "/profile" || location.startsWith("/profile")
+                ? "bg-primary/10"
+                : "hover:bg-muted"
+            )}>
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-black shrink-0 ${role === "owner" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300" : "bg-primary/10 text-primary"}`}>
+              {staffName ? staffName.slice(0, 2).toUpperCase() : <User size={14} />}
+            </div>
+            <div className="flex-1 min-w-0">
+              {/* If staffName is literally just the role ("Owner"/"Staff"),
+               * we'd render "Owner / Owner" which is silly. Collapse to a
+               * single line in that case. */}
+              {(() => {
+                const roleLabel = role === "owner" ? "Owner" : "Staff";
+                const nameIsJustRole = staffName?.trim().toLowerCase() === roleLabel.toLowerCase();
+                return nameIsJustRole ? (
+                  <>
+                    <p className="text-xs font-bold text-foreground truncate">{roleLabel}</p>
+                    <p className="text-[10px] text-muted-foreground">Tap to edit profile</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-bold text-foreground truncate">{staffName || "Unknown"}</p>
+                    <p className="text-[10px] text-muted-foreground">{roleLabel}</p>
+                  </>
+                );
+              })()}
+            </div>
+          </Link>
           <button onClick={handleLogout}
             title="Sign Out"
             className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors shrink-0">

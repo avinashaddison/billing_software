@@ -264,8 +264,15 @@ export default function Checkout() {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
   const paymentModeRef = useRef<PaymentMode>("cash");
   const [customerName, setCustomerName] = useState("");
+  /* True only when we filled the name from a previous-bill lookup. Lets the UI
+   * show a subtle "from previous visits" hint AND lets us safely overwrite it
+   * on a new lookup. If the user typed manually, we leave their value alone. */
+  const [nameAutoFilled, setNameAutoFilled] = useState(false);
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  /* Lookup state — purely cosmetic (spinner + hint). Failures stay silent
+   * because this is an auxiliary convenience, not core checkout flow. */
+  const [lookingUp, setLookingUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successBillId, setSuccessBillId] = useState<string | null>(null);
 
@@ -288,6 +295,44 @@ export default function Checkout() {
 
   const validatePhone = (v: string) =>
     !v || /^\d{10}$/.test(v) ? "" : "Enter a valid 10-digit number";
+
+  /* Auto-fill the customer name as soon as the phone hits 10 digits AND
+   * matches a returning customer. Won't clobber a name the cashier already
+   * typed manually (only overwrites an empty field or a previous auto-fill). */
+  useEffect(() => {
+    if (!/^\d{10}$/.test(phone)) {
+      // Clear the auto-fill flag (but not the typed name) when phone shrinks
+      if (nameAutoFilled) {
+        setCustomerName("");
+        setNameAutoFilled(false);
+      }
+      return;
+    }
+    // Bail if user has typed a name themselves — don't overwrite their input
+    if (customerName.trim() && !nameAutoFilled) return;
+
+    const controller = new AbortController();
+    setLookingUp(true);
+    fetch(`${BASE_URL}/api/customers/${phone}`, { signal: controller.signal })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        const fetched = data.bills?.[0]?.customerName ?? null;
+        if (fetched) {
+          setCustomerName(fetched);
+          setNameAutoFilled(true);
+        }
+      })
+      .catch(() => { /* network blip — silent, this is auxiliary */ })
+      .finally(() => setLookingUp(false));
+
+    return () => controller.abort();
+    // We deliberately omit customerName/nameAutoFilled from deps — the lookup
+    // is triggered by the phone field reaching 10 digits, not by every keystroke
+    // in the name field. Re-running on name change would re-fire the network
+    // request and could overwrite the cashier's edit mid-typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone]);
 
   const selectPaymentMode = (pm: PaymentMode) => {
     paymentModeRef.current = pm;
@@ -660,24 +705,8 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* Customer name */}
+            {/* Customer phone — first because typing it auto-fills the name */}
             <div className="px-4 pt-4">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5" /> Customer Name
-                <span className="normal-case font-medium text-muted-foreground/60">(optional)</span>
-              </p>
-              <input
-                type="text"
-                maxLength={80}
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Walk-in customer"
-                className="w-full h-12 px-3.5 rounded-xl bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
-              />
-            </div>
-
-            {/* Customer phone */}
-            <div className="px-4 pt-3 pb-4">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5" /> Customer Mobile
                 {paymentMode === "credit" ? (
@@ -701,16 +730,49 @@ export default function Checkout() {
                     setPhoneError(v ? validatePhone(v) : "");
                   }}
                   placeholder="98765 43210"
-                  className={`w-full h-12 pl-12 pr-4 rounded-xl bg-muted border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-all ${
+                  className={`w-full h-12 pl-12 pr-10 rounded-xl bg-muted border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-all ${
                     phoneError
                       ? "border-red-500 focus:ring-red-500/30"
                       : "border-border focus:ring-primary/40 focus:border-primary"
                   }`}
                 />
+                {lookingUp && (
+                  <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                )}
               </div>
               {phoneError && (
                 <p className="text-xs text-red-500 mt-1.5 font-medium">{phoneError}</p>
               )}
+            </div>
+
+            {/* Customer name — auto-fills from previous bills when phone is recognized */}
+            <div className="px-4 pt-3 pb-4">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" /> Customer Name
+                <span className="normal-case font-medium text-muted-foreground/60">(optional)</span>
+                {nameAutoFilled && (
+                  <span className="normal-case font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 ml-auto">
+                    <BadgeCheck className="w-3 h-3" /> auto-filled
+                  </span>
+                )}
+              </p>
+              <input
+                type="text"
+                maxLength={80}
+                value={customerName}
+                onChange={(e) => {
+                  setCustomerName(e.target.value);
+                  // Once the cashier edits, treat the value as manual so the
+                  // lookup effect stops trying to overwrite it.
+                  if (nameAutoFilled) setNameAutoFilled(false);
+                }}
+                placeholder={lookingUp ? "Looking up returning customer…" : "Walk-in customer"}
+                className={`w-full h-12 px-3.5 rounded-xl bg-muted border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-all ${
+                  nameAutoFilled
+                    ? "border-emerald-400 dark:border-emerald-600 focus:ring-emerald-400/30"
+                    : "border-border focus:ring-primary/40 focus:border-primary"
+                }`}
+              />
             </div>
           </div>
 
