@@ -5,7 +5,6 @@ import {
   ShieldCheck, Zap, MessageCircle, Phone, Mail, MapPin,
   ChevronDown, Check, ArrowRight, X, Star, Menu, Flame, Trophy,
   PartyPopper, Store, Smartphone, Heart, Headphones, Lock, Award,
-  Cloud,
 } from "lucide-react";
 
 /**
@@ -398,6 +397,50 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── WHO IS THIS FOR? (industry fit) ─────────────────────── */}
+      <section id="industries" className="py-20 md:py-24 bg-gradient-to-b from-[#fff8ee] via-rose-50/40 to-white relative overflow-hidden">
+        <div aria-hidden className="pointer-events-none absolute top-10 left-10 w-40 h-40 rounded-full bg-rose-300/30 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute bottom-10 right-10 w-40 h-40 rounded-full bg-amber-300/30 blur-3xl" />
+
+        <div className="relative max-w-6xl mx-auto px-5 md:px-8">
+          <div className="text-center mb-12">
+            <span className="inline-block px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-[11px] font-black uppercase tracking-widest mb-3">
+              Who is this for?
+            </span>
+            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-[1.05]">
+              आपकी दुकान के लिए <span className="text-rose-600">perfect है?</span>
+            </h2>
+            <p className="mt-4 text-slate-600 max-w-2xl mx-auto text-[15px]">
+              जिन दुकानों में barcode लगाकर billing होती है — वहाँ ये software पहले दिन से काम करता है.
+              नीचे देखो, आपकी दुकान शामिल है?
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
+            <IndustryCard icon={Store}       tone="emerald" name="Kirana / General Store" hindi="किराना · दैनिक सामान" />
+            <IndustryCard icon={PartyPopper} tone="rose"    name="Gift & Toy Shop"        hindi="गिफ्ट · खिलौने" />
+            <IndustryCard icon={Smartphone}  tone="violet"  name="Mobile & Accessories"   hindi="मोबाइल · accessories" />
+            <IndustryCard icon={Package}     tone="orange"  name="Stationery Shop"        hindi="स्टेशनरी · books" />
+            <IndustryCard icon={Sparkles}    tone="fuchsia" name="Cosmetics & Beauty"     hindi="कॉस्मेटिक्स · सौंदर्य" />
+            <IndustryCard icon={Zap}         tone="amber"   name="Hardware & Electrical" hindi="हार्डवेयर · इलेक्ट्रिकल" />
+            <IndustryCard icon={Heart}       tone="rose"    name="Footwear & Fashion"     hindi="कपड़े · जूते · बैग" />
+            <IndustryCard icon={ShieldCheck} tone="emerald" name="Pharmacy / Medical"     hindi="मेडिकल · pharmacy" />
+          </div>
+
+          {/* Honest fine print — what doesn't fit */}
+          <div className="mt-10 mx-auto max-w-3xl rounded-2xl bg-white border-2 border-amber-200 px-5 py-4 text-center shadow-sm">
+            <p className="text-[13px] text-slate-700 leading-relaxed">
+              <span className="font-black text-amber-700">अगर restaurant, salon, jewellery, या petrol pump है</span> —
+              तो इसमें कुछ extra modules चाहिए होंगे.{" "}
+              <a href="https://wa.me/919876543210" className="font-black text-emerald-700 underline decoration-2 underline-offset-2">
+                WhatsApp पर पूछें
+              </a>{" "}
+              — हम honest answer देंगे, fit है या नहीं.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* ── VS COMPARISON ───────────────────────────────────────── */}
       <section className="py-20 md:py-24">
         <div className="max-w-5xl mx-auto px-5 md:px-8">
@@ -466,86 +509,6 @@ export default function Landing() {
           <p className="mt-4 text-center text-[11px] text-slate-500">
             * Comparison based on publicly-listed features of competitor products. Your mileage may vary.
           </p>
-        </div>
-      </section>
-
-      {/* ── CLOUD + OFFLINE explainer ───────────────────────────── */}
-      <section className="py-16 md:py-20 bg-gradient-to-br from-emerald-50 via-[#fff8ee] to-amber-50 relative overflow-hidden">
-        <div aria-hidden className="pointer-events-none absolute -top-20 right-10 w-72 h-72 rounded-full bg-emerald-300/30 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-20 left-10 w-72 h-72 rounded-full bg-amber-300/30 blur-3xl" />
-
-        <div className="relative max-w-5xl mx-auto px-5 md:px-8">
-          <div className="text-center mb-12">
-            <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 border-2 border-emerald-300 text-emerald-700 text-[11px] font-black uppercase tracking-widest mb-3">
-              How it works
-            </span>
-            <h2 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 leading-tight">
-              Cloud + Offline = <span className="text-emerald-600">कैसे?</span>
-            </h2>
-            <p className="mt-3 text-slate-600 max-w-2xl mx-auto text-[14px] md:text-[15px]">
-              हम cloud पर हैं, but WiFi गई तो भी billing चलती रहती है.
-              ये trick है — खुद देखो कैसे काम करता है.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-5">
-            {/* Step 1 */}
-            <div className="relative rounded-3xl bg-white border-2 border-orange-100 p-6 shadow-sm">
-              <div className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-white font-black flex items-center justify-center shadow-md ring-4 ring-white text-sm">
-                1
-              </div>
-              <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4">
-                <Cloud className="w-5 h-5" strokeWidth={2.4} />
-              </div>
-              <p className="text-[16px] font-black text-slate-900">App pre-loaded</p>
-              <p className="text-[12px] font-bold text-emerald-600 mt-0.5">पहले से ready है</p>
-              <p className="mt-3 text-[13.5px] text-slate-600 leading-relaxed">
-                पहली बार खोलते ही, पूरा app आपके browser में cache हो जाता है.
-                अगली बार WiFi न हो तब भी instantly खुलेगा.
-              </p>
-            </div>
-
-            {/* Step 2 */}
-            <div className="relative rounded-3xl bg-white border-2 border-orange-100 p-6 shadow-sm">
-              <div className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-white font-black flex items-center justify-center shadow-md ring-4 ring-white text-sm">
-                2
-              </div>
-              <div className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mb-4">
-                <Receipt className="w-5 h-5" strokeWidth={2.4} />
-              </div>
-              <p className="text-[16px] font-black text-slate-900">Bills queue locally</p>
-              <p className="text-[12px] font-bold text-rose-600 mt-0.5">WiFi off → कोई dikkat नहीं</p>
-              <p className="mt-3 text-[13.5px] text-slate-600 leading-relaxed">
-                Internet चली गई? Bills आपके device पर securely save होते रहते हैं.
-                Customer wait नहीं करेगा — business चलता रहेगा.
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="relative rounded-3xl bg-white border-2 border-orange-100 p-6 shadow-sm">
-              <div className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white font-black flex items-center justify-center shadow-md ring-4 ring-white text-sm">
-                3
-              </div>
-              <div className="w-11 h-11 rounded-2xl bg-violet-100 text-violet-700 flex items-center justify-center mb-4">
-                <Zap className="w-5 h-5" strokeWidth={2.4} />
-              </div>
-              <p className="text-[16px] font-black text-slate-900">Auto-sync</p>
-              <p className="text-[12px] font-bold text-violet-600 mt-0.5">WiFi वापस → सब sync</p>
-              <p className="mt-3 text-[13.5px] text-slate-600 leading-relaxed">
-                Internet आते ही सारे offline bills अपने आप cloud पर sync हो जाते हैं.
-                कुछ manually नहीं करना — magic है.
-              </p>
-            </div>
-          </div>
-
-          {/* Honest fine print */}
-          <div className="mt-8 mx-auto max-w-2xl rounded-2xl bg-white/70 backdrop-blur-sm border border-emerald-200 px-4 py-3 text-center">
-            <p className="text-[12px] text-slate-600 leading-relaxed">
-              <span className="font-black text-emerald-700">Important:</span>{" "}
-              पहली बार setup करते समय internet चाहिए. उसके बाद daily billing offline-tolerant है.
-              Reports, customer lookups & live dashboard — ये cloud features हैं, internet ज़रूरी.
-            </p>
-          </div>
         </div>
       </section>
 
@@ -916,6 +879,35 @@ function FeatureCard({ icon: Icon, tone, title, hindi, body }: {
       <p className="mt-4 text-[18px] font-black tracking-tight text-slate-900">{title}</p>
       <p className="text-[12px] font-black text-rose-600 mt-0.5">{hindi}</p>
       <p className="mt-2 text-[14px] text-slate-600 leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function IndustryCard({ icon: Icon, tone, name, hindi }: {
+  icon: React.ElementType;
+  tone: "rose" | "orange" | "emerald" | "violet" | "fuchsia" | "amber";
+  name: string; hindi: string;
+}) {
+  const tones: Record<typeof tone, { bg: string; text: string; ring: string }> = {
+    rose:    { bg: "from-rose-500 to-pink-500",       text: "text-rose-600",    ring: "ring-rose-100"    },
+    orange:  { bg: "from-orange-500 to-amber-500",    text: "text-orange-600",  ring: "ring-orange-100"  },
+    emerald: { bg: "from-emerald-500 to-teal-500",    text: "text-emerald-600", ring: "ring-emerald-100" },
+    violet:  { bg: "from-violet-500 to-fuchsia-500",  text: "text-violet-600",  ring: "ring-violet-100"  },
+    fuchsia: { bg: "from-fuchsia-500 to-pink-500",    text: "text-fuchsia-600", ring: "ring-fuchsia-100" },
+    amber:   { bg: "from-amber-400 to-yellow-500",    text: "text-amber-700",   ring: "ring-amber-100"   },
+  };
+  const t = tones[tone];
+  return (
+    <div className="group rounded-2xl bg-white border-2 border-orange-100 p-4 md:p-5 text-center hover:border-orange-300 hover:shadow-lg hover:shadow-orange-100/60 hover:-translate-y-0.5 transition-all">
+      <div className={`mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br ${t.bg} text-white flex items-center justify-center shadow-md ring-4 ${t.ring}`}>
+        <Icon className="w-6 h-6" strokeWidth={2.4} />
+      </div>
+      <p className="mt-3 text-[14px] font-black text-slate-900 leading-tight">{name}</p>
+      <p className={`mt-1 text-[12px] font-bold ${t.text}`}>{hindi}</p>
+      <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+        <Check className="w-3 h-3" strokeWidth={3} />
+        Strong fit
+      </div>
     </div>
   );
 }
