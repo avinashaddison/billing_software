@@ -27,6 +27,10 @@ export interface StoreSettings {
   labelShowPrice: boolean;
   scannerThresholdMs: number;
   receiptPaperWidth: "58mm" | "80mm";
+  /** Festive bulb-laari decoration at the top of every page. Owner toggles
+   *  from Settings → Customization. Default on for the festive feel; turn
+   *  off if it feels too busy or for a clinical look. */
+  bulbLaariEnabled: boolean;
 }
 
 interface StoreSettingsStore extends StoreSettings {
@@ -64,6 +68,7 @@ const SETTINGS_DEFAULTS: StoreSettings = {
   labelShowPrice:     true,
   scannerThresholdMs: 100,
   receiptPaperWidth:  "80mm",
+  bulbLaariEnabled:   true,
 };
 
 export const useStoreSettings = create<StoreSettingsStore>()(

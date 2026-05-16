@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette, Sparkles } from "lucide-react";
 import { useStoreSettings, usePerStaffScannerPrefs, type StoreSettings } from "@/lib/store-info";
+
+/* `bulbLaariEnabled` is owned by the Customization section and toggled in
+ * realtime (no Save click). Excluding it from the form prevents an old
+ * mount-time form value from overwriting a fresh toggle on Save. */
+type FormSettings = Omit<StoreSettings, "bulbLaariEnabled">;
 import { SIDEBAR_THEMES, DEFAULT_LOGO_BG_THEME, getSidebarTheme, type LogoBgTheme } from "@/lib/sidebar-themes";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,7 +17,7 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 const EMOJI_OPTIONS = ["🧸", "🎮", "🛒", "🏪", "🎁", "🧩", "🎯", "🪀", "🎈", "⭐"];
 
-const DEFAULTS: StoreSettings = {
+const DEFAULTS: FormSettings = {
   name:               "Your Shop Name",
   tagline:            "Set your tagline in Settings",
   phone:              "",
@@ -48,7 +53,7 @@ export default function SettingsPage() {
   const scannerPrefs = usePerStaffScannerPrefs();
   const myPref = staffId ? scannerPrefs.getPref(staffId) : null;
 
-  const [form, setForm] = useState<StoreSettings>({
+  const [form, setForm] = useState<FormSettings>({
     name:               store.name,
     tagline:            store.tagline,
     phone:              store.phone,
@@ -95,10 +100,10 @@ export default function SettingsPage() {
     }
   };
 
-  const set = (key: keyof StoreSettings, val: string) =>
+  const set = (key: keyof FormSettings, val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
 
-  const toggle = (key: keyof StoreSettings) =>
+  const toggle = (key: keyof FormSettings) =>
     setForm((f) => ({ ...f, [key]: !f[key] }));
 
   const handleSave = () => {
@@ -278,6 +283,54 @@ export default function SettingsPage() {
             <p className="text-[11px] text-muted-foreground mt-3">
               The theme applies only to the sidebar's logo card. Bills, receipts, and other surfaces stay neutral.
             </p>
+          </Field>
+        </Section>
+
+        {/* ── Customization (realtime, not save-gated) ──
+         * Live toggles that update the UI instantly. Lives in its own section
+         * because these don't go through the form/Save loop — every click
+         * mutates the Zustand store directly and propagates to subscribers.
+         */}
+        <Section icon={Sparkles} title="Customization" color="text-rose-600 bg-rose-50 dark:bg-rose-950/30">
+          <Field
+            label="Bulb Laari (festival lights)"
+            hint="Colourful blinking lights strung along the top of every page. Toggle applies instantly — no refresh."
+          >
+            <button
+              type="button"
+              role="switch"
+              aria-checked={store.bulbLaariEnabled}
+              onClick={() => store.update({ bulbLaariEnabled: !store.bulbLaariEnabled })}
+              className={`group w-full flex items-center justify-between gap-3 p-3 rounded-xl border-2 transition-all active:scale-[0.99] ${
+                store.bulbLaariEnabled
+                  ? "border-rose-400 bg-gradient-to-br from-rose-50 to-amber-50 dark:from-rose-950/30 dark:to-amber-950/20 dark:border-rose-700"
+                  : "border-border bg-muted/30 hover:bg-muted/50"
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                {/* Mini bulb-row preview — same colours as the real laari */}
+                <div className={`flex items-center gap-1 transition-opacity ${store.bulbLaariEnabled ? "opacity-100" : "opacity-30"}`}>
+                  {["#ef4444", "#f59e0b", "#eab308", "#22c55e", "#3b82f6", "#ec4899"].map((c, i) => (
+                    <span key={i} className="inline-block w-2 h-2 rounded-full"
+                      style={{
+                        backgroundColor: c,
+                        boxShadow: store.bulbLaariEnabled ? `0 0 6px 1px ${c}` : "none",
+                      }} />
+                  ))}
+                </div>
+                <div className="text-left min-w-0">
+                  <p className={`text-sm font-black ${store.bulbLaariEnabled ? "text-rose-700 dark:text-rose-300" : "text-foreground"}`}>
+                    {store.bulbLaariEnabled ? "Lights are ON" : "Lights are OFF"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {store.bulbLaariEnabled ? "Festive mode — perfect for festivals and weekends" : "Clean mode — no decoration"}
+                  </p>
+                </div>
+              </div>
+              {store.bulbLaariEnabled
+                ? <ToggleRight className="w-8 h-8 text-rose-600 dark:text-rose-400 shrink-0" />
+                : <ToggleLeft  className="w-8 h-8 text-muted-foreground shrink-0" />}
+            </button>
           </Field>
         </Section>
 

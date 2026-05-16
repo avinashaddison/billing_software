@@ -2,6 +2,7 @@ import { BottomNav } from "./BottomNav";
 import { SideNav }   from "./SideNav";
 import { useOnline }  from "@/hooks/use-online";
 import { WifiOff }   from "lucide-react";
+import { BulbLaari } from "@/components/ui/BulbLaari";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -31,7 +32,11 @@ export function AppLayout({ children }: AppLayoutProps) {
         */}
         {/* pb-32 = 128px on mobile: 64px bottom nav + 48px cart strip + 16px breathing room.
             The strip is always mounted (opacity animated), so we always reserve its height. */}
-        <main className="flex-1 w-full max-w-md mx-auto md:max-w-none pb-32 md:pb-0">
+        <main className="relative flex-1 w-full max-w-md mx-auto md:max-w-none pb-32 md:pb-0">
+          {/* Festival bulb laari draped along the top of every page — lives
+           * in the layout so it stays mounted across route changes (animation
+           * never restarts) and individual pages don't need to know about it. */}
+          <BulbLaari />
           {children}
         </main>
       </div>
