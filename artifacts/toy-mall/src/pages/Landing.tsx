@@ -5,6 +5,8 @@ import {
   ShieldCheck, Zap, MessageCircle, Phone, Mail, MapPin,
   ChevronDown, Check, ArrowRight, X, Star, Menu, Flame, Trophy,
   PartyPopper, Store, Smartphone, Heart, Headphones, Lock, Award,
+  Instagram, Facebook, Youtube, Twitter, Linkedin, ArrowUp, Globe,
+  CreditCard,
 } from "lucide-react";
 
 /**
@@ -663,11 +665,12 @@ export default function Landing() {
 
       {/* ── Footer ──────────────────────────────────────────────── */}
       <footer className="relative bg-slate-950 text-slate-300 overflow-hidden">
-        {/* Top wave divider */}
+        {/* Top tricolor strip */}
         <div aria-hidden className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-600 via-orange-500 via-amber-500 to-emerald-500" />
         {/* Ambient backdrop */}
-        <div aria-hidden className="pointer-events-none absolute -top-32 -left-32 w-[400px] h-[400px] rounded-full bg-rose-500/10 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-32 w-[400px] h-[400px] rounded-full bg-orange-500/10 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -top-32 -left-32 w-[420px] h-[420px] rounded-full bg-rose-500/10 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full bg-amber-500/5 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-32 w-[420px] h-[420px] rounded-full bg-orange-500/10 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.04]"
           style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
 
@@ -675,10 +678,10 @@ export default function Landing() {
         <div className="relative border-b border-slate-800/80">
           <div className="max-w-6xl mx-auto px-5 md:px-8 py-7 grid grid-cols-2 md:grid-cols-4 gap-5">
             {[
-              { icon: ShieldCheck, label: "Bank-grade",  sub: "256-bit encryption", tone: "text-emerald-400" },
-              { icon: Award,       label: "GST Certified", sub: "Full compliance",  tone: "text-amber-400" },
-              { icon: Headphones,  label: "Live Support",  sub: "WhatsApp · 9-9",   tone: "text-rose-400" },
-              { icon: Store,       label: "Made in Bharat", sub: "Built in Ranchi", tone: "text-orange-400" },
+              { icon: ShieldCheck, label: "Bank-grade",   sub: "256-bit encryption", tone: "text-emerald-400" },
+              { icon: Award,       label: "GST Certified", sub: "Full compliance",   tone: "text-amber-400" },
+              { icon: Headphones,  label: "Live Support",  sub: "WhatsApp · 9-9",    tone: "text-rose-400" },
+              { icon: Store,       label: "Made in Bharat", sub: "Built in Ranchi",  tone: "text-orange-400" },
             ].map(({ icon: Icon, label, sub, tone }, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className={`w-11 h-11 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center ${tone}`}>
@@ -693,13 +696,31 @@ export default function Landing() {
           </div>
         </div>
 
+        {/* ─── Payments accepted strip ─── */}
+        <div className="relative border-b border-slate-800/80 bg-slate-900/40">
+          <div className="max-w-6xl mx-auto px-5 md:px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-400">
+              <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+              Payments accepted
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {["UPI", "RuPay", "Visa", "Mastercard", "Paytm", "PhonePe", "GPay", "Cash"].map((p) => (
+                <span key={p} className="text-[10.5px] font-black tracking-wider px-2.5 py-1 rounded-md bg-slate-900 border border-slate-700/80 text-slate-300">
+                  {p}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* ─── Main footer ─── */}
-        <div className="relative max-w-6xl mx-auto px-5 md:px-8 py-14 grid lg:grid-cols-[2fr_1fr_1fr_1.3fr] gap-10 text-sm">
+        <div className="relative max-w-6xl mx-auto px-5 md:px-8 py-14 grid lg:grid-cols-[1.8fr_1fr_1fr_1fr_1.3fr] gap-10 text-sm">
           {/* Brand block */}
           <div>
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 ring-2 ring-slate-800">
+              <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 ring-2 ring-slate-800">
                 <Zap className="w-6 h-6" strokeWidth={2.8} />
+                <span aria-hidden className="absolute inset-0 rounded-2xl ring-1 ring-white/20" />
               </div>
               <div>
                 <p className="text-lg font-black text-white tracking-tight">AddisonX</p>
@@ -711,10 +732,23 @@ export default function Landing() {
               भारत का सबसे आसान billing &amp; inventory software. Built with love in Ranchi, used in दुकानें across Bharat.
             </p>
 
+            {/* App ratings mini-card */}
+            <div className="mt-5 inline-flex items-center gap-3 rounded-xl bg-slate-900/80 border border-slate-800 px-3.5 py-2.5">
+              <div className="flex items-center gap-0.5 text-amber-400">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400" strokeWidth={0} />
+                ))}
+              </div>
+              <div className="leading-tight">
+                <p className="text-[12px] font-black text-white">4.9 / 5 <span className="text-slate-500 font-normal">· 2,400+ shopkeepers</span></p>
+                <p className="text-[10.5px] text-slate-500">हर रोज़ नई दुकानें जुड़ रही हैं</p>
+              </div>
+            </div>
+
             {/* Newsletter */}
             <div className="mt-6 max-w-sm">
               <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-2">
-                हर हफ्ते tips पाएं
+                हर हफ्ते shopkeeper tips
               </p>
               <form
                 onSubmit={(e) => e.preventDefault()}
@@ -734,17 +768,50 @@ export default function Landing() {
                 Spam नहीं. Unsubscribe कभी भी.
               </p>
             </div>
+
+            {/* Social row */}
+            <div className="mt-6">
+              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2.5">Follow us</p>
+              <div className="flex items-center gap-2">
+                {[
+                  { icon: Instagram, label: "Instagram", color: "hover:bg-gradient-to-br hover:from-fuchsia-500 hover:to-orange-500 hover:border-fuchsia-400 hover:text-white" },
+                  { icon: Facebook,  label: "Facebook",  color: "hover:bg-blue-600 hover:border-blue-500 hover:text-white" },
+                  { icon: Youtube,   label: "YouTube",   color: "hover:bg-red-600 hover:border-red-500 hover:text-white" },
+                  { icon: Twitter,   label: "Twitter",   color: "hover:bg-slate-100 hover:border-slate-100 hover:text-slate-900" },
+                  { icon: Linkedin,  label: "LinkedIn",  color: "hover:bg-sky-700 hover:border-sky-600 hover:text-white" },
+                ].map(({ icon: Icon, label, color }) => (
+                  <a key={label} href="#" aria-label={label}
+                    className={`w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center transition-all ${color}`}>
+                    <Icon className="w-4 h-4" strokeWidth={2.2} />
+                  </a>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Product links */}
           <div>
             <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-4">Product</p>
             <ul className="space-y-2.5">
-              <li><a href="#features"  className="text-slate-400 hover:text-white transition-colors">Features</a></li>
-              <li><a href="#how"       className="text-slate-400 hover:text-white transition-colors">कैसे काम करता है</a></li>
-              <li><a href="#pricing"   className="text-slate-400 hover:text-white transition-colors">Pricing</a></li>
-              <li><a href="#faq"       className="text-slate-400 hover:text-white transition-colors">FAQ</a></li>
-              <li><Link href="/login"  className="text-slate-400 hover:text-white transition-colors">Sign In</Link></li>
+              <li><a href="#features"   className="text-slate-400 hover:text-white transition-colors">Features</a></li>
+              <li><a href="#how"        className="text-slate-400 hover:text-white transition-colors">कैसे काम करता है</a></li>
+              <li><a href="#pricing"    className="text-slate-400 hover:text-white transition-colors">Pricing</a></li>
+              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Who is it for?</a></li>
+              <li><a href="#faq"        className="text-slate-400 hover:text-white transition-colors">FAQ</a></li>
+              <li><Link href="/login"   className="text-slate-400 hover:text-white transition-colors">Sign In</Link></li>
+            </ul>
+          </div>
+
+          {/* Industries quick-links */}
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-4">Industries</p>
+            <ul className="space-y-2.5">
+              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Kirana / General</a></li>
+              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Gift &amp; Toy</a></li>
+              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Mobile &amp; Accessories</a></li>
+              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Stationery</a></li>
+              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Cosmetics</a></li>
+              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Pharmacy</a></li>
             </ul>
           </div>
 
@@ -754,9 +821,11 @@ export default function Landing() {
             <ul className="space-y-2.5">
               <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">About us</a></li>
               <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Blog</a></li>
-              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Careers</a></li>
+              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Careers <span className="ml-1 text-[9px] font-black text-emerald-300 bg-emerald-900/40 border border-emerald-700/50 px-1.5 py-0.5 rounded">हम hiring पे हैं</span></a></li>
+              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Partner program</a></li>
               <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Privacy Policy</a></li>
               <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Terms of Service</a></li>
+              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Refund Policy</a></li>
             </ul>
           </div>
 
@@ -772,18 +841,21 @@ export default function Landing() {
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Call us</p>
                     <p className="text-[13px] font-bold text-white">+91 99999 99999</p>
+                    <p className="text-[10.5px] text-slate-500">सोमवार–शनिवार · 9 AM – 9 PM</p>
                   </div>
                 </a>
               </li>
               <li>
                 <a href="https://wa.me/" target="_blank" rel="noreferrer"
                   className="group flex items-start gap-2.5 hover:text-white transition-colors">
-                  <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0 group-hover:border-emerald-500/50">
+                  <div className="relative w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0 group-hover:border-emerald-500/50">
                     <MessageCircle className="w-3.5 h-3.5" />
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-slate-950 animate-pulse" />
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">WhatsApp</p>
                     <p className="text-[13px] font-bold text-emerald-300">Chat with us</p>
+                    <p className="text-[10.5px] text-slate-500">Reply in ~5 min during business hours</p>
                   </div>
                 </a>
               </li>
@@ -807,6 +879,7 @@ export default function Landing() {
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Office</p>
                     <p className="text-[12.5px] font-bold text-white">Ranchi, Jharkhand 🇮🇳</p>
+                    <p className="text-[10.5px] text-slate-500">By appointment only</p>
                   </div>
                 </div>
               </li>
@@ -815,12 +888,41 @@ export default function Landing() {
         </div>
 
         {/* ─── Bottom bar ─── */}
-        <div className="relative border-t border-slate-800/80">
-          <div className="max-w-6xl mx-auto px-5 md:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-[12px] text-slate-500">
-            <p>© {new Date().getFullYear()} AddisonX Media. All rights reserved.</p>
-            <p className="flex items-center gap-1.5">
-              हम भारत के लिए बनाते हैं · Made with <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500" /> in India 🇮🇳
-            </p>
+        <div className="relative border-t border-slate-800/80 bg-slate-950/60">
+          <div className="max-w-6xl mx-auto px-5 md:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-4 text-[12px] text-slate-500">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1.5">
+              <p className="font-bold">© {new Date().getFullYear()} AddisonX Media</p>
+              <span className="hidden md:inline text-slate-700">·</span>
+              <a className="hover:text-white transition-colors cursor-default">Privacy</a>
+              <a className="hover:text-white transition-colors cursor-default">Terms</a>
+              <a className="hover:text-white transition-colors cursor-default">Refunds</a>
+              <a className="hover:text-white transition-colors cursor-default">Security</a>
+              <a className="hover:text-white transition-colors cursor-default">GST</a>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-white transition-colors"
+                aria-label="Language"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                हिंदी / English
+              </button>
+
+              <p className="flex items-center gap-1.5">
+                Made with <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500" /> in India 🇮🇳
+              </p>
+
+              <button
+                type="button"
+                onClick={() => typeof window !== "undefined" && window.scrollTo({ top: 0, behavior: "smooth" })}
+                aria-label="Scroll to top"
+                className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-orange-500/30 hover:scale-110 active:scale-95 transition-all"
+              >
+                <ArrowUp className="w-4 h-4" strokeWidth={2.6} />
+              </button>
+            </div>
           </div>
         </div>
       </footer>
