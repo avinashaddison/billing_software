@@ -197,10 +197,8 @@ export default function ProductDetail() {
     const price = parseFloat(editForm.price);
     const salePriceRaw = editForm.salePrice.trim();
     const salePrice = salePriceRaw ? parseFloat(salePriceRaw) : null;
-    const salePriceUntilRaw = editForm.salePriceUntil.trim();
-    const salePriceUntil = salePriceUntilRaw
-      ? new Date(salePriceUntilRaw).toISOString()
-      : null;
+    // Sale prices no longer auto-expire — always store null for the end date.
+    const salePriceUntil = null;
     const purchasePriceRaw = (editForm.purchasePrice ?? "").trim();
     const purchasePrice = purchasePriceRaw ? parseFloat(purchasePriceRaw) : null;
     const threshold = parseInt(editForm.lowStockThreshold, 10);
@@ -382,13 +380,6 @@ export default function ProductDetail() {
                 placeholder="Your cost from supplier" className="h-11 rounded-xl" />
             </div>
             <div>
-              <p className="text-xs font-bold text-muted-foreground mb-1">Sale Ends On — optional</p>
-              <Input type="date" value={editForm.salePriceUntil}
-                onChange={(e) => setEditForm((f) => ({ ...f, salePriceUntil: e.target.value }))}
-                className="h-11 rounded-xl" />
-              <p className="text-[10px] text-muted-foreground mt-1">Sale stops applying after this date. Leave blank for an open-ended sale.</p>
-            </div>
-            <div>
               <p className="text-xs font-bold text-muted-foreground mb-1">Low Stock Threshold</p>
               <Input type="number" min={0} step={1} value={editForm.lowStockThreshold}
                 onChange={(e) => setEditForm((f) => ({ ...f, lowStockThreshold: e.target.value }))}
@@ -477,11 +468,6 @@ export default function ProductDetail() {
                       <p className="text-sm text-muted-foreground line-through">
                         MRP ₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
-                      {"salePriceUntil" in product && (product.salePriceUntil as string | null) != null && (
-                        <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-1">
-                          Sale ends {new Date(product.salePriceUntil as string).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                        </p>
-                      )}
                     </>
                   ) : (
                     <>

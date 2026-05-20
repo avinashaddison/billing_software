@@ -415,7 +415,6 @@ interface DealQuickModalProps {
 function DealQuickModal({ product, onClose, onSaved }: DealQuickModalProps) {
   const [type, setType]   = useState<"percent" | "amount">("percent");
   const [value, setValue] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [saving, setSaving]   = useState(false);
 
   const v = parseFloat(value);
@@ -424,12 +423,6 @@ function DealQuickModal({ product, onClose, onSaved }: DealQuickModalProps) {
     : type === "percent"
       ? Math.max(0, Math.round(product.price * (1 - v / 100) * 100) / 100)
       : Math.max(0, product.price - v);
-
-  const endOfDayISO = (d: Date) => {
-    const x = new Date(d);
-    x.setUTCHours(23, 59, 59, 999);
-    return x.toISOString();
-  };
 
   const handleActivate = async () => {
     if (computedSale == null) {
@@ -443,7 +436,7 @@ function DealQuickModal({ product, onClose, onSaved }: DealQuickModalProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           salePrice:      computedSale,
-          salePriceUntil: endDate ? endOfDayISO(new Date(endDate)) : endOfDayISO(new Date()),
+          salePriceUntil: null,
           isTodayDeal:    true,
         }),
       });
@@ -510,17 +503,6 @@ function DealQuickModal({ product, onClose, onSaved }: DealQuickModalProps) {
             )}
           </div>
 
-          <div>
-            <p className="text-xs font-bold text-muted-foreground mb-1.5">Valid until (optional)</p>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              min={new Date().toISOString().slice(0, 10)}
-              className="h-11 rounded-xl"
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">Leave empty for "today only" — auto-expires at midnight.</p>
-          </div>
         </div>
         <div className="p-4 border-t bg-muted/20">
           <button
@@ -600,11 +582,6 @@ const ProductMobileCard = memo(function ProductMobileCard({ product, supplierNam
                 <span className="text-[10px]">
                   <span className="line-through text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
                   {" "}<span className="text-red-600 font-bold">₹{product.salePrice.toLocaleString("en-IN")}</span>
-                  {product.salePriceUntil && (
-                    <span className="block text-amber-600 dark:text-amber-400">
-                      Sale ends {new Date(product.salePriceUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                    </span>
-                  )}
                 </span>
               ) : (
                 <span className="text-[10px] text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
@@ -688,11 +665,6 @@ const ProductDesktopRow = memo(function ProductDesktopRow({ product, supplierNam
             <div>
               <p className="text-xs line-through text-muted-foreground">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               <p className="font-bold text-red-600">₹{product.salePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              {product.salePriceUntil && (
-                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                  Sale ends {new Date(product.salePriceUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                </p>
-              )}
             </div>
           ) : (
             <p className="font-semibold">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
@@ -949,6 +921,14 @@ export default function Products() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Link href="/products/bulk-sale-price"
+                className="flex items-center gap-2 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 px-3 py-2 rounded-full font-bold text-sm hover:bg-emerald-50 dark:hover:bg-emerald-950/30 active:scale-95 transition-all"
+                title="Scan products and set sale prices in bulk">
+                <ScanLine className="w-4 h-4" />
+                <span className="hidden sm:inline">Scan & Set Sale Price</span>
+              </Link>
+            )}
             {isAdmin && (
               <button onClick={() => setShowRecover(true)}
                 className="flex items-center gap-2 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 px-3 py-2 rounded-full font-bold text-sm hover:bg-amber-50 dark:hover:bg-amber-950/30 active:scale-95 transition-all"

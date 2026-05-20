@@ -18,33 +18,25 @@ import QRCode from "qrcode";
 
 const router: IRouter = Router();
 
-function isSaleExpired(p: { salePriceUntil: Date | null }) {
-  if (!p.salePriceUntil) return false;
-  // Sale is active all day on the expiry date, expires only AFTER that day ends (UTC)
-  const endOfDay = new Date(p.salePriceUntil);
-  endOfDay.setUTCHours(23, 59, 59, 999);
-  return new Date() > endOfDay;
-}
-
+// Sale prices no longer auto-expire — only the merchant can clear them by
+// editing the product. The `sale_price_until` column is kept in the schema
+// for backwards-compat but is ignored on read.
 function effectiveSalePrice(p: typeof productsTable.$inferSelect): number | null {
-  if (p.salePrice == null || isSaleExpired(p)) return null;
+  if (p.salePrice == null) return null;
   return Number(p.salePrice);
 }
 
 function mapProduct(p: typeof productsTable.$inferSelect) {
-  const expired = isSaleExpired(p);
-  const rawSp  = p.salePrice != null ? Number(p.salePrice) : null;
-  const rawSpu = p.salePriceUntil ? p.salePriceUntil.toISOString() : null;
+  const sp  = p.salePrice != null ? Number(p.salePrice) : null;
+  const spu = p.salePriceUntil ? p.salePriceUntil.toISOString() : null;
   return {
     ...p,
     price: Number(p.price),
-    // Active sale fields — null when expired so checkout/scan never charge stale prices
-    salePrice: expired ? null : rawSp,
-    salePriceUntil: expired ? null : rawSpu,
-    // Raw stored values — survive expiration so the edit form can repopulate and
-    // not accidentally null the column on the next unrelated PATCH (e.g. stock edit)
-    rawSalePrice: rawSp,
-    rawSalePriceUntil: rawSpu,
+    salePrice: sp,
+    salePriceUntil: spu,
+    // Legacy aliases kept so older clients keep working
+    rawSalePrice: sp,
+    rawSalePriceUntil: spu,
     purchasePrice: p.purchasePrice != null ? Number(p.purchasePrice) : null,
   };
 }
@@ -672,26 +664,33 @@ async function buildSalePriceRecoveryCandidates(tenantId: string | null) {
   for (const p of products) {
     const regular = Number(p.price);
 
-    // Most recent line-item where pre_discount_price < regular price.
+    // The "sale price" we want to recover is the sticker price BEFORE any
+    // cashier line discount. `pre_discount_price` captures that — but it
+    // is only set when the cashier actually applied a line discount.
+    // For the common case (cashier billed at the sale price with no extra
+    // discount), the sale price is stored as plain `sale_items.price`.
+    // So coalesce: prefer pre_discount_price, fall back to price.
+    const effective = sql<string>`COALESCE(${saleItemsTable.preDiscountPrice}, ${saleItemsTable.price})`;
+
     const [row] = await db
       .select({
-        preDiscountPrice: saleItemsTable.preDiscountPrice,
+        effective,
         createdAt: saleItemsTable.createdAt,
       })
       .from(saleItemsTable)
       .where(
         and(
           eq(saleItemsTable.productId, p.id),
-          sql`${saleItemsTable.preDiscountPrice} IS NOT NULL`,
-          sql`${saleItemsTable.preDiscountPrice} < ${regular}`,
+          sql`${effective} IS NOT NULL`,
+          sql`${effective} < ${regular}`,
         ),
       )
       .orderBy(desc(saleItemsTable.createdAt))
       .limit(1);
 
-    if (!row || row.preDiscountPrice == null) continue;
+    if (!row || row.effective == null) continue;
 
-    const recovered = Number(row.preDiscountPrice);
+    const recovered = Number(row.effective);
     if (!Number.isFinite(recovered) || recovered <= 0 || recovered >= regular) continue;
 
     candidates.push({

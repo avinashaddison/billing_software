@@ -76,7 +76,7 @@ function NewDealModal({ allProducts, onClose, onSaved }: {
     try {
       const body = {
         salePrice: newSale,
-        salePriceUntil: endDate ? endOfDayISO(new Date(endDate)) : endOfDayISO(new Date()),
+        salePriceUntil: null,
         // Mark this product as a "Today's Deal" so it appears on the deals page.
         // Products that just have a salePrice (set elsewhere) will NOT show here.
         isTodayDeal: true,
@@ -220,11 +220,8 @@ function NewDealModal({ allProducts, onClose, onSaved }: {
 }
 
 function isLive(p: DealProduct): boolean {
-  if (p.salePrice == null) return false;
-  if (!p.salePriceUntil) return true;
-  const end = new Date(p.salePriceUntil);
-  end.setUTCHours(23, 59, 59, 999);
-  return new Date() <= end;
+  // Sale prices no longer auto-expire — a deal is live as long as a sale price is set.
+  return p.salePrice != null;
 }
 
 function offText(p: DealProduct): string {
