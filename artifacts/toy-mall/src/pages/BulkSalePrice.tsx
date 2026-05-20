@@ -1,16 +1,17 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Link } from "wouter";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
+import { useCameraScanner } from "@/hooks/use-camera-scanner";
 import { useScanFlash, ScanFlash } from "@/components/ui/ScanFlash";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListProductsQueryKey } from "@workspace/api-client-react";
-import { playScanBeep, playCheckoutSuccess, playError } from "@/lib/sounds";
+import { playScanBeep, playCheckoutSuccess, playError, playCameraDetect } from "@/lib/sounds";
 import {
   ScanLine, Tag, ArrowRight, Loader2, CheckCircle2, X,
-  RotateCcw, Sparkles,
+  RotateCcw, Sparkles, Camera, CameraOff,
 } from "lucide-react";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -57,7 +58,10 @@ export default function BulkSalePrice() {
   const [saving, setSaving] = useState(false);
   const [looking, setLooking] = useState(false);
   const [recent, setRecent] = useState<RecentEntry[]>([]);
+  const [cameraOn, setCameraOn] = useState(true);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const priceRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const { flash, triggerFlash } = useScanFlash();
   const qc = useQueryClient();
 
@@ -65,6 +69,7 @@ export default function BulkSalePrice() {
     if (saving || looking) return;
     setLooking(true);
     triggerFlash(code);
+    playCameraDetect();
     try {
       const p = await lookupByCode(code);
       playScanBeep();
@@ -83,6 +88,13 @@ export default function BulkSalePrice() {
   useUsbScanner(onScan, {
     enabled: !saving,
     allowedInput: priceRef.current ? { ref: priceRef, onClear: () => setPriceInput("") } : undefined,
+  });
+
+  // Pause the camera when a product is being filled in so the camera doesn't
+  // keep firing scans while the user types the sale price.
+  useCameraScanner(cameraOn && !product && !saving, videoRef, onScan, (msg) => {
+    setCameraError(msg);
+    setCameraOn(false);
   });
 
   // Focus listener: if nothing is focused on mount, leave focus on document so
@@ -198,21 +210,66 @@ export default function BulkSalePrice() {
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         {/* Active product card */}
         {!product ? (
-          <div className="border-2 border-dashed border-amber-300 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20 rounded-3xl p-8 md:p-12 text-center">
-            {looking ? (
-              <>
-                <Loader2 className="w-12 h-12 text-amber-500 mx-auto mb-4 animate-spin" />
-                <p className="text-lg font-black">Looking up…</p>
-              </>
-            ) : (
-              <>
-                <ScanLine className="w-14 h-14 text-amber-500 mx-auto mb-4" />
-                <p className="text-xl font-black">Ready to scan</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Point the scanner at a product label barcode
-                </p>
-              </>
-            )}
+          <div className="rounded-3xl border-2 border-dashed border-amber-300 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20 overflow-hidden">
+            {/* Camera viewport */}
+            <div className="relative aspect-video bg-black">
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                autoPlay
+                className={`absolute inset-0 w-full h-full object-cover ${cameraOn && !cameraError ? "" : "hidden"}`}
+              />
+              {/* Scanning frame overlay */}
+              {cameraOn && !cameraError && (
+                <>
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="w-2/3 max-w-sm aspect-[2/1] border-2 border-amber-400/80 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+                  </div>
+                  {looking && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black font-bold text-sm">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Looking up…
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              {(!cameraOn || cameraError) && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+                  {cameraError ? (
+                    <>
+                      <CameraOff className="w-12 h-12 text-amber-300 mb-3" />
+                      <p className="text-white font-black">{cameraError}</p>
+                      <p className="text-xs text-white/70 mt-1">USB scanner still works — just scan a barcode.</p>
+                    </>
+                  ) : (
+                    <>
+                      <CameraOff className="w-12 h-12 text-amber-300 mb-3" />
+                      <p className="text-white font-black">Camera off</p>
+                      <p className="text-xs text-white/70 mt-1">USB scanner still works.</p>
+                    </>
+                  )}
+                </div>
+              )}
+              {/* Camera toggle */}
+              <button
+                onClick={() => { setCameraError(null); setCameraOn((c) => !c); }}
+                className="absolute top-3 right-3 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+                aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}
+              >
+                {cameraOn ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
+              </button>
+            </div>
+            <div className="p-4 text-center">
+              <p className="font-black flex items-center justify-center gap-2">
+                <ScanLine className="w-4 h-4 text-amber-500" />
+                Ready to scan
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Point the camera at a label barcode, or use your USB scanner
+              </p>
+            </div>
           </div>
         ) : (
           <div className="rounded-3xl border bg-card overflow-hidden shadow-md">
