@@ -168,9 +168,15 @@ export default function ProductDetail() {
 
   const openEdit = () => {
     if (!product) return;
-    const sp  = "salePrice"      in product ? (product.salePrice      as number | null | undefined) : null;
+    // Prefer rawSalePrice/rawSalePriceUntil — they survive sale expiration so editing
+    // unrelated fields (e.g. stock, name) doesn't silently null the stored sale price.
+    const sp  = "rawSalePrice"      in product && (product as any).rawSalePrice      != null
+              ? ((product as any).rawSalePrice      as number)
+              : ("salePrice"      in product ? (product.salePrice      as number | null | undefined) ?? null : null);
+    const spu = "rawSalePriceUntil" in product && (product as any).rawSalePriceUntil != null
+              ? ((product as any).rawSalePriceUntil as string)
+              : ("salePriceUntil" in product ? (product.salePriceUntil as string | null | undefined) ?? null : null);
     const pp  = "purchasePrice"  in product ? (product.purchasePrice  as number | null | undefined) : null;
-    const spu = "salePriceUntil" in product ? (product.salePriceUntil as string | null | undefined) : null;
     const sid = "supplierId"     in product ? (product.supplierId     as string | null | undefined) : null;
     setEditForm({
       name:              product.name,
@@ -380,7 +386,7 @@ export default function ProductDetail() {
               <Input type="date" value={editForm.salePriceUntil}
                 onChange={(e) => setEditForm((f) => ({ ...f, salePriceUntil: e.target.value }))}
                 className="h-11 rounded-xl" />
-              <p className="text-[10px] text-muted-foreground mt-1">Sale price clears automatically after this date</p>
+              <p className="text-[10px] text-muted-foreground mt-1">Sale stops applying after this date. Leave blank for an open-ended sale.</p>
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground mb-1">Low Stock Threshold</p>

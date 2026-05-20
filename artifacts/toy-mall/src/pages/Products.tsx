@@ -1,8 +1,8 @@
-import { useState, useRef, memo, useCallback } from "react";
+import { useState, useEffect, useRef, memo, useCallback } from "react";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { Link, useSearch, useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
-import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2, ScanLine, Truck, Sparkles, Filter } from "lucide-react";
+import { Package, Search, Plus, AlertTriangle, Upload, X, Loader2, Check, FileText, Trash2, ScanLine, Truck, Sparkles, Filter, History } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -233,6 +233,172 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
               Done
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Sale-price recovery dialog ────────────────────────────────── */
+interface RecoverCandidate {
+  id: string;
+  sku: string;
+  name: string;
+  price: number;
+  recoveredSalePrice: number;
+  lastSoldAt: string;
+}
+
+function RecoverSalePricesModal({ onClose, onApplied }: { onClose: () => void; onApplied: () => void }) {
+  const [phase, setPhase] = useState<"loading" | "preview" | "applying" | "done" | "error">("loading");
+  const [candidates, setCandidates] = useState<RecoverCandidate[]>([]);
+  const [errMsg, setErrMsg] = useState("");
+  const [restoredCount, setRestoredCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`${BASE_URL}/api/products/sale-price-recovery/preview`);
+        if (!r.ok) throw new Error(`Server returned ${r.status}`);
+        const data = await r.json();
+        if (cancelled) return;
+        setCandidates(data.candidates ?? []);
+        setPhase("preview");
+      } catch (e) {
+        if (cancelled) return;
+        setErrMsg((e as Error).message);
+        setPhase("error");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const apply = async () => {
+    setPhase("applying");
+    try {
+      const r = await fetch(`${BASE_URL}/api/products/sale-price-recovery/apply`, { method: "POST" });
+      if (!r.ok) throw new Error(`Server returned ${r.status}`);
+      const data = await r.json();
+      setRestoredCount(data.restored ?? 0);
+      setPhase("done");
+      onApplied();
+    } catch (e) {
+      setErrMsg((e as Error).message);
+      setPhase("error");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full md:max-w-2xl bg-background rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="flex items-center justify-between p-4 border-b shrink-0">
+          <h2 className="font-black text-base flex items-center gap-2">
+            <History className="w-5 h-5 text-amber-500" /> Recover Sale Prices
+          </h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="p-4 overflow-y-auto flex-1">
+          {phase === "loading" && (
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Scanning sales history…
+            </div>
+          )}
+
+          {phase === "error" && (
+            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
+              <p className="font-bold">Could not contact server</p>
+              <p className="text-xs mt-1">{errMsg}</p>
+            </div>
+          )}
+
+          {phase === "preview" && (
+            <>
+              <div className="mb-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
+                <p className="font-bold mb-1">How this works</p>
+                <p className="leading-relaxed">
+                  We scan past bills for prices recorded below the current regular price. Those were
+                  active sale prices at billing time. The most recent match per product is restored
+                  with an <span className="font-bold">open-ended</span> end date — you can set a new
+                  end date anytime from the product page.
+                </p>
+              </div>
+
+              {candidates.length === 0 ? (
+                <div className="text-center py-8">
+                  <Check className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
+                  <p className="font-bold">Nothing to recover</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No products with missing sale prices have audit data in past bills.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground mb-2 font-bold">
+                    {candidates.length} product{candidates.length === 1 ? "" : "s"} can be restored
+                  </p>
+                  <div className="space-y-1.5">
+                    {candidates.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg border bg-card text-sm">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold truncate">{c.name}</p>
+                          <p className="text-[11px] text-muted-foreground font-mono">{c.sku}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-black text-sm">
+                            <span className="line-through text-muted-foreground font-normal mr-1.5">₹{c.price.toLocaleString("en-IN")}</span>
+                            <span className="text-red-600">₹{c.recoveredSalePrice.toLocaleString("en-IN")}</span>
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            from {new Date(c.lastSoldAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {phase === "applying" && (
+            <div className="flex items-center gap-3 text-sm text-muted-foreground py-6">
+              <Loader2 className="w-4 h-4 animate-spin" /> Restoring sale prices…
+            </div>
+          )}
+
+          {phase === "done" && (
+            <div className="text-center py-6">
+              <Check className="w-14 h-14 text-emerald-500 mx-auto mb-3" />
+              <p className="font-black text-lg">Done</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Restored sale prices on {restoredCount} product{restoredCount === 1 ? "" : "s"}.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t bg-muted/20 flex gap-2 shrink-0">
+          {phase === "preview" && candidates.length > 0 && (
+            <>
+              <button
+                onClick={onClose}
+                className="flex-1 h-11 rounded-xl border font-bold text-sm hover:bg-muted active:scale-95 transition-all"
+              >Cancel</button>
+              <button
+                onClick={apply}
+                className="flex-1 h-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm active:scale-95 transition-all"
+              >Restore {candidates.length} product{candidates.length === 1 ? "" : "s"}</button>
+            </>
+          )}
+          {(phase === "preview" && candidates.length === 0) || phase === "done" || phase === "error" ? (
+            <button
+              onClick={onClose}
+              className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground font-black text-sm active:scale-95 transition-all"
+            >Close</button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -590,6 +756,7 @@ export default function Products() {
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [stockFilter, setStockFilter] = useState<"all" | "in" | "low" | "out">("all");
   const [addedDateFilter, setAddedDateFilter] = useState<string>("");
+  const [showRecover, setShowRecover] = useState(false);
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
@@ -744,6 +911,12 @@ export default function Products() {
   return (
     <div className="flex flex-col h-full">
       {showImport && <CsvImportModal onClose={() => setShowImport(false)} />}
+      {showRecover && (
+        <RecoverSalePricesModal
+          onClose={() => setShowRecover(false)}
+          onApplied={() => qc.invalidateQueries({ queryKey: getListProductsQueryKey() })}
+        />
+      )}
       {pendingDeal && (
         <DealQuickModal
           product={pendingDeal}
@@ -776,6 +949,14 @@ export default function Products() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button onClick={() => setShowRecover(true)}
+                className="flex items-center gap-2 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 px-3 py-2 rounded-full font-bold text-sm hover:bg-amber-50 dark:hover:bg-amber-950/30 active:scale-95 transition-all"
+                title="Restore sale prices that were auto-cleared on older app versions">
+                <History className="w-4 h-4" />
+                <span className="hidden sm:inline">Recover Sale Prices</span>
+              </button>
+            )}
             {isAdmin && (
               <button onClick={() => setShowImport(true)}
                 className="flex items-center gap-2 border border-border px-3 py-2 rounded-full font-bold text-sm hover:bg-muted active:scale-95 transition-all">

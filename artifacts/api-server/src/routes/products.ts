@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, and, lte, inArray } from "drizzle-orm";
+import { eq, ilike, or, and, lte, inArray, sql, desc, isNull } from "drizzle-orm";
 import { db, productsTable, stockLogsTable, salesTable, saleItemsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import {
@@ -33,16 +33,25 @@ function effectiveSalePrice(p: typeof productsTable.$inferSelect): number | null
 
 function mapProduct(p: typeof productsTable.$inferSelect) {
   const expired = isSaleExpired(p);
+  const rawSp  = p.salePrice != null ? Number(p.salePrice) : null;
+  const rawSpu = p.salePriceUntil ? p.salePriceUntil.toISOString() : null;
   return {
     ...p,
     price: Number(p.price),
-    salePrice: expired ? null : (p.salePrice != null ? Number(p.salePrice) : null),
-    salePriceUntil: expired ? null : (p.salePriceUntil ? p.salePriceUntil.toISOString() : null),
+    // Active sale fields — null when expired so checkout/scan never charge stale prices
+    salePrice: expired ? null : rawSp,
+    salePriceUntil: expired ? null : rawSpu,
+    // Raw stored values — survive expiration so the edit form can repopulate and
+    // not accidentally null the column on the next unrelated PATCH (e.g. stock edit)
+    rawSalePrice: rawSp,
+    rawSalePriceUntil: rawSpu,
     purchasePrice: p.purchasePrice != null ? Number(p.purchasePrice) : null,
   };
 }
 
 router.get("/products", async (req, res): Promise<void> => {
+  const tenantId = req.tenantId ?? null;
+
   const parsed = ListProductsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -72,9 +81,19 @@ router.get("/products", async (req, res): Promise<void> => {
     conditions.push(lte(productsTable.stock, productsTable.lowStockThreshold));
   }
 
+  // Tenant filtering (non-destructive): show tenant rows + legacy NULL rows
+  const tenantCondition = tenantId
+    ? or(eq(productsTable.tenantId, tenantId), sql`(${productsTable.tenantId} IS NULL)`)
+    : sql`(${productsTable.tenantId} IS NULL)`;
+
+
+
   if (conditions.length > 0) {
-    query = query.where(and(...conditions));
+    query = query.where(and(...conditions, tenantCondition));
+  } else {
+    query = query.where(tenantCondition);
   }
+
 
   const products = await query.orderBy(productsTable.name);
 
@@ -606,6 +625,115 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
 
   broadcast("product_updated", { bulk: true, updated: results.updated, created: results.created });
   res.json(results);
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Sale price recovery
+ *
+ * Older versions of the app silently nulled `salePrice` / `salePriceUntil`
+ * when a merchant edited an unrelated field on a product whose sale had
+ * already expired. The actual sale price IS however preserved per-bill in
+ * `sale_items.pre_discount_price` (the unit price recorded at billing time
+ * before any cashier line discount).
+ *
+ * These two endpoints let the merchant restore lost sale prices from that
+ * audit trail. They are tenant-scoped via the standard tenant filter.
+ *
+ * Recovery rule: for each product with `salePrice IS NULL`, find the most
+ * recent `sale_items.pre_discount_price` where that price is strictly less
+ * than the current regular price. That's a clear signal a sale was active.
+ *
+ * Caveats:
+ *   - Sale-priced products that never got billed are unrecoverable.
+ *   - The original end date isn't stored anywhere, so restored sales are
+ *     open-ended (salePriceUntil = null).
+ * ────────────────────────────────────────────────────────────────────────── */
+
+async function buildSalePriceRecoveryCandidates(tenantId: string | null) {
+  const tenantCondition = tenantId
+    ? or(eq(productsTable.tenantId, tenantId), isNull(productsTable.tenantId))
+    : isNull(productsTable.tenantId);
+
+  // Pull every product missing a salePrice that this tenant can see.
+  const products = await db
+    .select()
+    .from(productsTable)
+    .where(and(isNull(productsTable.salePrice), tenantCondition));
+
+  const candidates: {
+    id: string;
+    sku: string;
+    name: string;
+    price: number;
+    recoveredSalePrice: number;
+    lastSoldAt: string;
+  }[] = [];
+
+  for (const p of products) {
+    const regular = Number(p.price);
+
+    // Most recent line-item where pre_discount_price < regular price.
+    const [row] = await db
+      .select({
+        preDiscountPrice: saleItemsTable.preDiscountPrice,
+        createdAt: saleItemsTable.createdAt,
+      })
+      .from(saleItemsTable)
+      .where(
+        and(
+          eq(saleItemsTable.productId, p.id),
+          sql`${saleItemsTable.preDiscountPrice} IS NOT NULL`,
+          sql`${saleItemsTable.preDiscountPrice} < ${regular}`,
+        ),
+      )
+      .orderBy(desc(saleItemsTable.createdAt))
+      .limit(1);
+
+    if (!row || row.preDiscountPrice == null) continue;
+
+    const recovered = Number(row.preDiscountPrice);
+    if (!Number.isFinite(recovered) || recovered <= 0 || recovered >= regular) continue;
+
+    candidates.push({
+      id: p.id,
+      sku: p.sku,
+      name: p.name,
+      price: regular,
+      recoveredSalePrice: recovered,
+      lastSoldAt: row.createdAt.toISOString(),
+    });
+  }
+
+  return candidates;
+}
+
+router.get("/products/sale-price-recovery/preview", async (req, res): Promise<void> => {
+  const tenantId = req.tenantId ?? null;
+  const candidates = await buildSalePriceRecoveryCandidates(tenantId);
+  res.json({ count: candidates.length, candidates });
+});
+
+router.post("/products/sale-price-recovery/apply", async (req, res): Promise<void> => {
+  const tenantId = req.tenantId ?? null;
+  const candidates = await buildSalePriceRecoveryCandidates(tenantId);
+
+  let restored = 0;
+  for (const c of candidates) {
+    await db
+      .update(productsTable)
+      .set({
+        salePrice: String(c.recoveredSalePrice),
+        salePriceUntil: null,
+      })
+      .where(eq(productsTable.id, c.id));
+    restored++;
+  }
+
+  if (restored > 0) {
+    broadcast("product_updated", { bulk: true, restored });
+  }
+
+  res.json({ restored, candidates });
 });
 
 export default router;
