@@ -923,6 +923,14 @@ export default function Products() {
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (
+              <Link href="/products/bulk-sale-price"
+                className="flex items-center gap-2 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 px-3 py-2 rounded-full font-bold text-sm hover:bg-emerald-50 dark:hover:bg-emerald-950/30 active:scale-95 transition-all"
+                title="Scan products and set sale prices in bulk">
+                <ScanLine className="w-4 h-4" />
+                <span className="hidden sm:inline">Scan & Set Sale Price</span>
+              </Link>
+            )}
+            {isAdmin && (
               <button onClick={() => setShowRecover(true)}
                 className="flex items-center gap-2 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 px-3 py-2 rounded-full font-bold text-sm hover:bg-amber-50 dark:hover:bg-amber-950/30 active:scale-95 transition-all"
                 title="Restore sale prices that were auto-cleared on older app versions">
