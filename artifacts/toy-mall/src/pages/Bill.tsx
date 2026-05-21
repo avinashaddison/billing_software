@@ -402,18 +402,18 @@ export default function Bill() {
 
             {/* ── CUSTOMER + BILL META ── */}
             <div className="border border-black grid grid-cols-2 text-[10.5px] leading-[1.55]">
-              <div className="p-1.5 border-r border-black space-y-0.5 flex flex-col justify-center">
-                <div className="flex">
-                  <span className="w-[58px] shrink-0">Name</span>
-                  <span>:&nbsp;</span>
-                  <span className="flex-1 border-b border-dotted border-black/40 font-semibold">
+              <div className="p-1.5 border-r border-black space-y-0.5 flex flex-col justify-center min-w-0">
+                <div className="flex min-w-0">
+                  <span className="w-[44px] shrink-0">Name</span>
+                  <span className="shrink-0">:&nbsp;</span>
+                  <span className="flex-1 min-w-0 border-b border-dotted border-black/40 font-semibold break-words">
                     {bill.customerName ? bill.customerName : <span className="text-black/30">—</span>}
                   </span>
                 </div>
-                <div className="flex">
-                  <span className="w-[58px] shrink-0">Mobile</span>
-                  <span>:&nbsp;</span>
-                  <span className="flex-1 border-b border-dotted border-black/40 font-semibold">
+                <div className="flex min-w-0">
+                  <span className="w-[44px] shrink-0">Mobile</span>
+                  <span className="shrink-0">:&nbsp;</span>
+                  <span className="flex-1 min-w-0 border-b border-dotted border-black/40 font-semibold break-words">
                     {bill.customerPhone ? `+91 ${bill.customerPhone}` : <span className="text-black/30">—</span>}
                   </span>
                 </div>
