@@ -1,13 +1,19 @@
--- One-shot cleanup of stale offer state on products that were taken
--- off Today's Deals before the PATCH endpoint started clearing the
--- offer fields on toggle-off. After this row, the only paths that can
--- create (is_today_deal = false AND sale_price IS NOT NULL) go through
--- direct DB edits, which is fine.
+-- DISABLED 2026-05-21.
 --
--- Idempotent: after the first run the WHERE clause matches nothing.
+-- This migration was originally intended as a one-shot cleanup of stale
+-- offer state. The author assumed the only path that could leave a
+-- product with (is_today_deal = false AND sale_price IS NOT NULL) was a
+-- legacy bug in the Today's Deal toggle. That assumption was wrong: the
+-- app also lets the merchant set a permanent sale_price independent of
+-- Today's Deal.
+--
+-- Because runBootMigrations() re-runs every file on every server start
+-- (Render's free tier cold-starts on idle), this migration was nulling
+-- the merchant's sale prices several times per day.
+--
+-- Replaced with a no-op so the migration runner is happy if the file is
+-- still referenced. The boot list in artifacts/api-server/src/lib/migrate.ts
+-- has also been updated to skip this filename, so this content should
+-- never actually execute again.
 
-UPDATE products
-   SET sale_price       = NULL,
-       sale_price_until = NULL
- WHERE is_today_deal = false
-   AND (sale_price IS NOT NULL OR sale_price_until IS NOT NULL);
+SELECT 1;

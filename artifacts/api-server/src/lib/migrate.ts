@@ -47,7 +47,11 @@ const MIGRATION_FILES = [
   "0002_auth_users.sql",
   "0003_tenant_expiry.sql",
   "0004_audit_events.sql",
-  "0005_clear_orphan_offers.sql",
+  // "0005_clear_orphan_offers.sql" — REMOVED. This SQL was NOT idempotent
+  //   in the presence of regular sale prices (not tied to Today's Deals):
+  //   it nulled sale_price on every cold-start for any product with
+  //   is_today_deal=false. On Render's free tier every spin-up wiped
+  //   sale prices that the merchant had just set. Disabled permanently.
   "0006_bill_customer_name.sql",
   "0007_bill_receivables.sql",
 ];
