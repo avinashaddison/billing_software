@@ -532,28 +532,34 @@ export default function Bill() {
               <span className="font-black text-[18px] tabular-nums leading-none">₹{fmt(bill.totalAmount)}</span>
             </div>
 
-            {/* ── SAVINGS / NET BOX (double border) ── */}
+            {/* ── SAVINGS / NET BOX (double border) ──
+                The MRP / Sub Total / You Saved breakdown is rendered only
+                when the customer actually saved money (sale price or manual
+                discount). For a plain bill at MRP we skip the redundant
+                "−₹0.00" line and let GST + NET TOTAL speak for themselves. */}
             <div className="mt-2.5 border border-black p-[2px]">
               <div className="border border-black px-2.5 py-2 text-[10.5px]">
-                <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 leading-tight">
-                  <span className="text-black/80">MRP Total</span>
-                  <span className="text-right tabular-nums">₹{fmt(mrpTotal)}</span>
-                  <span className="text-black/80">Sub Total</span>
-                  <span className="text-right tabular-nums">₹{fmt(itemsSubtotal)}</span>
-                  {manualDiscount > 0.001 && (
-                    <>
-                      <span className="text-black/80">
-                        Bill Discount
-                        {bill.discount != null && bill.discountType === "percent"
-                          ? ` (${bill.discount}%)`
-                          : ""}
-                      </span>
-                      <span className="text-right tabular-nums text-green-700">−₹{fmt(manualDiscount)}</span>
-                    </>
-                  )}
-                  <span className="text-black font-bold">You Saved (Total)</span>
-                  <span className="text-right tabular-nums font-bold text-green-700">−₹{fmt(totalSavings)}</span>
-                </div>
+                {totalSavings > 0.001 && (
+                  <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 leading-tight">
+                    <span className="text-black/80">MRP Total</span>
+                    <span className="text-right tabular-nums">₹{fmt(mrpTotal)}</span>
+                    <span className="text-black/80">Sub Total</span>
+                    <span className="text-right tabular-nums">₹{fmt(itemsSubtotal)}</span>
+                    {manualDiscount > 0.001 && (
+                      <>
+                        <span className="text-black/80">
+                          Bill Discount
+                          {bill.discount != null && bill.discountType === "percent"
+                            ? ` (${bill.discount}%)`
+                            : ""}
+                        </span>
+                        <span className="text-right tabular-nums text-green-700">−₹{fmt(manualDiscount)}</span>
+                      </>
+                    )}
+                    <span className="text-black font-bold">You Saved (Total)</span>
+                    <span className="text-right tabular-nums font-bold text-green-700">−₹{fmt(totalSavings)}</span>
+                  </div>
+                )}
 
                 {/* ── GST breakdown ──
                     Shown only when the owner has set a non-zero GST rate
@@ -578,7 +584,7 @@ export default function Bill() {
                   );
                 })()}
 
-                <div className="border-t border-dashed border-black/60 mt-1.5 pt-1.5 grid grid-cols-[1fr_auto] gap-x-2 leading-tight text-[12px] font-black">
+                <div className={`grid grid-cols-[1fr_auto] gap-x-2 leading-tight text-[12px] font-black ${(totalSavings > 0.001 || (store.gstRatePercent ?? 0) > 0) ? "border-t border-dashed border-black/60 mt-1.5 pt-1.5" : ""}`}>
                   <span>NET TOTAL</span>
                   <span className="text-right tabular-nums">₹{fmt(bill.totalAmount)}</span>
                 </div>
