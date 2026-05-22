@@ -291,16 +291,36 @@ export default function Bill() {
             }
 
             @media print {
-              body * { visibility: hidden !important; }
+              /* Hard-hide the screen-only chrome (top bar, etc.). Using
+                 display:none (not visibility:hidden) so the elements no
+                 longer reserve layout space and the receipt can sit at
+                 the top of the page. */
+              .no-print, .no-print * { display: none !important; }
 
-              .receipt-print-only,
-              .receipt-print-only * { visibility: visible !important; }
+              /* Turn every ancestor of the receipt into a transparent
+                 passthrough: no background, no shadow, no max-height, no
+                 scrolling. This is critical for long receipts — the screen
+                 'overflow-y-auto' on .receipt-shell would otherwise clip
+                 the print to the visible viewport height. */
+              html, body, .receipt-shell, .receipt-shell > div {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                box-shadow: none !important;
+                border: none !important;
+                height: auto !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                overflow: visible !important;
+              }
 
+              /* The receipt flows in NORMAL document order (not fixed) so
+                 a long bill paginates across the continuous thermal roll
+                 instead of being clipped to a single 'page' by the browser
+                 print engine. */
               .receipt-print-only {
-                position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                right: 0 !important;
+                position: static !important;
+                display: block !important;
                 margin: 0 auto !important;
                 width: ${contentWidth} !important;
                 max-width: ${contentWidth} !important;
@@ -310,7 +330,7 @@ export default function Bill() {
                 box-shadow: none !important;
                 border: none !important;
                 border-radius: 0 !important;
-                z-index: 99999 !important;
+                overflow: visible !important;
               }
 
               /* Force every descendant to honour border-box so a stray
@@ -319,11 +339,8 @@ export default function Bill() {
                 box-sizing: border-box !important;
               }
 
-              /* Kill ALL spacing above the store logo so the print starts
-                 right at the top of the paper. The screen receipt-card
-                 uses my-6 + py-4 padding for visual breathing room; in
-                 print we want zero — every mm here is wasted thermal
-                 paper that the client noticed. */
+              /* Kill the screen-only my-6 + py-4 padding above the store
+                 logo so the print starts right at the top of the paper. */
               .receipt-print-only > div:first-child {
                 padding-top: 1mm !important;
                 padding-bottom: 1mm !important;
@@ -331,23 +348,15 @@ export default function Bill() {
                 padding-right: 1.5mm !important;
               }
 
-              /* Belt-and-suspenders: even if the receipt's ancestors are
-                 still in flow because position:fixed gets demoted in some
-                 print engines, zero out every margin/padding above us. */
-              .receipt-shell,
-              .receipt-shell > *:not(.receipt-print-only) {
-                margin: 0 !important;
-                padding: 0 !important;
+              /* Don't split an item row across a page break. Browsers
+                 paginate based on @page; this hint keeps each line item
+                 intact. */
+              .receipt-print-only tr,
+              .receipt-print-only tbody,
+              .receipt-print-only thead {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
               }
-
-              html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-                background: white !important;
-              }
-
-              /* Hide screen-only chrome inside the receipt */
-              .receipt-print-only .no-print { display: none !important; }
 
               /* Force black-fill GRAND TOTAL bar to render solid in browser print */
               .receipt-print-only .receipt-grand-total {
