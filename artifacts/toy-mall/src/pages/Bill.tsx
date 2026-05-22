@@ -276,49 +276,68 @@ export default function Bill() {
   return (
     <>
       {/* ── Print CSS ── */}
-      <style>{`
-        @page {
-          size: ${store.receiptPaperWidth ?? "80mm"} auto;
-          margin: 2mm;
-        }
+      {(() => {
+        const paperWidth = store.receiptPaperWidth ?? "80mm";
+        // Thermal printers have a hardware non-printable margin (~3–4mm per
+        // side on 80mm rolls, ~2mm on 58mm). We shrink the rendered content
+        // to a safe inner width so nothing gets clipped, and zero out the
+        // CSS @page margin so the safe area itself isn't squeezed further.
+        const contentWidth = paperWidth === "58mm" ? "54mm" : "72mm";
+        return (
+          <style>{`
+            @page {
+              size: ${paperWidth} auto;
+              margin: 0;
+            }
 
-        @media print {
-          body * { visibility: hidden !important; }
+            @media print {
+              body * { visibility: hidden !important; }
 
-          .receipt-print-only,
-          .receipt-print-only * { visibility: visible !important; }
+              .receipt-print-only,
+              .receipt-print-only * { visibility: visible !important; }
 
-          .receipt-print-only {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: ${store.receiptPaperWidth ?? "80mm"} !important;
-            max-width: ${store.receiptPaperWidth ?? "80mm"} !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-            box-shadow: none !important;
-            border: none !important;
-            border-radius: 0 !important;
-            z-index: 99999 !important;
-          }
+              .receipt-print-only {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+                width: ${contentWidth} !important;
+                max-width: ${contentWidth} !important;
+                box-sizing: border-box !important;
+                padding: 0 !important;
+                background: white !important;
+                box-shadow: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                z-index: 99999 !important;
+              }
 
-          html, body {
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-          }
+              /* Force every descendant to honour border-box so a stray
+                 padding never bumps the outer width past ${contentWidth}. */
+              .receipt-print-only * {
+                box-sizing: border-box !important;
+              }
 
-          /* Hide screen-only chrome inside the receipt */
-          .receipt-print-only .no-print { display: none !important; }
+              html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+              }
 
-          /* Force black-fill GRAND TOTAL bar to render solid in browser print */
-          .receipt-print-only .receipt-grand-total {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-        }
-      `}</style>
+              /* Hide screen-only chrome inside the receipt */
+              .receipt-print-only .no-print { display: none !important; }
+
+              /* Force black-fill GRAND TOTAL bar to render solid in browser print */
+              .receipt-print-only .receipt-grand-total {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+            }
+          `}</style>
+        );
+      })()}
 
       <div className="receipt-shell flex flex-col h-full bg-gray-100 dark:bg-neutral-900 overflow-y-auto">
 
