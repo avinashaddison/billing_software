@@ -409,32 +409,63 @@ export default function Bill() {
                      className="shrink-0 h-14 w-auto max-w-[80px] object-contain"
                      style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
                 <div className="flex-1 text-center pr-1">
-                  <div className="font-black uppercase leading-[1.05]"
-                       style={{
-                         fontSize: store.name.length > 18 ? "19px" : "22px",
-                         letterSpacing: "0.02em",
-                         textWrap: "balance",
-                       } as any}>
+                  <div
+                    style={{
+                      fontFamily: "'Playfair Display', 'DM Serif Display', Georgia, serif",
+                      fontWeight: 900,
+                      fontSize: store.name.length > 18 ? "21px" : "26px",
+                      lineHeight: 1.0,
+                      letterSpacing: "0.01em",
+                      textTransform: "uppercase",
+                      textWrap: "balance",
+                    } as any}
+                  >
                     {store.name}
                   </div>
                   {store.tagline && (
-                    <div className="text-[10.5px] italic mt-1 text-black/70">{store.tagline}</div>
+                    <div
+                      className="mt-1.5 text-black/60"
+                      style={{
+                        fontFamily: "'Playfair Display', Georgia, serif",
+                        fontStyle: "italic",
+                        fontSize: "10.5px",
+                        letterSpacing: "0.04em",
+                      } as any}
+                    >
+                      ─ {store.tagline} ─
+                    </div>
                   )}
                 </div>
               </div>
             ) : (
               /* Clean centered header — no illustration */
               <div className="text-center">
-                <div className="font-black uppercase leading-[1.05] mx-auto"
-                     style={{
-                       fontSize: store.name.length > 22 ? "20px" : "24px",
-                       letterSpacing: "0.04em",
-                       textWrap: "balance",
-                     } as any}>
+                <div
+                  className="mx-auto"
+                  style={{
+                    fontFamily: "'Playfair Display', 'DM Serif Display', Georgia, serif",
+                    fontWeight: 900,
+                    fontSize: store.name.length > 22 ? "22px" : "28px",
+                    lineHeight: 1.0,
+                    letterSpacing: "0.03em",
+                    textTransform: "uppercase",
+                    textWrap: "balance",
+                  } as any}
+                >
                   {store.name}
                 </div>
                 {store.tagline && (
-                  <div className="text-[11px] italic mt-1 text-black/70">{store.tagline}</div>
+                  <div
+                    className="mt-1.5 text-black/60"
+                    style={{
+                      fontFamily: "'Playfair Display', Georgia, serif",
+                      fontStyle: "italic",
+                      fontSize: "11px",
+                      letterSpacing: "0.04em",
+                    } as any}
+                  >
+                    ─ {store.tagline} ─
+                  </div>
                 )}
               </div>
             )}
