@@ -301,8 +301,7 @@ export default function Bill() {
                 top: 0 !important;
                 left: 0 !important;
                 right: 0 !important;
-                margin-left: auto !important;
-                margin-right: auto !important;
+                margin: 0 auto !important;
                 width: ${contentWidth} !important;
                 max-width: ${contentWidth} !important;
                 box-sizing: border-box !important;
@@ -318,6 +317,15 @@ export default function Bill() {
                  padding never bumps the outer width past ${contentWidth}. */
               .receipt-print-only * {
                 box-sizing: border-box !important;
+              }
+
+              /* Kill the screen-only spacing above the store logo so the
+                 print starts right at the top of the paper. The screen
+                 receipt-card uses my-6 (24px) + py-4 (16px) — about 10mm
+                 of wasted thermal paper without this override. */
+              .receipt-print-only > div:first-child {
+                padding-top: 2mm !important;
+                padding-bottom: 2mm !important;
               }
 
               html, body {
