@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', 'Hind', system-ui, -apple-system, sans-serif;
+  --font-hindi: 'Hind', 'Inter', system-ui, sans-serif;
+  --font-display: 'Playfair Display', 'Inter', serif;
+
+  --color-saffron-50: #FFF6F0;
+  --color-saffron-100: #FFE4D1;
+  --color-saffron-200: #FFC8A0;
+  --color-saffron-300: #FFA86B;
+  --color-saffron-400: #FF8A3D;
+  --color-saffron-500: #FF6B35;
+  --color-saffron-600: #E94F18;
+  --color-saffron-700: #B83A0A;
+  --color-saffron-800: #8B2A05;
+
+  --color-leaf-500: #138808;
+  --color-leaf-600: #0F6A06;
+  --color-ink-900: #0B0B0F;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: #FFFCF8;
+  color: var(--color-ink-900);
+}
+
+/* ── Animations ───────────────────────────────────── */
+@keyframes float-slow {
+  0%,100% { transform: translateY(0) rotate(0); }
+  50%     { transform: translateY(-12px) rotate(2deg); }
+}
+@keyframes float-medium {
+  0%,100% { transform: translate(0, 0); }
+  50%     { transform: translate(-8px, -10px); }
+}
+@keyframes float-orb {
+  0%,100% { transform: translate(0, 0) scale(1); }
+  33%     { transform: translate(40px, -30px) scale(1.05); }
+  66%     { transform: translate(-30px, 40px) scale(0.97); }
+}
+@keyframes shimmer-text {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes ticker-up {
+  0%   { transform: translateY(8px); opacity: 0; }
+  100% { transform: translateY(0);   opacity: 1; }
+}
+@keyframes marquee-x {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes blob-morph {
+  0%,100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  50%     { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+}
+@keyframes wiggle {
+  0%,100% { transform: rotate(0); }
+  25%     { transform: rotate(-3deg); }
+  75%     { transform: rotate(3deg); }
+}
+@keyframes scan-line {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(120%); opacity: 0; }
+}
+@keyframes fade-up {
+  0%   { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes badge-bounce {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-4px); }
+}
+
+.animate-float-slow   { animation: float-slow 6s ease-in-out infinite; }
+.animate-float-medium { animation: float-medium 4s ease-in-out infinite; }
+.animate-float-orb    { animation: float-orb 18s ease-in-out infinite; }
+.animate-shimmer-text {
+  background-size: 200% auto;
+  animation: shimmer-text 4s linear infinite;
+}
+.animate-blob-morph   { animation: blob-morph 14s ease-in-out infinite; }
+.animate-wiggle       { animation: wiggle 0.8s ease-in-out infinite; }
+.animate-scan-line    { animation: scan-line 2.2s ease-in-out infinite; }
+.animate-fade-up      { animation: fade-up 0.7s ease-out backwards; }
+.animate-badge-bounce { animation: badge-bounce 2s ease-in-out infinite; }
+
+/* Marquee that loops cleanly */
+.marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee-x 30s linear infinite;
+}
+
+/* Gradient brand text */
+.gradient-brand {
+  background: linear-gradient(90deg, #FF6B35, #E94F18, #FF8A3D, #FF6B35);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Glass card */
+.glass {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+}
+.glass-dark {
+  background: rgba(11, 11, 15, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Selection */
+::selection {
+  background: #FF6B35;
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-slow,
+  .animate-float-medium,
+  .animate-float-orb,
+  .animate-shimmer-text,
+  .animate-blob-morph,
+  .animate-wiggle,
+  .animate-scan-line,
+  .animate-fade-up,
+  .animate-badge-bounce,
+  .marquee {
+    animation: none !important;
+  }
+}
