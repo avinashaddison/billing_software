@@ -319,13 +319,25 @@ export default function Bill() {
                 box-sizing: border-box !important;
               }
 
-              /* Kill the screen-only spacing above the store logo so the
-                 print starts right at the top of the paper. The screen
-                 receipt-card uses my-6 (24px) + py-4 (16px) — about 10mm
-                 of wasted thermal paper without this override. */
+              /* Kill ALL spacing above the store logo so the print starts
+                 right at the top of the paper. The screen receipt-card
+                 uses my-6 + py-4 padding for visual breathing room; in
+                 print we want zero — every mm here is wasted thermal
+                 paper that the client noticed. */
               .receipt-print-only > div:first-child {
-                padding-top: 2mm !important;
-                padding-bottom: 2mm !important;
+                padding-top: 1mm !important;
+                padding-bottom: 1mm !important;
+                padding-left: 1.5mm !important;
+                padding-right: 1.5mm !important;
+              }
+
+              /* Belt-and-suspenders: even if the receipt's ancestors are
+                 still in flow because position:fixed gets demoted in some
+                 print engines, zero out every margin/padding above us. */
+              .receipt-shell,
+              .receipt-shell > *:not(.receipt-print-only) {
+                margin: 0 !important;
+                padding: 0 !important;
               }
 
               html, body {
