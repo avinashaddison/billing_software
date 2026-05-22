@@ -411,7 +411,7 @@ export default function Bill() {
                 <div className="flex-1 text-center pr-1">
                   <div className="font-black uppercase leading-[1.05]"
                        style={{
-                         fontSize: store.name.length > 18 ? "15px" : "18px",
+                         fontSize: store.name.length > 18 ? "19px" : "22px",
                          letterSpacing: "0.02em",
                          textWrap: "balance",
                        } as any}>
@@ -427,7 +427,7 @@ export default function Bill() {
               <div className="text-center">
                 <div className="font-black uppercase leading-[1.05] mx-auto"
                      style={{
-                       fontSize: store.name.length > 22 ? "16px" : "20px",
+                       fontSize: store.name.length > 22 ? "20px" : "24px",
                        letterSpacing: "0.04em",
                        textWrap: "balance",
                      } as any}>

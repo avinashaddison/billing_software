@@ -48,7 +48,7 @@ export function BulbLaari({ className }: { className?: string }) {
       {/* z-50 puts the lights above sticky page headers — those use z-10
        * commonly and would otherwise eat the laari on pages like Customers,
        * Report, Settings. Pointer-events-none so it never blocks clicks. */}
-      <div aria-hidden className={cn("absolute inset-x-0 top-0 z-50 pointer-events-none select-none", className)}>
+      <div aria-hidden className={cn("no-print absolute inset-x-0 top-0 z-50 pointer-events-none select-none", className)}>
         {/* Sagging wire */}
         <svg viewBox="0 0 1200 24" preserveAspectRatio="none" className="w-full h-6">
           <path d="M0,2 Q300,18 600,8 T1200,4" stroke="rgba(0,0,0,0.35)" strokeWidth="1.5" fill="none" />
