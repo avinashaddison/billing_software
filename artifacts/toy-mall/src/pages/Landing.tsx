@@ -1,1184 +1,923 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import {
-  ScanLine, Receipt, IndianRupee, BarChart3, Package, Sparkles,
-  ShieldCheck, Zap, MessageCircle, Phone, Mail, MapPin,
-  ChevronDown, Check, ArrowRight, X, Star, Menu, Flame, Trophy,
-  PartyPopper, Store, Smartphone, Heart, Headphones, Lock, Award,
-  Instagram, Facebook, Youtube, Twitter, Linkedin, ArrowUp, Globe,
-  CreditCard,
+  ScanLine, Receipt, QrCode, Boxes, BarChart3, Sparkles,
+  Check, X, ArrowRight, Star, Shield, MessageCircle,
+  ShoppingBag, Pill, Shirt, Gem, Smartphone, Wrench,
+  PenTool, Heart, Menu, ChevronDown, TrendingUp,
+  Headphones, Cpu, Wifi, Cloud, Lock, Activity, Bot, Banknote,
 } from "lucide-react";
 
-/**
- * Public marketing landing page for Indian shopkeepers.
- *
- * Design rules tuned for an Indian SMB audience (not a Western SaaS look):
- *  - Saffron + magenta + emerald palette, lots of gradients, festival sparkle
- *  - Hindi+English mixed throughout, not just one decorative tagline
- *  - Sticker-style badges, big ₹ price callouts, prominent strike-throughs
- *  - WhatsApp green floating CTA + phone number always visible
- *  - "Made in Bharat" badges, real-feeling stats, dukaan testimonials
- *  - Heavy typography hierarchy — big bold headlines that read across the room
- */
-export default function Landing() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [openFaq,  setOpenFaq]  = useState<number | null>(0);
+const WHATSAPP_NUMBER = "919999999999";
+const TRIAL_URL       = "/login";
 
+/* ═══════════════════════════════════════════════════════════════
+   PUBLIC MARKETING LANDING — dark / premium SaaS feel.
+   English-first headlines with Hindi accents in subtitles.
+═══════════════════════════════════════════════════════════════ */
+export default function Landing() {
+  return (
+    <div className="min-h-screen bg-[#050507] text-white overflow-x-hidden selection:bg-[#FF6B35] selection:text-white">
+      <Nav />
+      <Hero />
+      <LogoMarquee />
+      <Features />
+      <HowItWorks />
+      <Industries />
+      <Comparison />
+      <Pricing />
+      <Testimonial />
+      <FAQ />
+      <FinalCTA />
+      <Footer />
+      <StickyCTA />
+    </div>
+  );
+}
+
+/* ─── NAV ──────────────────────────────────────────────────── */
+function Nav() {
+  const [scrolled, setScrolled] = useState(false);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
-    const close = () => setMenuOpen(false);
-    window.addEventListener("resize", close);
-    return () => window.removeEventListener("resize", close);
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const links = [
+    { href: "#features", label: "Features" },
+    { href: "#how",      label: "How it works" },
+    { href: "#compare",  label: "vs Tally" },
+    { href: "#pricing",  label: "Pricing" },
+    { href: "#faq",      label: "FAQ" },
+  ];
+
+  return (
+    <nav className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled ? "bg-[#050507]/80 backdrop-blur-xl border-b border-white/5" : "bg-transparent"}`}>
+      <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
+        <a href="#top" className="flex items-center gap-2.5 group">
+          <div className="relative">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#FF8A3D] via-[#FF6B35] to-[#E94F18] flex items-center justify-center text-white font-black shadow-lg shadow-[#FF6B35]/40">
+              <span className="text-lg italic" style={{ fontFamily: "var(--font-display)" }}>A</span>
+            </div>
+            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#8BFA3E] ring-2 ring-[#050507]" />
+          </div>
+          <div className="leading-tight">
+            <div className="font-black text-base text-white">AddisonX</div>
+            <div className="text-[9px] font-black tracking-[0.2em] uppercase text-[#FF8A3D] -mt-0.5">Billing OS</div>
+          </div>
+        </a>
+
+        <div className="hidden md:flex items-center gap-1">
+          {links.map((l) => (
+            <a key={l.href} href={l.href}
+               className="px-3.5 py-2 rounded-full text-[13px] font-semibold text-white/70 hover:text-white hover:bg-white/5 transition-all">
+              {l.label}
+            </a>
+          ))}
+        </div>
+
+        <div className="hidden md:flex items-center gap-2">
+          <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener"
+             className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[12px] font-bold text-[#B5FF6A] hover:bg-[#8BFA3E]/10 transition-all">
+            <MessageCircle className="w-3.5 h-3.5" />
+            Talk to us
+          </a>
+          <Link href={TRIAL_URL}
+             className="relative group px-4 py-2 rounded-full text-[13px] font-black text-[#050507] bg-white hover:bg-[#B5FF6A] transition-colors">
+            <span className="flex items-center gap-1.5">
+              Start Free Trial
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </span>
+          </Link>
+        </div>
+
+        <button onClick={() => setOpen((v) => !v)}
+                className="md:hidden w-9 h-9 rounded-xl bg-white/5 text-white flex items-center justify-center">
+          <Menu className="w-5 h-5" />
+        </button>
+      </div>
+
+      {open && (
+        <div className="md:hidden bg-[#0B0B11]/95 backdrop-blur-xl border-t border-white/5 px-4 py-3 space-y-1">
+          {links.map((l) => (
+            <a key={l.href} href={l.href} onClick={() => setOpen(false)}
+               className="block py-2.5 px-3 rounded-xl text-sm font-bold text-white/80 hover:bg-white/5">
+              {l.label}
+            </a>
+          ))}
+          <Link href={TRIAL_URL}
+             className="block text-center mt-2 px-4 py-3 rounded-xl font-black text-[#050507] bg-white">
+            Start Free Trial →
+          </Link>
+        </div>
+      )}
+    </nav>
+  );
+}
+
+/* ─── HERO ─────────────────────────────────────────────────── */
+function Hero() {
+  const [tracked, setTracked] = useState(2_84_50_823);
+  useEffect(() => {
+    const id = setInterval(() => setTracked((n) => n + Math.floor(Math.random() * 950 + 50)), 1700);
+    return () => clearInterval(id);
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#fff8ee] text-slate-900 selection:bg-orange-300 selection:text-slate-900 overflow-x-hidden">
-      {/* ── Top offer strip (festival flavor) ───────────────────── */}
-      <div className="bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white text-center text-[12px] md:text-[13px] font-bold tracking-wide py-2 px-4">
-        <span className="inline-flex items-center gap-1.5">
-          <PartyPopper className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Diwali Offer · पहले 100 दुकानदारों के लिए — </span>
-          <span className="sm:hidden">Diwali Offer — </span>
-          <span className="bg-white/25 px-2 py-0.5 rounded-full">First month <span className="underline">FREE</span></span>
-          <PartyPopper className="w-3.5 h-3.5" />
-        </span>
+    <section id="top" className="relative pt-32 md:pt-40 pb-24 overflow-hidden">
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0 lp-dot-grid opacity-50" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[120vw] h-[60vh] bg-[radial-gradient(ellipse_at_top,rgba(255,107,53,0.18),transparent_60%)]" />
+        <div className="absolute top-1/3 left-0 w-[55vw] h-[55vw] rounded-full bg-[#FF6B35]/15 blur-[120px] lp-animate-float-orb" />
+        <div className="absolute top-1/2 right-0 w-[45vw] h-[45vw] rounded-full bg-[#4ADE5F]/10 blur-[120px] lp-animate-float-orb" style={{ animationDelay: "-9s" }} />
       </div>
 
-      {/* ── Sticky top nav ──────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-[#fff8ee]/85 backdrop-blur-xl border-b-2 border-orange-200/60">
-        <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
-          <a href="#top" className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/40 ring-2 ring-white">
-              <Zap className="w-5 h-5" strokeWidth={2.8} />
-            </div>
-            <div className="flex flex-col leading-none">
-              <span className="text-base font-black tracking-tight">AddisonX</span>
-              <span className="text-[10px] font-bold text-orange-700 tracking-widest uppercase">दुकान का सॉफ्टवेयर</span>
-            </div>
-          </a>
+      <div className="max-w-7xl mx-auto px-4 md:px-8">
 
-          <nav className="hidden md:flex items-center gap-7 text-[14px] font-bold text-slate-700">
-            <a href="#features"   className="hover:text-orange-600 transition-colors">Features</a>
-            <a href="#how"        className="hover:text-orange-600 transition-colors">कैसे काम करता है</a>
-            <a href="#pricing"    className="hover:text-orange-600 transition-colors">Pricing</a>
-            <a href="#faq"        className="hover:text-orange-600 transition-colors">सवाल?</a>
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <a href="tel:+919999999999" className="hidden lg:inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-emerald-700 text-[13px] font-bold hover:bg-emerald-50">
-              <Phone className="w-3.5 h-3.5" /> +91 99999 99999
-            </a>
-            <Link href="/login"
-              className="hidden md:inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-gradient-to-br from-rose-600 to-orange-600 text-white text-[14px] font-black shadow-lg shadow-rose-500/30 hover:scale-[1.03] active:scale-95 transition-all">
-              Sign In <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-            <button onClick={() => setMenuOpen(true)}
-              className="md:hidden w-10 h-10 rounded-xl border-2 border-orange-200 flex items-center justify-center text-orange-700">
-              <Menu className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Mobile menu */}
-      {menuOpen && (
-        <div className="fixed inset-0 z-[60] bg-[#fff8ee] p-5 md:hidden">
-          <div className="flex items-center justify-between mb-8">
-            <span className="text-lg font-black">Menu</span>
-            <button onClick={() => setMenuOpen(false)} className="w-10 h-10 rounded-xl border-2 border-orange-200 flex items-center justify-center text-orange-700">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="flex flex-col gap-1 text-[17px] font-black">
-            <a href="#features"  onClick={() => setMenuOpen(false)} className="py-3 border-b border-orange-100">Features</a>
-            <a href="#how"       onClick={() => setMenuOpen(false)} className="py-3 border-b border-orange-100">कैसे काम करता है</a>
-            <a href="#pricing"   onClick={() => setMenuOpen(false)} className="py-3 border-b border-orange-100">Pricing</a>
-            <a href="#faq"       onClick={() => setMenuOpen(false)} className="py-3 border-b border-orange-100">सवाल?</a>
-            <Link href="/login"
-              className="mt-6 inline-flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-2xl bg-gradient-to-br from-rose-600 to-orange-600 text-white text-base font-black shadow-lg shadow-rose-500/30">
-              Sign In <ArrowRight className="w-4 h-4" />
-            </Link>
-            <a href="https://wa.me/?text=Hi%20AddisonX%2C%20demo%20chahiye"
-              target="_blank" rel="noreferrer"
-              className="mt-3 inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-emerald-500 text-white text-base font-black shadow-lg shadow-emerald-500/30">
-              <MessageCircle className="w-4 h-4" /> WhatsApp Demo
-            </a>
-          </div>
-        </div>
-      )}
-
-      {/* ── HERO ──────────────────────────────────────────────────── */}
-      <section id="top" className="relative overflow-hidden">
-        {/* Layered ambient backdrop — three blurred radial glows + a soft dotted grid + sparkles */}
-        <div aria-hidden className="pointer-events-none absolute -top-40 -right-32 w-[680px] h-[680px] rounded-full bg-gradient-to-br from-amber-300/55 via-orange-400/45 to-rose-400/35 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-48 -left-40 w-[600px] h-[600px] rounded-full bg-gradient-to-br from-fuchsia-300/45 via-rose-300/40 to-orange-300/30 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 w-[420px] h-[420px] rounded-full bg-emerald-300/15 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.22]"
-          style={{ backgroundImage: "radial-gradient(circle, #f97316 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
-        <div aria-hidden className="pointer-events-none absolute top-12  left-[8%]  text-amber-400/50 text-[28px] select-none rotate-12">✦</div>
-        <div aria-hidden className="pointer-events-none absolute top-32  right-[12%] text-rose-400/40  text-5xl select-none">✦</div>
-        <div aria-hidden className="pointer-events-none absolute bottom-24 left-[14%] text-orange-400/45 text-3xl select-none -rotate-12">✦</div>
-        <div aria-hidden className="pointer-events-none absolute bottom-44 right-[8%] text-fuchsia-400/40 text-4xl select-none rotate-[20deg]">✦</div>
-
-        <div className="relative max-w-6xl mx-auto px-5 md:px-8 pt-10 pb-20 md:pt-16 md:pb-28 grid lg:grid-cols-[1.05fr_1fr] gap-12 lg:gap-16 items-center">
-          {/* ─── Left: copy ─── */}
-          <div>
-            {/* Top trust pill row */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border-2 border-orange-300 text-rose-600 text-[11px] font-black shadow-sm">
-                <Flame className="w-3.5 h-3.5 text-rose-600" />
-                Made in Bharat 🇮🇳
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border-2 border-emerald-300 text-emerald-700 text-[11px] font-black">
-                GST + UPI Ready
-              </span>
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 border-2 border-violet-300 text-violet-700 text-[11px] font-black">
-                4.9 ⭐ · 100+ shops
-              </span>
-            </div>
-
-            <h1 className="mt-6 text-[44px] md:text-[60px] lg:text-[76px] font-black tracking-tight leading-[0.95] text-slate-900">
-              <span className="block">दुकान चलाओ,</span>
-              <span className="relative inline-block">
-                <span className="bg-gradient-to-r from-rose-600 via-orange-600 to-amber-500 bg-clip-text text-transparent">
-                  सॉफ्टवेयर
-                </span>
-                {/* Hand-drawn underline */}
-                <svg aria-hidden viewBox="0 0 220 12" className="absolute -bottom-1 left-0 w-full h-3 text-amber-500">
-                  <path d="M2 8 Q 55 2, 110 7 T 218 6" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" />
-                </svg>
-              </span>
-              <span className="block">नहीं!</span>
-            </h1>
-
-            <p className="mt-6 text-xl md:text-2xl font-bold text-slate-700 leading-snug">
-              <span className="bg-amber-200/80 px-1.5 rounded shadow-sm">5 second</span> में Bill.
-              UPI QR तैयार. <br className="hidden md:block" />
-              Stock अपने आप count.
-            </p>
-
-            <p className="mt-4 text-[15px] md:text-[17px] text-slate-600 leading-relaxed max-w-lg">
-              भारत के लाला जी, kirana वाले, और gift shop walas के लिए बना सबसे आसान billing software.
-              <span className="font-bold text-slate-800"> Tally जैसा confusing नहीं, WhatsApp जैसा simple.</span>
-            </p>
-
-            <div className="mt-7 flex flex-col sm:flex-row gap-3">
-              <Link href="/login"
-                className="group relative inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-gradient-to-br from-rose-600 via-orange-600 to-amber-500 text-white font-black text-[15px] shadow-2xl shadow-rose-500/40 ring-2 ring-white hover:scale-[1.03] active:scale-[0.98] transition-all overflow-hidden">
-                {/* Shimmer sweep on hover */}
-                <span aria-hidden className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
-                <span className="relative">अभी शुरू करें — Free</span>
-                <ArrowRight className="relative w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <a href="https://wa.me/?text=Hi%20AddisonX%2C%20demo%20chahiye"
-                target="_blank" rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-white text-emerald-700 font-black text-[15px] border-2 border-emerald-500 hover:bg-emerald-50 hover:shadow-lg hover:shadow-emerald-500/20 active:scale-[0.98] transition-all">
-                <MessageCircle className="w-5 h-5 text-emerald-600" /> WhatsApp पर बात करें
-              </a>
-            </div>
-
-            {/* Inline trust micro-row */}
-            <div className="mt-6 grid grid-cols-3 gap-3 max-w-md">
-              {[
-                ["Credit card", "नहीं चाहिए"],
-                ["14 दिन",       "Free Trial"],
-                ["कभी भी",       "Cancel"],
-              ].map(([a, b], i) => (
-                <div key={i} className="flex items-center gap-2 text-[11px] leading-tight">
-                  <Check className="w-4 h-4 text-emerald-600 shrink-0" strokeWidth={3} />
-                  <span><span className="font-black text-slate-900">{a}</span><br /><span className="text-slate-500">{b}</span></span>
-                </div>
-              ))}
-            </div>
-
-            {/* Social proof footer row */}
-            <div className="mt-8 flex items-center gap-5 pt-6 border-t-2 border-dashed border-orange-200">
-              <div className="flex -space-x-2.5">
-                {["from-rose-500 to-pink-500", "from-amber-500 to-orange-500", "from-emerald-500 to-teal-500", "from-violet-500 to-fuchsia-500"].map((g, i) => (
-                  <div key={i} className={`w-10 h-10 rounded-full bg-gradient-to-br ${g} ring-2 ring-[#fff8ee] flex items-center justify-center text-white text-[11px] font-black shadow-sm`}>
-                    {["HS", "KR", "MS", "AD"][i]}
-                  </div>
-                ))}
-                <div className="w-10 h-10 rounded-full bg-slate-900 text-white text-[10px] font-black ring-2 ring-[#fff8ee] flex items-center justify-center">
-                  +95
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center gap-0.5 text-amber-500">
-                  {[0,1,2,3,4].map((i) => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
-                  <span className="ml-1.5 text-[13px] font-black text-slate-900">4.9 / 5</span>
-                </div>
-                <p className="text-[12px] text-slate-600 font-bold mt-0.5">100+ दुकानें already running across India</p>
-              </div>
-            </div>
-          </div>
-
-          {/* ─── Right: phone-frame device mockup ─── */}
-          <div className="relative mx-auto w-full max-w-[420px]">
-            {/* Floating GST sticker */}
-            <div className="absolute -top-4 -right-2 md:-right-8 z-30 rotate-[8deg]">
-              <div className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl shadow-2xl ring-4 ring-white">
-                <p className="text-[11px] font-black tracking-widest">GST READY</p>
-                <p className="text-[9px] font-bold opacity-90">CGST + SGST auto</p>
-              </div>
-            </div>
-            {/* Floating UPI sticker */}
-            <div className="absolute -bottom-5 -left-2 md:-left-8 z-30 -rotate-[7deg]">
-              <div className="bg-violet-600 text-white px-3.5 py-2 rounded-2xl shadow-2xl ring-4 ring-white">
-                <p className="text-[11px] font-black tracking-widest">UPI QR</p>
-                <p className="text-[9px] font-bold opacity-90">Dynamic on every bill</p>
-              </div>
-            </div>
-            {/* Floating Telegram alert sticker */}
-            <div className="hidden md:block absolute top-1/2 -right-12 z-30 rotate-[5deg] animate-pulse">
-              <div className="bg-white px-3 py-2 rounded-2xl shadow-xl ring-4 ring-amber-100 border border-amber-200">
-                <p className="text-[10px] font-black text-rose-600">🔔 New sale!</p>
-                <p className="text-[9px] font-bold text-slate-700">Bill #47 · ₹890</p>
-              </div>
-            </div>
-
-            {/* Ambient halo behind the phone */}
-            <div className="absolute -inset-6 rounded-[44px] bg-gradient-to-br from-amber-300/60 via-rose-300/50 to-fuchsia-300/40 blur-3xl" />
-
-            {/* Phone frame */}
-            <div className="relative mx-auto rounded-[44px] bg-slate-900 p-2.5 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.35)]">
-              {/* Speaker / camera notch */}
-              <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-24 h-5 rounded-b-2xl bg-slate-900 z-10 flex items-center justify-center">
-                <div className="w-12 h-1.5 rounded-full bg-slate-700" />
-              </div>
-              <div className="rounded-[34px] overflow-hidden bg-[#fff8ee]">
-                {/* Status bar */}
-                <div className="h-8 bg-[#fff8ee] flex items-center justify-between px-5 text-[10px] font-black text-slate-700">
-                  <span>9:30 AM</span>
-                  <span className="flex items-center gap-1">📶 5G 100%</span>
-                </div>
-                {/* App content */}
-                <div className="bg-gradient-to-br from-orange-50 via-amber-50 to-white p-5 pb-8">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="text-[20px] font-black tracking-tight">आपकी दुकान</p>
-                      <p className="text-[11px] text-slate-500 font-medium">आज का overview · सबसे अच्छा दिन! 🎉</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 border-2 border-emerald-300 text-emerald-700 text-[10px] font-black">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      LIVE
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2.5 mb-4">
-                    <StatTile label="आज की कमाई" value="₹28,450" tone="emerald" />
-                    <StatTile label="Bills बने"   value="47"      tone="rose"    />
-                    <StatTile label="Items बिके"  value="134"     tone="amber"   />
-                    <StatTile label="Stock"       value="2,140"   tone="violet"  />
-                  </div>
-
-                  <div className="rounded-2xl border-2 border-orange-100 p-3.5 bg-white">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Revenue · 7 days</p>
-                      <span className="text-[10px] font-black text-emerald-600">+52% ↗</span>
-                    </div>
-                    <div className="flex items-end gap-1.5 h-16">
-                      {[40, 55, 48, 72, 65, 88, 100].map((h, i) => (
-                        <div key={i} className="flex-1 rounded-t-md bg-gradient-to-t from-rose-500 via-orange-500 to-amber-400" style={{ height: `${h}%` }} />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center gap-2 text-[11px] font-bold text-slate-600">
-                    <ScanLine className="w-3.5 h-3.5 text-rose-600" />
-                    Just sold · Steel Tiffin Set · <span className="text-slate-900">₹890</span>
-                  </div>
-                </div>
-                {/* Home indicator */}
-                <div className="h-5 bg-[#fff8ee] flex items-center justify-center">
-                  <div className="w-28 h-1 rounded-full bg-slate-300" />
-                </div>
-              </div>
-            </div>
-
-            {/* "Works on mobile + desktop" caption */}
-            <p className="mt-6 text-center text-[12px] font-bold text-slate-500 flex items-center justify-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5" />
-              Mobile, tablet, desktop — same login, सब जगह
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-8 lp-animate-fade-up">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.15em] lp-glass text-white">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#8BFA3E] animate-pulse" />
+            Live · 247 shops billing right now
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.15em] lp-glass text-white">
+            🇮🇳 Made in Bharat
+          </span>
         </div>
 
-        {/* Scroll cue */}
-        <div className="relative pb-6 flex justify-center">
-          <a href="#features" aria-label="Scroll to features"
-            className="group flex flex-col items-center gap-1 text-[11px] font-black text-slate-500 hover:text-rose-600 transition-colors">
-            <span className="tracking-widest uppercase">Scroll</span>
-            <ChevronDown className="w-5 h-5 animate-bounce" />
+        <h1 className="text-center font-black tracking-tight leading-[0.92] lp-animate-fade-up" style={{ animationDelay: "60ms" }}>
+          <span className="block text-5xl md:text-7xl lg:text-[7rem]">
+            Bill faster. <span className="lp-gradient-saffron">Stress less.</span>
+          </span>
+          <span className="block text-3xl md:text-5xl lg:text-6xl mt-3 text-white/70" style={{ fontFamily: "var(--font-hindi)" }}>
+            दुकान चलाओ, <span className="lp-gradient-shimmer lp-animate-shimmer-text">सॉफ्टवेयर नहीं</span>।
+          </span>
+        </h1>
+
+        <p className="mt-7 text-center text-base md:text-xl text-white/60 max-w-2xl mx-auto leading-relaxed lp-animate-fade-up" style={{ animationDelay: "140ms" }}>
+          The cloud billing OS that runs your kirana, gift shop, or pharmacy.
+          <br className="hidden md:inline" />
+          <span className="text-white/80 font-semibold">5-second bills · GST invoices · UPI QR · Live stock · WhatsApp reports.</span>
+        </p>
+
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-3 lp-animate-fade-up" style={{ animationDelay: "220ms" }}>
+          <Link href={TRIAL_URL}
+             className="group relative inline-flex items-center gap-2 px-6 py-4 rounded-full font-black text-[#050507] bg-white hover:bg-[#B5FF6A] transition-colors text-base lp-animate-glow-pulse">
+            <Sparkles className="w-5 h-5" />
+            <span>Start 14-day Free Trial</span>
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=AddisonX%20demo%20चाहिए`} target="_blank" rel="noopener"
+             className="inline-flex items-center gap-2 px-5 py-4 rounded-full font-bold text-white lp-glass lp-glass-hover transition-all">
+            <MessageCircle className="w-5 h-5 text-[#8BFA3E]" />
+            Book WhatsApp Demo
           </a>
         </div>
-      </section>
 
-      {/* ── Stats strip (the "lakhon bills" line) ───────────────── */}
-      <section className="border-y-4 border-orange-200 bg-gradient-to-r from-rose-50 via-orange-50 to-amber-50 py-8 md:py-10">
-        <div className="max-w-6xl mx-auto px-5 md:px-8 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          {[
-            { value: "100+",  label: "Happy दुकानें",     color: "text-rose-600"   },
-            { value: "2L+",   label: "Bills बने",         color: "text-orange-600" },
-            { value: "₹3 Cr+", label: "Sales tracked",    color: "text-emerald-600"},
-            { value: "0",     label: "Setup fees",        color: "text-violet-600" },
-          ].map((s, i) => (
-            <div key={i}>
-              <p className={`text-4xl md:text-5xl font-black tracking-tight ${s.color}`}>{s.value}</p>
-              <p className="mt-1 text-[12px] md:text-[13px] font-bold text-slate-600 uppercase tracking-wider">{s.label}</p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-white/40 lp-animate-fade-up" style={{ animationDelay: "300ms" }}>
+          <div className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#8BFA3E]" /> No credit card</div>
+          <div className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#8BFA3E]" /> Cancel anytime</div>
+          <div className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#8BFA3E]" /> Setup in 5 min</div>
+        </div>
+
+        <div className="mt-16 relative lp-animate-fade-up" style={{ animationDelay: "380ms" }}>
+          <DashboardMockup tracked={tracked} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DashboardMockup({ tracked }: { tracked: number }) {
+  return (
+    <div className="relative max-w-5xl mx-auto">
+      <div className="absolute -top-4 -left-2 md:-left-12 z-20 lp-glass rounded-2xl px-3 py-2 lp-animate-float-y">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-[#FF6B35] flex items-center justify-center text-white">
+            <ScanLine className="w-4 h-4" />
+          </div>
+          <div className="text-xs">
+            <div className="font-black text-white">SCAN</div>
+            <div className="text-white/50 text-[10px]">3.2s avg</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute -top-2 right-0 md:-right-10 z-20 lp-glass rounded-2xl px-3 py-2 lp-animate-float-y" style={{ animationDelay: "-2s" }}>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-[#4ADE5F] flex items-center justify-center text-[#050507]">
+            <QrCode className="w-4 h-4" />
+          </div>
+          <div className="text-xs">
+            <div className="font-black text-white">UPI</div>
+            <div className="text-white/50 text-[10px]">Auto-QR</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute -bottom-4 left-1/4 z-20 lp-glass rounded-2xl px-3 py-2 lp-animate-float-y" style={{ animationDelay: "-1s" }}>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-[#8B5CF6] flex items-center justify-center text-white">
+            <BarChart3 className="w-4 h-4" />
+          </div>
+          <div className="text-xs">
+            <div className="font-black text-white">Live</div>
+            <div className="text-white/50 text-[10px]">Daily report</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-3xl lp-glass p-2 md:p-3 shadow-2xl lp-conic-border">
+        <div className="rounded-2xl bg-[#0B0B11] overflow-hidden border border-white/5">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/70" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[#4ADE5F]/70" />
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── FEATURES grid ───────────────────────────────────────── */}
-      <section id="features" className="py-20 md:py-28 relative">
-        <div aria-hidden className="absolute top-20 right-10 text-orange-300/40 text-8xl select-none">✦</div>
-        <div className="relative max-w-6xl mx-auto px-5 md:px-8">
-          <div className="max-w-2xl mb-12 text-center mx-auto">
-            <span className="inline-block px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-[11px] font-black uppercase tracking-widest mb-3">
-              Features
-            </span>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-[1.05]">
-              जो चाहिए, सब है.<br />
-              <span className="text-rose-600">जो नहीं चाहिए, वो नहीं.</span>
-            </h2>
+            <div className="ml-auto text-[10px] text-white/30" style={{ fontFamily: "var(--font-mono)" }}>billing.addisonxmedia.com</div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            <FeatureCard icon={ScanLine}    tone="rose"
-              title="5-second billing"
-              hindi="Scan करो, bill तैयार"
-              body="USB scanner, camera, या type — सब चलता है. Cart instantly update होता है." />
-            <FeatureCard icon={Receipt}     tone="orange"
-              title="GST Invoice Print"
-              hindi="पूरा GST compliant"
-              body="CGST + SGST automatically calculate. आपका GSTIN, आपका rate. 80mm thermal में direct print." />
-            <FeatureCard icon={IndianRupee} tone="emerald"
-              title="UPI QR तुरंत"
-              hindi="हर bill पर dynamic QR"
-              body="Customer scan करे, अपने UPI से pay करे. Third-party app की ज़रूरत नहीं." />
-            <FeatureCard icon={Package}     tone="violet"
-              title="Stock अपने आप गिने"
-              hindi="कभी भी कुछ खत्म नहीं होगा"
-              body="हर bill पर stock automatic कम. Low stock पर Telegram पर alert आएगा." />
-            <FeatureCard icon={BarChart3}   tone="fuchsia"
-              title="Reports जो काम के हैं"
-              hindi="मालिक को सब दिखेगा"
-              body="आज कितना कमाया, क्या ज़्यादा बिका, कब peak hour था — सब एक click पर." />
-            <FeatureCard icon={Sparkles}    tone="amber"
-              title="Today's Deal"
-              hindi="आज का special"
-              body="One tap में flash discount. शाम को auto-expire. हर label पर strike-through MRP." />
-          </div>
-        </div>
-      </section>
-
-      {/* ── HOW IT WORKS ────────────────────────────────────────── */}
-      <section id="how" className="py-20 md:py-24 bg-gradient-to-b from-orange-50/50 to-[#fff8ee] relative overflow-hidden">
-        <div aria-hidden className="pointer-events-none absolute top-1/2 -translate-y-1/2 left-0 w-32 h-32 rounded-full bg-rose-300/30 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute top-10 right-0 w-40 h-40 rounded-full bg-amber-300/30 blur-3xl" />
-
-        <div className="relative max-w-6xl mx-auto px-5 md:px-8">
-          <div className="text-center mb-14">
-            <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-black uppercase tracking-widest mb-3">
-              How it works
-            </span>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-[1.05]">
-              3 step, <span className="text-emerald-600">पूरा दिन sorted</span>
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 md:gap-8 relative">
-            <StepCard n="1" hindi="Scan करो" title="Add to cart" icon={ScanLine} tone="rose"
-              body="Barcode scanner, USB, या camera. Product जल्दी से cart में." />
-            <StepCard n="2" hindi="Payment लो" title="Cash या UPI" icon={IndianRupee} tone="emerald"
-              body="QR दिखाओ, customer scan करे, OR cash लो. Receipt instant print." />
-            <StepCard n="3" hindi="आराम करो" title="App सब handle करेगा" icon={BarChart3} tone="violet"
-              body="Stock update, Telegram alert, daily report — सब अपने आप." />
-          </div>
-        </div>
-      </section>
-
-      {/* ── WHO IS THIS FOR? (industry fit) ─────────────────────── */}
-      <section id="industries" className="py-20 md:py-24 bg-gradient-to-b from-[#fff8ee] via-rose-50/40 to-white relative overflow-hidden">
-        <div aria-hidden className="pointer-events-none absolute top-10 left-10 w-40 h-40 rounded-full bg-rose-300/30 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute bottom-10 right-10 w-40 h-40 rounded-full bg-amber-300/30 blur-3xl" />
-
-        <div className="relative max-w-6xl mx-auto px-5 md:px-8">
-          <div className="text-center mb-12">
-            <span className="inline-block px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-[11px] font-black uppercase tracking-widest mb-3">
-              Who is this for?
-            </span>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-[1.05]">
-              आपकी दुकान के लिए <span className="text-rose-600">perfect है?</span>
-            </h2>
-            <p className="mt-4 text-slate-600 max-w-2xl mx-auto text-[15px]">
-              जिन दुकानों में barcode लगाकर billing होती है — वहाँ ये software पहले दिन से काम करता है.
-              नीचे देखो, आपकी दुकान शामिल है?
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
-            <IndustryCard icon={Store}       tone="emerald" name="Kirana / General Store" hindi="किराना · दैनिक सामान" />
-            <IndustryCard icon={PartyPopper} tone="rose"    name="Gift & Toy Shop"        hindi="गिफ्ट · खिलौने" />
-            <IndustryCard icon={Smartphone}  tone="violet"  name="Mobile & Accessories"   hindi="मोबाइल · accessories" />
-            <IndustryCard icon={Package}     tone="orange"  name="Stationery Shop"        hindi="स्टेशनरी · books" />
-            <IndustryCard icon={Sparkles}    tone="fuchsia" name="Cosmetics & Beauty"     hindi="कॉस्मेटिक्स · सौंदर्य" />
-            <IndustryCard icon={Zap}         tone="amber"   name="Hardware & Electrical" hindi="हार्डवेयर · इलेक्ट्रिकल" />
-            <IndustryCard icon={Heart}       tone="rose"    name="Footwear & Fashion"     hindi="कपड़े · जूते · बैग" />
-            <IndustryCard icon={ShieldCheck} tone="emerald" name="Pharmacy / Medical"     hindi="मेडिकल · pharmacy" />
-          </div>
-
-          {/* Honest fine print — what doesn't fit */}
-          <div className="mt-10 mx-auto max-w-3xl rounded-2xl bg-white border-2 border-amber-200 px-5 py-4 text-center shadow-sm">
-            <p className="text-[13px] text-slate-700 leading-relaxed">
-              <span className="font-black text-amber-700">अगर restaurant, salon, jewellery, या petrol pump है</span> —
-              तो इसमें कुछ extra modules चाहिए होंगे.{" "}
-              <a href="https://wa.me/919876543210" className="font-black text-emerald-700 underline decoration-2 underline-offset-2">
-                WhatsApp पर पूछें
-              </a>{" "}
-              — हम honest answer देंगे, fit है या नहीं.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ── VS COMPARISON ───────────────────────────────────────── */}
-      <section className="py-20 md:py-24">
-        <div className="max-w-5xl mx-auto px-5 md:px-8">
-          <div className="text-center mb-12">
-            <span className="inline-block px-3 py-1 rounded-full bg-violet-100 text-violet-700 text-[11px] font-black uppercase tracking-widest mb-3">
-              Comparison
-            </span>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-[1.05]">
-              Tally accountants के लिए है.<br />
-              AddisonX <span className="text-rose-600">दुकानदारों के लिए</span>.
-            </h2>
-          </div>
-
-          {/* Comparison card — softer palette, icons per feature, trophy header */}
-          <div className="relative rounded-[28px] border-2 border-orange-200 overflow-hidden bg-white shadow-2xl shadow-orange-100/60">
-            {/* Crown badge on the AddisonX header */}
-            <div className="absolute top-3 left-1/2 -translate-x-[14%] md:-translate-x-[10%] z-10 rotate-[-6deg] pointer-events-none">
-              <div className="bg-amber-400 text-amber-950 px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest shadow-md ring-2 ring-white">
-                🏆 WINNER
-              </div>
-            </div>
-
-            <div className="grid grid-cols-[1.4fr_1fr_1fr] text-sm">
-              {/* Headers */}
-              <div className="bg-gradient-to-br from-orange-50 to-amber-50/50 px-4 md:px-6 py-5 border-b-2 border-orange-100 font-black uppercase text-[10px] md:text-[11px] tracking-widest text-slate-500">
-                Feature
-              </div>
-              <div className="bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 px-4 md:px-6 py-5 border-b-2 border-rose-300 text-center">
-                <p className="font-black text-white text-[13px] md:text-[15px] tracking-tight">AddisonX</p>
-                <p className="text-[10px] font-bold text-amber-100 mt-0.5">दुकानदारों के लिए</p>
-              </div>
-              <div className="bg-slate-100 px-4 md:px-6 py-5 border-b-2 border-slate-200 text-center">
-                <p className="font-black text-slate-600 text-[13px] md:text-[15px]">Tally / Vyapar</p>
-                <p className="text-[10px] font-bold text-slate-400 mt-0.5">Accountants के लिए</p>
-              </div>
-
-              {/* Rows */}
-              {([
-                [Zap,          "5-second bill from barcode",          true,  "maybe"  ],
-                [IndianRupee,  "Dynamic UPI QR on checkout",          true,  false    ],
-                [Smartphone,   "Mobile + Desktop — same login",       true,  "limited"],
-                [Sparkles,     "Today's Deal — flash discount",       true,  false    ],
-                [MessageCircle,"WhatsApp + Telegram sale alerts",     true,  false    ],
-                [Heart,        "UI जो शाम तक थकाए नहीं",              true,  false    ],
-                [BarChart3,    "Accounting / Balance-sheet exports",  false, true     ],
-              ] as const).map(([Icon, feature, mine, theirs], i, arr) => (
-                <Row key={i} icon={Icon} feature={feature} mine={mine} theirs={theirs} last={i === arr.length - 1} />
-              ))}
-
-              {/* Verdict footer row */}
-              <div className="bg-orange-50 px-4 md:px-6 py-4 font-black text-[12px] md:text-[13px] text-slate-700">
-                Built for
-              </div>
-              <div className="bg-gradient-to-br from-rose-600 to-orange-600 px-4 md:px-6 py-4 text-center text-white">
-                <p className="text-[13px] md:text-[15px] font-black">दुकानदार</p>
-                <p className="text-[10px] font-bold text-white/80 mt-0.5">Shop counter</p>
-              </div>
-              <div className="bg-slate-100 px-4 md:px-6 py-4 text-center text-slate-600">
-                <p className="text-[13px] md:text-[15px] font-black">CA / Accountants</p>
-                <p className="text-[10px] font-bold text-slate-400 mt-0.5">Back office</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Note about "Tally/Vyapar" rating — keeps us honest */}
-          <p className="mt-4 text-center text-[11px] text-slate-500">
-            * Comparison based on publicly-listed features of competitor products. Your mileage may vary.
-          </p>
-        </div>
-      </section>
-
-      {/* ── PRICING ─────────────────────────────────────────────── */}
-      <section id="pricing" className="py-20 md:py-28 bg-gradient-to-b from-[#fff8ee] via-amber-50/50 to-rose-50/30 relative overflow-hidden">
-        <div aria-hidden className="pointer-events-none absolute top-20 left-10 text-amber-400/40 text-7xl select-none">✦</div>
-        <div aria-hidden className="pointer-events-none absolute bottom-20 right-10 text-rose-400/40 text-6xl select-none">✦</div>
-
-        <div className="relative max-w-6xl mx-auto px-5 md:px-8">
-          <div className="text-center mb-14">
-            <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black uppercase tracking-widest mb-3">
-              Pricing
-            </span>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-[1.05]">
-              Honest pricing. <br className="md:hidden" />
-              <span className="text-emerald-600">कोई छुपा charge नहीं.</span>
-            </h2>
-            <p className="mt-4 text-slate-600 max-w-xl mx-auto text-[15px]">
-              Pay monthly or yearly. Cancel anytime. Setup + training हमारे taraf से <span className="font-black text-emerald-700">FREE</span>.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto items-stretch">
-            <PriceCard
-              name="Free Trial"
-              tagline="कोई card नहीं चाहिए"
-              hindi="पहले इस्तेमाल करो, फिर पैसे दो"
-              originalPrice=""
-              price="14 दिन"
-              period="Free"
-              features={[
-                "पूरा software · कोई limit नहीं",
-                "Unlimited products + bills",
-                "GST invoice + UPI QR",
-                "Email + WhatsApp support",
-                "कभी भी upgrade करें",
-              ]}
-              cta="अभी शुरू करें"
-              highlighted={false}
-            />
-            <PriceCard
-              name="1 Year Plan"
-              tagline="साल भर का सबसे अच्छा deal"
-              hindi="MOST POPULAR · 2 महीने FREE"
-              originalPrice="₹4,788"
-              price="₹2,999"
-              period="/year"
-              features={[
-                "Unlimited products + bills",
-                "GST invoice + UPI QR तुरंत",
-                "Telegram + WhatsApp alerts",
-                "Today's Deal + customer database",
-                "Priority WhatsApp support",
-                "Free onboarding + training",
-              ]}
-              cta="अभी subscribe करें"
-              highlighted={true}
-              badge="🔥 BESTSELLER"
-            />
-          </div>
-
-          <div className="mt-10 flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 text-[13px] font-bold text-slate-600">
-            <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-emerald-600" /> 14 दिन Free Trial</span>
-            <span className="text-orange-300 hidden md:inline">·</span>
-            <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-emerald-600" /> Credit card नहीं चाहिए</span>
-            <span className="text-orange-300 hidden md:inline">·</span>
-            <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-emerald-600" /> कभी भी cancel</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── TESTIMONIAL ─────────────────────────────────────────── */}
-      <section className="py-20 md:py-24 bg-gradient-to-br from-rose-600 via-orange-600 to-amber-500 relative overflow-hidden">
-        <div aria-hidden className="pointer-events-none absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.2),transparent_50%)]" />
-        <div className="relative max-w-3xl mx-auto px-5 md:px-8 text-center text-white">
-          <div className="flex justify-center gap-1 mb-5 text-amber-200">
-            {[0,1,2,3,4].map((i) => <Star key={i} className="w-6 h-6 fill-current drop-shadow-md" />)}
-          </div>
-          <p className="text-2xl md:text-4xl font-black tracking-tight leading-snug">
-            "हमारा cashier सालों से Tally पर था. <br className="hidden md:inline" />
-            2 दिन में AddisonX सीख गया. अब वापस नहीं जाएगा."
-          </p>
-          <div className="mt-8 inline-flex items-center gap-4 bg-white/15 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/30">
-            <div className="w-14 h-14 rounded-full bg-white text-rose-600 flex items-center justify-center font-black text-lg shadow-lg">
-              SK
-            </div>
-            <div className="text-left">
-              <p className="font-black text-base">Sharma Kirana Store</p>
-              <p className="text-[12px] opacity-90">India · Verified shopkeeper</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FAQ ─────────────────────────────────────────────────── */}
-      <section id="faq" className="py-20 md:py-24">
-        <div className="max-w-3xl mx-auto px-5 md:px-8">
-          <div className="text-center mb-12">
-            <span className="inline-block px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-[11px] font-black uppercase tracking-widest mb-3">
-              FAQ
-            </span>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-[1.05]">
-              शुरू करने से पहले <br className="md:hidden" />
-              <span className="text-rose-600">कुछ सवाल?</span>
-            </h2>
-          </div>
-
-          <div className="space-y-3">
-            {FAQS.map((f, i) => (
-              <details key={i} open={openFaq === i}
-                onToggle={(e) => (e.currentTarget as HTMLDetailsElement).open && setOpenFaq(i)}
-                className="rounded-2xl border-2 border-orange-200 bg-white overflow-hidden group hover:border-orange-300 transition-colors">
-                <summary className="cursor-pointer list-none px-5 py-4 flex items-center justify-between gap-3 font-black text-slate-900">
-                  <span className="text-[15px]">{f.q}</span>
-                  <ChevronDown className="w-5 h-5 text-rose-500 transition-transform group-open:rotate-180 shrink-0" />
-                </summary>
-                <div className="px-5 pb-4 text-[14px] text-slate-600 leading-relaxed">{f.a}</div>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Final CTA ───────────────────────────────────────────── */}
-      <section className="py-20 md:py-24 relative overflow-hidden">
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-rose-600 via-orange-600 via-amber-500 to-emerald-600" />
-        <div aria-hidden className="absolute -top-32 -right-32 w-[420px] h-[420px] rounded-full bg-white/20 blur-3xl" />
-        <div aria-hidden className="absolute -bottom-32 -left-32 w-[420px] h-[420px] rounded-full bg-amber-200/30 blur-3xl" />
-
-        <div className="relative max-w-3xl mx-auto px-5 md:px-8 text-center text-white">
-          <Trophy className="w-12 h-12 mx-auto mb-5 text-amber-200" />
-          <h2 className="text-3xl md:text-5xl font-black tracking-tight leading-[1.05]">
-            दुकान चलाओ. <br />
-            <span className="text-amber-200">हम सब handle करेंगे.</span>
-          </h2>
-          <p className="mt-5 text-white/95 text-lg max-w-xl mx-auto">
-            14 दिन free. कोई card नहीं चाहिए. WhatsApp पर तुरंत support.
-          </p>
-          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/login"
-              className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-white text-rose-700 font-black text-[15px] shadow-2xl hover:scale-[1.03] active:scale-[0.98] transition-all">
-              अभी Free शुरू करें <ArrowRight className="w-4 h-4" />
-            </Link>
-            <a href="https://wa.me/?text=Hi%2C%20demo%20chahiye"
-              target="_blank" rel="noreferrer"
-              className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-emerald-500 text-white font-black text-[15px] shadow-2xl ring-2 ring-white/40 hover:bg-emerald-600 active:scale-[0.98] transition-all">
-              <MessageCircle className="w-5 h-5" /> WhatsApp Demo
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Footer ──────────────────────────────────────────────── */}
-      <footer className="relative bg-slate-950 text-slate-300 overflow-hidden">
-        {/* Top tricolor strip */}
-        <div aria-hidden className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-600 via-orange-500 via-amber-500 to-emerald-500" />
-        {/* Ambient backdrop */}
-        <div aria-hidden className="pointer-events-none absolute -top-32 -left-32 w-[420px] h-[420px] rounded-full bg-rose-500/10 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full bg-amber-500/5 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-32 w-[420px] h-[420px] rounded-full bg-orange-500/10 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.04]"
-          style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
-
-        {/* ─── Trust badges row ─── */}
-        <div className="relative border-b border-slate-800/80">
-          <div className="max-w-6xl mx-auto px-5 md:px-8 py-7 grid grid-cols-2 md:grid-cols-4 gap-5">
-            {[
-              { icon: ShieldCheck, label: "Bank-grade",   sub: "256-bit encryption", tone: "text-emerald-400" },
-              { icon: Award,       label: "GST Certified", sub: "Full compliance",   tone: "text-amber-400" },
-              { icon: Headphones,  label: "Live Support",  sub: "WhatsApp · 9-9",    tone: "text-rose-400" },
-              { icon: Store,       label: "Made in Bharat", sub: "Built in Ranchi",  tone: "text-orange-400" },
-            ].map(({ icon: Icon, label, sub, tone }, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className={`w-11 h-11 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center ${tone}`}>
-                  <Icon className="w-5 h-5" strokeWidth={2.4} />
-                </div>
+          <div className="p-4 md:p-6 grid grid-cols-12 gap-3 md:gap-4">
+            <div className="col-span-12 md:col-span-7 rounded-2xl bg-gradient-to-br from-[#FF6B35]/15 to-[#FF6B35]/5 border border-[#FF6B35]/20 p-5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#FF8A3D] to-transparent lp-animate-scan-line" />
+              <div className="flex items-start justify-between mb-4">
                 <div>
-                  <p className="text-[13px] font-black text-white leading-tight">{label}</p>
-                  <p className="text-[11px] text-slate-500 leading-tight mt-0.5">{sub}</p>
+                  <div className="text-[10px] font-black tracking-widest uppercase text-[#FF8A3D]">Today's Sales</div>
+                  <div className="mt-1 text-3xl md:text-4xl font-black tabular-nums text-white">
+                    ₹{tracked.toLocaleString("en-IN")}
+                  </div>
+                </div>
+                <div className="text-[11px] text-[#8BFA3E] font-bold flex items-center gap-1">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  +24%
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ─── Payments accepted strip ─── */}
-        <div className="relative border-b border-slate-800/80 bg-slate-900/40">
-          <div className="max-w-6xl mx-auto px-5 md:px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-400">
-              <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-              Payments accepted
+              <div className="flex items-end gap-1.5 h-16 mt-3">
+                {[35, 55, 40, 70, 50, 85, 60, 75, 90, 55, 80, 95].map((h, i) => (
+                  <div key={i} className="flex-1 bg-gradient-to-t from-[#FF6B35] to-[#FFA86B] rounded-t opacity-90"
+                       style={{ height: `${h}%` }} />
+                ))}
+              </div>
+              <div className="flex justify-between mt-1 text-[8px] font-bold text-white/30">
+                <span>00</span><span>02</span><span>04</span><span>06</span><span>08</span><span>10</span><span>12</span><span>14</span><span>16</span><span>18</span><span>20</span><span>22</span>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {["UPI", "RuPay", "Visa", "Mastercard", "Paytm", "PhonePe", "GPay", "Cash"].map((p) => (
-                <span key={p} className="text-[10.5px] font-black tracking-wider px-2.5 py-1 rounded-md bg-slate-900 border border-slate-700/80 text-slate-300">
-                  {p}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
 
-        {/* ─── Main footer ─── */}
-        <div className="relative max-w-6xl mx-auto px-5 md:px-8 py-14 grid lg:grid-cols-[1.8fr_1fr_1fr_1fr_1.3fr] gap-10 text-sm">
-          {/* Brand block */}
-          <div>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 ring-2 ring-slate-800">
-                <Zap className="w-6 h-6" strokeWidth={2.8} />
-                <span aria-hidden className="absolute inset-0 rounded-2xl ring-1 ring-white/20" />
+            <div className="col-span-6 md:col-span-5 rounded-2xl bg-white/[0.03] border border-white/5 p-5 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="text-[10px] font-black tracking-widest uppercase text-white/40">Bills</div>
+                <Receipt className="w-4 h-4 text-[#8BFA3E]" />
               </div>
               <div>
-                <p className="text-lg font-black text-white tracking-tight">AddisonX</p>
-                <p className="text-[10px] font-bold text-orange-300 tracking-widest uppercase">दुकान का सॉफ्टवेयर</p>
+                <div className="text-4xl md:text-5xl font-black tabular-nums text-white">134</div>
+                <div className="text-xs text-white/50 mt-1">vs 108 yesterday</div>
               </div>
             </div>
 
-            <p className="text-slate-400 leading-relaxed text-[13.5px] max-w-sm">
-              भारत का सबसे आसान billing &amp; inventory software. Built with love in Ranchi, used in दुकानें across Bharat.
-            </p>
-
-            {/* App ratings mini-card */}
-            <div className="mt-5 inline-flex items-center gap-3 rounded-xl bg-slate-900/80 border border-slate-800 px-3.5 py-2.5">
-              <div className="flex items-center gap-0.5 text-amber-400">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400" strokeWidth={0} />
-                ))}
+            <div className="col-span-12 rounded-2xl bg-white/[0.02] border border-white/5 p-3 md:p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="w-3.5 h-3.5 text-[#8BFA3E]" />
+                <div className="text-[10px] font-black tracking-widest uppercase text-white/40">Live Bills</div>
+                <div className="ml-auto text-[10px] text-white/30">just now</div>
               </div>
-              <div className="leading-tight">
-                <p className="text-[12px] font-black text-white">4.9 / 5 <span className="text-slate-500 font-normal">· 2,400+ shopkeepers</span></p>
-                <p className="text-[10.5px] text-slate-500">हर रोज़ नई दुकानें जुड़ रही हैं</p>
-              </div>
-            </div>
-
-            {/* Newsletter */}
-            <div className="mt-6 max-w-sm">
-              <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-2">
-                हर हफ्ते shopkeeper tips
-              </p>
-              <form
-                onSubmit={(e) => e.preventDefault()}
-                className="flex gap-2"
-              >
-                <input
-                  type="email"
-                  placeholder="aap@dukaan.com"
-                  className="flex-1 px-3.5 h-11 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50"
-                />
-                <button type="submit"
-                  className="px-4 h-11 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 text-white font-black text-sm shadow-md shadow-orange-500/30 hover:scale-[1.03] active:scale-95 transition-all flex items-center gap-1">
-                  Subscribe <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </form>
-              <p className="mt-2 text-[11px] text-slate-500">
-                Spam नहीं. Unsubscribe कभी भी.
-              </p>
-            </div>
-
-            {/* Social row */}
-            <div className="mt-6">
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2.5">Follow us</p>
-              <div className="flex items-center gap-2">
+              <div className="space-y-2">
                 {[
-                  { icon: Instagram, label: "Instagram", color: "hover:bg-gradient-to-br hover:from-fuchsia-500 hover:to-orange-500 hover:border-fuchsia-400 hover:text-white" },
-                  { icon: Facebook,  label: "Facebook",  color: "hover:bg-blue-600 hover:border-blue-500 hover:text-white" },
-                  { icon: Youtube,   label: "YouTube",   color: "hover:bg-red-600 hover:border-red-500 hover:text-white" },
-                  { icon: Twitter,   label: "Twitter",   color: "hover:bg-slate-100 hover:border-slate-100 hover:text-slate-900" },
-                  { icon: Linkedin,  label: "LinkedIn",  color: "hover:bg-sky-700 hover:border-sky-600 hover:text-white" },
-                ].map(({ icon: Icon, label, color }) => (
-                  <a key={label} href="#" aria-label={label}
-                    className={`w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center transition-all ${color}`}>
-                    <Icon className="w-4 h-4" strokeWidth={2.2} />
-                  </a>
+                  { name: "Coffee Mug + Teddy Bear",  amt: "₹449",   t: "2s ago",  p: "UPI" },
+                  { name: "Stationery Bundle",        amt: "₹275",   t: "9s ago",  p: "CASH" },
+                  { name: "Wooden Wind Chime",        amt: "₹598",   t: "23s ago", p: "UPI" },
+                ].map((b, i) => (
+                  <div key={i} className="flex items-center gap-3 text-xs">
+                    <div className="w-1 h-8 rounded-full bg-gradient-to-b from-[#FF6B35] to-[#B83A0A]" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-white truncate">{b.name}</div>
+                      <div className="text-white/40 text-[10px]">{b.t}</div>
+                    </div>
+                    <div className="text-[9px] font-black px-2 py-0.5 rounded-full bg-white/5 text-white/60">{b.p}</div>
+                    <div className="font-black tabular-nums text-white text-sm w-16 text-right">{b.amt}</div>
+                  </div>
                 ))}
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          {/* Product links */}
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-4">Product</p>
-            <ul className="space-y-2.5">
-              <li><a href="#features"   className="text-slate-400 hover:text-white transition-colors">Features</a></li>
-              <li><a href="#how"        className="text-slate-400 hover:text-white transition-colors">कैसे काम करता है</a></li>
-              <li><a href="#pricing"    className="text-slate-400 hover:text-white transition-colors">Pricing</a></li>
-              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Who is it for?</a></li>
-              <li><a href="#faq"        className="text-slate-400 hover:text-white transition-colors">FAQ</a></li>
-              <li><Link href="/login"   className="text-slate-400 hover:text-white transition-colors">Sign In</Link></li>
-            </ul>
-          </div>
+/* ─── LOGO MARQUEE ─────────────────────────────────────────── */
+function LogoMarquee() {
+  const shops = [
+    "Hira & Sons", "Sharma Kirana", "Mina Gift Shop", "Mukti Stationery",
+    "Patel Medical", "Singh Cosmetics", "Royal Hardware", "Krishna Footwear",
+    "Joy Bookstore", "Modern Mobile", "Anand Toys", "Bhagat Pharmacy",
+  ];
+  return (
+    <section className="border-y border-white/5 py-10 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 mb-6">
+        <p className="text-center text-[10px] font-black tracking-[0.3em] uppercase text-white/30">
+          Powering 100+ shops across India
+        </p>
+      </div>
+      <div className="lp-marquee gap-12 text-white/30">
+        {[...shops, ...shops].map((s, i) => (
+          <div key={i} className="text-2xl whitespace-nowrap italic" style={{ fontFamily: "var(--font-display)" }}>{s}</div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-          {/* Industries quick-links */}
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-4">Industries</p>
-            <ul className="space-y-2.5">
-              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Kirana / General</a></li>
-              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Gift &amp; Toy</a></li>
-              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Mobile &amp; Accessories</a></li>
-              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Stationery</a></li>
-              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Cosmetics</a></li>
-              <li><a href="#industries" className="text-slate-400 hover:text-white transition-colors">Pharmacy</a></li>
-            </ul>
-          </div>
-
-          {/* Company / Resources */}
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-4">Company</p>
-            <ul className="space-y-2.5">
-              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">About us</a></li>
-              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Blog</a></li>
-              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Careers <span className="ml-1 text-[9px] font-black text-emerald-300 bg-emerald-900/40 border border-emerald-700/50 px-1.5 py-0.5 rounded">हम hiring पे हैं</span></a></li>
-              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Partner program</a></li>
-              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Privacy Policy</a></li>
-              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Terms of Service</a></li>
-              <li><a className="text-slate-400 hover:text-white transition-colors cursor-default">Refund Policy</a></li>
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-widest text-orange-300 mb-4">हमसे बात करें</p>
-            <ul className="space-y-3">
-              <li>
-                <a href="tel:+919999999999" className="group flex items-start gap-2.5 hover:text-white transition-colors">
-                  <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0 group-hover:border-emerald-500/50">
-                    <Phone className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Call us</p>
-                    <p className="text-[13px] font-bold text-white">+91 99999 99999</p>
-                    <p className="text-[10.5px] text-slate-500">सोमवार–शनिवार · 9 AM – 9 PM</p>
-                  </div>
-                </a>
-              </li>
-              <li>
-                <a href="https://wa.me/" target="_blank" rel="noreferrer"
-                  className="group flex items-start gap-2.5 hover:text-white transition-colors">
-                  <div className="relative w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0 group-hover:border-emerald-500/50">
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-slate-950 animate-pulse" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">WhatsApp</p>
-                    <p className="text-[13px] font-bold text-emerald-300">Chat with us</p>
-                    <p className="text-[10.5px] text-slate-500">Reply in ~5 min during business hours</p>
-                  </div>
-                </a>
-              </li>
-              <li>
-                <a href="mailto:addisonxmedia@gmail.com"
-                  className="group flex items-start gap-2.5 hover:text-white transition-colors">
-                  <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-amber-400 shrink-0 group-hover:border-amber-500/50">
-                    <Mail className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Email</p>
-                    <p className="text-[12.5px] font-bold text-white break-all">addisonxmedia@gmail.com</p>
-                  </div>
-                </a>
-              </li>
-              <li>
-                <div className="flex items-start gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-rose-400 shrink-0">
-                    <MapPin className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Office</p>
-                    <p className="text-[12.5px] font-bold text-white">Ranchi, Jharkhand 🇮🇳</p>
-                    <p className="text-[10.5px] text-slate-500">By appointment only</p>
-                  </div>
-                </div>
-              </li>
-            </ul>
-          </div>
+/* ─── FEATURES (BENTO) ─────────────────────────────────────── */
+function Features() {
+  return (
+    <section id="features" className="py-24 md:py-32 relative">
+      <div className="max-w-7xl mx-auto px-4 md:px-8">
+        <div className="text-center mb-16">
+          <p className="inline-block text-[10px] font-black uppercase tracking-[0.3em] text-[#FF8A3D] mb-4">Capabilities</p>
+          <h2 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[0.95]">
+            Every tool a <span className="lp-gradient-saffron">shopkeeper</span><br />
+            actually needs.
+          </h2>
+          <p className="mt-5 text-white/50 max-w-xl mx-auto" style={{ fontFamily: "var(--font-hindi)" }}>
+            जो चाहिए, सब है। जो नहीं चाहिए, वो नहीं।
+          </p>
         </div>
 
-        {/* ─── Bottom bar ─── */}
-        <div className="relative border-t border-slate-800/80 bg-slate-950/60">
-          <div className="max-w-6xl mx-auto px-5 md:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-4 text-[12px] text-slate-500">
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1.5">
-              <p className="font-bold">© {new Date().getFullYear()} AddisonX Media</p>
-              <span className="hidden md:inline text-slate-700">·</span>
-              <a className="hover:text-white transition-colors cursor-default">Privacy</a>
-              <a className="hover:text-white transition-colors cursor-default">Terms</a>
-              <a className="hover:text-white transition-colors cursor-default">Refunds</a>
-              <a className="hover:text-white transition-colors cursor-default">Security</a>
-              <a className="hover:text-white transition-colors cursor-default">GST</a>
+        <div className="grid grid-cols-12 gap-4 md:gap-5">
+          <FeatureCard
+            className="col-span-12 md:col-span-7 lg:col-span-8 row-span-2 md:p-8"
+            Icon={ScanLine}
+            iconColor="text-[#FF8A3D]"
+            iconBg="bg-[#FF6B35]/10"
+            title="3-second billing"
+            hindi="3 सेकंड में बिल"
+            desc="USB scanner, phone camera, or type the SKU — cart updates instantly. No 'loading'. No 'syncing'. Just bill, print, done."
+            badge="MOST LOVED"
+            big
+          >
+            <div className="mt-6 rounded-xl bg-white/5 border border-white/5 p-3 text-xs" style={{ fontFamily: "var(--font-mono)" }}>
+              <div className="flex items-center gap-2 mb-2 text-white/40 text-[10px]">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#8BFA3E] animate-pulse" />
+                terminal
+              </div>
+              <div className="text-white/70">$ scan <span className="text-[#FFA86B]">TB-035</span></div>
+              <div className="text-[#8BFA3E]">→ Kuromi Big · ₹1,050 · added</div>
+              <div className="text-white/70 mt-1">$ scan <span className="text-[#FFA86B]">M-002</span></div>
+              <div className="text-[#8BFA3E]">→ Yellow Coffee Mug · ₹550 · added</div>
+              <div className="text-white/70 mt-1">$ checkout<span className="lp-animate-blink">_</span></div>
             </div>
+          </FeatureCard>
 
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-white transition-colors"
-                aria-label="Language"
-              >
-                <Globe className="w-3.5 h-3.5" />
-                हिंदी / English
-              </button>
+          <FeatureCard className="col-span-6 md:col-span-5 lg:col-span-4" Icon={Receipt}
+            iconColor="text-[#8BFA3E]" iconBg="bg-[#4ADE5F]/10"
+            title="GST Invoices" hindi="GST बिल प्रिंट"
+            desc="Auto-split CGST + SGST. HSN codes. 80mm thermal print-ready." />
 
-              <p className="flex items-center gap-1.5">
-                Made with <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500" /> in India 🇮🇳
-              </p>
+          <FeatureCard className="col-span-6 md:col-span-5 lg:col-span-4" Icon={QrCode}
+            iconColor="text-[#A78BFA]" iconBg="bg-[#8B5CF6]/10"
+            title="UPI QR on every bill" hindi="UPI QR हर बिल पर"
+            desc="Customer scans, amount pre-filled. Money in your account in seconds." />
 
-              <button
-                type="button"
-                onClick={() => typeof window !== "undefined" && window.scrollTo({ top: 0, behavior: "smooth" })}
-                aria-label="Scroll to top"
-                className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-orange-500/30 hover:scale-110 active:scale-95 transition-all"
-              >
-                <ArrowUp className="w-4 h-4" strokeWidth={2.6} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </footer>
+          <FeatureCard className="col-span-12 md:col-span-7 lg:col-span-4" Icon={Boxes}
+            iconColor="text-[#FF8A3D]" iconBg="bg-[#FF6B35]/10"
+            title="Stock auto-updates" hindi="Stock अपने आप घटे"
+            desc="Sold → stock −1. Low-stock alert in WhatsApp." />
 
-      {/* ── Floating WhatsApp button (mobile + desktop) ─────────── */}
-      <a href="https://wa.me/?text=Hi%20AddisonX%2C%20demo%20chahiye"
-        target="_blank" rel="noreferrer"
-        aria-label="WhatsApp us"
-        className="fixed bottom-5 right-5 z-50 group">
-        <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-30" />
-        <div className="relative w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-2xl shadow-emerald-500/40 ring-4 ring-white transition-all group-hover:scale-110">
-          <MessageCircle className="w-7 h-7" strokeWidth={2.5} />
-        </div>
-        <span className="absolute right-16 top-1/2 -translate-y-1/2 hidden md:block whitespace-nowrap bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-          WhatsApp पर बात करें
-        </span>
-      </a>
-    </div>
-  );
-}
+          <FeatureCard className="col-span-6 md:col-span-7 lg:col-span-5" Icon={BarChart3}
+            iconColor="text-[#8BFA3E]" iconBg="bg-[#4ADE5F]/10"
+            title="Daily report on Telegram" hindi="रिपोर्ट जो ज़रूरी है"
+            desc="9pm sharp — your phone vibrates with today's sales, top sellers, profit margin." />
 
-/* ───────── helpers ──────────────────────────────────────────── */
+          <FeatureCard className="col-span-6 md:col-span-5 lg:col-span-3" Icon={Sparkles}
+            iconColor="text-[#FF8A3D]" iconBg="bg-[#FF6B35]/10"
+            title="Today's Deal" hindi="One-tap discount"
+            desc="One tap to put a product on sale. Instant." />
 
-function StatTile({ label, value, tone }: { label: string; value: string; tone: "emerald" | "rose" | "amber" | "violet" }) {
-  const map = {
-    emerald: "from-emerald-100 to-white text-emerald-700 border-emerald-200",
-    rose:    "from-rose-100    to-white text-rose-700    border-rose-200",
-    amber:   "from-amber-100   to-white text-amber-700   border-amber-200",
-    violet:  "from-violet-100  to-white text-violet-700  border-violet-200",
-  }[tone];
-  return (
-    <div className={`rounded-2xl border-2 bg-gradient-to-br ${map} p-2.5`}>
-      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</p>
-      <p className="mt-0.5 text-xl font-black tabular-nums">{value}</p>
-    </div>
-  );
-}
+          <FeatureCard className="col-span-12 md:col-span-4 lg:col-span-4" Icon={Wifi}
+            iconColor="text-[#8BFA3E]" iconBg="bg-[#4ADE5F]/10"
+            title="Works offline" hindi="Internet गया? चलता रहेगा।"
+            desc="Bills queue locally, auto-sync when internet returns." />
 
-function FeatureCard({ icon: Icon, tone, title, hindi, body }: {
-  icon: React.ElementType; tone: "rose" | "orange" | "emerald" | "violet" | "fuchsia" | "amber";
-  title: string; hindi: string; body: string;
-}) {
-  const tones: Record<typeof tone, string> = {
-    rose:    "from-rose-500    to-pink-500     shadow-rose-500/30",
-    orange:  "from-orange-500  to-amber-500    shadow-orange-500/30",
-    emerald: "from-emerald-500 to-teal-500     shadow-emerald-500/30",
-    violet:  "from-violet-500  to-fuchsia-500  shadow-violet-500/30",
-    fuchsia: "from-fuchsia-500 to-pink-500     shadow-fuchsia-500/30",
-    amber:   "from-amber-400   to-yellow-500   shadow-amber-500/30",
-  };
-  return (
-    <div className="group rounded-3xl border-2 border-orange-100 bg-white p-6 hover:border-orange-300 hover:shadow-xl hover:shadow-orange-100 hover:-translate-y-1 transition-all">
-      <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${tones[tone]} flex items-center justify-center text-white shadow-lg`}>
-        <Icon className="w-6 h-6" strokeWidth={2.4} />
-      </div>
-      <p className="mt-4 text-[18px] font-black tracking-tight text-slate-900">{title}</p>
-      <p className="text-[12px] font-black text-rose-600 mt-0.5">{hindi}</p>
-      <p className="mt-2 text-[14px] text-slate-600 leading-relaxed">{body}</p>
-    </div>
-  );
-}
+          <FeatureCard className="col-span-6 md:col-span-4" Icon={Cloud}
+            iconColor="text-[#A78BFA]" iconBg="bg-[#8B5CF6]/10"
+            title="Cloud-synced" hindi="हर device पर"
+            desc="Phone, laptop, tablet — same data, instant." />
 
-function IndustryCard({ icon: Icon, tone, name, hindi }: {
-  icon: React.ElementType;
-  tone: "rose" | "orange" | "emerald" | "violet" | "fuchsia" | "amber";
-  name: string; hindi: string;
-}) {
-  const tones: Record<typeof tone, { bg: string; text: string; ring: string }> = {
-    rose:    { bg: "from-rose-500 to-pink-500",       text: "text-rose-600",    ring: "ring-rose-100"    },
-    orange:  { bg: "from-orange-500 to-amber-500",    text: "text-orange-600",  ring: "ring-orange-100"  },
-    emerald: { bg: "from-emerald-500 to-teal-500",    text: "text-emerald-600", ring: "ring-emerald-100" },
-    violet:  { bg: "from-violet-500 to-fuchsia-500",  text: "text-violet-600",  ring: "ring-violet-100"  },
-    fuchsia: { bg: "from-fuchsia-500 to-pink-500",    text: "text-fuchsia-600", ring: "ring-fuchsia-100" },
-    amber:   { bg: "from-amber-400 to-yellow-500",    text: "text-amber-700",   ring: "ring-amber-100"   },
-  };
-  const t = tones[tone];
-  return (
-    <div className="group rounded-2xl bg-white border-2 border-orange-100 p-4 md:p-5 text-center hover:border-orange-300 hover:shadow-lg hover:shadow-orange-100/60 hover:-translate-y-0.5 transition-all">
-      <div className={`mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br ${t.bg} text-white flex items-center justify-center shadow-md ring-4 ${t.ring}`}>
-        <Icon className="w-6 h-6" strokeWidth={2.4} />
-      </div>
-      <p className="mt-3 text-[14px] font-black text-slate-900 leading-tight">{name}</p>
-      <p className={`mt-1 text-[12px] font-bold ${t.text}`}>{hindi}</p>
-      <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
-        <Check className="w-3 h-3" strokeWidth={3} />
-        Strong fit
-      </div>
-    </div>
-  );
-}
-
-function StepCard({ n, hindi, title, body, icon: Icon, tone }: {
-  n: string; hindi: string; title: string; body: string;
-  icon: React.ElementType; tone: "rose" | "emerald" | "violet";
-}) {
-  const tones: Record<typeof tone, { bg: string; ring: string; text: string }> = {
-    rose:    { bg: "from-rose-500 to-pink-500",         ring: "ring-rose-200",    text: "text-rose-600"    },
-    emerald: { bg: "from-emerald-500 to-teal-500",      ring: "ring-emerald-200", text: "text-emerald-600" },
-    violet:  { bg: "from-violet-500 to-fuchsia-500",    ring: "ring-violet-200",  text: "text-violet-600"  },
-  };
-  const t = tones[tone];
-  return (
-    <div className="relative rounded-3xl bg-white border-2 border-orange-100 p-6 md:p-7 shadow-sm hover:shadow-xl hover:shadow-orange-100 transition-all">
-      {/* Big number sticker */}
-      <div className={`absolute -top-5 -left-3 w-14 h-14 rounded-2xl bg-gradient-to-br ${t.bg} text-white flex items-center justify-center font-black text-2xl shadow-lg ring-4 ring-white rotate-[-6deg]`}>
-        {n}
-      </div>
-      <div className="flex justify-end mb-3">
-        <div className={`w-10 h-10 rounded-xl bg-white border-2 border-orange-100 flex items-center justify-center ${t.text}`}>
-          <Icon className="w-5 h-5" strokeWidth={2.5} />
+          <FeatureCard className="col-span-6 md:col-span-4" Icon={Lock}
+            iconColor="text-[#FF8A3D]" iconBg="bg-[#FF6B35]/10"
+            title="Bank-grade security" hindi="Data सुरक्षित"
+            desc="Encrypted at rest + in transit. Indian servers." />
         </div>
       </div>
-      <p className={`text-[12px] font-black uppercase tracking-widest ${t.text}`}>{hindi}</p>
-      <p className="mt-1 text-[20px] font-black tracking-tight text-slate-900">{title}</p>
-      <p className="mt-2 text-[14px] text-slate-600 leading-relaxed">{body}</p>
-    </div>
+    </section>
   );
 }
 
-function Row({ icon: Icon, feature, mine, theirs, last }: {
-  icon: React.ElementType;
-  feature: string; mine: boolean | "maybe" | "limited"; theirs: boolean | "maybe" | "limited"; last: boolean;
-}) {
-  const cell = (v: typeof mine, accent: boolean) => {
-    if (v === true) {
-      return (
-        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-          accent ? "bg-white/95 text-rose-600" : "bg-emerald-100 text-emerald-700"
-        }`}>
-          <Check className="w-4 h-4" strokeWidth={3.5} />
-        </div>
-      );
-    }
-    if (v === false) {
-      return (
-        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-          accent ? "bg-white/15 text-white/60" : "bg-slate-200 text-slate-400"
-        }`}>
-          <X className="w-4 h-4" strokeWidth={3} />
-        </div>
-      );
-    }
-    return (
-      <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
-        accent ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"
-      }`}>{v}</span>
-    );
-  };
-  const borderClass = last ? "" : "border-b";
-  return (
-    <>
-      <div className={`flex items-center gap-2.5 px-4 md:px-6 py-4 text-slate-700 font-bold text-[13px] md:text-[14px] ${borderClass} border-orange-100 bg-white`}>
-        <span className="w-7 h-7 rounded-lg bg-orange-100 text-rose-600 flex items-center justify-center shrink-0">
-          <Icon className="w-3.5 h-3.5" strokeWidth={2.4} />
-        </span>
-        {feature}
-      </div>
-      <div className={`px-4 md:px-6 py-4 flex justify-center items-center bg-gradient-to-br from-rose-500/95 via-orange-500/95 to-amber-500/95 ${borderClass} border-rose-300/40`}>
-        {cell(mine, true)}
-      </div>
-      <div className={`px-4 md:px-6 py-4 flex justify-center items-center bg-slate-50 ${borderClass} border-slate-200`}>
-        {cell(theirs, false)}
-      </div>
-    </>
-  );
+interface FeatureCardProps {
+  Icon: React.ComponentType<{ className?: string }>;
+  iconColor: string;
+  iconBg: string;
+  title: string;
+  hindi: string;
+  desc: string;
+  className?: string;
+  big?: boolean;
+  badge?: string;
+  children?: React.ReactNode;
 }
-
-function PriceCard({
-  name, tagline, hindi, originalPrice, price, period, features, cta, highlighted, badge, comingSoon,
-}: {
-  name: string; tagline: string; hindi: string;
-  originalPrice?: string; price: string; period: string;
-  features: string[]; cta: string;
-  highlighted?: boolean; badge?: string; comingSoon?: boolean;
-}) {
+function FeatureCard({ Icon, iconColor, iconBg, title, hindi, desc, className = "", big = false, badge, children }: FeatureCardProps) {
   return (
-    <div className={`relative rounded-3xl p-6 md:p-7 ${
-      highlighted
-        ? "bg-gradient-to-br from-rose-600 via-orange-600 to-amber-500 text-white shadow-2xl shadow-rose-500/30 ring-2 ring-amber-300 scale-105 md:scale-110 md:my-0 my-4"
-        : "bg-white text-slate-900 border-2 border-orange-100"
-    }`}>
+    <div className={`relative group rounded-3xl lp-glass lp-glass-hover transition-all p-5 md:p-6 overflow-hidden ${className}`}>
       {badge && (
-        <span className="absolute -top-4 left-1/2 -translate-x-1/2 px-3.5 py-1.5 rounded-full bg-amber-300 text-amber-950 text-[11px] font-black uppercase tracking-widest shadow-lg ring-2 ring-white whitespace-nowrap">
+        <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-[#FF6B35]/20 text-[#FFA86B] border border-[#FF6B35]/30">
           {badge}
         </span>
       )}
-      <div className="flex items-baseline gap-2">
-        <p className={`text-[13px] font-black uppercase tracking-widest ${highlighted ? "text-amber-100" : "text-rose-600"}`}>{name}</p>
+      <div className={`w-11 h-11 rounded-2xl ${iconBg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+        <Icon className={`w-5 h-5 ${iconColor}`} />
       </div>
-      <p className={`mt-0.5 text-[13px] font-bold ${highlighted ? "text-white/95" : "text-slate-700"}`}>{tagline}</p>
-      <p className={`mt-2 text-[12px] font-bold ${highlighted ? "text-amber-200" : "text-emerald-600"}`}>{hindi}</p>
-
-      <div className="mt-5 flex items-baseline gap-2 flex-wrap">
-        {originalPrice && (
-          <span className={`text-xl line-through ${highlighted ? "text-white/60" : "text-slate-400"}`}>{originalPrice}</span>
-        )}
-        <span className="text-4xl md:text-5xl font-black tracking-tight">{price}</span>
-        <span className={`${highlighted ? "text-white/90" : "text-slate-500"} font-bold`}>{period}</span>
-      </div>
-
-      <ul className="mt-6 space-y-2.5 text-[14px]">
-        {features.map((f, i) => (
-          <li key={i} className="flex items-start gap-2">
-            <div className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
-              highlighted ? "bg-amber-300 text-amber-950" : "bg-emerald-100 text-emerald-700"
-            }`}>
-              <Check className="w-3 h-3" strokeWidth={3} />
-            </div>
-            <span className={highlighted ? "text-white/95 font-medium" : "text-slate-700 font-medium"}>{f}</span>
-          </li>
-        ))}
-      </ul>
-
-      {comingSoon ? (
-        <a href="https://wa.me/?text=Hi%2C%20Chain%20plan%20chahiye"
-          target="_blank" rel="noreferrer"
-          className="mt-7 inline-flex items-center justify-center gap-1.5 w-full py-3.5 rounded-2xl border-2 border-slate-300 text-slate-700 font-black hover:bg-slate-50 transition-colors">
-          {cta} <ArrowRight className="w-4 h-4" />
-        </a>
-      ) : (
-        <Link href="/login"
-          className={`mt-7 inline-flex items-center justify-center gap-1.5 w-full py-3.5 rounded-2xl font-black text-[14px] transition-all active:scale-[0.98] ${
-            highlighted
-              ? "bg-white text-rose-700 hover:scale-[1.02] shadow-xl"
-              : "bg-gradient-to-br from-rose-600 to-orange-600 text-white hover:scale-[1.02] shadow-lg shadow-rose-500/30"
-          }`}>
-          {cta} <ArrowRight className="w-4 h-4" />
-        </Link>
-      )}
+      <h3 className={`font-black tracking-tight ${big ? "text-2xl md:text-3xl" : "text-lg md:text-xl"}`}>{title}</h3>
+      <p className="text-xs font-bold text-[#FFA86B]/80 mt-0.5" style={{ fontFamily: "var(--font-hindi)" }}>{hindi}</p>
+      <p className={`mt-3 text-white/55 leading-relaxed ${big ? "text-base" : "text-sm"}`}>{desc}</p>
+      {children}
     </div>
   );
 }
 
-const FAQS: { q: string; a: string }[] = [
-  {
-    q: "क्या मुझे कुछ install करना पड़ेगा?",
-    a: "नहीं. AddisonX browser में चलता है — Chrome, Edge, Safari, सब. Mobile, tablet, और desktop तीनों पर. Data cloud में सुरक्षित, सब devices पर real time sync.",
-  },
-  {
-    q: "कौन सा hardware चाहिए?",
-    a: "बस एक USB barcode scanner (TVS, Honeywell, Symbol — कोई भी) और 80mm thermal printer for receipt. कोई driver या extra software नहीं. Plug-and-play — ज़्यादातर scanner लगाते ही auto-detect होते हैं.",
-  },
-  {
-    q: "Internet नहीं हो तो क्या?",
-    a: "Tension मत लो. Internet चला गया तो भी billing चलती रहेगी. Bills locally save होते हैं, internet वापस आते ही automatically sync हो जाते हैं. कोई customer wait नहीं करेगा.",
-  },
-  {
-    q: "मेरा data safe है?",
-    a: "बिल्कुल. Encrypted database, HMAC-signed sessions, owner-staff अलग logins, गलत PIN पर lockout, हर admin action का audit log. आपका data सिर्फ आपका — कभी भी export कर सकते हैं.",
-  },
-  {
-    q: "GST का setup कैसे?",
-    a: "Settings में अपना GSTIN और tax rate (5/12/18/28%) डालो — बस. हर receipt पर CGST + SGST split, taxable value, net total सब automatic. 80mm thermal printer में direct print.",
-  },
-  {
-    q: "Cancel करना हो तो?",
-    a: "कभी भी. कोई lock-in नहीं. Monthly या yearly — आपकी मर्ज़ी (yearly में 20% बचत). Cancel करोगे तो आपका data export करके आपको दे देंगे — कोई सवाल नहीं, कोई fee नहीं.",
-  },
-];
+/* ─── HOW IT WORKS ─────────────────────────────────────────── */
+function HowItWorks() {
+  const steps = [
+    { n: "01", Icon: ScanLine, title: "Scan",      hindi: "Add to cart",  desc: "Bar code, camera, or type. Product flies into cart in milliseconds." },
+    { n: "02", Icon: Banknote, title: "Get paid",  hindi: "Cash या UPI",   desc: "UPI QR auto-generated. Customer pays, you get a ping." },
+    { n: "03", Icon: Bot,      title: "We handle the rest", hindi: "बाकी सब छोड़ो", desc: "Stock −1, GST entries, daily report, customer DB — all automatic." },
+  ];
+  return (
+    <section id="how" className="py-24 md:py-32 relative">
+      <div className="absolute inset-0 -z-10"><div className="absolute inset-0 lp-dot-grid opacity-30" /></div>
+      <div className="max-w-6xl mx-auto px-4 md:px-8">
+        <div className="text-center mb-16">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#FF8A3D] mb-4">How it works</p>
+          <h2 className="text-4xl md:text-6xl font-black tracking-tight leading-[0.95]">
+            Three steps to <span className="lp-gradient-saffron">a full day sorted.</span>
+          </h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-5 md:gap-6">
+          {steps.map((s, i) => (
+            <div key={s.n} className="group relative lp-glass rounded-3xl p-6 md:p-8 overflow-hidden hover:-translate-y-1 transition-transform"
+                 style={{ animation: `lp-fade-up 0.8s ${i * 100}ms backwards` }}>
+              <div className="absolute -top-8 -right-8 text-9xl font-black text-white/[0.03] select-none">{s.n}</div>
+              <div className="relative">
+                <div className="w-12 h-12 rounded-2xl bg-[#FF6B35]/10 text-[#FF8A3D] flex items-center justify-center mb-5 group-hover:bg-[#FF6B35] group-hover:text-[#050507] transition-colors">
+                  <s.Icon className="w-6 h-6" />
+                </div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] text-white/30" style={{ fontFamily: "var(--font-mono)" }}>{s.n}</span>
+                  <span className="w-8 h-px bg-white/15" />
+                </div>
+                <h3 className="text-2xl font-black">{s.title}</h3>
+                <p className="text-xs font-bold text-[#FFA86B] mt-0.5" style={{ fontFamily: "var(--font-hindi)" }}>{s.hindi}</p>
+                <p className="mt-3 text-sm text-white/55 leading-relaxed">{s.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── INDUSTRIES ───────────────────────────────────────────── */
+function Industries() {
+  const shops = [
+    { Icon: ShoppingBag, name: "Kirana / General",      hindi: "किराना" },
+    { Icon: Heart,       name: "Gift & Toys",           hindi: "गिफ्ट शॉप" },
+    { Icon: Smartphone,  name: "Mobile & Accessories",  hindi: "मोबाइल" },
+    { Icon: PenTool,     name: "Stationery",            hindi: "स्टेशनरी" },
+    { Icon: Gem,         name: "Cosmetics & Beauty",    hindi: "कॉस्मेटिक्स" },
+    { Icon: Wrench,      name: "Hardware",              hindi: "हार्डवेयर" },
+    { Icon: Shirt,       name: "Footwear & Fashion",    hindi: "कपड़े जूते" },
+    { Icon: Pill,        name: "Pharmacy",              hindi: "मेडिकल" },
+  ];
+  return (
+    <section className="py-24 md:py-32">
+      <div className="max-w-7xl mx-auto px-4 md:px-8">
+        <div className="text-center mb-14">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#FF8A3D] mb-4">Who it's for</p>
+          <h2 className="text-4xl md:text-6xl font-black tracking-tight leading-[0.95]">
+            Built for <span className="lp-gradient-saffron">your dukaan.</span>
+          </h2>
+          <p className="mt-4 text-white/50 max-w-xl mx-auto">
+            Any retail shop where speed at the counter matters more than spreadsheet wizardry.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          {shops.map((s, i) => (
+            <div key={i} className="group lp-glass lp-glass-hover rounded-2xl p-4 md:p-5 text-center hover:-translate-y-1 transition-all"
+                 style={{ animation: `lp-fade-up 0.6s ${i * 50}ms backwards` }}>
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-[#FF6B35]/10 text-[#FF8A3D] flex items-center justify-center group-hover:bg-[#FF6B35] group-hover:text-[#050507] group-hover:rotate-6 transition-all">
+                <s.Icon className="w-6 h-6" />
+              </div>
+              <p className="font-black text-sm mt-3 text-white">{s.name}</p>
+              <p className="text-[11px] font-bold text-[#FFA86B]/70 mt-0.5" style={{ fontFamily: "var(--font-hindi)" }}>{s.hindi}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-center mt-10 text-sm text-white/50">
+          Restaurant, salon, jewellery, or पेट्रोल पंप भी? <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="font-black text-[#FF8A3D] hover:underline">Talk to us →</a>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/* ─── COMPARISON ───────────────────────────────────────────── */
+function Comparison() {
+  const rows = [
+    { feat: "Barcode bill in 3 seconds",          a: true, t: false as const },
+    { feat: "UPI QR built into checkout",         a: true, t: false as const },
+    { feat: "Same login on phone + desktop",      a: true, t: false as const },
+    { feat: "One-tap Today's Deal",               a: true, t: false as const },
+    { feat: "Daily Telegram / WhatsApp reports",  a: true, t: false as const },
+    { feat: "Stock auto-decrement",                a: true, t: "limited" as const },
+    { feat: "GST returns / Accounting exports",    a: true, t: true as const },
+  ];
+  return (
+    <section id="compare" className="py-24 md:py-32 relative">
+      <div className="max-w-5xl mx-auto px-4 md:px-8">
+        <div className="text-center mb-14">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#FF8A3D] mb-4">vs Tally / Vyapar</p>
+          <h2 className="text-3xl md:text-5xl lg:text-6xl font-black leading-[1.05]">
+            <span className="text-white/30">Tally is for accountants.</span><br />
+            <span className="lp-gradient-saffron">AddisonX is for you.</span>
+          </h2>
+        </div>
+
+        <div className="rounded-3xl lp-glass overflow-hidden lp-conic-border">
+          <div className="grid grid-cols-[1.4fr_1fr_1fr] text-[11px] md:text-sm font-black uppercase tracking-wider">
+            <div className="p-4 md:p-5 text-white/50">Feature</div>
+            <div className="p-4 md:p-5 text-center bg-gradient-to-br from-[#FF6B35] to-[#E94F18] text-white relative">
+              <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-[#8BFA3E] text-[#050507] text-[9px] rounded-full font-black lp-animate-badge-bounce whitespace-nowrap">
+                ✦ RECOMMENDED
+              </span>
+              AddisonX
+            </div>
+            <div className="p-4 md:p-5 text-center text-white/40">Tally / Vyapar</div>
+          </div>
+
+          {rows.map((r, i) => (
+            <div key={i} className={`grid grid-cols-[1.4fr_1fr_1fr] text-sm border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}>
+              <div className="p-4 md:p-5 font-semibold text-white/80">{r.feat}</div>
+              <div className="p-4 md:p-5 text-center">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#4ADE5F] text-[#050507]">
+                  <Check className="w-4 h-4" strokeWidth={3} />
+                </span>
+              </div>
+              <div className="p-4 md:p-5 text-center">
+                {r.t === true ? (
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/10 text-white/60">
+                    <Check className="w-4 h-4" />
+                  </span>
+                ) : r.t === false ? (
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-500/15 text-red-400">
+                    <X className="w-4 h-4" />
+                  </span>
+                ) : (
+                  <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-400">limited</span>
+                )}
+              </div>
+            </div>
+          ))}
+
+          <div className="grid grid-cols-[1.4fr_1fr_1fr] text-sm border-t border-white/5">
+            <div className="p-4 md:p-5 font-black uppercase text-[11px] tracking-wider text-white/40">Built for</div>
+            <div className="p-4 md:p-5 text-center font-black text-[#FFA86B]">Shopkeepers</div>
+            <div className="p-4 md:p-5 text-center font-black text-white/30">CAs / Accountants</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── PRICING ──────────────────────────────────────────────── */
+function Pricing() {
+  return (
+    <section id="pricing" className="py-24 md:py-32 relative overflow-hidden">
+      <div className="absolute inset-0 -z-10 pointer-events-none">
+        <div className="absolute top-1/2 -left-20 w-80 h-80 rounded-full bg-[#FF6B35]/15 blur-[120px] lp-animate-float-orb" />
+        <div className="absolute top-1/2 -right-20 w-80 h-80 rounded-full bg-[#4ADE5F]/10 blur-[120px] lp-animate-float-orb" style={{ animationDelay: "-9s" }} />
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 md:px-8">
+        <div className="text-center mb-14">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#FF8A3D] mb-4">Pricing</p>
+          <h2 className="text-4xl md:text-6xl lg:text-7xl font-black leading-[0.95]">
+            One price. <span className="lp-gradient-saffron">No hidden charges.</span>
+          </h2>
+          <p className="mt-5 text-white/50 max-w-xl mx-auto" style={{ fontFamily: "var(--font-hindi)" }}>
+            Honest pricing. कोई छुपा charge नहीं। Cancel anytime.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-5 max-w-4xl mx-auto">
+          <div className="relative lp-glass rounded-3xl p-7 md:p-8">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/5 text-white/60 mb-5">
+              <Sparkles className="w-3 h-3" /> Free Trial
+            </div>
+            <h3 className="text-2xl font-black">Try before you commit</h3>
+            <p className="text-sm text-white/50 mt-1" style={{ fontFamily: "var(--font-hindi)" }}>पहले try करो, बाद में decide</p>
+            <div className="mt-6 flex items-baseline gap-2">
+              <span className="text-6xl md:text-7xl font-black tabular-nums">14</span>
+              <span className="text-2xl font-bold text-white/60">days</span>
+            </div>
+            <p className="text-sm text-white/50 mt-1">No credit card required.</p>
+
+            <ul className="mt-7 space-y-2.5 text-sm">
+              {[
+                "Unlimited products + bills",
+                "GST invoice + UPI QR",
+                "Stock auto-update",
+                "Email + WhatsApp support",
+                "All features ON",
+              ].map((p, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-white/75">
+                  <Check className="w-4 h-4 text-[#8BFA3E] mt-0.5 shrink-0" strokeWidth={3} />
+                  <span>{p}</span>
+                </li>
+              ))}
+            </ul>
+
+            <Link href={TRIAL_URL}
+               className="mt-8 inline-flex w-full items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-black text-white bg-white/10 border border-white/10 hover:bg-white/15 transition-all">
+              Start free <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="relative rounded-3xl bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-[#B83A0A] text-white overflow-hidden shadow-2xl shadow-[#FF6B35]/40 p-7 md:p-8">
+            <div className="absolute top-0 left-0 right-0 h-px bg-white/30" />
+            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
+            <div className="absolute inset-0 opacity-10"
+                 style={{
+                   backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 1px)",
+                   backgroundSize: "20px 20px",
+                 }} />
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-5">
+                <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#050507] text-[#B5FF6A]">★ Bestseller</span>
+                <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 backdrop-blur">1 Year</span>
+              </div>
+              <h3 className="text-2xl font-black">Pro · annual</h3>
+              <p className="text-sm opacity-80 mt-1" style={{ fontFamily: "var(--font-hindi)" }}>90% shopkeepers इसी पर हैं</p>
+
+              <div className="mt-6 flex items-baseline gap-3">
+                <span className="text-lg line-through opacity-50 tabular-nums">₹14,999</span>
+                <span className="text-6xl md:text-7xl font-black tabular-nums">₹9,999</span>
+                <span className="text-sm font-bold opacity-80">/year</span>
+              </div>
+              <p className="text-sm opacity-90 mt-1.5">
+                ≈ <strong>₹833/month</strong> · ₹27/day · <span style={{ fontFamily: "var(--font-hindi)" }}>एक चाय की कीमत</span>
+              </p>
+
+              <ul className="mt-7 space-y-2.5 text-sm">
+                {[
+                  "Everything in Free Trial",
+                  "Telegram + WhatsApp daily reports",
+                  "Today's Deal + customer database",
+                  "Multi-staff with PIN logins",
+                  "Priority support (avg 12-min reply)",
+                  "Free onboarding call (Hindi/English)",
+                ].map((p, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <Check className="w-4 h-4 mt-0.5 shrink-0" strokeWidth={3} />
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Link href={TRIAL_URL}
+                 className="mt-8 inline-flex w-full items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-black text-[#B83A0A] bg-white hover:bg-[#B5FF6A] transition-colors">
+                Get started <ArrowRight className="w-4 h-4" />
+              </Link>
+
+              <p className="text-[11px] text-center opacity-80 mt-3.5">
+                ✓ 14-day free trial first · ✓ Pro-rata refund · ✓ Cancel anytime
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── TESTIMONIAL ──────────────────────────────────────────── */
+function Testimonial() {
+  return (
+    <section className="py-24 md:py-32 relative">
+      <div className="max-w-4xl mx-auto px-4 md:px-8">
+        <div className="rounded-3xl lp-glass p-8 md:p-12 text-center relative overflow-hidden lp-conic-border">
+          <div className="absolute top-4 left-4 text-7xl text-white/[0.04] italic select-none" style={{ fontFamily: "var(--font-display)" }}>"</div>
+          <div className="absolute bottom-4 right-8 text-7xl text-white/[0.04] italic select-none" style={{ fontFamily: "var(--font-display)" }}>"</div>
+
+          <div className="flex justify-center gap-1 mb-6 relative">
+            {[1,2,3,4,5].map(i => <Star key={i} className="w-5 h-5 fill-[#FF8A3D] text-[#FF8A3D]" />)}
+          </div>
+          <blockquote className="text-2xl md:text-4xl font-black leading-tight relative" style={{ fontFamily: "var(--font-hindi)" }}>
+            "हमारा cashier सालों से Tally पर था. <span className="lp-gradient-saffron">2 दिन में AddisonX सीख गया.</span> अब वापस नहीं जाएगा."
+          </blockquote>
+          <div className="mt-8 inline-flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF8A3D] to-[#E94F18] flex items-center justify-center font-black text-[#050507]">
+              SK
+            </div>
+            <div className="text-left">
+              <p className="font-black text-sm">Sharma Kirana Store</p>
+              <p className="text-xs text-white/50">Indore · 4 months on AddisonX</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── FAQ ─────────────────────────────────────────────────── */
+function FAQ() {
+  const faqs = [
+    { q: "Do I have to install anything?", qh: "क्या install करना पड़ेगा?",
+      a: "Nothing. AddisonX runs in your browser — Chrome, Edge, Safari, or mobile. Open the link, log in, start billing. कुछ install नहीं करना।" },
+    { q: "What hardware do I need?", qh: "क्या hardware चाहिए?",
+      a: "Minimum: an Android phone or any laptop. Recommended: 80mm thermal printer + USB barcode scanner. हम बता देंगे क्या खरीदना है — total under ₹6,000." },
+    { q: "What if internet goes down?", qh: "Internet नहीं हो तो?",
+      a: "Offline mode kicks in automatically — bills queue locally and auto-sync the moment internet returns. Your shop never stops." },
+    { q: "Is my data safe?", qh: "मेरा data safe है?",
+      a: "Bank-grade encryption (at rest + in transit), daily backups, Indian servers. We literally can't access your data — neither can anyone else." },
+    { q: "Will you help me with GST setup?", qh: "GST setup में help मिलेगी?",
+      a: "Free onboarding call (Hindi/English). We set up your GSTIN, HSN codes, opening stock — सब हम कर देंगे।" },
+    { q: "What if I want to cancel?", qh: "Cancel करना हो तो?",
+      a: "One click. Pro-rata refund. No 'cancellation fee'. We'll even export your data as CSV so you can take it anywhere." },
+  ];
+  const [open, setOpen] = useState<number | null>(0);
+  return (
+    <section id="faq" className="py-24 md:py-32">
+      <div className="max-w-3xl mx-auto px-4 md:px-8">
+        <div className="text-center mb-14">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#FF8A3D] mb-4">FAQ</p>
+          <h2 className="text-4xl md:text-6xl font-black tracking-tight leading-[0.95]">
+            Questions before <span className="lp-gradient-saffron">you start.</span>
+          </h2>
+        </div>
+        <div className="space-y-3">
+          {faqs.map((f, i) => (
+            <div key={i} className="lp-glass rounded-2xl overflow-hidden">
+              <button onClick={() => setOpen(open === i ? null : i)}
+                      className="w-full flex items-start justify-between gap-4 p-5 text-left">
+                <div className="flex-1">
+                  <div className="font-black text-base">{f.q}</div>
+                  <div className="text-xs font-bold text-[#FFA86B]/70 mt-1" style={{ fontFamily: "var(--font-hindi)" }}>{f.qh}</div>
+                </div>
+                <ChevronDown className={`w-5 h-5 text-[#FF8A3D] shrink-0 transition-transform ${open === i ? "rotate-180" : ""}`} />
+              </button>
+              {open === i && (
+                <div className="px-5 pb-5 text-sm text-white/65 leading-relaxed border-t border-white/5 pt-4">
+                  {f.a}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── FINAL CTA ────────────────────────────────────────────── */
+function FinalCTA() {
+  return (
+    <section className="py-24 md:py-32 relative overflow-hidden">
+      <div className="max-w-5xl mx-auto px-4 md:px-8">
+        <div className="rounded-[2.5rem] bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-[#B83A0A] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl shadow-[#FF6B35]/30">
+          <div className="absolute inset-0 opacity-15"
+               style={{
+                 backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 1px)",
+                 backgroundSize: "24px 24px",
+               }} />
+          <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#8BFA3E]/15 blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-[#8BFA3E]/15 blur-3xl" />
+
+          <div className="relative text-white">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#050507] text-[#B5FF6A] mb-6 lp-animate-badge-bounce">
+              <Sparkles className="w-3.5 h-3.5" />
+              14-day free trial · no credit card
+            </div>
+            <h2 className="text-5xl md:text-7xl lg:text-8xl font-black leading-[0.95]">
+              Run your shop.<br />
+              <span className="text-[#B5FF6A]" style={{ fontFamily: "var(--font-hindi)" }}>हम सब handle करेंगे.</span>
+            </h2>
+            <p className="mt-6 text-base md:text-xl opacity-90 max-w-xl mx-auto">
+              Stop spending evenings on Tally. Stop losing stock. Stop guessing your profit.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+              <Link href={TRIAL_URL}
+                 className="inline-flex items-center gap-2 px-7 py-4 rounded-full font-black text-[#B83A0A] bg-white hover:bg-[#B5FF6A] hover:text-[#050507] transition-all text-lg shadow-2xl">
+                Start Free Trial <ArrowRight className="w-5 h-5" />
+              </Link>
+              <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener"
+                 className="inline-flex items-center gap-2 px-6 py-4 rounded-full font-black text-white bg-[#050507] hover:bg-[#15151E] transition-all">
+                <MessageCircle className="w-5 h-5" /> WhatsApp us
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── FOOTER ───────────────────────────────────────────────── */
+function Footer() {
+  return (
+    <footer className="border-t border-white/5 pt-16 pb-8 bg-[#050507]">
+      <div className="max-w-7xl mx-auto px-4 md:px-8">
+        <div className="flex flex-wrap items-center justify-center gap-6 pb-10 border-b border-white/5 text-xs font-bold uppercase tracking-widest text-white/40">
+          <div className="flex items-center gap-2"><Cpu className="w-4 h-4 text-[#FF8A3D]" /> Bank-grade Encryption</div>
+          <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-[#8BFA3E]" /> GST Certified</div>
+          <div className="flex items-center gap-2"><Headphones className="w-4 h-4 text-[#A78BFA]" /> Live Support</div>
+          <div className="flex items-center gap-2"><span className="text-base">🇮🇳</span> Made in Bharat</div>
+        </div>
+
+        <div className="grid md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-10 mt-10">
+          <div>
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B35] to-[#B83A0A] flex items-center justify-center text-white font-black">
+                  <span className="italic text-lg" style={{ fontFamily: "var(--font-display)" }}>A</span>
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#8BFA3E] ring-2 ring-[#050507]" />
+              </div>
+              <div>
+                <div className="font-black text-lg text-white">AddisonX</div>
+                <div className="text-[10px] font-black tracking-[0.2em] text-[#FF8A3D] -mt-0.5">BILLING OS</div>
+              </div>
+            </div>
+            <p className="text-sm text-white/50 leading-relaxed max-w-xs">
+              India's simplest billing software. Built shoulder-to-shoulder with shopkeepers, not accountants.
+            </p>
+          </div>
+
+          {[
+            { title: "Product",    items: ["Features", "Pricing", "Demo", "Sign in"] },
+            { title: "Industries", items: ["Kirana", "Gift Shop", "Pharmacy", "Mobile"] },
+            { title: "Company",    items: ["About", "Blog", "Terms", "Privacy", "Refund"] },
+          ].map((col, i) => (
+            <div key={i}>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-4">{col.title}</p>
+              <ul className="space-y-2.5">
+                {col.items.map((it, j) => (
+                  <li key={j}>
+                    <a href="#" className="text-sm text-white/65 hover:text-[#FF8A3D] transition-colors">{it}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-12 pt-6 border-t border-white/5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-xs text-white/30">
+          <p>© {new Date().getFullYear()} AddisonX Media. All rights reserved.</p>
+          <div className="flex items-center gap-4">
+            <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="hover:text-[#FF8A3D] font-bold">+91 99999 99999</a>
+            <span className="text-white/15">·</span>
+            <a href="mailto:hello@addisonxmedia.com" className="hover:text-[#FF8A3D] font-bold">hello@addisonxmedia.com</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ─── STICKY MOBILE CTA ────────────────────────────────────── */
+function StickyCTA() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShow(window.scrollY > 600);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  if (!show) return null;
+  return (
+    <div className="md:hidden fixed bottom-4 inset-x-4 z-40 lp-animate-fade-up">
+      <Link href={TRIAL_URL}
+         className="flex items-center justify-center gap-2 w-full px-5 py-4 rounded-full font-black text-[#050507] bg-white shadow-2xl">
+        <Sparkles className="w-5 h-5" />
+        Start 14-day Free Trial
+        <ArrowRight className="w-5 h-5" />
+      </Link>
+    </div>
+  );
+}
