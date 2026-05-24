@@ -152,51 +152,74 @@ function Nav() {
 /* ─── 4. HERO ──────────────────────────────────────────────── */
 function Hero() {
   return (
-    <section id="top" className="relative pt-16 md:pt-24 pb-20 overflow-hidden">
-      {/* Mandala backdrop */}
+    <section id="top" className="relative pt-12 md:pt-16 pb-24 overflow-hidden">
+      {/* Backdrop layers */}
       <div className="absolute inset-0 -z-10 pointer-events-none">
         <div className="absolute inset-0 lp-mandala-bg" />
         <div className="absolute top-[-12%] left-[-8%] w-[55vw] h-[55vw] rounded-full bg-gradient-to-br from-[#FFA86B]/40 via-[#FF6B35]/25 to-transparent blur-3xl lp-animate-float-orb" />
         <div className="absolute top-[0%] right-[-15%] w-[50vw] h-[50vw] rounded-full bg-gradient-to-br from-[#F59E0B]/35 to-rose-300/20 blur-3xl lp-animate-float-orb" style={{ animationDelay: "-9s" }} />
         <div className="absolute bottom-[-20%] left-[35%] w-[40vw] h-[40vw] rounded-full bg-gradient-to-br from-[#138808]/15 to-emerald-200/30 blur-3xl lp-animate-float-orb" style={{ animationDelay: "-14s" }} />
-        {/* Sparkles around */}
+
+        {/* Falling petals (decorative) */}
+        <span className="lp-petal text-2xl" style={{ left: "8%",  animationDuration: "14s", animationDelay: "0s",  color: "#FF6B35" }}>🌸</span>
+        <span className="lp-petal text-xl"  style={{ left: "22%", animationDuration: "18s", animationDelay: "-3s", color: "#F59E0B" }}>🌼</span>
+        <span className="lp-petal text-2xl" style={{ left: "45%", animationDuration: "16s", animationDelay: "-7s", color: "#FF6B35" }}>🌸</span>
+        <span className="lp-petal text-xl"  style={{ left: "70%", animationDuration: "20s", animationDelay: "-10s",color: "#F59E0B" }}>🌼</span>
+        <span className="lp-petal text-2xl" style={{ left: "90%", animationDuration: "15s", animationDelay: "-5s", color: "#FF6B35" }}>🌸</span>
+
+        {/* Sparkles */}
         <span className="lp-sparkle absolute top-12 left-[6%] text-[#F59E0B] text-3xl" style={{ animationDelay: "0s" }}>✦</span>
         <span className="lp-sparkle absolute top-28 right-[10%] text-[#FF6B35] text-4xl" style={{ animationDelay: "-1s" }}>✦</span>
         <span className="lp-sparkle absolute bottom-32 left-[12%] text-[#FF6B35] text-2xl" style={{ animationDelay: "-2s" }}>✦</span>
         <span className="lp-sparkle absolute bottom-16 right-[8%] text-[#138808] text-3xl" style={{ animationDelay: "-1.5s" }}>✦</span>
-        <span className="lp-sparkle absolute top-1/2 left-[3%] text-[#F59E0B]/60 text-2xl" style={{ animationDelay: "-2.5s" }}>✺</span>
-        <span className="lp-sparkle absolute top-1/3 right-[3%] text-[#B83A0A]/50 text-2xl" style={{ animationDelay: "-3s" }}>✺</span>
+
+        {/* Devanagari watermark behind headline (decorative only — no translation needed) */}
+        <span className="lp-watermark hidden lg:block top-[28%] left-[2%] text-[12rem] leading-none">व्यापार</span>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 grid md:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-16 items-center">
         {/* LEFT */}
-        <div className="lp-animate-fade-up">
-          {/* Sticker line above headline */}
-          <div className="flex flex-wrap items-center gap-2 mb-6">
+        <div className="lp-animate-fade-up relative z-10">
+
+          {/* Live activity pill (above everything else) */}
+          <div className="inline-flex items-center gap-2 mb-5 px-3 py-1.5 rounded-full bg-white border-2 border-[#138808]/30 shadow-sm">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-[#138808] opacity-75 animate-ping" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#138808]" />
+            </span>
+            <span className="text-[11px] font-black uppercase tracking-wider text-[#0F7C57]">12 dukaan abhi billing kar rahi hain</span>
+          </div>
+
+          {/* Trust pills */}
+          <div className="flex flex-wrap items-center gap-2 mb-7">
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-white text-[#B83A0A] border-2 border-[#FFC8A0] shadow-sm">
               <span className="text-base">🇮🇳</span> Made in Bharat
             </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#138808] text-white border-2 border-[#138808] shadow-sm">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#138808] text-white shadow-sm">
               <Shield className="w-3 h-3" /> GST + UPI Ready
             </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#F59E0B] text-white border-2 border-[#F59E0B] shadow-sm">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#F59E0B] text-white shadow-sm">
               <Star className="w-3 h-3 fill-white" /> 4.9 · 100+ shops
             </span>
           </div>
 
-          {/* Massive Bollywood headline */}
-          <h1 className="font-black tracking-tight leading-[0.9]">
-            <span className="block text-6xl md:text-8xl lg:text-[7rem] text-slate-900">
+          {/* MASSIVE multi-color headline */}
+          <h1 className="font-black tracking-tight leading-[0.88]">
+            <span className="block text-6xl md:text-8xl lg:text-[7.5rem] text-slate-900">
               Dukaan
-              <span className="text-[#B83A0A]"> badhao,</span>
             </span>
-            <span className="block text-6xl md:text-8xl lg:text-[7rem] mt-2">
+            <span className="block text-6xl md:text-8xl lg:text-[7.5rem] mt-1">
+              <span className="bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-[#B83A0A] bg-clip-text text-transparent">
+                badhao,
+              </span>
+            </span>
+            <span className="block text-6xl md:text-8xl lg:text-[7.5rem] mt-1">
               <span className="relative inline-block">
                 <span className="lp-gold-foil">tension</span>
-                <span aria-hidden className="absolute -bottom-1 left-0 right-0 h-4 bg-[#F59E0B]/40 rounded-full blur-sm -z-0" />
+                <span aria-hidden className="absolute -bottom-2 left-0 right-0 h-5 bg-[#F59E0B]/35 rounded-full blur-md -z-0" />
               </span>
               {" "}
-              <span className="text-slate-900">nahi!</span>
+              <span className="lp-text-stroke">nahi!</span>
             </span>
           </h1>
 
@@ -209,15 +232,21 @@ function Hero() {
           {/* CTAs */}
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link href={TRIAL_URL}
-               className="group inline-flex items-center gap-2 px-7 py-4 rounded-full font-black text-white bg-gradient-to-r from-[#FF6B35] via-[#E94F18] to-[#B83A0A] shadow-xl shadow-[#B83A0A]/40 hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#B83A0A]/50 transition-all text-base ring-2 ring-[#F59E0B]/40">
+               className="group relative inline-flex items-center gap-2 px-7 py-4 rounded-full font-black text-white bg-gradient-to-r from-[#FF6B35] via-[#E94F18] to-[#B83A0A] shadow-xl shadow-[#B83A0A]/40 hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#B83A0A]/50 transition-all text-base ring-2 ring-[#F59E0B]/40">
               <Sparkles className="w-5 h-5" />
               <span>Free Trial shuru karein</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              {/* Pulse aura */}
+              <span aria-hidden className="absolute inset-0 rounded-full lp-animate-pulse-soft pointer-events-none" />
             </Link>
             <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=AddisonX%20demo%20chahiye`} target="_blank" rel="noopener"
                className="inline-flex items-center gap-2 px-5 py-4 rounded-full font-black text-[#0F7C57] bg-white border-2 border-[#138808]/40 hover:bg-[#138808]/5 hover:border-[#138808]/60 transition-all">
               <MessageCircle className="w-5 h-5" />
               <span>WhatsApp Demo</span>
+            </a>
+            <a href="#how" className="inline-flex items-center gap-2 px-3 py-3 rounded-full font-bold text-slate-700 hover:text-[#B83A0A] hover:bg-white/60 transition-all text-sm">
+              <span className="inline-flex w-7 h-7 rounded-full bg-[#FFE4D1] items-center justify-center text-[#B83A0A]">▶</span>
+              90-sec demo
             </a>
           </div>
 
@@ -235,6 +264,35 @@ function Hero() {
               <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>5-min setup</span>
             </div>
           </div>
+
+          {/* Avatar stack with names */}
+          <div className="mt-7 flex items-center gap-3 max-w-md">
+            <div className="flex -space-x-2.5">
+              {[
+                { c: "#FF6B35", l: "HS" },
+                { c: "#138808", l: "SK" },
+                { c: "#F59E0B", l: "MG" },
+                { c: "#8B5CF6", l: "AT" },
+                { c: "#E94F18", l: "BP" },
+              ].map((a, i) => (
+                <div key={i}
+                     className="w-9 h-9 rounded-full ring-2 ring-white shadow flex items-center justify-center font-black text-white text-[10px]"
+                     style={{ background: `linear-gradient(135deg, ${a.c}, ${a.c}dd)` }}>
+                  {a.l}
+                </div>
+              ))}
+              <div className="w-9 h-9 rounded-full ring-2 ring-white shadow bg-slate-900 text-white flex items-center justify-center text-[9px] font-black">
+                +95
+              </div>
+            </div>
+            <div className="text-xs leading-tight">
+              <div className="flex items-center gap-1 text-amber-500">
+                {[1,2,3,4,5].map(i => <Star key={i} className="w-3 h-3 fill-current" />)}
+                <span className="text-slate-900 font-black ml-1">4.9 / 5</span>
+              </div>
+              <div className="text-slate-500 text-[11px] font-bold">100+ dukaandaars · daily use</div>
+            </div>
+          </div>
         </div>
 
         {/* RIGHT */}
@@ -248,10 +306,18 @@ function PhoneMockup() {
   return (
     <div className="relative mx-auto md:mr-0 max-w-[360px] lp-animate-fade-up" style={{ animationDelay: "150ms" }}>
       {/* Decorative ring behind phone */}
-      <div className="absolute inset-[-20px] rounded-[3.2rem] bg-gradient-to-br from-[#F59E0B]/30 via-transparent to-[#FF6B35]/20 blur-2xl -z-10" />
+      <div className="absolute inset-[-30px] rounded-[3.5rem] bg-gradient-to-br from-[#F59E0B]/30 via-transparent to-[#FF6B35]/20 blur-2xl -z-10" />
+
+      {/* Bharat-verified sticker */}
+      <div className="absolute -top-4 -left-6 z-30 lp-animate-tilt">
+        <div className="bg-gradient-to-br from-[#138808] to-[#0F7C57] text-white rounded-full px-3 py-2 shadow-xl shadow-[#138808]/30 ring-4 ring-white flex items-center gap-1.5">
+          <span className="text-sm">🇮🇳</span>
+          <span className="text-[10px] font-black uppercase tracking-wider leading-none">Bharat<br />Verified</span>
+        </div>
+      </div>
 
       {/* Floating ornate cards */}
-      <div className="absolute -left-8 top-12 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#B83A0A]/15 border border-[#FFC8A0]/50 lp-animate-float-y">
+      <div className="absolute -left-10 top-20 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#B83A0A]/15 border border-[#FFC8A0]/50 lp-animate-float-y">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-[#138808] text-white flex items-center justify-center">
             <Check className="w-4 h-4" strokeWidth={3} />
@@ -263,7 +329,7 @@ function PhoneMockup() {
         </div>
       </div>
 
-      <div className="absolute -right-6 top-32 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#F59E0B]/15 border border-[#FFC8A0]/50 lp-animate-float-y" style={{ animationDelay: "-2s" }}>
+      <div className="absolute -right-8 top-40 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#F59E0B]/15 border border-[#FFC8A0]/50 lp-animate-float-y" style={{ animationDelay: "-2s" }}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-[#8B5CF6] text-white flex items-center justify-center">
             <QrCode className="w-4 h-4" />
@@ -275,7 +341,7 @@ function PhoneMockup() {
         </div>
       </div>
 
-      <div className="absolute -left-4 bottom-24 z-20 bg-gradient-to-br from-[#FF6B35] to-[#B83A0A] text-white rounded-2xl px-3 py-2 shadow-xl shadow-[#B83A0A]/30 lp-animate-float-y" style={{ animationDelay: "-1s" }}>
+      <div className="absolute -left-6 bottom-32 z-20 bg-gradient-to-br from-[#FF6B35] to-[#B83A0A] text-white rounded-2xl px-3 py-2 shadow-xl shadow-[#B83A0A]/30 lp-animate-float-y" style={{ animationDelay: "-1s" }}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
             <Trophy className="w-4 h-4" />
@@ -287,8 +353,22 @@ function PhoneMockup() {
         </div>
       </div>
 
-      {/* Phone */}
-      <div className="relative bg-slate-900 rounded-[2.8rem] p-2.5 lp-poster-shadow">
+      {/* Live slide-in notification at top */}
+      <div className="absolute right-[-20px] top-4 z-30 lp-animate-slide-in-right">
+        <div className="bg-white rounded-2xl px-3 py-2 shadow-2xl border-2 border-[#138808]/30 flex items-center gap-2 min-w-[200px]">
+          <div className="w-8 h-8 rounded-full bg-[#138808] text-white flex items-center justify-center">
+            <Banknote className="w-4 h-4" />
+          </div>
+          <div className="text-xs flex-1">
+            <div className="font-black text-slate-900">+ ₹950 just now</div>
+            <div className="text-[#0F7C57] text-[10px] font-bold">Sharma Kirana · UPI</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Phone — tilted slightly for drama */}
+      <div className="relative bg-slate-900 rounded-[2.8rem] p-2.5 lp-poster-shadow"
+           style={{ transform: "rotate(-2deg)" }}>
         <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-24 h-5 bg-slate-900 rounded-b-2xl z-10" />
         <div className="rounded-[2.2rem] bg-white overflow-hidden aspect-[9/19] relative">
           <div className="bg-gradient-to-br from-[#FFF6F0] via-white to-[#FFE4D1] h-full p-4 pt-8 flex flex-col">
