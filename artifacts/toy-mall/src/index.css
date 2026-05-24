@@ -95,36 +95,78 @@
   background-clip: text;
   color: transparent;
 }
-.lp-glass {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Light-theme card (cream / paper feel) */
+.lp-card {
+  background: #fff;
+  border: 1px solid rgba(255, 107, 53, 0.10);
+  box-shadow: 0 1px 0 rgba(255, 168, 107, 0.30) inset,
+              0 12px 32px -16px rgba(184, 58, 10, 0.18);
 }
-.lp-glass-hover:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.14);
+.lp-card-hover:hover {
+  border-color: rgba(255, 107, 53, 0.30);
+  transform: translateY(-2px);
+  box-shadow: 0 1px 0 rgba(255, 168, 107, 0.40) inset,
+              0 20px 40px -16px rgba(184, 58, 10, 0.28);
 }
+
+/* Cream paper background with a subtle warm tint */
+.lp-cream {
+  background:
+    radial-gradient(1200px 600px at 50% -200px, rgba(255, 168, 107, 0.22), transparent),
+    radial-gradient(800px 400px at 100% 100%, rgba(255, 224, 178, 0.25), transparent),
+    #FFFBF5;
+}
+
+/* Conic border in saffron→gold→green (Indian flag inspired) */
 .lp-conic-border {
   position: relative;
 }
 .lp-conic-border::before {
   content: "";
   position: absolute;
-  inset: -1px;
+  inset: -1.5px;
   border-radius: inherit;
-  padding: 1px;
-  background: conic-gradient(from 0deg, #FF6B35, #B5FF6A, #8B5CF6, #FF6B35);
+  padding: 1.5px;
+  background: conic-gradient(from 0deg, #FF6B35, #F59E0B, #138808, #F59E0B, #FF6B35);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
 }
+
+/* Subtle paisley/dot pattern for backgrounds */
 .lp-dot-grid {
-  background-image: radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(255, 107, 53, 0.10) 1px, transparent 1px);
   background-size: 24px 24px;
 }
+
+/* Mandala / rangoli pattern (very subtle) */
+.lp-mandala {
+  background-image:
+    radial-gradient(circle at 25% 25%, rgba(255, 107, 53, 0.06) 0, transparent 30%),
+    radial-gradient(circle at 75% 75%, rgba(19, 136, 8, 0.05) 0, transparent 30%);
+  background-size: 200px 200px, 240px 240px;
+}
+
+/* Diya-inspired golden glow */
+.lp-glow-diya {
+  box-shadow: 0 0 0 1px rgba(255, 168, 107, 0.5),
+              0 8px 24px -8px rgba(245, 158, 11, 0.4),
+              0 0 40px -8px rgba(255, 107, 53, 0.25);
+}
+
+/* Marigold gradient text */
+.lp-gradient-marigold {
+  background: linear-gradient(135deg, #FF6B35 0%, #F59E0B 45%, #FF6B35 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Mehndi green for accents */
+.lp-text-mehndi { color: #0F7C57; }
+.lp-bg-mehndi  { background-color: #138808; }
 
 @theme inline {
   --color-background: hsl(var(--background));
