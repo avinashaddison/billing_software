@@ -5,24 +5,25 @@ import {
   Check, X, ArrowRight, Star, Shield, MessageCircle,
   ShoppingBag, Pill, Shirt, Gem, Smartphone, Wrench,
   PenTool, Heart, Menu, ChevronDown, TrendingUp,
-  Headphones, Wifi, Cloud, Lock, Activity, Bot, Banknote, Flame,
+  Headphones, Wifi, Lock, Banknote, Flame, Crown, Trophy,
 } from "lucide-react";
 
 const WHATSAPP_NUMBER = "919999999999";
 const TRIAL_URL       = "/login";
 
 /* ═══════════════════════════════════════════════════════════════
-   PUBLIC MARKETING LANDING — Light Indian Premium
-
-   Cream paper background, saffron + marigold + mehndi-green palette,
-   subtle paisley & mandala motifs. Hindi + English mixed throughout.
+   AddisonX — Indian-show landing.
+   Bold copy, marigold garland, mandala motifs, gold-foil headings,
+   wedding-invitation pricing card, Bollywood-poster shadows.
 ═══════════════════════════════════════════════════════════════ */
 export default function Landing() {
   return (
     <div className="min-h-screen text-slate-900 lp-cream overflow-x-hidden selection:bg-[#FF6B35] selection:text-white">
-      <DiwaliStrip />
+      <Garland />
+      <OfferStrip />
       <Nav />
       <Hero />
+      <LiveCounter />
       <LogoMarquee />
       <Features />
       <HowItWorks />
@@ -38,21 +39,37 @@ export default function Landing() {
   );
 }
 
-/* ─── Top festive strip ────────────────────────────────────── */
-function DiwaliStrip() {
+/* ─── 1. Animated bulb garland — sits behind everything ────── */
+function Garland() {
   return (
-    <div className="bg-gradient-to-r from-[#FF6B35] via-[#F59E0B] to-[#FF6B35] text-white text-center py-2 px-4 text-[12px] md:text-[13px] font-bold">
+    <div aria-hidden className="pointer-events-none fixed top-0 inset-x-0 z-40 overflow-hidden">
+      <div className="relative h-7 w-full">
+        {/* curve string */}
+        <svg viewBox="0 0 1200 28" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
+          <path d="M0,4 Q300,22 600,8 T1200,6" stroke="rgba(120,53,15,0.35)" strokeWidth="1.5" fill="none" />
+        </svg>
+        {/* bulb row */}
+        <div className="absolute inset-x-0 top-3 lp-garland" style={{ animation: "lp-garland-sway 4s ease-in-out infinite" }} />
+      </div>
+    </div>
+  );
+}
+
+/* ─── 2. Top festive strip ─────────────────────────────────── */
+function OfferStrip() {
+  return (
+    <div className="bg-gradient-to-r from-[#B83A0A] via-[#E94F18] to-[#B83A0A] text-white text-center py-2 px-4 text-[12px] md:text-[13px] font-bold mt-7 relative z-30">
       <span className="inline-flex items-center gap-2">
-        <span className="text-base">🪔</span>
-        <span>Diwali Offer · pehle 100 dukaandaars ke liye — </span>
-        <span className="bg-white/25 px-2 py-0.5 rounded-full font-black">First month FREE</span>
-        <span className="text-base">🪔</span>
+        <span className="text-base lp-flame inline-block">🪔</span>
+        <span>DIWALI BLOWOUT · pehle 100 dukaandaars ke liye — </span>
+        <span className="bg-[#F59E0B] text-[#0B0B11] px-2 py-0.5 rounded-full font-black uppercase tracking-wider">First month FREE</span>
+        <span className="text-base lp-flame inline-block">🪔</span>
       </span>
     </div>
   );
 }
 
-/* ─── NAV ──────────────────────────────────────────────────── */
+/* ─── 3. NAV ───────────────────────────────────────────────── */
 function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -68,29 +85,29 @@ function Nav() {
     { href: "#how",      label: "Kaise kaam karta hai" },
     { href: "#compare",  label: "vs Tally" },
     { href: "#pricing",  label: "Pricing" },
-    { href: "#faq",      label: "FAQ" },
+    { href: "#faq",      label: "Sawal?" },
   ];
 
   return (
-    <nav className={`sticky top-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/85 backdrop-blur-xl border-b border-[#FFC8A0]/60 shadow-sm" : "bg-transparent"}`}>
+    <nav className={`sticky top-0 z-50 transition-all duration-300 ${scrolled ? "bg-[#FFFBF5]/90 backdrop-blur-xl border-b-2 border-[#FFC8A0]/60 shadow-sm" : "bg-transparent"}`}>
       <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
         <a href="#top" className="flex items-center gap-2.5 group">
           <div className="relative">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#FFA86B] via-[#FF6B35] to-[#E94F18] flex items-center justify-center text-white font-black shadow-lg shadow-[#FF6B35]/30 ring-2 ring-white">
-              <span className="text-lg italic" style={{ fontFamily: "var(--font-display)" }}>A</span>
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#F59E0B] via-[#FF6B35] to-[#B83A0A] flex items-center justify-center text-white font-black shadow-lg shadow-[#B83A0A]/30 ring-2 ring-white">
+              <span className="text-xl">⚡</span>
             </div>
             <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#138808] ring-2 ring-white" />
           </div>
           <div className="leading-tight">
             <div className="font-black text-base text-slate-900">AddisonX</div>
-            <div className="text-[9px] font-black tracking-[0.2em] uppercase text-[#E94F18] -mt-0.5">Dukaan ka Software</div>
+            <div className="text-[9px] font-black tracking-[0.2em] uppercase text-[#B83A0A] -mt-0.5">Dukaan ka Software</div>
           </div>
         </a>
 
         <div className="hidden md:flex items-center gap-1">
           {links.map((l) => (
             <a key={l.href} href={l.href}
-               className="px-3.5 py-2 rounded-full text-[13px] font-semibold text-slate-700 hover:text-[#E94F18] hover:bg-[#FFE4D1]/50 transition-all">
+               className="px-3.5 py-2 rounded-full text-[13px] font-bold text-slate-700 hover:text-[#B83A0A] hover:bg-[#FFE4D1]/60 transition-all">
               {l.label}
             </a>
           ))}
@@ -103,16 +120,13 @@ function Nav() {
             +91 99999 99999
           </a>
           <Link href={TRIAL_URL}
-             className="group px-4 py-2 rounded-full text-[13px] font-black text-white bg-gradient-to-r from-[#FF6B35] to-[#E94F18] hover:shadow-lg hover:shadow-[#FF6B35]/40 hover:-translate-y-0.5 transition-all">
-            <span className="flex items-center gap-1.5">
-              Sign In
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </span>
+             className="group px-5 py-2.5 rounded-full text-[13px] font-black text-white bg-gradient-to-r from-[#FF6B35] to-[#B83A0A] hover:shadow-lg hover:shadow-[#B83A0A]/40 hover:-translate-y-0.5 transition-all ring-2 ring-[#F59E0B]/40">
+            Sign In →
           </Link>
         </div>
 
         <button onClick={() => setOpen((v) => !v)}
-                className="md:hidden w-9 h-9 rounded-xl bg-[#FF6B35]/10 text-[#E94F18] flex items-center justify-center">
+                className="md:hidden w-9 h-9 rounded-xl bg-[#FF6B35]/10 text-[#B83A0A] flex items-center justify-center">
           <Menu className="w-5 h-5" />
         </button>
       </div>
@@ -126,7 +140,7 @@ function Nav() {
             </a>
           ))}
           <Link href={TRIAL_URL}
-             className="block text-center mt-2 px-4 py-3 rounded-xl font-black text-white bg-gradient-to-r from-[#FF6B35] to-[#E94F18]">
+             className="block text-center mt-2 px-4 py-3 rounded-xl font-black text-white bg-gradient-to-r from-[#FF6B35] to-[#B83A0A]">
             Sign In →
           </Link>
         </div>
@@ -135,101 +149,95 @@ function Nav() {
   );
 }
 
-/* ─── HERO ─────────────────────────────────────────────────── */
+/* ─── 4. HERO ──────────────────────────────────────────────── */
 function Hero() {
-  const [tracked, setTracked] = useState(2_84_50_823);
-  useEffect(() => {
-    const id = setInterval(() => setTracked((n) => n + Math.floor(Math.random() * 950 + 50)), 1700);
-    return () => clearInterval(id);
-  }, []);
-
   return (
-    <section id="top" className="relative pt-12 md:pt-20 pb-20 overflow-hidden">
-      {/* Soft decorative blobs + mandala */}
+    <section id="top" className="relative pt-16 md:pt-24 pb-20 overflow-hidden">
+      {/* Mandala backdrop */}
       <div className="absolute inset-0 -z-10 pointer-events-none">
-        <div className="absolute inset-0 lp-mandala" />
-        <div className="absolute top-[-12%] left-[-8%] w-[50vw] h-[50vw] rounded-full bg-gradient-to-br from-[#FFA86B]/40 via-[#FF6B35]/25 to-transparent blur-3xl lp-animate-float-orb" />
-        <div className="absolute top-[5%] right-[-12%] w-[45vw] h-[45vw] rounded-full bg-gradient-to-br from-[#F59E0B]/30 to-rose-300/20 blur-3xl lp-animate-float-orb" style={{ animationDelay: "-9s" }} />
-        <div className="absolute bottom-[-15%] left-[30%] w-[35vw] h-[35vw] rounded-full bg-gradient-to-br from-[#138808]/15 to-emerald-200/30 blur-3xl lp-animate-float-orb" style={{ animationDelay: "-14s" }} />
-        {/* Sparkle accents */}
-        <div className="absolute top-12 left-[8%] text-[#F59E0B]/60 text-2xl select-none rotate-12">✦</div>
-        <div className="absolute top-32 right-[12%] text-[#FF6B35]/50 text-3xl select-none">✦</div>
-        <div className="absolute bottom-32 left-[15%] text-[#FF6B35]/40 text-2xl select-none">✦</div>
-        <div className="absolute bottom-20 right-[6%] text-[#138808]/40 text-3xl select-none">✦</div>
+        <div className="absolute inset-0 lp-mandala-bg" />
+        <div className="absolute top-[-12%] left-[-8%] w-[55vw] h-[55vw] rounded-full bg-gradient-to-br from-[#FFA86B]/40 via-[#FF6B35]/25 to-transparent blur-3xl lp-animate-float-orb" />
+        <div className="absolute top-[0%] right-[-15%] w-[50vw] h-[50vw] rounded-full bg-gradient-to-br from-[#F59E0B]/35 to-rose-300/20 blur-3xl lp-animate-float-orb" style={{ animationDelay: "-9s" }} />
+        <div className="absolute bottom-[-20%] left-[35%] w-[40vw] h-[40vw] rounded-full bg-gradient-to-br from-[#138808]/15 to-emerald-200/30 blur-3xl lp-animate-float-orb" style={{ animationDelay: "-14s" }} />
+        {/* Sparkles around */}
+        <span className="lp-sparkle absolute top-12 left-[6%] text-[#F59E0B] text-3xl" style={{ animationDelay: "0s" }}>✦</span>
+        <span className="lp-sparkle absolute top-28 right-[10%] text-[#FF6B35] text-4xl" style={{ animationDelay: "-1s" }}>✦</span>
+        <span className="lp-sparkle absolute bottom-32 left-[12%] text-[#FF6B35] text-2xl" style={{ animationDelay: "-2s" }}>✦</span>
+        <span className="lp-sparkle absolute bottom-16 right-[8%] text-[#138808] text-3xl" style={{ animationDelay: "-1.5s" }}>✦</span>
+        <span className="lp-sparkle absolute top-1/2 left-[3%] text-[#F59E0B]/60 text-2xl" style={{ animationDelay: "-2.5s" }}>✺</span>
+        <span className="lp-sparkle absolute top-1/3 right-[3%] text-[#B83A0A]/50 text-2xl" style={{ animationDelay: "-3s" }}>✺</span>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 grid md:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-16 items-center">
-        {/* LEFT: copy */}
+        {/* LEFT */}
         <div className="lp-animate-fade-up">
+          {/* Sticker line above headline */}
           <div className="flex flex-wrap items-center gap-2 mb-6">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-gradient-to-r from-[#FFE4D1] to-[#FCD9B6] text-[#B83A0A] border border-[#FFC8A0]">
-              🇮🇳 Made in Bharat
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-white text-[#B83A0A] border-2 border-[#FFC8A0] shadow-sm">
+              <span className="text-base">🇮🇳</span> Made in Bharat
             </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#138808]/10 text-[#0F7C57] border border-[#138808]/20">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#138808] text-white border-2 border-[#138808] shadow-sm">
               <Shield className="w-3 h-3" /> GST + UPI Ready
             </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#F59E0B]/10 text-[#B45309] border border-[#F59E0B]/20">
-              <Star className="w-3 h-3 fill-current" /> 4.9 · 100+ shops
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#F59E0B] text-white border-2 border-[#F59E0B] shadow-sm">
+              <Star className="w-3 h-3 fill-white" /> 4.9 · 100+ shops
             </span>
           </div>
 
-          <h1 className="font-black tracking-tight leading-[0.95]">
-            <span className="block text-5xl md:text-7xl lg:text-[5.5rem] text-slate-900">Dukaan badhao,</span>
-            <span className="block text-5xl md:text-7xl lg:text-[5.5rem] mt-1">
+          {/* Massive Bollywood headline */}
+          <h1 className="font-black tracking-tight leading-[0.9]">
+            <span className="block text-6xl md:text-8xl lg:text-[7rem] text-slate-900">
+              Dukaan
+              <span className="text-[#B83A0A]"> badhao,</span>
+            </span>
+            <span className="block text-6xl md:text-8xl lg:text-[7rem] mt-2">
               <span className="relative inline-block">
-                <span className="relative z-10 lp-gradient-marigold">tension</span>
-                <span aria-hidden className="absolute -bottom-1 left-0 right-0 h-3 bg-[#F59E0B]/30 rounded-full blur-sm -z-0" />
+                <span className="lp-gold-foil">tension</span>
+                <span aria-hidden className="absolute -bottom-1 left-0 right-0 h-4 bg-[#F59E0B]/40 rounded-full blur-sm -z-0" />
               </span>
-              {" "}<span className="text-slate-900">nahi!</span>
+              {" "}
+              <span className="text-slate-900">nahi!</span>
             </span>
           </h1>
 
-          <p className="mt-6 text-base md:text-lg text-slate-700 leading-relaxed max-w-xl">
-            <strong className="text-[#E94F18]">5 second</strong> mein bill, UPI QR taiyaar, Stock apne aap count.
+          <p className="mt-7 text-base md:text-xl text-slate-700 leading-relaxed max-w-xl">
+            <strong className="text-[#B83A0A]">5 second</strong> mein bill, UPI QR taiyaar, Stock apne aap count.
             <br />
             <span className="text-slate-600">Tally jaisa confusing nahi, WhatsApp jaisa simple.</span>
           </p>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          {/* CTAs */}
+          <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link href={TRIAL_URL}
-               className="group inline-flex items-center gap-2 px-6 py-4 rounded-full font-black text-white bg-gradient-to-r from-[#FF6B35] to-[#E94F18] shadow-xl shadow-[#FF6B35]/40 hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#FF6B35]/50 transition-all">
+               className="group inline-flex items-center gap-2 px-7 py-4 rounded-full font-black text-white bg-gradient-to-r from-[#FF6B35] via-[#E94F18] to-[#B83A0A] shadow-xl shadow-[#B83A0A]/40 hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#B83A0A]/50 transition-all text-base ring-2 ring-[#F59E0B]/40">
               <Sparkles className="w-5 h-5" />
-              <span>Abhi shuru karein — Free</span>
+              <span>Free Trial shuru karein</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=AddisonX%20demo%20chahiye`} target="_blank" rel="noopener"
-               className="inline-flex items-center gap-2 px-5 py-4 rounded-full font-black text-[#0F7C57] bg-white border-2 border-[#138808]/30 hover:bg-[#138808]/5 hover:border-[#138808]/50 transition-all">
+               className="inline-flex items-center gap-2 px-5 py-4 rounded-full font-black text-[#0F7C57] bg-white border-2 border-[#138808]/40 hover:bg-[#138808]/5 hover:border-[#138808]/60 transition-all">
               <MessageCircle className="w-5 h-5" />
-              <span>WhatsApp par baat karein</span>
+              <span>WhatsApp Demo</span>
             </a>
           </div>
 
-          <div className="mt-6 flex items-center gap-4 text-sm">
+          {/* Trust micro */}
+          <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <div className="flex items-center gap-1.5 text-slate-600">
-              <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>Credit card nahi chahiye</span>
+              <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>Credit card nahi</span>
             </div>
-            <span className="text-slate-300">·</span>
+            <span className="text-slate-300 hidden sm:inline">·</span>
             <div className="flex items-center gap-1.5 text-slate-600">
               <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>14 din Free</span>
             </div>
-          </div>
-
-          {/* Live tracker */}
-          <div className="mt-6 inline-flex items-center gap-3 px-4 py-3 rounded-2xl bg-white border border-[#FFC8A0]/50 shadow-sm">
-            <div className="relative">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#138808]" />
-              <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-[#138808] animate-ping" />
-            </div>
-            <div className="text-xs leading-tight">
-              <div className="text-slate-500 font-semibold">Aaj trade hua</div>
-              <div className="font-black tabular-nums text-[#B83A0A] text-base">
-                ₹{tracked.toLocaleString("en-IN")}
-              </div>
+            <span className="text-slate-300 hidden sm:inline">·</span>
+            <div className="flex items-center gap-1.5 text-slate-600">
+              <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>5-min setup</span>
             </div>
           </div>
         </div>
 
-        {/* RIGHT: Phone mockup */}
+        {/* RIGHT */}
         <PhoneMockup />
       </div>
     </section>
@@ -238,12 +246,15 @@ function Hero() {
 
 function PhoneMockup() {
   return (
-    <div className="relative mx-auto md:mr-0 max-w-[340px] lp-animate-fade-up" style={{ animationDelay: "150ms" }}>
-      {/* Floating tags around mockup */}
-      <div className="absolute -left-6 top-10 z-20 bg-white rounded-2xl px-3 py-2 shadow-lg shadow-[#FF6B35]/15 border border-[#FFC8A0]/40 lp-animate-float-y">
+    <div className="relative mx-auto md:mr-0 max-w-[360px] lp-animate-fade-up" style={{ animationDelay: "150ms" }}>
+      {/* Decorative ring behind phone */}
+      <div className="absolute inset-[-20px] rounded-[3.2rem] bg-gradient-to-br from-[#F59E0B]/30 via-transparent to-[#FF6B35]/20 blur-2xl -z-10" />
+
+      {/* Floating ornate cards */}
+      <div className="absolute -left-8 top-12 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#B83A0A]/15 border border-[#FFC8A0]/50 lp-animate-float-y">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-[#138808] text-white flex items-center justify-center">
-            <ScanLine className="w-4 h-4" />
+            <Check className="w-4 h-4" strokeWidth={3} />
           </div>
           <div className="text-xs">
             <div className="font-black text-slate-900">GST READY</div>
@@ -252,7 +263,7 @@ function PhoneMockup() {
         </div>
       </div>
 
-      <div className="absolute -right-4 top-28 z-20 bg-white rounded-2xl px-3 py-2 shadow-lg shadow-[#F59E0B]/15 border border-[#FFC8A0]/40 lp-animate-float-y" style={{ animationDelay: "-2s" }}>
+      <div className="absolute -right-6 top-32 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#F59E0B]/15 border border-[#FFC8A0]/50 lp-animate-float-y" style={{ animationDelay: "-2s" }}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-[#8B5CF6] text-white flex items-center justify-center">
             <QrCode className="w-4 h-4" />
@@ -264,20 +275,20 @@ function PhoneMockup() {
         </div>
       </div>
 
-      <div className="absolute -left-2 bottom-24 z-20 bg-white rounded-2xl px-3 py-2 shadow-lg shadow-rose-500/15 border border-[#FFC8A0]/40 lp-animate-float-y" style={{ animationDelay: "-1s" }}>
+      <div className="absolute -left-4 bottom-24 z-20 bg-gradient-to-br from-[#FF6B35] to-[#B83A0A] text-white rounded-2xl px-3 py-2 shadow-xl shadow-[#B83A0A]/30 lp-animate-float-y" style={{ animationDelay: "-1s" }}>
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-[#FF6B35] text-white flex items-center justify-center">
-            <span className="text-base">🎉</span>
+          <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+            <Trophy className="w-4 h-4" />
           </div>
           <div className="text-xs">
-            <div className="font-black text-slate-900">New sale!</div>
-            <div className="text-slate-500 text-[10px]">Bill #47 · ₹890</div>
+            <div className="font-black">New sale!</div>
+            <div className="text-white/80 text-[10px]">Bill #47 · ₹890</div>
           </div>
         </div>
       </div>
 
       {/* Phone */}
-      <div className="relative bg-slate-900 rounded-[2.8rem] p-2.5 shadow-2xl shadow-slate-900/30">
+      <div className="relative bg-slate-900 rounded-[2.8rem] p-2.5 lp-poster-shadow">
         <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-24 h-5 bg-slate-900 rounded-b-2xl z-10" />
         <div className="rounded-[2.2rem] bg-white overflow-hidden aspect-[9/19] relative">
           <div className="bg-gradient-to-br from-[#FFF6F0] via-white to-[#FFE4D1] h-full p-4 pt-8 flex flex-col">
@@ -286,7 +297,6 @@ function PhoneMockup() {
               <span>5G ▮▮▮ 92%</span>
             </div>
 
-            {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="text-[9px] font-black uppercase tracking-widest text-slate-500">Aapki dukaan</div>
@@ -298,7 +308,6 @@ function PhoneMockup() {
               </span>
             </div>
 
-            {/* Stats */}
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="bg-gradient-to-br from-[#FFE4D1] to-[#FFC8A0]/40 rounded-xl p-2.5 border border-[#FFC8A0]/50">
                 <div className="text-[8px] font-bold uppercase tracking-wider text-[#B83A0A]/70">Aaj ki kamaai</div>
@@ -318,7 +327,6 @@ function PhoneMockup() {
               </div>
             </div>
 
-            {/* Chart */}
             <div className="bg-white/70 backdrop-blur rounded-2xl p-3 border border-[#FFC8A0]/30 flex-1">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-[8px] font-bold uppercase tracking-wider text-slate-500">Revenue · 7 days</div>
@@ -351,7 +359,48 @@ function PhoneMockup() {
   );
 }
 
-/* ─── LOGO MARQUEE ─────────────────────────────────────────── */
+/* ─── 5. LIVE COUNTER (Bollywood ticker) ──────────────────── */
+function LiveCounter() {
+  const [tracked, setTracked] = useState(2_84_50_823);
+  useEffect(() => {
+    const id = setInterval(() => setTracked((n) => n + Math.floor(Math.random() * 950 + 50)), 1700);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <section className="relative -mt-4 mb-12">
+      <div className="max-w-5xl mx-auto px-4 md:px-8">
+        <div className="rounded-3xl bg-gradient-to-r from-[#B83A0A] via-[#E94F18] to-[#FF6B35] text-white p-6 md:p-8 relative overflow-hidden shadow-2xl shadow-[#B83A0A]/30 lp-ornate-corner">
+          <div className="absolute inset-0 opacity-10 pointer-events-none"
+               style={{
+                 backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 1px)",
+                 backgroundSize: "20px 20px",
+               }} />
+          <div className="relative grid md:grid-cols-3 gap-6 text-center">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-white/70">Aaj abhi tak</div>
+              <div className="text-3xl md:text-5xl font-black tabular-nums mt-1 lp-counter-glow">
+                ₹{tracked.toLocaleString("en-IN")}
+              </div>
+              <div className="text-[11px] text-white/80 mt-0.5">tracked across all shops · live</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-white/70">Bills last hour</div>
+              <div className="text-3xl md:text-5xl font-black tabular-nums mt-1 lp-gold-foil inline-block">2,847</div>
+              <div className="text-[11px] text-white/80 mt-0.5">across India</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-white/70">Avg billing time</div>
+              <div className="text-3xl md:text-5xl font-black tabular-nums mt-1 lp-gold-foil inline-block">3.2s</div>
+              <div className="text-[11px] text-white/80 mt-0.5">scan → done</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── 6. LOGO MARQUEE ─────────────────────────────────────── */
 function LogoMarquee() {
   const shops = [
     "Hira & Sons", "Sharma Kirana", "Mina Gift Shop", "Mukti Stationery",
@@ -359,15 +408,16 @@ function LogoMarquee() {
     "Joy Bookstore", "Modern Mobile", "Anand Toys", "Bhagat Pharmacy",
   ];
   return (
-    <section className="border-y border-[#FFC8A0]/40 py-10 bg-white/40 overflow-hidden">
+    <section className="py-10 bg-white/60 border-y-2 border-[#FFC8A0]/40 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 md:px-8 mb-6">
         <p className="text-center text-[10px] font-black tracking-[0.3em] uppercase text-slate-500">
-          ★ 100+ shopkeepers already running across India ★
+          ★ Trusted by 100+ shopkeepers across India ★
         </p>
       </div>
       <div className="lp-marquee gap-12 text-slate-400">
         {[...shops, ...shops].map((s, i) => (
-          <div key={i} className="text-2xl whitespace-nowrap italic" style={{ fontFamily: "var(--font-display)" }}>
+          <div key={i} className="text-2xl whitespace-nowrap italic flex items-center gap-3" style={{ fontFamily: "var(--font-display)" }}>
+            <span className="text-[#F59E0B]">✦</span>
             {s}
           </div>
         ))}
@@ -376,20 +426,26 @@ function LogoMarquee() {
   );
 }
 
-/* ─── FEATURES ─────────────────────────────────────────────── */
+/* ─── 7. FEATURES (Bollywood poster cards) ─────────────────── */
 function Features() {
   const features = [
-    { Icon: ScanLine,  iconBg: "bg-[#FF6B35]", title: "5-second Billing", hindi: "5 second mein bill",
-      desc: "Barcode scanner, camera, ya SKU type karo — cart instantly update ho jaata hai." },
-    { Icon: Receipt, iconBg: "bg-[#138808]", title: "GST Invoice Print", hindi: "GST bill compliant",
-      desc: "CGST + SGST auto-split, HSN, GSTIN, 80mm thermal ready — sab set." },
-    { Icon: QrCode, iconBg: "bg-[#8B5CF6]", title: "UPI QR on Bill", hindi: "Har bill par UPI",
-      desc: "Customer scan kare, amount UPI app mein pre-filled — paise minto mein." },
-    { Icon: Boxes, iconBg: "bg-[#F59E0B]", title: "Stock apne aap ghate", hindi: "Low-stock WhatsApp alert",
-      desc: "Har bill par stock apne aap ghate, low-stock alerts WhatsApp par." },
-    { Icon: BarChart3, iconBg: "bg-rose-500", title: "Reports jo zaroori hai", hindi: "Live dikh raha hai",
-      desc: "Roz profit, top sellers, slow movers — sab ek nazar mein." },
-    { Icon: Flame, iconBg: "bg-amber-500", title: "Today's Deal", hindi: "One-tap discount setup",
+    { Icon: ScanLine, color: "from-[#FF6B35] to-[#B83A0A]", chip: "bg-[#FFE4D1] text-[#B83A0A]",
+      title: "3-second Billing", hindi: "3 second mein bill",
+      desc: "Barcode scanner, camera, ya SKU type karo — cart instantly update ho jaata hai. Customer wait nahi karta." },
+    { Icon: Receipt, color: "from-[#138808] to-[#0F7C57]", chip: "bg-[#D1FAE5] text-[#0F7C57]",
+      title: "GST Invoice Print", hindi: "GST bill compliant",
+      desc: "CGST + SGST auto-split, HSN, GSTIN, 80mm thermal — sab ready. Audit-proof." },
+    { Icon: QrCode, color: "from-[#8B5CF6] to-[#6D28D9]", chip: "bg-violet-100 text-violet-700",
+      title: "UPI QR on Bill", hindi: "Har bill par UPI",
+      desc: "Customer scan kare, amount UPI app mein pre-filled. Paisa seconds mein." },
+    { Icon: Boxes, color: "from-[#F59E0B] to-[#B45309]", chip: "bg-amber-100 text-amber-700",
+      title: "Stock apne aap ghate", hindi: "Low-stock WhatsApp alert",
+      desc: "Har bill par stock turant update. Out-of-stock se pehle WhatsApp alert." },
+    { Icon: BarChart3, color: "from-rose-500 to-rose-700", chip: "bg-rose-100 text-rose-700",
+      title: "Reports jo zaroori hai", hindi: "9pm Telegram digest",
+      desc: "Roz profit, top sellers, slow movers — ek nazar mein. Phone vibrate hote hi pata chal jaye." },
+    { Icon: Flame, color: "from-[#FF6B35] to-[#F59E0B]", chip: "bg-orange-100 text-orange-700",
+      title: "Today's Deal", hindi: "One-tap discount",
       desc: "Ek tap mein sale price set karo, sab customer-facing pages par turant dikhe." },
   ];
 
@@ -397,24 +453,31 @@ function Features() {
     <section id="features" className="py-20 md:py-28 relative">
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         <div className="text-center mb-14">
-          <p className="inline-block text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">Features</p>
-          <h2 className="text-4xl md:text-6xl font-black tracking-tight leading-[0.95] text-slate-900">
-            Jo chahiye, sab hai.<br />
-            <span className="lp-gradient-marigold">Jo nahi chahiye, woh nahi.</span>
+          <div className="inline-flex items-center gap-2 mb-3">
+            <span className="text-[#F59E0B] text-xl">✦</span>
+            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#B83A0A]">Features</p>
+            <span className="text-[#F59E0B] text-xl">✦</span>
+          </div>
+          <h2 className="text-4xl md:text-7xl font-black tracking-tight leading-[0.9] text-slate-900">
+            Jo chahiye, <span className="lp-gold-foil">sab hai.</span><br />
+            <span className="text-slate-400 text-3xl md:text-5xl">Jo nahi chahiye, woh nahi.</span>
           </h2>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f, i) => (
             <div key={i}
-                 className="group relative p-6 rounded-3xl lp-card lp-card-hover transition-all"
+                 className="group relative p-6 rounded-3xl bg-white border-2 border-[#FFC8A0]/40 hover:border-[#FF6B35]/60 lp-card-hover overflow-hidden transition-all"
                  style={{ animation: `lp-fade-up 0.6s ${i * 60}ms backwards` }}>
-              <div className={`w-12 h-12 rounded-2xl ${f.iconBg} text-white flex items-center justify-center shadow-md group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
-                <f.Icon className="w-6 h-6" />
+              <span className={`absolute top-4 right-4 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${f.chip}`}>
+                {f.hindi}
+              </span>
+              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${f.color} text-white flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
+                <f.Icon className="w-7 h-7" />
               </div>
-              <h3 className="mt-5 text-lg font-black text-slate-900">{f.title}</h3>
-              <p className="text-sm font-bold text-[#E94F18] mt-0.5">{f.hindi}</p>
-              <p className="mt-2 text-sm text-slate-600 leading-relaxed">{f.desc}</p>
+              <h3 className="mt-5 text-xl md:text-2xl font-black text-slate-900">{f.title}</h3>
+              <p className="mt-2 text-sm md:text-base text-slate-600 leading-relaxed">{f.desc}</p>
+              <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-br from-[#F59E0B]/20 to-transparent opacity-50 group-hover:opacity-100 transition-opacity blur-2xl" />
             </div>
           ))}
         </div>
@@ -423,43 +486,50 @@ function Features() {
   );
 }
 
-/* ─── HOW IT WORKS ─────────────────────────────────────────── */
+/* ─── 8. HOW IT WORKS ──────────────────────────────────────── */
 function HowItWorks() {
   const steps = [
-    { n: 1, Icon: ScanLine, title: "Scan karo",        hindi: "Add to cart",     desc: "Barcode scanner, USB, ya camera. Product turant cart mein." },
-    { n: 2, Icon: Banknote, title: "Payment lo",       hindi: "Cash ya UPI",     desc: "UPI QR auto. Customer scan kare, paisa instant." },
-    { n: 3, Icon: Sparkles, title: "App handle karegi", hindi: "Baaki sab chhodo", desc: "Stock update, daily report, GST — sab automatic." },
+    { n: 1, Icon: ScanLine, title: "Scan karo",        sub: "Add to cart",       desc: "Barcode scanner, USB, ya camera. Product turant cart mein." },
+    { n: 2, Icon: Banknote, title: "Payment lo",       sub: "Cash ya UPI",       desc: "UPI QR auto-generate. Customer scan kare, paisa instant." },
+    { n: 3, Icon: Sparkles, title: "App handle karegi", sub: "Baaki sab chhodo",  desc: "Stock update, daily report, GST — sab automatic." },
   ];
   return (
-    <section id="how" className="py-20 md:py-28 bg-gradient-to-b from-white/60 to-white/0">
+    <section id="how" className="py-20 md:py-28 bg-gradient-to-b from-white/60 to-transparent">
       <div className="max-w-6xl mx-auto px-4 md:px-8">
         <div className="text-center mb-14">
-          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">How it works</p>
-          <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900">
-            3 step, <span className="lp-gradient-marigold">poora din sorted</span>
+          <div className="inline-flex items-center gap-2 mb-3">
+            <span className="text-[#F59E0B] text-xl">✦</span>
+            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#B83A0A]">How it works</p>
+            <span className="text-[#F59E0B] text-xl">✦</span>
+          </div>
+          <h2 className="text-4xl md:text-7xl font-black tracking-tight text-slate-900 leading-[0.9]">
+            3 step. <span className="lp-gold-foil">Poora din sorted.</span>
           </h2>
         </div>
 
         <div className="relative grid md:grid-cols-3 gap-6">
-          {/* Connecting dashed line behind cards (desktop) */}
-          <div className="hidden md:block absolute top-16 left-[16%] right-[16%] -z-10">
+          {/* Dashed connector */}
+          <div className="hidden md:block absolute top-20 left-[16%] right-[16%] -z-10">
             <svg viewBox="0 0 1000 10" className="w-full">
-              <line x1="0" y1="5" x2="1000" y2="5" stroke="#FFA86B" strokeWidth="2" strokeDasharray="8 8" />
+              <line x1="0" y1="5" x2="1000" y2="5" stroke="#F59E0B" strokeWidth="3" strokeDasharray="10 10" />
             </svg>
           </div>
 
           {steps.map((s, i) => (
             <div key={s.n} className="relative lp-animate-fade-up" style={{ animationDelay: `${i * 100}ms` }}>
-              <div className="lp-card lp-card-hover bg-white rounded-3xl p-6 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#FF6B35] to-[#E94F18] text-white font-black flex items-center justify-center shadow-md text-lg ring-2 ring-white">
+              <div className="lp-card lp-card-hover bg-white rounded-3xl p-7 transition-all border-2 border-[#FFC8A0]/40 hover:border-[#FF6B35]/60 relative overflow-hidden">
+                {/* Giant step number watermark */}
+                <div className="absolute -top-8 -right-4 text-[10rem] font-black text-[#FFC8A0]/30 leading-none select-none">{s.n}</div>
+
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#FF6B35] to-[#B83A0A] text-white font-black flex items-center justify-center shadow-lg text-2xl ring-4 ring-white">
                     {s.n}
                   </div>
-                  <s.Icon className="w-6 h-6 text-[#E94F18]" />
+                  <s.Icon className="w-7 h-7 text-[#B83A0A] mt-4" />
+                  <h3 className="text-2xl font-black text-slate-900 mt-3">{s.title}</h3>
+                  <p className="text-sm font-bold text-[#B83A0A] uppercase tracking-wider mt-0.5">{s.sub}</p>
+                  <p className="text-sm md:text-base text-slate-600 mt-3 leading-relaxed">{s.desc}</p>
                 </div>
-                <h3 className="text-xl font-black text-slate-900">{s.title}</h3>
-                <p className="text-sm font-bold text-[#E94F18]">{s.hindi}</p>
-                <p className="text-sm text-slate-600 mt-2 leading-relaxed">{s.desc}</p>
               </div>
             </div>
           ))}
@@ -469,7 +539,7 @@ function HowItWorks() {
   );
 }
 
-/* ─── INDUSTRIES ───────────────────────────────────────────── */
+/* ─── 9. INDUSTRIES ────────────────────────────────────────── */
 function Industries() {
   const shops = [
     { Icon: ShoppingBag, name: "Kirana / General Store", hindi: "Kirana dukaan" },
@@ -485,11 +555,16 @@ function Industries() {
     <section className="py-20 md:py-28">
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         <div className="text-center mb-12">
-          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">Who is it for</p>
-          <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900">
-            Aapki dukaan ke liye <span className="lp-gradient-marigold">perfect hai?</span>
+          <div className="inline-flex items-center gap-2 mb-3">
+            <span className="text-[#F59E0B] text-xl">✦</span>
+            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#B83A0A]">Who it's for</p>
+            <span className="text-[#F59E0B] text-xl">✦</span>
+          </div>
+          <h2 className="text-4xl md:text-7xl font-black tracking-tight text-slate-900 leading-[0.9]">
+            Aapki dukaan ke liye<br />
+            <span className="lp-gold-foil">perfect hai?</span>
           </h2>
-          <p className="mt-4 text-sm md:text-base text-slate-600 max-w-2xl mx-auto">
+          <p className="mt-5 text-sm md:text-base text-slate-600 max-w-2xl mx-auto">
             Har woh dukaandaar jo 5 second mein bill chahta hai, GST compliant invoice chahta hai, aur apna time bachana chahta hai.
           </p>
         </div>
@@ -497,26 +572,26 @@ function Industries() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {shops.map((s, i) => (
             <div key={i}
-                 className="group lp-card lp-card-hover p-4 md:p-5 rounded-2xl bg-white transition-all text-center"
+                 className="group lp-card lp-card-hover p-5 rounded-2xl bg-white transition-all text-center border-2 border-[#FFC8A0]/40 hover:border-[#FF6B35]/60"
                  style={{ animation: `lp-fade-up 0.6s ${i * 50}ms backwards` }}>
-              <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-[#FFE4D1] to-[#FCD9B6] text-[#E94F18] flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-[#FF6B35] group-hover:to-[#E94F18] group-hover:text-white group-hover:rotate-6 transition-all">
-                <s.Icon className="w-6 h-6" />
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-[#FFE4D1] to-[#FCD9B6] text-[#B83A0A] flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-[#FF6B35] group-hover:to-[#B83A0A] group-hover:text-white group-hover:rotate-6 transition-all">
+                <s.Icon className="w-7 h-7" />
               </div>
-              <p className="font-black text-sm mt-3 text-slate-900">{s.name}</p>
-              <p className="text-xs font-bold text-[#E94F18] mt-0.5">{s.hindi}</p>
+              <p className="font-black text-base mt-3 text-slate-900">{s.name}</p>
+              <p className="text-xs font-bold text-[#B83A0A] mt-0.5">{s.hindi}</p>
             </div>
           ))}
         </div>
 
-        <p className="text-center mt-8 text-sm text-slate-600">
-          Aur restaurant, salon, jewellery, ya petrol pump bhi? <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="font-black text-[#E94F18] hover:underline">WhatsApp par poochh lo →</a>
+        <p className="text-center mt-10 text-sm text-slate-600">
+          Aur restaurant, salon, jewellery, ya petrol pump bhi? <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="font-black text-[#B83A0A] hover:underline">WhatsApp par poochh lo →</a>
         </p>
       </div>
     </section>
   );
 }
 
-/* ─── COMPARISON ───────────────────────────────────────────── */
+/* ─── 10. COMPARISON ───────────────────────────────────────── */
 function Comparison() {
   const rows = [
     { feat: "5 second mein bill barcode se",      a: true, t: false as const },
@@ -525,25 +600,29 @@ function Comparison() {
     { feat: "Today's Deal — instant discount",    a: true, t: false as const },
     { feat: "WhatsApp + Telegram daily report",   a: true, t: false as const },
     { feat: "Stock apne aap ghate",                a: true, t: "limited" as const },
-    { feat: "Accounting / Balance-sheet exports", a: true, t: true as const },
+    { feat: "GST / Accounting exports",            a: true, t: true as const },
   ];
   return (
-    <section id="compare" className="py-20 md:py-28 bg-gradient-to-b from-[#FFE4D1]/30 to-white/0">
+    <section id="compare" className="py-20 md:py-28 bg-gradient-to-b from-[#FFE4D1]/30 to-transparent">
       <div className="max-w-5xl mx-auto px-4 md:px-8">
         <div className="text-center mb-12">
-          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">Comparison</p>
-          <h2 className="text-3xl md:text-5xl font-black leading-tight text-slate-900">
-            <span className="text-slate-400">Tally accountants ke liye hai.</span><br />
-            <span className="lp-gradient-marigold">AddisonX</span> dukaandaaron ke liye.
+          <div className="inline-flex items-center gap-2 mb-3">
+            <span className="text-[#F59E0B] text-xl">⚔️</span>
+            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#B83A0A]">vs Tally / Vyapar</p>
+            <span className="text-[#F59E0B] text-xl">⚔️</span>
+          </div>
+          <h2 className="text-3xl md:text-6xl font-black leading-[1.05] text-slate-900">
+            <span className="text-slate-400 line-through decoration-2 decoration-rose-300">Tally accountants ke liye hai.</span><br />
+            <span className="lp-gold-foil">AddisonX</span> dukaandaaron ke liye.
           </h2>
         </div>
 
-        <div className="rounded-3xl bg-white shadow-xl shadow-[#FF6B35]/10 overflow-hidden lp-conic-border">
+        <div className="rounded-3xl bg-white shadow-2xl shadow-[#B83A0A]/10 overflow-hidden lp-conic-border">
           <div className="grid grid-cols-[1.4fr_1fr_1fr] text-[11px] md:text-sm font-black uppercase tracking-wider">
             <div className="p-4 md:p-5 bg-[#FFE4D1]/40 text-slate-700">Feature</div>
-            <div className="p-4 md:p-5 text-center bg-gradient-to-br from-[#FF6B35] to-[#E94F18] text-white relative">
-              <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-[#F59E0B] text-white text-[9px] rounded-full font-black lp-animate-badge-bounce whitespace-nowrap">
-                ★ RECOMMENDED
+            <div className="p-4 md:p-5 text-center bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-[#B83A0A] text-white relative">
+              <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-[#F59E0B] text-white text-[9px] rounded-full font-black lp-animate-badge-bounce whitespace-nowrap ring-2 ring-white">
+                <Crown className="inline w-3 h-3 mr-1 -mt-0.5" /> RECOMMENDED
               </span>
               AddisonX
             </div>
@@ -554,17 +633,17 @@ function Comparison() {
             <div key={i} className={`grid grid-cols-[1.4fr_1fr_1fr] text-sm border-t border-[#FFC8A0]/40 ${i % 2 === 0 ? "bg-white" : "bg-[#FFE4D1]/15"}`}>
               <div className="p-4 md:p-5 font-bold text-slate-800">{r.feat}</div>
               <div className="p-4 md:p-5 text-center">
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#138808] text-white">
-                  <Check className="w-4 h-4" strokeWidth={3} />
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#138808] text-white shadow-md shadow-[#138808]/40">
+                  <Check className="w-5 h-5" strokeWidth={3} />
                 </span>
               </div>
               <div className="p-4 md:p-5 text-center">
                 {r.t === true ? (
-                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-200 text-slate-600">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-200 text-slate-600">
                     <Check className="w-4 h-4" />
                   </span>
                 ) : r.t === false ? (
-                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-rose-100 text-rose-500">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-100 text-rose-500">
                     <X className="w-4 h-4" />
                   </span>
                 ) : (
@@ -574,9 +653,9 @@ function Comparison() {
             </div>
           ))}
 
-          <div className="grid grid-cols-[1.4fr_1fr_1fr] text-sm border-t border-[#FFC8A0]/40 bg-[#FFE4D1]/40">
+          <div className="grid grid-cols-[1.4fr_1fr_1fr] text-sm border-t-2 border-[#FFC8A0]/60 bg-[#FFE4D1]/40">
             <div className="p-4 md:p-5 font-black uppercase text-[11px] tracking-wider text-slate-700">Built for</div>
-            <div className="p-4 md:p-5 text-center font-black text-[#B83A0A]">Dukaandaars</div>
+            <div className="p-4 md:p-5 text-center font-black text-[#B83A0A] text-base">Dukaandaars 👑</div>
             <div className="p-4 md:p-5 text-center font-black text-slate-500">CA / Accountants</div>
           </div>
         </div>
@@ -589,7 +668,7 @@ function Comparison() {
   );
 }
 
-/* ─── PRICING ──────────────────────────────────────────────── */
+/* ─── 11. PRICING (Wedding-invite card) ────────────────────── */
 function Pricing() {
   return (
     <section id="pricing" className="py-20 md:py-28 relative overflow-hidden">
@@ -600,16 +679,21 @@ function Pricing() {
 
       <div className="max-w-6xl mx-auto px-4 md:px-8">
         <div className="text-center mb-12">
-          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">Pricing</p>
-          <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900">
-            Honest pricing. <span className="lp-gradient-marigold">Koi chhupa charge nahi.</span>
+          <div className="inline-flex items-center gap-2 mb-3">
+            <span className="text-[#F59E0B] text-xl">✦</span>
+            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#B83A0A]">Pricing</p>
+            <span className="text-[#F59E0B] text-xl">✦</span>
+          </div>
+          <h2 className="text-4xl md:text-7xl font-black tracking-tight text-slate-900 leading-[0.9]">
+            <span className="lp-gold-foil">Honest pricing.</span><br />
+            Koi chhupa charge nahi.
           </h2>
-          <p className="mt-4 text-sm md:text-base text-slate-600">
+          <p className="mt-5 text-sm md:text-base text-slate-600">
             Pay monthly ya yearly. Cancel anytime. Setup <strong>FREE</strong>.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-5 md:gap-6 max-w-4xl mx-auto">
           {/* Free Trial */}
           <div className="relative p-7 md:p-8 rounded-3xl bg-white border-2 border-[#FFC8A0]/40">
             <div className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 mb-4">Free Trial</div>
@@ -623,7 +707,7 @@ function Pricing() {
                 "GST invoice + UPI QR",
                 "Stock auto-update",
                 "Email + WhatsApp support",
-                "Sab features ON, no upgrade gimmick",
+                "Sab features ON",
               ].map((p, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-slate-700">
                   <Check className="w-4 h-4 text-[#138808] mt-0.5 shrink-0" strokeWidth={3} />
@@ -638,8 +722,8 @@ function Pricing() {
             </Link>
           </div>
 
-          {/* Paid */}
-          <div className="relative rounded-3xl bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-[#B83A0A] text-white overflow-hidden shadow-2xl shadow-[#FF6B35]/40 p-7 md:p-8">
+          {/* Paid — wedding-invitation style */}
+          <div className="relative rounded-3xl bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-[#B83A0A] text-white overflow-hidden shadow-2xl shadow-[#B83A0A]/40 p-7 md:p-9 lp-ornate-corner ring-4 ring-[#F59E0B]/50">
             <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-[#F59E0B]/30 blur-2xl" />
             <div className="absolute inset-0 opacity-15"
                  style={{
@@ -648,21 +732,30 @@ function Pricing() {
                  }} />
 
             <div className="relative">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#F59E0B] text-white">★ Bestseller</span>
-                <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 backdrop-blur">1 Year Plan</span>
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#F59E0B] text-white">★ BESTSELLER</span>
+                <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 backdrop-blur">1 Year</span>
               </div>
-              <h3 className="text-2xl font-black">Most popular — 90%+ choose this</h3>
-              <div className="flex items-baseline gap-2 mt-5">
-                <span className="text-lg line-through opacity-50 tabular-nums">₹14,999</span>
-                <div className="text-6xl md:text-7xl font-black tabular-nums">₹9,999</div>
-                <span className="text-sm font-bold opacity-80">/year</span>
+
+              <p className="text-center text-[11px] font-bold uppercase tracking-[0.25em] opacity-80">— Most popular —</p>
+              <h3 className="text-center text-3xl font-black mt-1">Pro · Annual</h3>
+              <p className="text-center text-sm opacity-80 mt-1">90%+ shopkeepers choose this</p>
+
+              <div className="text-center mt-6 flex items-baseline gap-3 justify-center">
+                <span className="text-xl line-through opacity-50 tabular-nums">₹14,999</span>
+                <span className="text-7xl md:text-8xl font-black tabular-nums lp-counter-glow">₹9,999</span>
               </div>
-              <p className="text-sm opacity-90 mt-1.5">
+              <p className="text-center text-sm opacity-90 mt-1.5">
                 = <strong>₹833/month</strong> · ₹27/day · ek chai se kam
               </p>
 
-              <ul className="mt-6 space-y-2.5 text-sm">
+              <div className="my-7 flex items-center gap-3">
+                <div className="flex-1 h-px bg-white/30" />
+                <span className="text-[#F59E0B] text-xl">✦</span>
+                <div className="flex-1 h-px bg-white/30" />
+              </div>
+
+              <ul className="space-y-2.5 text-sm">
                 {[
                   "Everything in Free Trial",
                   "Telegram + WhatsApp daily reports",
@@ -679,12 +772,12 @@ function Pricing() {
               </ul>
 
               <Link href={TRIAL_URL}
-                 className="mt-7 inline-flex w-full items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-black text-[#B83A0A] bg-white hover:bg-[#FFE4D1] hover:-translate-y-0.5 transition-all shadow-xl">
+                 className="mt-7 inline-flex w-full items-center justify-center gap-2 px-5 py-4 rounded-2xl font-black text-[#B83A0A] bg-white hover:bg-[#FFE4D1] hover:-translate-y-0.5 transition-all shadow-xl text-base">
                 Subscribe karein <ArrowRight className="w-4 h-4" />
               </Link>
 
               <p className="text-[11px] text-center opacity-80 mt-3">
-                ✓ 14 din free trial &nbsp;·&nbsp; ✓ Credit card nahi chahiye &nbsp;·&nbsp; ✓ Kabhi bhi cancel
+                ✓ 14 din free trial &nbsp;·&nbsp; ✓ Pro-rata refund &nbsp;·&nbsp; ✓ Kabhi bhi cancel
               </p>
             </div>
           </div>
@@ -694,10 +787,10 @@ function Pricing() {
   );
 }
 
-/* ─── TESTIMONIAL ──────────────────────────────────────────── */
+/* ─── 12. TESTIMONIAL ──────────────────────────────────────── */
 function Testimonial() {
   return (
-    <section className="py-20 md:py-28 bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-rose-500 text-white relative overflow-hidden">
+    <section className="py-20 md:py-28 bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-[#B83A0A] text-white relative overflow-hidden">
       <div className="absolute inset-0 opacity-15 pointer-events-none"
            style={{
              backgroundImage: "radial-gradient(circle at 25% 25%, white 1px, transparent 1px)",
@@ -706,15 +799,16 @@ function Testimonial() {
 
       <div className="max-w-4xl mx-auto px-4 md:px-8 text-center relative">
         <div className="flex justify-center gap-1 mb-6">
-          {[1,2,3,4,5].map(i => <Star key={i} className="w-6 h-6 fill-[#F59E0B] text-[#F59E0B]" />)}
+          {[1,2,3,4,5].map(i => <Star key={i} className="w-7 h-7 fill-[#F59E0B] text-[#F59E0B]" />)}
         </div>
-        <blockquote className="text-2xl md:text-4xl font-black leading-tight">
-          "Hamara cashier saalon se Tally par tha. 2 din mein AddisonX seekh gaya. <span className="text-[#F59E0B]">Ab wapas nahi jaayega.</span>"
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70 mb-4">— What shopkeepers say —</p>
+        <blockquote className="text-3xl md:text-5xl font-black leading-tight">
+          "Hamara cashier saalon se Tally par tha. 2 din mein AddisonX seekh gaya. <span className="lp-gold-foil inline-block">Ab wapas nahi jaayega.</span>"
         </blockquote>
-        <div className="mt-8 inline-flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/15 backdrop-blur border border-white/20">
-          <div className="w-10 h-10 rounded-full bg-[#F59E0B] flex items-center justify-center font-black text-white">SK</div>
+        <div className="mt-10 inline-flex items-center gap-3 px-5 py-3 rounded-2xl bg-white/15 backdrop-blur border border-white/20">
+          <div className="w-12 h-12 rounded-full bg-[#F59E0B] flex items-center justify-center font-black text-white text-lg ring-2 ring-white">SK</div>
           <div className="text-left">
-            <p className="font-black text-sm">Sharma Kirana Store</p>
+            <p className="font-black text-base">Sharma Kirana Store</p>
             <p className="text-xs opacity-80">Indore · 4 months on AddisonX</p>
           </div>
         </div>
@@ -723,7 +817,7 @@ function Testimonial() {
   );
 }
 
-/* ─── FAQ ─────────────────────────────────────────────────── */
+/* ─── 13. FAQ ──────────────────────────────────────────────── */
 function FAQ() {
   const faqs = [
     { q: "Kya mujhe install karna padega?",
@@ -744,22 +838,27 @@ function FAQ() {
     <section id="faq" className="py-20 md:py-28">
       <div className="max-w-3xl mx-auto px-4 md:px-8">
         <div className="text-center mb-12">
-          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">FAQ</p>
-          <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900">
-            Shuru karne se pehle <span className="lp-gradient-marigold">kuchh sawal?</span>
+          <div className="inline-flex items-center gap-2 mb-3">
+            <span className="text-[#F59E0B] text-xl">?</span>
+            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#B83A0A]">FAQ</p>
+            <span className="text-[#F59E0B] text-xl">?</span>
+          </div>
+          <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 leading-[0.9]">
+            Shuru karne se pehle<br />
+            <span className="lp-gold-foil">kuchh sawal?</span>
           </h2>
         </div>
 
         <div className="space-y-3">
           {faqs.map((f, i) => (
-            <div key={i} className="rounded-2xl bg-white border border-[#FFC8A0]/40 overflow-hidden hover:border-[#FFA86B]/60 transition-colors">
+            <div key={i} className="rounded-2xl bg-white border-2 border-[#FFC8A0]/40 overflow-hidden hover:border-[#FF6B35]/50 transition-colors">
               <button onClick={() => setOpen(open === i ? null : i)}
                       className="w-full flex items-center justify-between gap-4 p-5 text-left">
-                <span className="font-black text-sm md:text-base text-slate-900">{f.q}</span>
-                <ChevronDown className={`w-5 h-5 text-[#E94F18] shrink-0 transition-transform ${open === i ? "rotate-180" : ""}`} />
+                <span className="font-black text-base md:text-lg text-slate-900">{f.q}</span>
+                <ChevronDown className={`w-5 h-5 text-[#B83A0A] shrink-0 transition-transform ${open === i ? "rotate-180" : ""}`} />
               </button>
               {open === i && (
-                <div className="px-5 pb-5 text-sm text-slate-600 leading-relaxed border-t border-[#FFC8A0]/40 pt-4">
+                <div className="px-5 pb-5 text-sm md:text-base text-slate-600 leading-relaxed border-t-2 border-[#FFC8A0]/40 pt-4">
                   {f.a}
                 </div>
               )}
@@ -771,12 +870,12 @@ function FAQ() {
   );
 }
 
-/* ─── FINAL CTA ────────────────────────────────────────────── */
+/* ─── 14. FINAL CTA (fireworks finale) ─────────────────────── */
 function FinalCTA() {
   return (
     <section className="py-20 md:py-28 relative overflow-hidden">
       <div className="max-w-5xl mx-auto px-4 md:px-8">
-        <div className="rounded-[2.5rem] bg-gradient-to-br from-[#FF6B35] via-rose-500 to-[#E94F18] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl shadow-[#FF6B35]/30">
+        <div className="rounded-[2.5rem] bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-[#B83A0A] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl shadow-[#B83A0A]/40 lp-ornate-corner ring-4 ring-[#F59E0B]/30">
           <div className="absolute inset-0 opacity-15 pointer-events-none"
                style={{
                  backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 1px)",
@@ -785,13 +884,19 @@ function FinalCTA() {
           <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#F59E0B]/30 blur-3xl" />
           <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-rose-400/30 blur-3xl" />
 
+          {/* Sparkle decoration */}
+          <span className="lp-sparkle absolute top-8 left-12 text-white text-3xl" style={{ animationDelay: "0s" }}>✦</span>
+          <span className="lp-sparkle absolute top-16 right-16 text-white text-2xl" style={{ animationDelay: "-1s" }}>✦</span>
+          <span className="lp-sparkle absolute bottom-12 left-20 text-white text-2xl" style={{ animationDelay: "-2s" }}>✦</span>
+          <span className="lp-sparkle absolute bottom-20 right-12 text-white text-3xl" style={{ animationDelay: "-1.5s" }}>✦</span>
+
           <div className="relative text-white">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#F59E0B] text-white mb-6 lp-animate-badge-bounce">
-              🪔 14 din ka free trial · 🪔
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#F59E0B] text-white mb-6 lp-animate-badge-bounce ring-2 ring-white/30">
+              🪔 14 din free trial — koi credit card nahi · 🪔
             </div>
-            <h2 className="text-5xl md:text-7xl font-black leading-[0.95]">
+            <h2 className="text-5xl md:text-8xl font-black leading-[0.9]">
               Dukaan badhao.<br />
-              <span className="text-[#FFE4D1]">Hum sab handle karenge.</span>
+              <span className="lp-gold-foil inline-block">Hum sab handle karenge.</span>
             </h2>
             <p className="mt-6 text-base md:text-lg opacity-90 max-w-xl mx-auto">
               14 din free. Koi credit card nahi. WhatsApp par 24×7 support.
@@ -799,11 +904,12 @@ function FinalCTA() {
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
               <Link href={TRIAL_URL}
-                 className="inline-flex items-center gap-2 px-7 py-4 rounded-full font-black text-[#B83A0A] bg-white hover:-translate-y-1 hover:shadow-2xl transition-all text-lg">
+                 className="inline-flex items-center gap-2 px-8 py-5 rounded-full font-black text-[#B83A0A] bg-white hover:-translate-y-1 hover:shadow-2xl transition-all text-xl ring-2 ring-[#F59E0B]/30">
+                <Sparkles className="w-5 h-5" />
                 Free Trial shuru karein <ArrowRight className="w-5 h-5" />
               </Link>
               <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener"
-                 className="inline-flex items-center gap-2 px-6 py-4 rounded-full font-black text-white bg-[#138808] hover:bg-[#0F7C57] transition-all">
+                 className="inline-flex items-center gap-2 px-7 py-5 rounded-full font-black text-white bg-[#138808] hover:bg-[#0F7C57] transition-all text-lg">
                 <MessageCircle className="w-5 h-5" /> WhatsApp Demo
               </a>
             </div>
@@ -814,7 +920,7 @@ function FinalCTA() {
   );
 }
 
-/* ─── FOOTER ───────────────────────────────────────────────── */
+/* ─── 15. FOOTER ───────────────────────────────────────────── */
 function Footer() {
   return (
     <footer className="bg-slate-900 text-white pt-16 pb-8">
@@ -823,14 +929,15 @@ function Footer() {
           <div className="flex items-center gap-2"><Lock className="w-4 h-4 text-[#FFA86B]" /> Bank-grade Encryption</div>
           <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-[#B5FF6A]" /> GST Certified</div>
           <div className="flex items-center gap-2"><Headphones className="w-4 h-4 text-amber-300" /> Live Support</div>
+          <div className="flex items-center gap-2"><Wifi className="w-4 h-4 text-violet-300" /> Works Offline</div>
           <div className="flex items-center gap-2"><span className="text-base">🇮🇳</span> Made in Bharat</div>
         </div>
 
         <div className="grid md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-10 mt-10">
           <div>
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B35] to-[#E94F18] flex items-center justify-center text-white font-black ring-2 ring-white/10">
-                <span className="italic text-lg" style={{ fontFamily: "var(--font-display)" }}>A</span>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#F59E0B] via-[#FF6B35] to-[#B83A0A] flex items-center justify-center text-white font-black ring-2 ring-white/10">
+                <span className="text-lg">⚡</span>
               </div>
               <div>
                 <div className="font-black text-lg">AddisonX</div>
@@ -873,7 +980,7 @@ function Footer() {
   );
 }
 
-/* ─── STICKY MOBILE CTA ────────────────────────────────────── */
+/* ─── 16. STICKY MOBILE CTA ────────────────────────────────── */
 function StickyCTA() {
   const [show, setShow] = useState(false);
   useEffect(() => {
@@ -886,9 +993,9 @@ function StickyCTA() {
   return (
     <div className="md:hidden fixed bottom-4 inset-x-4 z-40 lp-animate-fade-up">
       <Link href={TRIAL_URL}
-         className="flex items-center justify-center gap-2 w-full px-5 py-4 rounded-full font-black text-white bg-gradient-to-r from-[#FF6B35] to-[#E94F18] shadow-2xl shadow-[#FF6B35]/40">
+         className="flex items-center justify-center gap-2 w-full px-5 py-4 rounded-full font-black text-white bg-gradient-to-r from-[#FF6B35] via-[#E94F18] to-[#B83A0A] shadow-2xl shadow-[#B83A0A]/50 ring-2 ring-[#F59E0B]/30">
         <Sparkles className="w-5 h-5" />
-        Free Trial shuru karein — 14 din
+        Free Trial shuru karein
         <ArrowRight className="w-5 h-5" />
       </Link>
     </div>
