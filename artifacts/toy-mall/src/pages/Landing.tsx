@@ -19,8 +19,7 @@ const TRIAL_URL       = "/login";
 ═══════════════════════════════════════════════════════════════ */
 export default function Landing() {
   return (
-    <div className="min-h-screen text-slate-900 lp-cream overflow-x-hidden selection:bg-[#FF6B35] selection:text-white"
-         style={{ fontFamily: "var(--font-hindi)" }}>
+    <div className="min-h-screen text-slate-900 lp-cream overflow-x-hidden selection:bg-[#FF6B35] selection:text-white">
       <DiwaliStrip />
       <Nav />
       <Hero />
@@ -45,7 +44,7 @@ function DiwaliStrip() {
     <div className="bg-gradient-to-r from-[#FF6B35] via-[#F59E0B] to-[#FF6B35] text-white text-center py-2 px-4 text-[12px] md:text-[13px] font-bold">
       <span className="inline-flex items-center gap-2">
         <span className="text-base">🪔</span>
-        <span>Diwali Offer · पहले 100 दुकानदारों के लिए — </span>
+        <span>Diwali Offer · pehle 100 dukaandaars ke liye — </span>
         <span className="bg-white/25 px-2 py-0.5 rounded-full font-black">First month FREE</span>
         <span className="text-base">🪔</span>
       </span>
@@ -66,7 +65,7 @@ function Nav() {
 
   const links = [
     { href: "#features", label: "Features" },
-    { href: "#how",      label: "कैसे काम करता है" },
+    { href: "#how",      label: "Kaise kaam karta hai" },
     { href: "#compare",  label: "vs Tally" },
     { href: "#pricing",  label: "Pricing" },
     { href: "#faq",      label: "FAQ" },
@@ -84,7 +83,7 @@ function Nav() {
           </div>
           <div className="leading-tight">
             <div className="font-black text-base text-slate-900">AddisonX</div>
-            <div className="text-[9px] font-black tracking-[0.2em] uppercase text-[#E94F18] -mt-0.5">दुकान का सॉफ्टवेयर</div>
+            <div className="text-[9px] font-black tracking-[0.2em] uppercase text-[#E94F18] -mt-0.5">Dukaan ka Software</div>
           </div>
         </a>
 
@@ -175,43 +174,43 @@ function Hero() {
           </div>
 
           <h1 className="font-black tracking-tight leading-[0.95]">
-            <span className="block text-5xl md:text-7xl lg:text-[5.5rem] text-slate-900">दुकान चलाओ,</span>
+            <span className="block text-5xl md:text-7xl lg:text-[5.5rem] text-slate-900">Dukaan badhao,</span>
             <span className="block text-5xl md:text-7xl lg:text-[5.5rem] mt-1">
               <span className="relative inline-block">
-                <span className="relative z-10 lp-gradient-marigold">सॉफ्टवेयर</span>
+                <span className="relative z-10 lp-gradient-marigold">tension</span>
                 <span aria-hidden className="absolute -bottom-1 left-0 right-0 h-3 bg-[#F59E0B]/30 rounded-full blur-sm -z-0" />
               </span>
-              {" "}<span className="text-slate-900">नहीं!</span>
+              {" "}<span className="text-slate-900">nahi!</span>
             </span>
           </h1>
 
           <p className="mt-6 text-base md:text-lg text-slate-700 leading-relaxed max-w-xl">
-            <strong className="text-[#E94F18]">5 second</strong> में बिल, UPI QR तैयार, Stock अपने आप count.
+            <strong className="text-[#E94F18]">5 second</strong> mein bill, UPI QR taiyaar, Stock apne aap count.
             <br />
-            <span className="text-slate-600">Tally जैसा confusing नहीं, WhatsApp जैसा simple.</span>
+            <span className="text-slate-600">Tally jaisa confusing nahi, WhatsApp jaisa simple.</span>
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link href={TRIAL_URL}
                className="group inline-flex items-center gap-2 px-6 py-4 rounded-full font-black text-white bg-gradient-to-r from-[#FF6B35] to-[#E94F18] shadow-xl shadow-[#FF6B35]/40 hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#FF6B35]/50 transition-all">
               <Sparkles className="w-5 h-5" />
-              <span>अभी शुरू करें — Free</span>
+              <span>Abhi shuru karein — Free</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=AddisonX%20demo%20चाहिए`} target="_blank" rel="noopener"
+            <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=AddisonX%20demo%20chahiye`} target="_blank" rel="noopener"
                className="inline-flex items-center gap-2 px-5 py-4 rounded-full font-black text-[#0F7C57] bg-white border-2 border-[#138808]/30 hover:bg-[#138808]/5 hover:border-[#138808]/50 transition-all">
               <MessageCircle className="w-5 h-5" />
-              <span>WhatsApp पर बात करें</span>
+              <span>WhatsApp par baat karein</span>
             </a>
           </div>
 
           <div className="mt-6 flex items-center gap-4 text-sm">
             <div className="flex items-center gap-1.5 text-slate-600">
-              <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>Credit card नहीं चाहिए</span>
+              <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>Credit card nahi chahiye</span>
             </div>
             <span className="text-slate-300">·</span>
             <div className="flex items-center gap-1.5 text-slate-600">
-              <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>14 दिन Free</span>
+              <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>14 din Free</span>
             </div>
           </div>
 
@@ -222,7 +221,7 @@ function Hero() {
               <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-[#138808] animate-ping" />
             </div>
             <div className="text-xs leading-tight">
-              <div className="text-slate-500 font-semibold">आज trade हुआ</div>
+              <div className="text-slate-500 font-semibold">Aaj trade hua</div>
               <div className="font-black tabular-nums text-[#B83A0A] text-base">
                 ₹{tracked.toLocaleString("en-IN")}
               </div>
@@ -260,7 +259,7 @@ function PhoneMockup() {
           </div>
           <div className="text-xs">
             <div className="font-black text-slate-900">UPI QR</div>
-            <div className="text-slate-500 text-[10px]">हर बिल पर</div>
+            <div className="text-slate-500 text-[10px]">Har bill par</div>
           </div>
         </div>
       </div>
@@ -290,9 +289,9 @@ function PhoneMockup() {
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div>
-                <div className="text-[9px] font-black uppercase tracking-widest text-slate-500">आपकी दुकान</div>
-                <div className="text-xl font-black text-slate-900 leading-tight">आज का overview</div>
-                <div className="text-[10px] text-slate-500">सबसे अच्छा दिन! 🎉</div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-slate-500">Aapki dukaan</div>
+                <div className="text-xl font-black text-slate-900 leading-tight">Aaj ka overview</div>
+                <div className="text-[10px] text-slate-500">Sabse achha din! 🎉</div>
               </div>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-[#138808]/10 text-[#0F7C57]">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#138808] animate-pulse" /> LIVE
@@ -302,15 +301,15 @@ function PhoneMockup() {
             {/* Stats */}
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="bg-gradient-to-br from-[#FFE4D1] to-[#FFC8A0]/40 rounded-xl p-2.5 border border-[#FFC8A0]/50">
-                <div className="text-[8px] font-bold uppercase tracking-wider text-[#B83A0A]/70">आज की कमाई</div>
+                <div className="text-[8px] font-bold uppercase tracking-wider text-[#B83A0A]/70">Aaj ki kamaai</div>
                 <div className="text-base font-black tabular-nums text-[#B83A0A]">₹28,450</div>
               </div>
               <div className="bg-rose-100/50 rounded-xl p-2.5 border border-rose-200/50">
-                <div className="text-[8px] font-bold uppercase tracking-wider text-rose-700/70">Bills बने</div>
+                <div className="text-[8px] font-bold uppercase tracking-wider text-rose-700/70">Bills bane</div>
                 <div className="text-base font-black tabular-nums text-rose-700">47</div>
               </div>
               <div className="bg-amber-100/50 rounded-xl p-2.5 border border-amber-200/50">
-                <div className="text-[8px] font-bold uppercase tracking-wider text-amber-700/70">Items बिके</div>
+                <div className="text-[8px] font-bold uppercase tracking-wider text-amber-700/70">Items bike</div>
                 <div className="text-base font-black tabular-nums text-amber-700">134</div>
               </div>
               <div className="bg-violet-100/40 rounded-xl p-2.5 border border-violet-200/50">
@@ -380,18 +379,18 @@ function LogoMarquee() {
 /* ─── FEATURES ─────────────────────────────────────────────── */
 function Features() {
   const features = [
-    { Icon: ScanLine,  iconBg: "bg-[#FF6B35]", title: "5-second Billing", hindi: "5 सेकंड में बिल",
-      desc: "Barcode scanner, camera, या SKU type करो — cart instantly update हो जाता है।" },
-    { Icon: Receipt, iconBg: "bg-[#138808]", title: "GST Invoice Print", hindi: "GST बिल compliant",
-      desc: "CGST + SGST auto-split, HSN, GSTIN, 80mm thermal ready — सब set।" },
-    { Icon: QrCode, iconBg: "bg-[#8B5CF6]", title: "UPI QR on Bill", hindi: "हर बिल पर UPI",
-      desc: "Customer scan करे, amount UPI app में pre-filled — paise मिनटों में।" },
-    { Icon: Boxes, iconBg: "bg-[#F59E0B]", title: "Stock अपने आप घटे", hindi: "Low-stock WhatsApp alert",
-      desc: "हर बिल पर stock अपने आप घटे, low-stock alerts WhatsApp पर।" },
-    { Icon: BarChart3, iconBg: "bg-rose-500", title: "Reports जो ज़रूरी है", hindi: "Live दिख रहा है",
-      desc: "रोज़ profit, top sellers, slow movers — सब एक नज़र में।" },
+    { Icon: ScanLine,  iconBg: "bg-[#FF6B35]", title: "5-second Billing", hindi: "5 second mein bill",
+      desc: "Barcode scanner, camera, ya SKU type karo — cart instantly update ho jaata hai." },
+    { Icon: Receipt, iconBg: "bg-[#138808]", title: "GST Invoice Print", hindi: "GST bill compliant",
+      desc: "CGST + SGST auto-split, HSN, GSTIN, 80mm thermal ready — sab set." },
+    { Icon: QrCode, iconBg: "bg-[#8B5CF6]", title: "UPI QR on Bill", hindi: "Har bill par UPI",
+      desc: "Customer scan kare, amount UPI app mein pre-filled — paise minto mein." },
+    { Icon: Boxes, iconBg: "bg-[#F59E0B]", title: "Stock apne aap ghate", hindi: "Low-stock WhatsApp alert",
+      desc: "Har bill par stock apne aap ghate, low-stock alerts WhatsApp par." },
+    { Icon: BarChart3, iconBg: "bg-rose-500", title: "Reports jo zaroori hai", hindi: "Live dikh raha hai",
+      desc: "Roz profit, top sellers, slow movers — sab ek nazar mein." },
     { Icon: Flame, iconBg: "bg-amber-500", title: "Today's Deal", hindi: "One-tap discount setup",
-      desc: "एक tap में sale price set करो, सब customer-facing pages पर तुरंत दिखे।" },
+      desc: "Ek tap mein sale price set karo, sab customer-facing pages par turant dikhe." },
   ];
 
   return (
@@ -400,8 +399,8 @@ function Features() {
         <div className="text-center mb-14">
           <p className="inline-block text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">Features</p>
           <h2 className="text-4xl md:text-6xl font-black tracking-tight leading-[0.95] text-slate-900">
-            जो चाहिए, सब है.<br />
-            <span className="lp-gradient-marigold">जो नहीं चाहिए, वो नहीं.</span>
+            Jo chahiye, sab hai.<br />
+            <span className="lp-gradient-marigold">Jo nahi chahiye, woh nahi.</span>
           </h2>
         </div>
 
@@ -427,9 +426,9 @@ function Features() {
 /* ─── HOW IT WORKS ─────────────────────────────────────────── */
 function HowItWorks() {
   const steps = [
-    { n: 1, Icon: ScanLine,    title: "Scan करो", hindi: "Add to cart",       desc: "Barcode scanner, USB, या camera. Product तुरंत cart में।" },
-    { n: 2, Icon: Banknote,    title: "Payment लो", hindi: "Cash या UPI",      desc: "UPI QR auto. Customer scan करे, paisa instant।" },
-    { n: 3, Icon: Sparkles,    title: "App handle करेगी", hindi: "बाकी सब छोड़ो", desc: "Stock update, daily report, GST — सब automatic।" },
+    { n: 1, Icon: ScanLine, title: "Scan karo",        hindi: "Add to cart",     desc: "Barcode scanner, USB, ya camera. Product turant cart mein." },
+    { n: 2, Icon: Banknote, title: "Payment lo",       hindi: "Cash ya UPI",     desc: "UPI QR auto. Customer scan kare, paisa instant." },
+    { n: 3, Icon: Sparkles, title: "App handle karegi", hindi: "Baaki sab chhodo", desc: "Stock update, daily report, GST — sab automatic." },
   ];
   return (
     <section id="how" className="py-20 md:py-28 bg-gradient-to-b from-white/60 to-white/0">
@@ -437,7 +436,7 @@ function HowItWorks() {
         <div className="text-center mb-14">
           <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">How it works</p>
           <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900">
-            3 step, <span className="lp-gradient-marigold">पूरा दिन sorted</span>
+            3 step, <span className="lp-gradient-marigold">poora din sorted</span>
           </h2>
         </div>
 
@@ -473,14 +472,14 @@ function HowItWorks() {
 /* ─── INDUSTRIES ───────────────────────────────────────────── */
 function Industries() {
   const shops = [
-    { Icon: ShoppingBag, name: "Kirana / General Store", hindi: "किराना दुकान" },
-    { Icon: Heart,       name: "Gift & Toy Shop",         hindi: "गिफ्ट शॉप" },
-    { Icon: Smartphone,  name: "Mobile & Accessories",    hindi: "मोबाइल शॉप" },
-    { Icon: PenTool,     name: "Stationery Shop",         hindi: "स्टेशनरी" },
-    { Icon: Gem,         name: "Cosmetics & Beauty",      hindi: "कॉस्मेटिक्स" },
-    { Icon: Wrench,      name: "Hardware & Electrical",   hindi: "हार्डवेयर" },
-    { Icon: Shirt,       name: "Footwear & Fashion",      hindi: "कपड़े / जूते" },
-    { Icon: Pill,        name: "Pharmacy / Medical",      hindi: "मेडिकल" },
+    { Icon: ShoppingBag, name: "Kirana / General Store", hindi: "Kirana dukaan" },
+    { Icon: Heart,       name: "Gift & Toy Shop",         hindi: "Gift shop" },
+    { Icon: Smartphone,  name: "Mobile & Accessories",    hindi: "Mobile shop" },
+    { Icon: PenTool,     name: "Stationery Shop",         hindi: "Stationery" },
+    { Icon: Gem,         name: "Cosmetics & Beauty",      hindi: "Cosmetics" },
+    { Icon: Wrench,      name: "Hardware & Electrical",   hindi: "Hardware" },
+    { Icon: Shirt,       name: "Footwear & Fashion",      hindi: "Kapde / jootein" },
+    { Icon: Pill,        name: "Pharmacy / Medical",      hindi: "Medical" },
   ];
   return (
     <section className="py-20 md:py-28">
@@ -488,10 +487,10 @@ function Industries() {
         <div className="text-center mb-12">
           <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">Who is it for</p>
           <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900">
-            आपकी दुकान के लिए <span className="lp-gradient-marigold">perfect है?</span>
+            Aapki dukaan ke liye <span className="lp-gradient-marigold">perfect hai?</span>
           </h2>
           <p className="mt-4 text-sm md:text-base text-slate-600 max-w-2xl mx-auto">
-            हर वो दुकानदार जो 5 second में बिल चाहता है, GST compliant invoice चाहता है, और अपना समय बचाना चाहता है।
+            Har woh dukaandaar jo 5 second mein bill chahta hai, GST compliant invoice chahta hai, aur apna time bachana chahta hai.
           </p>
         </div>
 
@@ -510,7 +509,7 @@ function Industries() {
         </div>
 
         <p className="text-center mt-8 text-sm text-slate-600">
-          और restaurant, salon, jewellery, या पेट्रोल पंप भी? <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="font-black text-[#E94F18] hover:underline">WhatsApp पर पूछ लो →</a>
+          Aur restaurant, salon, jewellery, ya petrol pump bhi? <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="font-black text-[#E94F18] hover:underline">WhatsApp par poochh lo →</a>
         </p>
       </div>
     </section>
@@ -520,12 +519,12 @@ function Industries() {
 /* ─── COMPARISON ───────────────────────────────────────────── */
 function Comparison() {
   const rows = [
-    { feat: "5 second में बिल barcode से",        a: true, t: false as const },
-    { feat: "Built-in UPI QR on checkout",       a: true, t: false as const },
-    { feat: "Mobile + Desktop — same login",     a: true, t: false as const },
-    { feat: "Today's Deal — instant discount",   a: true, t: false as const },
-    { feat: "WhatsApp + Telegram daily report",  a: true, t: false as const },
-    { feat: "Stock अपने आप घटे",                  a: true, t: "limited" as const },
+    { feat: "5 second mein bill barcode se",      a: true, t: false as const },
+    { feat: "Built-in UPI QR on checkout",        a: true, t: false as const },
+    { feat: "Mobile + Desktop — same login",      a: true, t: false as const },
+    { feat: "Today's Deal — instant discount",    a: true, t: false as const },
+    { feat: "WhatsApp + Telegram daily report",   a: true, t: false as const },
+    { feat: "Stock apne aap ghate",                a: true, t: "limited" as const },
     { feat: "Accounting / Balance-sheet exports", a: true, t: true as const },
   ];
   return (
@@ -534,8 +533,8 @@ function Comparison() {
         <div className="text-center mb-12">
           <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">Comparison</p>
           <h2 className="text-3xl md:text-5xl font-black leading-tight text-slate-900">
-            <span className="text-slate-400">Tally accountants के लिए है.</span><br />
-            <span className="lp-gradient-marigold">AddisonX</span> दुकानदारों के लिए.
+            <span className="text-slate-400">Tally accountants ke liye hai.</span><br />
+            <span className="lp-gradient-marigold">AddisonX</span> dukaandaaron ke liye.
           </h2>
         </div>
 
@@ -577,7 +576,7 @@ function Comparison() {
 
           <div className="grid grid-cols-[1.4fr_1fr_1fr] text-sm border-t border-[#FFC8A0]/40 bg-[#FFE4D1]/40">
             <div className="p-4 md:p-5 font-black uppercase text-[11px] tracking-wider text-slate-700">Built for</div>
-            <div className="p-4 md:p-5 text-center font-black text-[#B83A0A]">दुकानदार</div>
+            <div className="p-4 md:p-5 text-center font-black text-[#B83A0A]">Dukaandaars</div>
             <div className="p-4 md:p-5 text-center font-black text-slate-500">CA / Accountants</div>
           </div>
         </div>
@@ -603,10 +602,10 @@ function Pricing() {
         <div className="text-center mb-12">
           <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">Pricing</p>
           <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900">
-            Honest pricing. <span className="lp-gradient-marigold">कोई छुपा charge नहीं.</span>
+            Honest pricing. <span className="lp-gradient-marigold">Koi chhupa charge nahi.</span>
           </h2>
           <p className="mt-4 text-sm md:text-base text-slate-600">
-            Pay monthly या yearly. Cancel anytime. Setup <strong>FREE</strong>.
+            Pay monthly ya yearly. Cancel anytime. Setup <strong>FREE</strong>.
           </p>
         </div>
 
@@ -614,9 +613,9 @@ function Pricing() {
           {/* Free Trial */}
           <div className="relative p-7 md:p-8 rounded-3xl bg-white border-2 border-[#FFC8A0]/40">
             <div className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 mb-4">Free Trial</div>
-            <h3 className="text-2xl font-black text-slate-900">पहले try करो, बाद में decide</h3>
-            <div className="text-6xl md:text-7xl font-black tabular-nums mt-5 text-slate-900">14 <span className="text-2xl text-slate-500">दिन</span></div>
-            <p className="text-sm text-slate-500 mt-1">कोई credit card नहीं</p>
+            <h3 className="text-2xl font-black text-slate-900">Pehle try karo, baad mein decide</h3>
+            <div className="text-6xl md:text-7xl font-black tabular-nums mt-5 text-slate-900">14 <span className="text-2xl text-slate-500">din</span></div>
+            <p className="text-sm text-slate-500 mt-1">Koi credit card nahi</p>
 
             <ul className="mt-7 space-y-2.5 text-sm">
               {[
@@ -624,7 +623,7 @@ function Pricing() {
                 "GST invoice + UPI QR",
                 "Stock auto-update",
                 "Email + WhatsApp support",
-                "सब features ON, no upgrade gimmick",
+                "Sab features ON, no upgrade gimmick",
               ].map((p, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-slate-700">
                   <Check className="w-4 h-4 text-[#138808] mt-0.5 shrink-0" strokeWidth={3} />
@@ -635,7 +634,7 @@ function Pricing() {
 
             <Link href={TRIAL_URL}
                className="mt-7 inline-flex w-full items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-black text-[#B83A0A] bg-[#FFE4D1] border border-[#FFC8A0] hover:bg-[#FCD9B6] transition-all">
-              अभी शुरू करें <ArrowRight className="w-4 h-4" />
+              Abhi shuru karein <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
@@ -660,7 +659,7 @@ function Pricing() {
                 <span className="text-sm font-bold opacity-80">/year</span>
               </div>
               <p className="text-sm opacity-90 mt-1.5">
-                = <strong>₹833/month</strong> · ₹27/day · एक चाय से कम
+                = <strong>₹833/month</strong> · ₹27/day · ek chai se kam
               </p>
 
               <ul className="mt-6 space-y-2.5 text-sm">
@@ -681,11 +680,11 @@ function Pricing() {
 
               <Link href={TRIAL_URL}
                  className="mt-7 inline-flex w-full items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-black text-[#B83A0A] bg-white hover:bg-[#FFE4D1] hover:-translate-y-0.5 transition-all shadow-xl">
-                Subscribe करें <ArrowRight className="w-4 h-4" />
+                Subscribe karein <ArrowRight className="w-4 h-4" />
               </Link>
 
               <p className="text-[11px] text-center opacity-80 mt-3">
-                ✓ 14 दिन free trial &nbsp;·&nbsp; ✓ Credit card नहीं चाहिए &nbsp;·&nbsp; ✓ कभी भी cancel
+                ✓ 14 din free trial &nbsp;·&nbsp; ✓ Credit card nahi chahiye &nbsp;·&nbsp; ✓ Kabhi bhi cancel
               </p>
             </div>
           </div>
@@ -710,7 +709,7 @@ function Testimonial() {
           {[1,2,3,4,5].map(i => <Star key={i} className="w-6 h-6 fill-[#F59E0B] text-[#F59E0B]" />)}
         </div>
         <blockquote className="text-2xl md:text-4xl font-black leading-tight">
-          "हमारा cashier सालों से Tally पर था. 2 दिन में AddisonX सीख गया. <span className="text-[#F59E0B]">अब वापस नहीं जाएगा.</span>"
+          "Hamara cashier saalon se Tally par tha. 2 din mein AddisonX seekh gaya. <span className="text-[#F59E0B]">Ab wapas nahi jaayega.</span>"
         </blockquote>
         <div className="mt-8 inline-flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/15 backdrop-blur border border-white/20">
           <div className="w-10 h-10 rounded-full bg-[#F59E0B] flex items-center justify-center font-black text-white">SK</div>
@@ -727,18 +726,18 @@ function Testimonial() {
 /* ─── FAQ ─────────────────────────────────────────────────── */
 function FAQ() {
   const faqs = [
-    { q: "क्या मुझे install करना पड़ेगा?",
-      a: "नहीं. AddisonX cloud पर चलता है — Chrome, Edge, Safari, या मोबाइल पर browser खोलो, login करो, बस।" },
-    { q: "कौन सा hardware चाहिए?",
-      a: "Minimum: एक Android फ़ोन या laptop. Recommended: 80mm thermal printer (अगर bill print करना है), USB barcode scanner." },
-    { q: "Internet नहीं हो तो?",
-      a: "Offline mode काम करता है — bills queue में जाएँगे, internet आते ही auto-sync. आपका दिन रुकता नहीं।" },
-    { q: "मेरा data safe है?",
-      a: "Bank-grade encryption, daily backups, Indian servers. कोई access नहीं करता आपका data — हम भी नहीं।" },
-    { q: "GST के setup में help मिलेगी?",
-      a: "हाँ. Free onboarding call (Hindi/English) — आपका GSTIN, HSN codes, opening stock — सब हम setup कर देंगे।" },
-    { q: "Cancel करना हो तो?",
-      a: "एक click. Pro-rata refund. कोई 'cancellation fee' नहीं. आपका data भी CSV में export करके दे देंगे।" },
+    { q: "Kya mujhe install karna padega?",
+      a: "Nahi. AddisonX cloud par chalta hai — Chrome, Edge, Safari, ya mobile par browser kholo, login karo, bas." },
+    { q: "Kaun sa hardware chahiye?",
+      a: "Minimum: ek Android phone ya laptop. Recommended: 80mm thermal printer (agar bill print karna hai), USB barcode scanner." },
+    { q: "Internet nahi ho toh?",
+      a: "Offline mode kaam karta hai — bills queue mein jaayenge, internet aate hi auto-sync. Aapka din rukta nahi." },
+    { q: "Mera data safe hai?",
+      a: "Bank-grade encryption, daily backups, Indian servers. Koi access nahi karta aapka data — hum bhi nahi." },
+    { q: "GST ke setup mein help milegi?",
+      a: "Haan. Free onboarding call (Hindi/English) — aapka GSTIN, HSN codes, opening stock — sab hum setup kar denge." },
+    { q: "Cancel karna ho toh?",
+      a: "Ek click. Pro-rata refund. Koi 'cancellation fee' nahi. Aapka data bhi CSV mein export karke de denge." },
   ];
   const [open, setOpen] = useState<number | null>(0);
   return (
@@ -747,7 +746,7 @@ function FAQ() {
         <div className="text-center mb-12">
           <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#E94F18] mb-3">FAQ</p>
           <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900">
-            शुरू करने से पहले <span className="lp-gradient-marigold">कुछ सवाल?</span>
+            Shuru karne se pehle <span className="lp-gradient-marigold">kuchh sawal?</span>
           </h2>
         </div>
 
@@ -788,20 +787,20 @@ function FinalCTA() {
 
           <div className="relative text-white">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#F59E0B] text-white mb-6 lp-animate-badge-bounce">
-              🪔 14 दिन का free trial · 🪔
+              🪔 14 din ka free trial · 🪔
             </div>
             <h2 className="text-5xl md:text-7xl font-black leading-[0.95]">
-              दुकान चलाओ.<br />
-              <span className="text-[#FFE4D1]">हम सब handle करेंगे.</span>
+              Dukaan badhao.<br />
+              <span className="text-[#FFE4D1]">Hum sab handle karenge.</span>
             </h2>
             <p className="mt-6 text-base md:text-lg opacity-90 max-w-xl mx-auto">
-              14 दिन free. कोई credit card नहीं. WhatsApp पर 24×7 support.
+              14 din free. Koi credit card nahi. WhatsApp par 24×7 support.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
               <Link href={TRIAL_URL}
                  className="inline-flex items-center gap-2 px-7 py-4 rounded-full font-black text-[#B83A0A] bg-white hover:-translate-y-1 hover:shadow-2xl transition-all text-lg">
-                Free Trial शुरू करें <ArrowRight className="w-5 h-5" />
+                Free Trial shuru karein <ArrowRight className="w-5 h-5" />
               </Link>
               <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener"
                  className="inline-flex items-center gap-2 px-6 py-4 rounded-full font-black text-white bg-[#138808] hover:bg-[#0F7C57] transition-all">
@@ -835,7 +834,7 @@ function Footer() {
               </div>
               <div>
                 <div className="font-black text-lg">AddisonX</div>
-                <div className="text-[10px] font-black tracking-[0.2em] text-[#FFA86B] -mt-0.5">दुकान का सॉफ्टवेयर</div>
+                <div className="text-[10px] font-black tracking-[0.2em] text-[#FFA86B] -mt-0.5">Dukaan ka Software</div>
               </div>
             </div>
             <p className="text-sm text-white/60 leading-relaxed max-w-xs">
@@ -889,7 +888,7 @@ function StickyCTA() {
       <Link href={TRIAL_URL}
          className="flex items-center justify-center gap-2 w-full px-5 py-4 rounded-full font-black text-white bg-gradient-to-r from-[#FF6B35] to-[#E94F18] shadow-2xl shadow-[#FF6B35]/40">
         <Sparkles className="w-5 h-5" />
-        Free Trial शुरू करें — 14 दिन
+        Free Trial shuru karein — 14 din
         <ArrowRight className="w-5 h-5" />
       </Link>
     </div>
