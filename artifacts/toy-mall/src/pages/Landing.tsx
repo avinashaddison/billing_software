@@ -154,7 +154,7 @@ function Nav() {
 /* ─── 4. HERO ──────────────────────────────────────────────── */
 function Hero() {
   return (
-    <section id="top" className="relative pt-12 md:pt-16 pb-24 overflow-hidden">
+    <section id="top" className="relative pt-10 md:pt-12 pb-16 md:pb-20 overflow-hidden">
       {/* Backdrop layers */}
       <div className="absolute inset-0 -z-10 pointer-events-none">
         <div className="absolute inset-0 lp-mandala-bg" />
@@ -205,34 +205,32 @@ function Hero() {
             </span>
           </div>
 
-          {/* MASSIVE multi-color headline */}
-          <h1 className="font-black tracking-tight leading-[0.88]">
-            <span className="block text-6xl md:text-8xl lg:text-[7.5rem] text-slate-900">
-              Dukaan
-            </span>
-            <span className="block text-6xl md:text-8xl lg:text-[7.5rem] mt-1">
+          {/* Multi-color headline */}
+          <h1 className="font-black tracking-tight leading-[0.9]">
+            <span className="block text-5xl md:text-6xl lg:text-7xl text-slate-900">
+              Dukaan{" "}
               <span className="bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-[#B83A0A] bg-clip-text text-transparent">
                 badhao,
               </span>
             </span>
-            <span className="block text-6xl md:text-8xl lg:text-[7.5rem] mt-1">
+            <span className="block text-5xl md:text-6xl lg:text-7xl mt-1">
               <span className="relative inline-block">
                 <span className="lp-gold-foil">tension</span>
-                <span aria-hidden className="absolute -bottom-2 left-0 right-0 h-5 bg-[#F59E0B]/35 rounded-full blur-md -z-0" />
+                <span aria-hidden className="absolute -bottom-1 left-0 right-0 h-4 bg-[#F59E0B]/35 rounded-full blur-md -z-0" />
               </span>
               {" "}
               <span className="lp-text-stroke">nahi!</span>
             </span>
           </h1>
 
-          <p className="mt-7 text-base md:text-xl text-slate-700 leading-relaxed max-w-xl">
+          <p className="mt-5 text-base md:text-lg text-slate-700 leading-relaxed max-w-xl">
             <strong className="text-[#B83A0A]">5 second</strong> mein bill, UPI QR taiyaar, Stock apne aap count.
             <br />
             <span className="text-slate-600">Tally jaisa confusing nahi, WhatsApp jaisa simple.</span>
           </p>
 
           {/* CTAs */}
-          <div className="mt-9 flex flex-wrap items-center gap-3">
+          <div className="mt-7 flex flex-wrap items-center gap-3">
             <Link href={TRIAL_URL}
                className="group relative inline-flex items-center gap-2 px-7 py-4 rounded-full font-black text-white bg-gradient-to-r from-[#FF6B35] via-[#E94F18] to-[#B83A0A] shadow-xl shadow-[#B83A0A]/40 hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#B83A0A]/50 transition-all text-base ring-2 ring-[#F59E0B]/40">
               <Sparkles className="w-5 h-5" />
@@ -253,7 +251,7 @@ function Hero() {
           </div>
 
           {/* Trust micro */}
-          <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <div className="flex items-center gap-1.5 text-slate-600">
               <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>Credit card nahi</span>
             </div>
@@ -268,7 +266,7 @@ function Hero() {
           </div>
 
           {/* Avatar stack with names */}
-          <div className="mt-7 flex items-center gap-3 max-w-md">
+          <div className="mt-5 flex items-center gap-3 max-w-md">
             <div className="flex -space-x-2.5">
               {[
                 { c: "#FF6B35", l: "HS" },
@@ -297,8 +295,13 @@ function Hero() {
           </div>
         </div>
 
-        {/* RIGHT */}
-        <PhoneMockup />
+        {/* RIGHT — phone on mobile, laptop on desktop */}
+        <div className="md:hidden">
+          <PhoneMockup />
+        </div>
+        <div className="hidden md:block">
+          <LaptopMockup />
+        </div>
       </div>
     </section>
   );
@@ -435,6 +438,187 @@ function PhoneMockup() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── 4b. LAPTOP MOCKUP (desktop hero) ────────────────────── */
+function LaptopMockup() {
+  return (
+    <div className="relative w-full max-w-[640px] mx-auto md:ml-auto lp-animate-fade-up" style={{ animationDelay: "150ms" }}>
+      {/* Decorative halo behind laptop */}
+      <div className="absolute inset-[-30px] rounded-[3rem] bg-gradient-to-br from-[#F59E0B]/30 via-transparent to-[#FF6B35]/20 blur-2xl -z-10" />
+
+      {/* "Bharat Verified" sticker */}
+      <div className="absolute -top-4 -left-4 z-30 lp-animate-tilt">
+        <div className="bg-gradient-to-br from-[#138808] to-[#0F7C57] text-white rounded-full px-3 py-2 shadow-xl shadow-[#138808]/30 ring-4 ring-white flex items-center gap-1.5">
+          <span className="text-sm">🇮🇳</span>
+          <span className="text-[10px] font-black uppercase tracking-wider leading-none">Bharat<br />Verified</span>
+        </div>
+      </div>
+
+      {/* Floating cards */}
+      <div className="absolute -left-10 top-12 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#B83A0A]/15 border border-[#FFC8A0]/50 lp-animate-float-y">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-[#138808] text-white flex items-center justify-center">
+            <Check className="w-4 h-4" strokeWidth={3} />
+          </div>
+          <div className="text-xs">
+            <div className="font-black text-slate-900">GST READY</div>
+            <div className="text-slate-500 text-[10px]">CGST + SGST auto</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute -right-8 top-1/3 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#F59E0B]/15 border border-[#FFC8A0]/50 lp-animate-float-y" style={{ animationDelay: "-2s" }}>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-[#8B5CF6] text-white flex items-center justify-center">
+            <QrCode className="w-4 h-4" />
+          </div>
+          <div className="text-xs">
+            <div className="font-black text-slate-900">UPI QR</div>
+            <div className="text-slate-500 text-[10px]">Har bill par</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Live notification slide-in */}
+      <div className="absolute right-[-20px] top-2 z-30 lp-animate-slide-in-right">
+        <div className="bg-white rounded-2xl px-3 py-2 shadow-2xl border-2 border-[#138808]/30 flex items-center gap-2 min-w-[200px]">
+          <div className="w-8 h-8 rounded-full bg-[#138808] text-white flex items-center justify-center">
+            <Banknote className="w-4 h-4" />
+          </div>
+          <div className="text-xs flex-1">
+            <div className="font-black text-slate-900">+ ₹950 just now</div>
+            <div className="text-[#0F7C57] text-[10px] font-bold">Sharma Kirana · UPI</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Laptop body */}
+      <div className="relative">
+        {/* Screen bezel */}
+        <div className="relative bg-slate-900 rounded-t-2xl p-2.5 lp-poster-shadow">
+          {/* Top notch (mac-style) */}
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 w-16 h-1 bg-slate-800 rounded-full z-10" />
+
+          {/* Screen */}
+          <div className="rounded-t-xl bg-[#0B0B11] overflow-hidden aspect-[16/10] relative border border-white/5">
+            {/* Window chrome */}
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5 bg-slate-900">
+              <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500/70" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#4ADE5F]/70" />
+              </div>
+              <div className="ml-3 flex-1 flex items-center gap-1.5 px-3 py-1 rounded-md bg-white/5 text-[9px] text-white/40" style={{ fontFamily: "var(--font-mono)" }}>
+                <Lock className="w-2.5 h-2.5" /> billing.addisonxmedia.com
+              </div>
+              <div className="text-[9px] text-white/30">9:41</div>
+            </div>
+
+            {/* Dashboard content — bento with light cream cards on dark screen */}
+            <div className="p-4 grid grid-cols-12 gap-3 bg-gradient-to-br from-[#0B0B11] via-[#15151E] to-[#0B0B11]">
+
+              {/* Header row */}
+              <div className="col-span-12 flex items-center justify-between mb-1">
+                <div>
+                  <div className="text-[9px] font-black uppercase tracking-widest text-white/40">Aapki dukaan</div>
+                  <div className="text-base font-black text-white leading-tight">Aaj ka overview</div>
+                </div>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-[#138808]/20 text-[#B5FF6A]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#8BFA3E] animate-pulse" /> LIVE
+                </span>
+              </div>
+
+              {/* Big sales tile */}
+              <div className="col-span-7 rounded-xl bg-gradient-to-br from-[#FF6B35]/15 to-[#FF6B35]/5 border border-[#FF6B35]/20 p-3 relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#FF8A3D] to-transparent lp-animate-scan-line" />
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-[8px] font-black tracking-widest uppercase text-[#FF8A3D]">Today's sales</div>
+                    <div className="text-2xl font-black tabular-nums text-white mt-0.5">₹28,450</div>
+                  </div>
+                  <div className="text-[9px] text-[#8BFA3E] font-bold flex items-center gap-0.5">
+                    <TrendingUp className="w-3 h-3" />+52%
+                  </div>
+                </div>
+                <div className="flex items-end gap-1 h-10 mt-2">
+                  {[40, 55, 50, 70, 60, 85, 95, 75, 90].map((h, i) => (
+                    <div key={i} className="flex-1 bg-gradient-to-t from-[#FF6B35] to-[#FFA86B] rounded-t opacity-90"
+                         style={{ height: `${h}%` }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Bills */}
+              <div className="col-span-5 rounded-xl bg-white/[0.03] border border-white/5 p-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="text-[8px] font-black tracking-widest uppercase text-white/40">Bills</div>
+                  <Receipt className="w-3 h-3 text-[#8BFA3E]" />
+                </div>
+                <div>
+                  <div className="text-2xl font-black tabular-nums text-white">47</div>
+                  <div className="text-[9px] text-white/50">vs 38 yesterday</div>
+                </div>
+              </div>
+
+              {/* Mini stats row */}
+              <div className="col-span-3 rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                <div className="text-[8px] font-black uppercase tracking-wider text-white/40">Items</div>
+                <div className="text-lg font-black tabular-nums text-amber-300">134</div>
+              </div>
+              <div className="col-span-3 rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                <div className="text-[8px] font-black uppercase tracking-wider text-white/40">Stock</div>
+                <div className="text-lg font-black tabular-nums text-violet-300">2,140</div>
+              </div>
+              <div className="col-span-3 rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                <div className="text-[8px] font-black uppercase tracking-wider text-white/40">Profit</div>
+                <div className="text-lg font-black tabular-nums text-[#8BFA3E]">₹9.2k</div>
+              </div>
+              <div className="col-span-3 rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                <div className="text-[8px] font-black uppercase tracking-wider text-white/40">Margin</div>
+                <div className="text-lg font-black tabular-nums text-rose-300">32%</div>
+              </div>
+
+              {/* Live bills row */}
+              <div className="col-span-12 rounded-xl bg-white/[0.02] border border-white/5 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#8BFA3E] animate-pulse" />
+                  <div className="text-[8px] font-black tracking-widest uppercase text-white/40">Live bills</div>
+                  <div className="ml-auto text-[8px] text-white/30">just now</div>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    { name: "Coffee Mug + Teddy Bear", amt: "₹449", t: "2s",  p: "UPI" },
+                    { name: "Stationery Bundle",       amt: "₹275", t: "9s",  p: "CASH" },
+                    { name: "Wooden Wind Chime",       amt: "₹598", t: "23s", p: "UPI" },
+                  ].map((b, i) => (
+                    <div key={i} className="flex items-center gap-2 text-[10px]">
+                      <div className="w-0.5 h-5 rounded-full bg-gradient-to-b from-[#FF6B35] to-[#B83A0A]" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-white truncate">{b.name}</div>
+                        <div className="text-white/40 text-[9px]">{b.t} ago</div>
+                      </div>
+                      <div className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-white/5 text-white/60">{b.p}</div>
+                      <div className="font-black tabular-nums text-white w-14 text-right">{b.amt}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Laptop base (keyboard hinge) */}
+        <div className="relative h-3 bg-gradient-to-b from-slate-700 to-slate-900 rounded-b-[1.5rem]"
+             style={{ width: "calc(100% + 28px)", marginLeft: "-14px" }}>
+          {/* Notch */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-1.5 bg-slate-950 rounded-b-md" />
+          {/* Foot */}
+          <div className="absolute -bottom-1 inset-x-1/4 h-1 bg-slate-900 rounded-full opacity-50" />
         </div>
       </div>
     </div>
