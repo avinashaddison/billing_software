@@ -6,6 +6,8 @@ import {
   ShoppingBag, Pill, Shirt, Gem, Smartphone, Wrench,
   PenTool, Heart, Menu, ChevronDown, TrendingUp,
   Headphones, Wifi, Lock, Banknote, Flame, Crown, Trophy,
+  Instagram, Facebook, Youtube, Linkedin, Twitter, Mail, Phone,
+  MapPin, Globe, Award,
 } from "lucide-react";
 
 const WHATSAPP_NUMBER = "919999999999";
@@ -1002,44 +1004,134 @@ function FinalCTA() {
 
 /* ─── 15. FOOTER ───────────────────────────────────────────── */
 function Footer() {
+  const cities = [
+    "Mumbai", "Delhi", "Bengaluru", "Pune", "Indore", "Hyderabad",
+    "Jaipur", "Ahmedabad", "Lucknow", "Kanpur", "Surat", "Patna",
+    "Bhopal", "Ranchi", "Nagpur", "Kochi", "Coimbatore", "Chandigarh",
+  ];
+
   return (
-    <footer className="bg-slate-900 text-white pt-16 pb-8">
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
-        <div className="flex flex-wrap items-center justify-center gap-6 pb-10 border-b border-white/10 text-xs font-bold uppercase tracking-widest text-white/50">
-          <div className="flex items-center gap-2"><Lock className="w-4 h-4 text-[#FFA86B]" /> Bank-grade Encryption</div>
-          <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-[#B5FF6A]" /> GST Certified</div>
-          <div className="flex items-center gap-2"><Headphones className="w-4 h-4 text-amber-300" /> Live Support</div>
-          <div className="flex items-center gap-2"><Wifi className="w-4 h-4 text-violet-300" /> Works Offline</div>
-          <div className="flex items-center gap-2"><span className="text-base">🇮🇳</span> Made in Bharat</div>
+    <footer className="relative bg-slate-900 text-white pt-20 pb-8 overflow-hidden">
+      {/* Scalloped/dotted top edge */}
+      <div aria-hidden className="absolute top-0 inset-x-0 h-6 lp-section-divider opacity-50" />
+
+      {/* Background orbs */}
+      <div aria-hidden className="absolute inset-0 -z-0 pointer-events-none">
+        <div className="absolute top-1/4 -left-32 w-96 h-96 rounded-full bg-[#FF6B35]/10 blur-3xl lp-animate-float-orb" />
+        <div className="absolute bottom-0 -right-32 w-96 h-96 rounded-full bg-[#F59E0B]/10 blur-3xl lp-animate-float-orb" style={{ animationDelay: "-9s" }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[#138808]/5 blur-3xl" />
+        {/* Faint dot grid */}
+        <div className="absolute inset-0 opacity-[0.06]"
+             style={{
+               backgroundImage: "radial-gradient(rgba(255,255,255,0.6) 1px, transparent 1px)",
+               backgroundSize: "32px 32px",
+             }} />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
+
+        {/* ─ 1. Newsletter / connect card ─ */}
+        <div className="rounded-3xl bg-gradient-to-br from-[#FF6B35]/15 via-slate-800/40 to-[#138808]/15 backdrop-blur p-6 md:p-10 border border-white/10 mb-14 relative overflow-hidden">
+          <div aria-hidden className="absolute top-0 right-0 w-64 h-64 rounded-full bg-[#F59E0B]/10 blur-3xl" />
+          <div className="relative grid md:grid-cols-[1.3fr_1fr] gap-8 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#F59E0B]/20 text-[#FBBF24] border border-[#F59E0B]/40 mb-4">
+                <Sparkles className="w-3 h-3" /> Weekly tips for dukaandaars
+              </div>
+              <h3 className="text-3xl md:text-4xl font-black leading-tight">
+                Dukaan-growth tips, <span className="lp-gold-foil">har Sunday subah.</span>
+              </h3>
+              <p className="mt-2 text-sm md:text-base text-white/60 max-w-md">
+                Free WhatsApp digest — GST updates, festival sale ideas, real shopkeeper stories. Spam nahi, unsubscribe kabhi bhi.
+              </p>
+            </div>
+            <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=Subscribe%20Sunday%20Tips`}
+               target="_blank" rel="noopener"
+               className="group inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-black text-white bg-[#138808] hover:bg-[#0F7C57] hover:-translate-y-0.5 transition-all shadow-xl shadow-[#138808]/30 ring-2 ring-[#138808]/40 text-base">
+              <MessageCircle className="w-5 h-5" />
+              <span>Join WhatsApp list</span>
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </a>
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-10 mt-10">
-          <div>
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#F59E0B] via-[#FF6B35] to-[#B83A0A] flex items-center justify-center text-white font-black ring-2 ring-white/10">
-                <span className="text-lg">⚡</span>
+        {/* ─ 2. Trust badge strip ─ */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-14">
+          {[
+            { Icon: Lock,       label: "Bank-grade",      sub: "encryption",       color: "text-[#FFA86B]" },
+            { Icon: Shield,     label: "GST Certified",   sub: "audit-ready",      color: "text-[#B5FF6A]" },
+            { Icon: Headphones, label: "Live Support",    sub: "12-min avg reply", color: "text-amber-300" },
+            { Icon: Wifi,       label: "Works Offline",   sub: "auto-sync",        color: "text-violet-300" },
+            { Icon: Award,      label: "100+ shops",      sub: "4.9 stars",        color: "text-rose-300" },
+          ].map((b, i) => (
+            <div key={i} className="px-3 py-3 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-xl bg-white/[0.05] flex items-center justify-center shrink-0 ${b.color}`}>
+                <b.Icon className="w-4 h-4" />
               </div>
-              <div>
-                <div className="font-black text-lg">AddisonX</div>
-                <div className="text-[10px] font-black tracking-[0.2em] text-[#FFA86B] -mt-0.5">Dukaan ka Software</div>
+              <div className="min-w-0">
+                <div className="text-xs font-black text-white truncate">{b.label}</div>
+                <div className="text-[10px] text-white/40 uppercase tracking-wider truncate">{b.sub}</div>
               </div>
             </div>
-            <p className="text-sm text-white/60 leading-relaxed max-w-xs">
-              India's simplest billing software. Made by shopkeepers, for shopkeepers.
+          ))}
+        </div>
+
+        {/* ─ 3. Main grid ─ */}
+        <div className="grid md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-10">
+
+          {/* Brand col */}
+          <div>
+            <a href="#top" className="flex items-center gap-2.5 mb-5 group">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#F59E0B] via-[#FF6B35] to-[#B83A0A] flex items-center justify-center text-white font-black ring-2 ring-white/10 group-hover:scale-105 transition-transform shadow-lg shadow-[#B83A0A]/30">
+                  <span className="text-xl">⚡</span>
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#138808] ring-2 ring-slate-900" />
+              </div>
+              <div>
+                <div className="font-black text-xl">AddisonX</div>
+                <div className="text-[10px] font-black tracking-[0.2em] text-[#FFA86B] -mt-0.5">Dukaan ka Software</div>
+              </div>
+            </a>
+            <p className="text-sm text-white/65 leading-relaxed max-w-xs mb-5">
+              India's simplest billing software. Made by shopkeepers, for shopkeepers — not by accountants for CAs.
             </p>
+
+            {/* Social */}
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-3">Follow us</p>
+            <div className="flex items-center gap-2">
+              {[
+                { Icon: Instagram, label: "Instagram", color: "hover:bg-gradient-to-br hover:from-purple-500 hover:via-pink-500 hover:to-yellow-400" },
+                { Icon: Youtube,   label: "YouTube",   color: "hover:bg-red-500" },
+                { Icon: Facebook,  label: "Facebook",  color: "hover:bg-blue-500" },
+                { Icon: Twitter,   label: "X",         color: "hover:bg-slate-700" },
+                { Icon: Linkedin,  label: "LinkedIn",  color: "hover:bg-blue-600" },
+              ].map((s, i) => (
+                <a key={i} href="#" aria-label={s.label}
+                   className={`w-9 h-9 rounded-xl bg-white/[0.06] border border-white/10 hover:border-white/20 flex items-center justify-center text-white/70 hover:text-white transition-all ${s.color}`}>
+                  <s.Icon className="w-4 h-4" />
+                </a>
+              ))}
+            </div>
           </div>
 
+          {/* Link columns */}
           {[
-            { title: "Product",    items: ["Features", "Pricing", "Demo", "Sign In"] },
-            { title: "Industries", items: ["Kirana", "Gift Shop", "Pharmacy", "Mobile"] },
-            { title: "Company",    items: ["About", "Blog", "Terms", "Privacy", "Refund"] },
+            { title: "Product",    items: ["Features", "Pricing", "Demo", "Sign In", "Status"] },
+            { title: "Industries", items: ["Kirana", "Gift Shop", "Pharmacy", "Mobile", "Fashion"] },
+            { title: "Company",    items: ["About us", "Blog", "Terms", "Privacy", "Refund"] },
           ].map((col, i) => (
             <div key={i}>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-4">{col.title}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-4 flex items-center gap-1.5">
+                <span className="w-4 h-px bg-[#FFA86B]" />
+                {col.title}
+              </p>
               <ul className="space-y-2.5">
                 {col.items.map((it, j) => (
                   <li key={j}>
-                    <a href="#" className="text-sm text-white/70 hover:text-[#FFA86B] transition-colors">{it}</a>
+                    <a href="#" className="text-sm text-white/70 hover:text-[#FFA86B] hover:translate-x-1 inline-block transition-all">
+                      {it}
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -1047,12 +1139,72 @@ function Footer() {
           ))}
         </div>
 
-        <div className="mt-12 pt-6 border-t border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-xs text-white/40">
-          <p>© {new Date().getFullYear()} AddisonX Media. All rights reserved.</p>
-          <div className="flex items-center gap-3">
-            <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="hover:text-[#FFA86B] font-bold">+91 99999 99999</a>
-            <span className="text-white/20">·</span>
-            <a href="mailto:hello@addisonxmedia.com" className="hover:text-[#FFA86B] font-bold">hello@addisonxmedia.com</a>
+        {/* ─ 4. Direct contact row ─ */}
+        <div className="mt-12 grid md:grid-cols-3 gap-3">
+          <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener"
+             className="group flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/[0.04] border border-white/10 hover:bg-[#138808]/15 hover:border-[#138808]/40 transition-all">
+            <div className="w-10 h-10 rounded-xl bg-[#138808] text-white flex items-center justify-center">
+              <MessageCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-wider text-white/40">WhatsApp</div>
+              <div className="font-black text-white">+91 99999 99999</div>
+            </div>
+          </a>
+          <a href="mailto:hello@addisonxmedia.com"
+             className="group flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/[0.04] border border-white/10 hover:bg-[#FF6B35]/15 hover:border-[#FF6B35]/40 transition-all">
+            <div className="w-10 h-10 rounded-xl bg-[#FF6B35] text-white flex items-center justify-center">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-wider text-white/40">Email</div>
+              <div className="font-black text-white text-sm truncate">hello@addisonxmedia.com</div>
+            </div>
+          </a>
+          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/[0.04] border border-white/10">
+            <div className="w-10 h-10 rounded-xl bg-[#F59E0B] text-white flex items-center justify-center">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-wider text-white/40">HQ</div>
+              <div className="font-black text-white text-sm">Mumbai · Ranchi</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ─ 5. Cities marquee ─ */}
+        <div className="mt-12 pt-8 border-t border-white/10 overflow-hidden">
+          <p className="text-center text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-4">
+            Dukaandaars in
+          </p>
+          <div className="lp-marquee gap-8 text-sm text-white/40">
+            {[...cities, ...cities].map((c, i) => (
+              <span key={i} className="whitespace-nowrap flex items-center gap-2">
+                <MapPin className="w-3.5 h-3.5 text-[#FFA86B]" />
+                {c}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* ─ 6. Bottom row ─ */}
+        <div className="mt-10 pt-6 border-t border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-xs">
+          <p className="text-white/40">
+            © {new Date().getFullYear()} AddisonX Media · Built with <span className="text-[#FF6B35]">♥</span> in <span className="text-[#FFA86B] font-bold">Bharat 🇮🇳</span>
+          </p>
+          <div className="flex items-center gap-2 text-white/40">
+            <span className="font-bold uppercase tracking-wider text-[10px]">We accept</span>
+            <span className="px-2 py-1 rounded-md bg-white/5 text-[10px] font-black text-white border border-white/10">UPI</span>
+            <span className="px-2 py-1 rounded-md bg-white/5 text-[10px] font-black text-white border border-white/10">Razorpay</span>
+            <span className="px-2 py-1 rounded-md bg-white/5 text-[10px] font-black text-white border border-white/10">VISA</span>
+            <span className="px-2 py-1 rounded-md bg-white/5 text-[10px] font-black text-white border border-white/10">Mastercard</span>
+          </div>
+        </div>
+
+        {/* ─ 7. Giant brand word (tasteful footer flourish) ─ */}
+        <div aria-hidden className="mt-10 select-none pointer-events-none overflow-hidden">
+          <div className="text-center font-black tracking-tight leading-none text-[8rem] md:text-[14rem] lg:text-[18rem] lp-text-stroke opacity-30">
+            AddisonX
           </div>
         </div>
       </div>
