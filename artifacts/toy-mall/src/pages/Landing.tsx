@@ -447,16 +447,11 @@ function PhoneMockup() {
 /* ─── 4b. LAPTOP MOCKUP (desktop hero) ────────────────────── */
 function LaptopMockup() {
   return (
-    <div
-      className="relative w-full max-w-[680px] mx-auto md:ml-auto lp-animate-fade-up"
-      style={{ animationDelay: "150ms", perspective: "2200px" }}
-    >
+    <div className="relative w-full max-w-[640px] mx-auto md:ml-auto lp-animate-fade-up" style={{ animationDelay: "150ms" }}>
       {/* Decorative halo behind laptop */}
-      <div className="absolute inset-[-30px] rounded-[3rem] bg-gradient-to-br from-[#F59E0B]/35 via-[#FFA86B]/15 to-[#FF6B35]/25 blur-3xl -z-10" />
-      {/* Soft saffron under-glow (anchors the floating laptop) */}
-      <div className="absolute left-1/2 -translate-x-1/2 bottom-[-40px] w-[70%] h-16 rounded-[50%] bg-[#FF6B35]/25 blur-2xl -z-10" />
+      <div className="absolute inset-[-30px] rounded-[3rem] bg-gradient-to-br from-[#F59E0B]/30 via-transparent to-[#FF6B35]/20 blur-2xl -z-10" />
 
-      {/* "Bharat Verified" sticker — kept flat (outside the 3D scene) */}
+      {/* "Bharat Verified" sticker */}
       <div className="absolute -top-4 -left-4 z-30 lp-animate-tilt">
         <div className="bg-gradient-to-br from-[#138808] to-[#0F7C57] text-white rounded-full px-3 py-2 shadow-xl shadow-[#138808]/30 ring-4 ring-white flex items-center gap-1.5">
           <span className="text-sm">🇮🇳</span>
@@ -464,8 +459,8 @@ function LaptopMockup() {
         </div>
       </div>
 
-      {/* Floating cards — flat, readable */}
-      <div className="absolute -left-10 top-16 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#B83A0A]/15 border border-[#FFC8A0]/50 lp-animate-float-y">
+      {/* Floating cards */}
+      <div className="absolute -left-10 top-12 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#B83A0A]/15 border border-[#FFC8A0]/50 lp-animate-float-y">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-[#138808] text-white flex items-center justify-center">
             <Check className="w-4 h-4" strokeWidth={3} />
@@ -477,7 +472,7 @@ function LaptopMockup() {
         </div>
       </div>
 
-      <div className="absolute -right-6 top-1/3 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#F59E0B]/15 border border-[#FFC8A0]/50 lp-animate-float-y" style={{ animationDelay: "-2s" }}>
+      <div className="absolute -right-8 top-1/3 z-20 bg-white rounded-2xl px-3 py-2 shadow-xl shadow-[#F59E0B]/15 border border-[#FFC8A0]/50 lp-animate-float-y" style={{ animationDelay: "-2s" }}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-[#8B5CF6] text-white flex items-center justify-center">
             <QrCode className="w-4 h-4" />
@@ -502,27 +497,15 @@ function LaptopMockup() {
         </div>
       </div>
 
-      {/* ── 3D-tilted laptop scene (white aluminium chassis) ── */}
-      <div
-        className="relative"
-        style={{
-          transform: "rotateY(-14deg) rotateX(6deg)",
-          transformStyle: "preserve-3d",
-          transformOrigin: "center center",
-        }}
-      >
-        {/* Lid / screen bezel — white silver */}
-        <div className="relative rounded-t-[1.75rem] p-3 bg-gradient-to-b from-white via-slate-50 to-slate-200 ring-1 ring-slate-300/70 shadow-[0_50px_120px_-35px_rgba(15,23,42,0.55),inset_0_1px_0_rgba(255,255,255,0.9)]">
-          {/* Specular highlight on top edge */}
-          <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-          {/* Camera + brand etch on bezel */}
-          <div className="absolute top-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
-            <div className="w-1 h-1 rounded-full bg-slate-400/80" />
-            <div className="text-[7px] font-black tracking-[0.3em] text-slate-400 uppercase">AddisonX</div>
-          </div>
+      {/* Laptop body */}
+      <div className="relative">
+        {/* Screen bezel */}
+        <div className="relative bg-slate-900 rounded-t-2xl p-2.5 lp-poster-shadow">
+          {/* Top notch (mac-style) */}
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 w-16 h-1 bg-slate-800 rounded-full z-10" />
 
-          {/* Screen — dark dashboard pops against white frame */}
-          <div className="mt-3 rounded-[1.1rem] bg-[#0B0B11] overflow-hidden aspect-[16/10] relative ring-1 ring-slate-300/50 shadow-[inset_0_0_0_2px_rgba(255,255,255,0.04)]">
+          {/* Screen */}
+          <div className="rounded-t-xl bg-[#0B0B11] overflow-hidden aspect-[16/10] relative border border-white/5">
             {/* Window chrome */}
             <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5 bg-slate-900">
               <div className="flex gap-1.5">
@@ -629,27 +612,14 @@ function LaptopMockup() {
           </div>
         </div>
 
-        {/* Laptop base — white aluminium hinge + deck */}
-        <div className="relative">
-          {/* Hinge slot */}
-          <div className="mx-auto h-1.5 w-[96%] bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400/60 rounded-b-md" />
-          {/* Deck (slightly wider than the lid for that real-laptop silhouette) */}
-          <div
-            className="relative h-4 rounded-b-[1.75rem] bg-gradient-to-b from-slate-100 via-white to-slate-300 ring-1 ring-slate-300/70 shadow-[0_30px_60px_-20px_rgba(15,23,42,0.55),inset_0_1px_0_rgba(255,255,255,0.95)]"
-            style={{ width: "calc(100% + 32px)", marginLeft: "-16px" }}
-          >
-            {/* Trackpad notch */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-1.5 rounded-b-md bg-slate-300/80" />
-            {/* Side highlight */}
-            <div className="absolute inset-x-10 bottom-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent" />
-            {/* Rubber feet */}
-            <div className="absolute -bottom-1 left-[16%] w-1.5 h-1.5 rounded-full bg-slate-400/70" />
-            <div className="absolute -bottom-1 right-[16%] w-1.5 h-1.5 rounded-full bg-slate-400/70" />
-          </div>
+        {/* Laptop base (keyboard hinge) */}
+        <div className="relative h-3 bg-gradient-to-b from-slate-700 to-slate-900 rounded-b-[1.5rem]"
+             style={{ width: "calc(100% + 28px)", marginLeft: "-14px" }}>
+          {/* Notch */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-1.5 bg-slate-950 rounded-b-md" />
+          {/* Foot */}
+          <div className="absolute -bottom-1 inset-x-1/4 h-1 bg-slate-900 rounded-full opacity-50" />
         </div>
-
-        {/* Soft floor reflection beneath the tilted laptop */}
-        <div className="mx-auto mt-3 h-8 w-[78%] rounded-[50%] bg-slate-900/35 blur-2xl opacity-80" />
       </div>
     </div>
   );
