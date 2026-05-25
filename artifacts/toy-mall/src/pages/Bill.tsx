@@ -285,23 +285,22 @@ export default function Bill() {
         const contentWidth = paperWidth === "58mm" ? "54mm" : "72mm";
 
         // ── Why a giant fixed page height instead of `auto` ──
-        // The CSS spec says `size: 80mm auto` should produce one
-        // page-as-tall-as-the-content. In practice, many Windows thermal
-        // printer drivers (incl. the generic "80mm Series Printer") report a
-        // FIXED default paper length (often ~297mm). Chrome then paginates
-        // against that fixed length, so any receipt taller than ~297mm gets
-        // split into "2 sheets" in the print preview — which on a continuous
-        // thermal roll means the user gets two separate cut receipts.
+        // `size: 80mm auto` is the spec-compliant way to ask the browser
+        // for "one page, as tall as the content". In practice, many
+        // Windows thermal drivers (incl. the generic "80mm Series Printer")
+        // report a FIXED default paper length (often ~297mm), and Chrome
+        // paginates against that — so any receipt taller than ~297mm is
+        // split into 2 sheets in the print preview, which becomes 2 cut
+        // receipts on a continuous roll.
         //
-        // 3276mm is Chromium's max accepted page dimension; declaring this
-        // forces the receipt onto a SINGLE logical page no matter how many
-        // line items it has. The thermal printer only feeds paper for the
-        // marks actually rendered, so there is no wasted blank tape.
-        const pageHeight = "3276mm";
+        // Declaring a very tall page height (3276mm is Chromium's max)
+        // forces the receipt onto a single logical page. The thermal
+        // printer only feeds paper for actual ink marks, so no blank
+        // tape is wasted.
         return (
           <style>{`
             @page {
-              size: ${paperWidth} ${pageHeight};
+              size: ${paperWidth} 3276mm;
               margin: 0;
             }
 
@@ -329,10 +328,10 @@ export default function Bill() {
                 overflow: visible !important;
               }
 
-              /* Single-page receipt: keep the entire bill together so the
-                 browser never inserts an artificial cut between sections.
-                 Combined with the giant @page height above, this guarantees
-                 one continuous print on the thermal roll. */
+              /* The receipt flows in NORMAL document order (not fixed) so
+                 a long bill paginates across the continuous thermal roll
+                 instead of being clipped to a single 'page' by the browser
+                 print engine. */
               .receipt-print-only {
                 position: static !important;
                 display: block !important;
@@ -346,33 +345,12 @@ export default function Bill() {
                 border: none !important;
                 border-radius: 0 !important;
                 overflow: visible !important;
-                break-inside: avoid !important;
-                page-break-inside: avoid !important;
-                break-before: avoid !important;
-                page-break-before: avoid !important;
-                break-after: avoid !important;
-                page-break-after: avoid !important;
               }
 
               /* Force every descendant to honour border-box so a stray
                  padding never bumps the outer width past ${contentWidth}. */
               .receipt-print-only * {
                 box-sizing: border-box !important;
-              }
-
-              /* Belt-and-braces: forbid the browser from breaking inside
-                 ANY block of the receipt. With the giant page height this
-                 is rarely needed, but it protects against driver/OS combos
-                 that ignore the @page size. */
-              .receipt-print-only,
-              .receipt-print-only > *,
-              .receipt-print-only table,
-              .receipt-print-only tr,
-              .receipt-print-only tbody,
-              .receipt-print-only thead,
-              .receipt-print-only tfoot {
-                break-inside: avoid !important;
-                page-break-inside: avoid !important;
               }
 
               /* Kill the screen-only my-6 + py-4 padding above the store
@@ -382,6 +360,16 @@ export default function Bill() {
                 padding-bottom: 1mm !important;
                 padding-left: 1.5mm !important;
                 padding-right: 1.5mm !important;
+              }
+
+              /* Don't split an item row across a page break. Browsers
+                 paginate based on @page; this hint keeps each line item
+                 intact. */
+              .receipt-print-only tr,
+              .receipt-print-only tbody,
+              .receipt-print-only thead {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
               }
 
               /* Force black-fill GRAND TOTAL bar to render solid in browser print */
