@@ -180,9 +180,9 @@ function Hero() {
 
 function DashboardMockup({ tracked }: { tracked: number }) {
   return (
-    <div className="relative max-w-5xl mx-auto">
-      {/* Floating accent badges around mockup */}
-      <div className="absolute -top-4 -left-2 md:-left-12 z-20 glass rounded-2xl px-3 py-2 animate-float-y">
+    <div className="relative max-w-5xl mx-auto" style={{ perspective: "1800px" }}>
+      {/* Floating accent badges around the laptop */}
+      <div className="absolute -top-4 -left-2 md:-left-12 z-30 glass rounded-2xl px-3 py-2 animate-float-y">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-saffron-500 flex items-center justify-center text-white">
             <ScanLine className="w-4 h-4" />
@@ -194,7 +194,7 @@ function DashboardMockup({ tracked }: { tracked: number }) {
         </div>
       </div>
 
-      <div className="absolute -top-2 right-0 md:-right-10 z-20 glass rounded-2xl px-3 py-2 animate-float-y" style={{ animationDelay: "-2s" }}>
+      <div className="absolute top-8 right-0 md:-right-10 z-30 glass rounded-2xl px-3 py-2 animate-float-y" style={{ animationDelay: "-2s" }}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-volt-500 flex items-center justify-center text-ink-950">
             <QrCode className="w-4 h-4" />
@@ -206,7 +206,7 @@ function DashboardMockup({ tracked }: { tracked: number }) {
         </div>
       </div>
 
-      <div className="absolute -bottom-4 left-1/4 z-20 glass rounded-2xl px-3 py-2 animate-float-y" style={{ animationDelay: "-1s" }}>
+      <div className="absolute -bottom-2 left-1/4 z-30 glass rounded-2xl px-3 py-2 animate-float-y" style={{ animationDelay: "-1s" }}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-violet-500 flex items-center justify-center text-white">
             <BarChart3 className="w-4 h-4" />
@@ -218,88 +218,121 @@ function DashboardMockup({ tracked }: { tracked: number }) {
         </div>
       </div>
 
-      {/* The dashboard card */}
-      <div className="rounded-3xl glass p-2 md:p-3 shadow-2xl conic-border">
-        <div className="rounded-2xl bg-ink-900 overflow-hidden border border-white/5">
-          {/* Window chrome */}
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
-            <div className="flex gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/70" />
-              <div className="w-2.5 h-2.5 rounded-full bg-volt-500/70" />
-            </div>
-            <div className="ml-auto text-[10px] font-mono text-white/30">billing.addisonxmedia.com</div>
+      {/* ── White Laptop ────────────────────────────────────── */}
+      <div
+        className="relative mx-auto"
+        style={{ transform: "rotateX(6deg)", transformStyle: "preserve-3d" }}
+      >
+        {/* Lid / screen housing */}
+        <div className="relative rounded-[28px] p-3 md:p-4 bg-gradient-to-b from-white to-slate-100 shadow-[0_50px_120px_-30px_rgba(0,0,0,0.55)] ring-1 ring-slate-200">
+          {/* Camera dot on top bezel */}
+          <div className="absolute top-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-slate-400/80" />
+            <div className="text-[8px] font-bold tracking-[0.2em] text-slate-400 uppercase">AddisonX</div>
           </div>
 
-          {/* Body — bento style */}
-          <div className="p-4 md:p-6 grid grid-cols-12 gap-3 md:gap-4">
-
-            {/* Big sale tile */}
-            <div className="col-span-12 md:col-span-7 rounded-2xl bg-gradient-to-br from-saffron-500/15 to-saffron-500/5 border border-saffron-500/20 p-5 relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-saffron-400 to-transparent animate-scan-line" />
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="text-[10px] font-black tracking-widest uppercase text-saffron-400">Today's Sales</div>
-                  <div className="mt-1 text-3xl md:text-4xl font-black tabular-nums text-white">
-                    ₹{tracked.toLocaleString("en-IN")}
-                  </div>
-                </div>
-                <div className="text-[11px] text-volt-400 font-bold flex items-center gap-1">
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  +24%
-                </div>
+          {/* Screen */}
+          <div className="mt-4 rounded-[18px] bg-white overflow-hidden border border-slate-200 shadow-inner">
+            {/* Browser chrome (light) */}
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 bg-slate-50">
+              <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
               </div>
-              {/* Mini bar chart */}
-              <div className="flex items-end gap-1.5 h-16 mt-3">
-                {[35, 55, 40, 70, 50, 85, 60, 75, 90, 55, 80, 95].map((h, i) => (
-                  <div key={i} className="flex-1 bg-gradient-to-t from-saffron-500 to-saffron-300 rounded-t opacity-90"
-                       style={{ height: `${h}%` }} />
-                ))}
+              <div className="mx-auto px-3 py-1 rounded-full bg-white border border-slate-200 text-[10px] font-mono text-slate-500 flex items-center gap-1.5">
+                <Lock className="w-3 h-3 text-emerald-500" />
+                billing.addisonxmedia.com
               </div>
-              <div className="flex justify-between mt-1 text-[8px] font-bold text-white/30">
-                <span>00</span><span>02</span><span>04</span><span>06</span><span>08</span><span>10</span><span>12</span><span>14</span><span>16</span><span>18</span><span>20</span><span>22</span>
-              </div>
+              <div className="w-12" />
             </div>
 
-            {/* Bills count */}
-            <div className="col-span-6 md:col-span-5 rounded-2xl bg-white/[0.03] border border-white/5 p-5 flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <div className="text-[10px] font-black tracking-widest uppercase text-white/40">Bills</div>
-                <Receipt className="w-4 h-4 text-volt-400" />
-              </div>
-              <div>
-                <div className="text-4xl md:text-5xl font-black tabular-nums text-white">134</div>
-                <div className="text-xs text-white/50 mt-1">vs 108 yesterday</div>
-              </div>
-            </div>
+            {/* Body — bento style (light) */}
+            <div className="p-4 md:p-6 grid grid-cols-12 gap-3 md:gap-4 bg-gradient-to-br from-white via-slate-50 to-white">
 
-            {/* Recent bill row */}
-            <div className="col-span-12 rounded-2xl bg-white/[0.02] border border-white/5 p-3 md:p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Activity className="w-3.5 h-3.5 text-volt-400" />
-                <div className="text-[10px] font-black tracking-widest uppercase text-white/40">Live Bills</div>
-                <div className="ml-auto text-[10px] text-white/30">just now</div>
-              </div>
-              <div className="space-y-2">
-                {[
-                  { name: "Coffee Mug + Teddy Bear",  amt: "₹449",   t: "2s ago",  p: "UPI" },
-                  { name: "Stationery Bundle",        amt: "₹275",   t: "9s ago",  p: "CASH" },
-                  { name: "Wooden Wind Chime",        amt: "₹598",   t: "23s ago", p: "UPI" },
-                ].map((b, i) => (
-                  <div key={i} className="flex items-center gap-3 text-xs">
-                    <div className="w-1 h-8 rounded-full bg-gradient-to-b from-saffron-500 to-saffron-700" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-white truncate">{b.name}</div>
-                      <div className="text-white/40 text-[10px]">{b.t}</div>
+              {/* Big sale tile */}
+              <div className="col-span-12 md:col-span-7 rounded-2xl bg-gradient-to-br from-saffron-50 to-white border border-saffron-200/70 p-5 relative overflow-hidden shadow-sm">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-saffron-400 to-transparent animate-scan-line" />
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <div className="text-[10px] font-black tracking-widest uppercase text-saffron-600">Today's Sales</div>
+                    <div className="mt-1 text-3xl md:text-4xl font-black tabular-nums text-slate-900">
+                      ₹{tracked.toLocaleString("en-IN")}
                     </div>
-                    <div className="text-[9px] font-black px-2 py-0.5 rounded-full bg-white/5 text-white/60">{b.p}</div>
-                    <div className="font-black tabular-nums text-white text-sm w-16 text-right">{b.amt}</div>
                   </div>
-                ))}
+                  <div className="text-[11px] text-emerald-600 font-bold flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-100">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    +24%
+                  </div>
+                </div>
+                {/* Mini bar chart */}
+                <div className="flex items-end gap-1.5 h-16 mt-3">
+                  {[35, 55, 40, 70, 50, 85, 60, 75, 90, 55, 80, 95].map((h, i) => (
+                    <div key={i} className="flex-1 bg-gradient-to-t from-saffron-500 to-saffron-300 rounded-t"
+                         style={{ height: `${h}%` }} />
+                  ))}
+                </div>
+                <div className="flex justify-between mt-1 text-[8px] font-bold text-slate-400">
+                  <span>00</span><span>02</span><span>04</span><span>06</span><span>08</span><span>10</span><span>12</span><span>14</span><span>16</span><span>18</span><span>20</span><span>22</span>
+                </div>
+              </div>
+
+              {/* Bills count */}
+              <div className="col-span-6 md:col-span-5 rounded-2xl bg-white border border-slate-200 p-5 flex flex-col justify-between shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] font-black tracking-widest uppercase text-slate-500">Bills</div>
+                  <div className="w-7 h-7 rounded-lg bg-volt-100 flex items-center justify-center">
+                    <Receipt className="w-4 h-4 text-volt-700" />
+                  </div>
+                </div>
+                <div>
+                  <div className="text-4xl md:text-5xl font-black tabular-nums text-slate-900">134</div>
+                  <div className="text-xs text-slate-500 mt-1">vs 108 yesterday</div>
+                </div>
+              </div>
+
+              {/* Recent bill row */}
+              <div className="col-span-12 rounded-2xl bg-white border border-slate-200 p-3 md:p-4 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <Activity className="w-3.5 h-3.5 text-emerald-500" />
+                  <div className="text-[10px] font-black tracking-widest uppercase text-slate-500">Live Bills</div>
+                  <div className="ml-auto text-[10px] text-slate-400">just now</div>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { name: "Coffee Mug + Teddy Bear",  amt: "₹449",   t: "2s ago",  p: "UPI" },
+                    { name: "Stationery Bundle",        amt: "₹275",   t: "9s ago",  p: "CASH" },
+                    { name: "Wooden Wind Chime",        amt: "₹598",   t: "23s ago", p: "UPI" },
+                  ].map((b, i) => (
+                    <div key={i} className="flex items-center gap-3 text-xs">
+                      <div className="w-1 h-8 rounded-full bg-gradient-to-b from-saffron-500 to-saffron-700" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-slate-900 truncate">{b.name}</div>
+                        <div className="text-slate-400 text-[10px]">{b.t}</div>
+                      </div>
+                      <div className={`text-[9px] font-black px-2 py-0.5 rounded-full ${b.p === "UPI" ? "bg-volt-100 text-volt-700" : "bg-slate-100 text-slate-600"}`}>{b.p}</div>
+                      <div className="font-black tabular-nums text-slate-900 text-sm w-16 text-right">{b.amt}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Hinge / base of the laptop */}
+        <div className="relative mx-auto -mt-1">
+          {/* Hinge slot */}
+          <div className="mx-auto h-2 w-[94%] rounded-b-2xl bg-gradient-to-b from-slate-200 to-slate-300" />
+          {/* Base deck */}
+          <div className="relative mx-auto h-4 md:h-5 w-[102%] -ml-[1%] rounded-b-[28px] bg-gradient-to-b from-slate-100 via-white to-slate-200 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.45)] ring-1 ring-slate-200">
+            {/* Trackpad notch */}
+            <div className="absolute left-1/2 top-0 -translate-x-1/2 w-24 md:w-32 h-1.5 rounded-b-xl bg-slate-300/80" />
+          </div>
+        </div>
+
+        {/* Soft floor reflection */}
+        <div className="mx-auto mt-2 h-6 w-[80%] rounded-[50%] bg-black/40 blur-2xl opacity-50" />
       </div>
     </div>
   );
