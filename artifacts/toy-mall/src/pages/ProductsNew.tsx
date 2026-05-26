@@ -221,6 +221,29 @@ export default function CreateProduct() {
     );
   };
 
+  /* Move focus to the next input on Enter (instead of submitting the form) */
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key !== "Enter") return;
+    const target = e.target as HTMLElement;
+    // Allow submit button Enter to actually submit
+    if (target.tagName === "BUTTON" && (target as HTMLButtonElement).type === "submit") return;
+    // Allow textarea Enter to add newlines
+    if (target.tagName === "TEXTAREA") return;
+
+    e.preventDefault();
+    const formEl = e.currentTarget;
+    const focusable = Array.from(
+      formEl.querySelectorAll<HTMLElement>(
+        'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+      )
+    ).filter((el) => el.offsetParent !== null && el.tabIndex !== -1);
+
+    const idx = focusable.indexOf(target);
+    if (idx >= 0 && idx < focusable.length - 1) {
+      focusable[idx + 1].focus();
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* ── Page header ── */}
@@ -238,7 +261,7 @@ export default function CreateProduct() {
           {/* ─── LEFT: Form ─────────────────────────────────────────── */}
           <div>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleFormKeyDown} className="space-y-5">
 
                 {/* ── Basic Info ── */}
                 <div className="p-5 bg-card border rounded-2xl space-y-5">
