@@ -48,7 +48,7 @@ export default function ProductDetail() {
   const [savingImg, setSavingImg]       = useState(false);
   const [editOpen, setEditOpen]         = useState(false);
   const [editSaving, setEditSaving]     = useState(false);
-  const [editForm, setEditForm]         = useState({ name: "", price: "", salePrice: "", salePriceUntil: "", purchasePrice: "", category: "", lowStockThreshold: "", supplierId: "" });
+  const [editForm, setEditForm]         = useState({ name: "", price: "", salePrice: "", salePriceUntil: "", purchasePrice: "", category: "", lowStockThreshold: "", supplierId: "", barcode: "" });
   const [printing, setPrinting]             = useState(false);
   const [printCopies, setPrintCopies]       = useState(1);
   const [labelSize]                          = useState(loadLabelSize);
@@ -204,6 +204,7 @@ export default function ProductDetail() {
       category:          product.category,
       lowStockThreshold: String(product.lowStockThreshold),
       supplierId:        sid ?? "",
+      barcode:           product.barcode ?? "",
     });
     setEditOpen(true);
   };
@@ -220,6 +221,7 @@ export default function ProductDetail() {
     const purchasePrice = purchasePriceRaw ? parseFloat(purchasePriceRaw) : null;
     const threshold = parseInt(editForm.lowStockThreshold, 10);
     const category = editForm.category.trim();
+    const barcode = editForm.barcode.trim();
     if (!name)                          { toast.error("Name is required"); return; }
     if (isNaN(price) || price <= 0)     { toast.error("Enter a valid price"); return; }
     if (salePrice !== null && (isNaN(salePrice) || salePrice <= 0)) { toast.error("Sale price must be greater than 0"); return; }
@@ -232,7 +234,7 @@ export default function ProductDetail() {
       const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, price, salePrice, salePriceUntil, purchasePrice, category, lowStockThreshold: threshold, supplierId: editForm.supplierId || null }),
+        body: JSON.stringify({ name, price, salePrice, salePriceUntil, purchasePrice, category, lowStockThreshold: threshold, supplierId: editForm.supplierId || null, barcode: barcode || null }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       toast.success("Product updated");
@@ -401,6 +403,11 @@ export default function ProductDetail() {
               <Input type="number" min={0} step={1} value={editForm.lowStockThreshold}
                 onChange={(e) => setEditForm((f) => ({ ...f, lowStockThreshold: e.target.value }))}
                 placeholder="5" className="h-11 rounded-xl" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground mb-1">Barcode (Scan or Type) — optional</p>
+              <Input value={editForm.barcode} onChange={(e) => setEditForm((f) => ({ ...f, barcode: e.target.value }))}
+                placeholder="Scan barcode with USB scanner or type…" className="h-11 rounded-xl font-mono" />
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground mb-1 flex items-center gap-1">
@@ -584,6 +591,21 @@ export default function ProductDetail() {
                     </div>
                   );
                 })()}
+
+                {/* Barcode */}
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Barcode</p>
+                  {product.barcode ? (
+                    <div className="flex items-center gap-1.5">
+                      <Barcode className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <p className="text-sm font-semibold font-mono">{product.barcode}</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {isOwner ? "Not set — add in edit panel" : "Not specified"}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Image upload */}

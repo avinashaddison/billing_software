@@ -56,6 +56,7 @@ const createProductSchema = z.object({
                       .refine((v) => !JUNK_PATTERN.test(v.trim()), { message: "Enter a real product name, not placeholder text" }),
   category:          z.string().min(1, "Please select a category"),
   customCategory:    z.string().optional(),
+  barcode:           z.string().optional().or(z.literal("")),
   price:             z.coerce.number().min(0.01, "Price must be greater than 0"),
   salePrice:         z.union([z.coerce.number().min(0.01, "Sale price must be greater than 0"), z.literal("")]).optional(),
   purchasePrice:     z.union([z.coerce.number().min(0.01, "Purchase price must be greater than 0"), z.literal("")]).optional(),
@@ -126,7 +127,7 @@ export default function CreateProduct() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(createProductSchema),
-    defaultValues: { name: "", category: "", customCategory: "", price: undefined as unknown as number, stock: 0, lowStockThreshold: 5, imageUrl: "" },
+    defaultValues: { name: "", category: "", customCategory: "", barcode: "", price: undefined as unknown as number, stock: 0, lowStockThreshold: 5, imageUrl: "" },
   });
 
   const selectedCategory     = form.watch("category");
@@ -207,7 +208,7 @@ export default function CreateProduct() {
     const salePriceVal      = data.salePrice && typeof data.salePrice === "number" ? data.salePrice : undefined;
     const purchasePriceVal  = data.purchasePrice && typeof data.purchasePrice === "number" ? data.purchasePrice : undefined;
     createProduct.mutate(
-      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, salePriceUntil: null, purchasePrice: purchasePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || null, supplierId: selectedSupplierId || null } },
+      { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, salePriceUntil: null, purchasePrice: purchasePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || null, supplierId: selectedSupplierId || null, barcode: data.barcode?.trim() || null } },
       {
         onSuccess: (product) => {
           toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
@@ -469,6 +470,17 @@ export default function CreateProduct() {
                       )}
                     </div>
                   </div>
+
+                  {/* Barcode */}
+                  <FormField control={form.control} name="barcode" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-bold text-muted-foreground">Barcode (Scan or Type) — optional</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Scan barcode with USB scanner or type…" className="h-12 rounded-xl font-mono" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                 </div>
 
                 {/* ── Pricing & Stock ── */}

@@ -10,6 +10,8 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
+  /** @nullable */
+  barcode?: string | null;
   category: string;
   price: number;
   /** @nullable */
