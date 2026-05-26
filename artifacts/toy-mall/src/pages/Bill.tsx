@@ -319,6 +319,8 @@ export default function Bill() {
         // tape is wasted.
         return (
           <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap');
+
             @page {
               size: ${paperWidth} 3276mm;
               margin: 0;
@@ -437,70 +439,75 @@ export default function Bill() {
 
             {/* ── STORE HEADER ── */}
             {store.logoUrl ? (
-              /* Custom logo + name on the right */
-              <div className="flex items-center gap-3">
-                <img src={store.logoUrl} alt={store.name}
-                     className="shrink-0 h-14 w-auto max-w-[80px] object-contain"
-                     style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
-                <div className="flex-1 text-center pr-1">
-                  <div
-                    style={{
-                      fontFamily: "'Playfair Display', 'DM Serif Display', Georgia, serif",
-                      fontWeight: 900,
-                      fontSize: store.name.length > 18 ? "21px" : "26px",
-                      lineHeight: 1.0,
-                      letterSpacing: "0.01em",
-                      textTransform: "uppercase",
-                      textWrap: "balance",
-                    } as any}
-                  >
-                    {store.name}
-                  </div>
-                  {store.tagline && (
-                    <div
-                      className="mt-1.5 text-black/60"
-                      style={{
-                        fontFamily: "'Playfair Display', Georgia, serif",
-                        fontStyle: "italic",
-                        fontSize: "10.5px",
-                        letterSpacing: "0.04em",
-                      } as any}
-                    >
-                      ─ {store.tagline} ─
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* Clean centered header — no illustration */
+              /* Centered logo above large elegant store name */
               <div className="text-center">
+                <img src={store.logoUrl} alt={store.name}
+                     className="mx-auto h-16 w-auto max-w-[80px] object-contain mb-2"
+                     style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
                 <div
-                  className="mx-auto"
                   style={{
-                    fontFamily: "'Playfair Display', 'DM Serif Display', Georgia, serif",
+                    fontFamily: "'Cinzel', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif",
                     fontWeight: 900,
-                    fontSize: store.name.length > 22 ? "22px" : "28px",
-                    lineHeight: 1.0,
-                    letterSpacing: "0.03em",
+                    fontSize: store.name.length > 20 ? "24px" : "30px",
+                    lineHeight: 1.1,
+                    letterSpacing: "0.06em",
                     textTransform: "uppercase",
-                    textWrap: "balance",
+                    color: "#000",
                   } as any}
                 >
                   {store.name}
                 </div>
                 {store.tagline && (
                   <div
-                    className="mt-1.5 text-black/60"
                     style={{
-                      fontFamily: "'Playfair Display', Georgia, serif",
+                      fontFamily: "'Cinzel', Georgia, serif",
+                      fontSize: "10px",
                       fontStyle: "italic",
+                      letterSpacing: "0.1em",
+                      color: "#444",
+                      marginTop: "5px",
+                    } as any}
+                  >
+                    ✦ {store.tagline} ✦
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Elegant centered header with decorative ornament frame */
+              <div className="text-center" style={{ padding: '4px 0' }}>
+                <div style={{ fontSize: '9px', letterSpacing: '0.4em', color: '#999', marginBottom: '5px' }}>
+                  ✦ ─────── ✦
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'Cinzel', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif",
+                    fontWeight: 900,
+                    fontSize: store.name.length > 22 ? "26px" : "32px",
+                    lineHeight: 1.05,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "#000",
+                  } as any}
+                >
+                  {store.name}
+                </div>
+                {store.tagline && (
+                  <div
+                    style={{
+                      fontFamily: "'Cinzel', Georgia, serif",
                       fontSize: "11px",
-                      letterSpacing: "0.04em",
+                      fontStyle: "italic",
+                      letterSpacing: "0.08em",
+                      color: "#444",
+                      marginTop: "5px",
                     } as any}
                   >
                     ─ {store.tagline} ─
                   </div>
                 )}
+                <div style={{ fontSize: '9px', letterSpacing: '0.4em', color: '#999', marginTop: '5px' }}>
+                  ✦ ─────── ✦
+                </div>
               </div>
             )}
 
@@ -511,7 +518,7 @@ export default function Bill() {
               {store.gst && <div>GSTIN : <span className="font-semibold">{store.gst}</span></div>}
             </div>
 
-            <div className="text-center font-black text-[13px] tracking-[0.2em] mt-2.5 mb-1.5 border-y border-black py-0.5">GST INVOICE</div>
+            <div className="text-center font-black text-[11px] tracking-[0.25em] mt-2.5 mb-1.5 border-y border-black py-0.5 uppercase">Invoice</div>
 
             {/* ── CUSTOMER + BILL META ── */}
             <div className="border border-black grid grid-cols-2 text-[10.5px] leading-[1.55]">
@@ -649,7 +656,7 @@ export default function Bill() {
                 The MRP / Sub Total / You Saved breakdown is rendered only
                 when the customer actually saved money (sale price or manual
                 discount). For a plain bill at MRP we skip the redundant
-                "−₹0.00" line and let GST + NET TOTAL speak for themselves. */}
+                "−₹0.00" line and let NET TOTAL speak for itself. */}
             <div className="mt-2.5 border border-black p-[2px]">
               <div className="border border-black px-2.5 py-2 text-[10.5px]">
                 {totalSavings > 0.001 && (
@@ -674,30 +681,7 @@ export default function Bill() {
                   </div>
                 )}
 
-                {/* ── GST breakdown ──
-                    Shown only when the owner has set a non-zero GST rate
-                    in Settings. Treats the GRAND TOTAL as inclusive of
-                    GST and splits the tax 50/50 into CGST + SGST (the
-                    standard intra-state pattern for retail SMB). */}
-                {(store.gstRatePercent ?? 0) > 0 && (() => {
-                  const rate     = store.gstRatePercent!;
-                  const taxable  = bill.totalAmount / (1 + rate / 100);
-                  const totalTax = bill.totalAmount - taxable;
-                  const halfRate = rate / 2;
-                  const halfTax  = totalTax / 2;
-                  return (
-                    <div className="border-t border-dashed border-black/60 mt-1.5 pt-1.5 grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 leading-tight text-[10.5px]">
-                      <span className="text-black/80">Taxable Value</span>
-                      <span className="text-right tabular-nums">₹{fmt(taxable)}</span>
-                      <span className="text-black/80">CGST @ {halfRate}%</span>
-                      <span className="text-right tabular-nums">₹{fmt(halfTax)}</span>
-                      <span className="text-black/80">SGST @ {halfRate}%</span>
-                      <span className="text-right tabular-nums">₹{fmt(halfTax)}</span>
-                    </div>
-                  );
-                })()}
-
-                <div className={`grid grid-cols-[1fr_auto] gap-x-2 leading-tight text-[12px] font-black ${(totalSavings > 0.001 || (store.gstRatePercent ?? 0) > 0) ? "border-t border-dashed border-black/60 mt-1.5 pt-1.5" : ""}`}>
+                <div className={`grid grid-cols-[1fr_auto] gap-x-2 leading-tight text-[12px] font-black ${totalSavings > 0.001 ? "border-t border-dashed border-black/60 mt-1.5 pt-1.5" : ""}`}>
                   <span>NET TOTAL</span>
                   <span className="text-right tabular-nums">₹{fmt(bill.totalAmount)}</span>
                 </div>
