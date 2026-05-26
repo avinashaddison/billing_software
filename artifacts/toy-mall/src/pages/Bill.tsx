@@ -304,27 +304,32 @@ export default function Bill() {
         // CSS @page margin so the safe area itself isn't squeezed further.
         const contentWidth = paperWidth === "58mm" ? "54mm" : "72mm";
 
-        // ── Why a giant fixed page height instead of `auto` ──
-        // `size: 80mm auto` is the spec-compliant way to ask the browser
-        // for "one page, as tall as the content". In practice, many
-        // Windows thermal drivers (incl. the generic "80mm Series Printer")
-        // report a FIXED default paper length (often ~297mm), and Chrome
-        // paginates against that — so any receipt taller than ~297mm is
-        // split into 2 sheets in the print preview, which becomes 2 cut
-        // receipts on a continuous roll.
+        // ── @page height: `auto` vs a fixed giant value ──
         //
-        // Declaring a very tall page height (3276mm is Chromium's max)
-        // forces the receipt onto a single logical page. The thermal
-        // printer only feeds paper for actual ink marks, so no blank
-        // tape is wasted.
+        // `size: 80mm auto` is the spec-compliant way to say "as tall as
+        // the content".  We use `auto` here because some Windows thermal
+        // drivers (including the common "80mm Series Printer") report a
+        // FIXED default paper length (often 297 mm).  When @page declares
+        // a DIFFERENT explicit height (e.g. 3276 mm), Chrome scales the
+        // entire logical page DOWN to fit the driver's physical 297 mm —
+        // shrinking the receipt to ≈9 % of its correct size and rendering
+        // it as a tiny thumbnail at the top of a blank page.
+        //
+        // With `auto`, Chrome lets the content determine the page height
+        // and prints at 100 % scale.  On continuous roll printers the
+        // driver feeds exactly as much paper as there is ink — no blank
+        // tape is wasted.  If an unusually long receipt happens to be
+        // split across 2 cuts, that is far better than an unreadable
+        // thumbnail, so `auto` is the right default.
         return (
           <style>{`
             @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap');
 
             @page {
-              size: ${paperWidth} 3276mm;
+              size: ${paperWidth} auto;
               margin: 0;
             }
+
 
             @media print {
               /* Hard-hide the screen-only chrome (top bar, etc.). Using
