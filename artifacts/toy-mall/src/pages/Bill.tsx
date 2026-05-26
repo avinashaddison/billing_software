@@ -202,6 +202,31 @@ function ReturnModal({ billId, items, onClose }: { billId: string; items: BillIt
 export default function Bill() {
   const { id: billId } = useParams<{ id: string }>();
   const store = useStoreSettings();
+
+  const getFontFamilyCss = (font?: string) => {
+    switch (font) {
+      case "Cinzel": return "'Cinzel', Georgia, serif";
+      case "Playfair Display": return "'Playfair Display', Georgia, serif";
+      case "Inter": return "'Inter', sans-serif";
+      case "Courier New": return "'Courier New', monospace";
+      case "Georgia": return "'Georgia', serif";
+      case "Montserrat": return "'Montserrat', sans-serif";
+      case "Lora": return "'Lora', serif";
+      case "Rubik": return "'Rubik', sans-serif";
+      case "Oswald": return "'Oswald', sans-serif";
+      case "Sacramento": return "'Sacramento', cursive";
+      case "Great Vibes": return "'Great Vibes', cursive";
+      default: return "'Playfair Display', Georgia, serif";
+    }
+  };
+
+  const brandFont = getFontFamilyCss(store.headerBrandFontFamily ?? "Playfair Display");
+  const subtitleFont = getFontFamilyCss(store.headerSubtitleFontFamily ?? "Playfair Display");
+  const taglineFont = getFontFamilyCss(store.headerTaglineFontFamily ?? "Playfair Display");
+  const addressPhoneFont = getFontFamilyCss(store.headerAddressPhoneFontFamily ?? "Inter");
+
+  const isTaglineSans = (store.headerTaglineFontFamily ?? "Playfair Display").includes("Inter") || (store.headerTaglineFontFamily ?? "Playfair Display").includes("Courier") || (store.headerTaglineFontFamily ?? "Playfair Display").includes("Montserrat") || (store.headerTaglineFontFamily ?? "Playfair Display").includes("Rubik") || (store.headerTaglineFontFamily ?? "Playfair Display").includes("Oswald");
+
   const [data, setData]       = useState<BillData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -323,7 +348,7 @@ export default function Bill() {
         // thumbnail, so `auto` is the right default.
         return (
           <style>{`
-            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Cinzel:wght@400;700;900&family=Montserrat:wght@400;500;700;900&family=Inter:wght@400;500;700;900&family=Lora:ital,wght@0,400;0,700;1,400&family=Rubik:wght@400;500;700;900&family=Oswald:wght@400;700&family=Sacramento&family=Great+Vibes&display=swap');
 
             @page {
               size: ${paperWidth} auto;
@@ -451,111 +476,206 @@ export default function Bill() {
             {/* ── STORE HEADER ── */}
             {(() => {
               const storeName = store.name || "HIRA & SON GIFT SHOP";
+              const layout = store.headerLayout || "split";
+              const brandFontSize = store.headerBrandFontSize ?? (layout === "single" ? 26 : 28);
+              const subtitleFontSize = store.headerSubtitleFontSize ?? 25;
+              const taglineFontSize = store.headerTaglineFontSize ?? 13;
+              const addressPhoneFontSize = store.headerAddressPhoneFontSize ?? 12;
+              const logoSize = store.headerLogoSize ?? 96;
+              const colorTheme = store.headerColorTheme || "black";
+              const showOrnaments = store.headerShowOrnaments ?? false;
+
+              // Color mapping
+              const textClr = colorTheme === "gold-navy" ? "#0a1c36" : "#000000";
+              const accentClr = colorTheme === "gold-navy" ? "#c5a85a" : "#000000";
+
               let mainName = storeName;
               let subName = store.tagline || "GIFT SHOP";
 
-              // Try to split at "Gift Shop" or "Gifts"
-              const giftShopRegex = /(.*?)\s*\b(gift\s+shop|gifts\s+shop|gift\s+store|gifts)\b/i;
-              const match = storeName.match(giftShopRegex);
-              if (match) {
-                mainName = match[1].trim();
-                subName = match[2].trim();
+              if (layout === "split") {
+                const giftShopRegex = /(.*?)\s*\b(gift\s+shop|gifts\s+shop|gift\s+store|gifts)\b/i;
+                const match = storeName.match(giftShopRegex);
+                if (match) {
+                  mainName = match[1].trim();
+                  subName = match[2].trim();
+                }
               }
 
-              // Style the ampersand if it exists in the mainName
+              // Style the ampersand if it exists
               const ampersandRegex = /(.*?)\s*([&]|and)\s*(.*)/i;
-              const ampMatch = mainName.match(ampersandRegex);
-              let renderedMainName;
+              const mainNameMatch = layout === "split" ? mainName : storeName;
+              const ampMatch = mainNameMatch.match(ampersandRegex);
+              let renderedName;
               if (ampMatch) {
-                renderedMainName = (
+                renderedName = (
                   <>
-                    {ampMatch[1]} <span className="font-playfair italic font-normal" style={{ fontSize: "1.15em", verticalAlign: "middle", color: "#000" }}>&amp;</span> {ampMatch[3]}
+                    {ampMatch[1]} <span style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: "italic", fontWeight: "normal", fontSize: "1.15em", verticalAlign: "middle", color: accentClr }}>&amp;</span> {ampMatch[3]}
                   </>
                 );
               } else {
-                renderedMainName = mainName;
+                renderedName = mainNameMatch;
               }
 
               return (
                 <div className="text-center" style={{ padding: '0px 0' }}>
-                  {store.logoUrl ? (
+                  {store.logoUrl === "teddy" ? (
+                    <svg className="mx-auto mb-1" style={{ height: `${logoSize}px`, width: "auto", color: textClr }} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="50" cy="50" r="30" />
+                      <circle cx="23" cy="23" r="10" />
+                      <circle cx="23" cy="23" r="5" fill="currentColor" />
+                      <circle cx="77" cy="23" r="10" />
+                      <circle cx="77" cy="23" r="5" fill="currentColor" />
+                      <circle cx="38" cy="45" r="3" fill="currentColor" />
+                      <circle cx="62" cy="45" r="3" fill="currentColor" />
+                      <ellipse cx="50" cy="58" rx="8" ry="6" strokeWidth="2" />
+                      <polygon points="50,54 46,58 54,58" fill="currentColor" />
+                      <path d="M50,60 Q47,64 44,62 M50,60 Q53,64 56,62" />
+                    </svg>
+                  ) : store.logoUrl ? (
                     <img src={store.logoUrl} alt={store.name}
-                         className="mx-auto h-24 w-auto max-w-[110px] object-contain mb-1"
-                         style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
+                         className="mx-auto object-contain mb-1"
+                         style={{ height: `${logoSize}px`, maxWidth: "120px", printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
                   ) : (
-                    <div className="text-[28px] mb-1">🧸</div>
+                    <div className="text-[28px] mb-1">{store.logoEmoji || "🧸"}</div>
                   )}
 
-                  {/* Main Shop Name (Row 1) */}
+                  {/* Top Ornament */}
+                  {showOrnaments && (
+                    <div className="flex justify-center mb-1 text-center" style={{ color: accentClr }}>
+                      <svg className="w-32 h-4" viewBox="0 0 120 12" fill="none" stroke="currentColor" strokeWidth="1">
+                        <path d="M10,6 H50 C54,6 56,2 60,6 C64,2 66,6 70,6 H110" strokeLinecap="round"/>
+                        <circle cx="60" cy="6" r="1" fill="currentColor"/>
+                        <path d="M57,6 C58,4 62,4 63,6" strokeLinecap="round"/>
+                        <polygon points="60,2 58,5 60,8 62,5" fill="currentColor"/>
+                      </svg>
+                    </div>
+                  )}
+
+                  {/* Main Shop Name (Row 1 or single line) */}
                   <div
                     style={{
-                      fontFamily: "'Playfair Display', 'Cinzel', 'Palatino Linotype', Palatino, Georgia, serif",
+                      fontFamily: brandFont,
                       fontWeight: 900,
-                      fontSize: mainName.length > 15 ? "22px" : (mainName.length > 10 ? "28px" : "34px"),
+                      fontSize: `${brandFontSize}px`,
                       lineHeight: 1.05,
                       letterSpacing: "0.02em",
                       textTransform: "uppercase",
-                      color: "#000",
+                      color: textClr,
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {renderedMainName}
+                    {renderedName}
                   </div>
 
-                  {/* Subtitle GIFT SHOP (Row 2) - also big */}
-                  <div
-                    style={{
-                      fontFamily: "'Playfair Display', 'Cinzel', 'Palatino Linotype', Palatino, Georgia, serif",
-                      fontWeight: 900,
-                      fontSize: subName.length > 12 ? "20px" : (subName.length > 8 ? "25px" : "30px"),
-                      lineHeight: 1.05,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                      color: "#000",
-                      marginTop: "2px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {subName}
-                  </div>
+                  {/* Subtitle (only if split layout) */}
+                  {layout === "split" && (
+                    <div className="flex items-center justify-center gap-3 mt-1.5" style={{ color: accentClr }}>
+                      {showOrnaments && (
+                        <div className="h-[1px] bg-current flex-1 max-w-[50px] relative">
+                          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-1 bg-current rotate-45" />
+                        </div>
+                      )}
+                      <span
+                        style={{
+                          color: textClr,
+                          fontFamily: subtitleFont,
+                          fontWeight: 900,
+                          fontSize: `${subtitleFontSize}px`,
+                          lineHeight: 1.05,
+                          letterSpacing: "0.04em",
+                          textTransform: "uppercase",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {subName}
+                      </span>
+                      {showOrnaments && (
+                        <div className="h-[1px] bg-current flex-1 max-w-[50px] relative">
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1 bg-current rotate-45" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Optional Gift Box & scrolls */}
+                  {layout === "split" && showOrnaments && (
+                    <div className="flex items-center justify-center gap-2 my-1.5" style={{ color: accentClr }}>
+                      <svg className="w-14 h-3.5" style={{ transform: "scaleX(-1)" }} viewBox="0 0 60 16" fill="none" stroke="currentColor" strokeWidth="1.2">
+                        <path d="M0,8 H30 C38,8 42,14 46,14 C52,14 54,8 46,4 C40,0 34,8 44,10 C46,10.5 48,10 48,10" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M11.5 7.2c-1-1.5-2.8-2.2-4-1.2-1.3 1.1-.8 3.1 1.2 3.8 1.8.6 2.8-2.6 2.8-2.6z" />
+                        <path d="M12.5 7.2c1-1.5 2.8-2.2 4-1.2 1.3 1.1.8 3.1-1.2 3.8-1.8.6-2.8-2.6-2.8-2.6z" />
+                        <circle cx="12" cy="7.5" r="1.2" fill="currentColor" />
+                        <path d="M 5 9 L 11.25 9 L 11.25 11.5 L 5 11.5 Z" />
+                        <path d="M 12.75 9 L 19 9 L 19 11.5 L 12.75 11.5 Z" />
+                        <path d="M 6 12.25 L 11.25 12.25 L 11.25 19 L 6 19 Z" />
+                        <path d="M 12.75 12.25 L 18 12.25 L 18 19 L 12.75 19 Z" />
+                      </svg>
+                      <svg className="w-14 h-3.5" viewBox="0 0 60 16" fill="none" stroke="currentColor" strokeWidth="1.2">
+                        <path d="M0,8 H30 C38,8 42,14 46,14 C52,14 54,8 46,4 C40,0 34,8 44,10 C46,10.5 48,10 48,10" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  )}
 
                   {/* Tagline / Complete Gift Store */}
-                  <div
-                    style={{
-                      fontFamily: "'Playfair Display', Georgia, serif",
-                      fontStyle: 'italic',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      color: '#000',
-                      letterSpacing: '0.04em',
-                      marginTop: "3px",
-                      marginBottom: "6px"
-                    }}
-                  >
-                    {store.tagline || "The Complete Gift Store"}
+                  <div className="flex items-center justify-center gap-2.5 mt-1.5">
+                    {showOrnaments && <div className="h-[1px] flex-1 max-w-[30px]" style={{ background: `linear-gradient(to right, transparent, ${accentClr})` }} />}
+                    {showOrnaments && <span className="text-[9px] relative -top-[1px]" style={{ color: accentClr }}>✦</span>}
+                    <span
+                      style={{
+                        fontFamily: taglineFont,
+                        fontStyle: isTaglineSans ? "normal" : 'italic',
+                        fontSize: `${taglineFontSize}px`,
+                        fontWeight: 600,
+                        color: textClr,
+                        letterSpacing: '0.04em'
+                      }}
+                    >
+                      {store.tagline || "The Complete Gift Store"}
+                    </span>
+                    {showOrnaments && <span className="text-[9px] relative -top-[1px]" style={{ color: accentClr }}>✦</span>}
+                    {showOrnaments && <div className="h-[1px] flex-1 max-w-[30px]" style={{ background: `linear-gradient(to left, transparent, ${accentClr})` }} />}
                   </div>
+
+                  {/* Bottom Ornament */}
+                  {showOrnaments && (
+                    <div className="flex justify-center mt-2.5 mb-1" style={{ color: accentClr }}>
+                      <svg className="w-32 h-4" viewBox="0 0 120 12" fill="none" stroke="currentColor" strokeWidth="1">
+                        <path d="M10,6 H50 C54,6 56,10 60,6 C64,10 66,6 70,6 H110" strokeLinecap="round"/>
+                        <circle cx="60" cy="6" r="1" fill="currentColor"/>
+                        <path d="M57,6 C58,8 62,8 63,6" strokeLinecap="round"/>
+                        <polygon points="60,10 58,7 60,4 62,7" fill="currentColor"/>
+                      </svg>
+                    </div>
+                  )}
                 </div>
               );
             })()}
 
-            <div className="text-center text-[12px] leading-snug mt-1 space-y-1">
+            <div className="text-center leading-snug mt-2 space-y-1"
+                 style={{
+                   fontFamily: addressPhoneFont,
+                   fontSize: `${store.headerAddressPhoneFontSize ?? 12}px`,
+                   color: store.headerColorTheme === "gold-navy" ? "#0a1c36" : "#000000"
+                 }}>
               {store.address && (
                 <div className="flex items-center justify-center gap-1.5 px-2">
-                  <svg className="w-4 h-4 text-black shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 24 24" style={{ color: store.headerColorTheme === "gold-navy" ? "#0a1c36" : "#000000" }}>
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                   </svg>
-                  <span className="font-semibold text-black">{store.address}</span>
+                  <span className="font-semibold">{store.address}</span>
                 </div>
               )}
               {store.phone && (
                 <div className="flex items-center justify-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-black shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24" style={{ color: store.headerColorTheme === "gold-navy" ? "#0a1c36" : "#000000" }}>
                     <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
                   </svg>
-                  <span className="font-bold text-black">Phone : {store.phone}</span>
+                  <span className="font-bold">Phone : {store.phone}</span>
                 </div>
               )}
-              {store.email && <div className="text-black font-semibold">E-Mail : {store.email}</div>}
+              {store.email && <div className="font-semibold">E-Mail : {store.email}</div>}
             </div>
 
             <div className="text-center font-black text-[11px] tracking-[0.25em] mt-2.5 mb-1.5 border-y border-black py-0.5 uppercase">Invoice</div>

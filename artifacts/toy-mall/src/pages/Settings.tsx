@@ -17,6 +17,20 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 const EMOJI_OPTIONS = ["🧸", "🎮", "🛒", "🏪", "🎁", "🧩", "🎯", "🪀", "🎈", "⭐"];
 
+const FONT_OPTIONS = [
+  { id: "Playfair Display", label: "Playfair (Display)", family: "'Playfair Display', Georgia, serif" },
+  { id: "Cinzel", label: "Cinzel (Roman Caps)", family: "'Cinzel', Georgia, serif" },
+  { id: "Inter", label: "Inter (Modern Sans)", family: "'Inter', sans-serif" },
+  { id: "Montserrat", label: "Montserrat (Geometric)", family: "'Montserrat', sans-serif" },
+  { id: "Courier New", label: "Courier (Monospace)", family: "'Courier New', monospace" },
+  { id: "Georgia", label: "Georgia (Serif)", family: "'Georgia', serif" },
+  { id: "Lora", label: "Lora (Elegant Serif)", family: "'Lora', serif" },
+  { id: "Rubik", label: "Rubik (Soft Sans)", family: "'Rubik', sans-serif" },
+  { id: "Oswald", label: "Oswald (Condense)", family: "'Oswald', sans-serif" },
+  { id: "Sacramento", label: "Sacramento (Hand-script)", family: "'Sacramento', cursive" },
+  { id: "Great Vibes", label: "Great Vibes (Cursive)", family: "'Great Vibes', cursive" },
+];
+
 const DEFAULTS: FormSettings = {
   name:               "Your Shop Name",
   tagline:            "Set your tagline in Settings",
@@ -39,6 +53,19 @@ const DEFAULTS: FormSettings = {
   labelShowPrice:     true,
   scannerThresholdMs: 100,
   receiptPaperWidth:  "80mm",
+  headerLayout:       "split",
+  headerFontFamily:   "Playfair Display",
+  headerBrandFontFamily: "Playfair Display",
+  headerSubtitleFontFamily: "Playfair Display",
+  headerTaglineFontFamily: "Playfair Display",
+  headerAddressPhoneFontFamily: "Inter",
+  headerBrandFontSize: 28,
+  headerSubtitleFontSize: 25,
+  headerTaglineFontSize: 13,
+  headerAddressPhoneFontSize: 12,
+  headerLogoSize:     96,
+  headerColorTheme:   "black",
+  headerShowOrnaments: false,
 };
 
 const SCANNER_PRESETS = [
@@ -72,6 +99,19 @@ export default function SettingsPage() {
     labelShowPrice:     store.labelShowPrice ?? true,
     scannerThresholdMs: store.scannerThresholdMs ?? 100,
     receiptPaperWidth:  store.receiptPaperWidth ?? "80mm",
+    headerLayout:       store.headerLayout ?? "split",
+    headerFontFamily:   store.headerFontFamily ?? "Playfair Display",
+    headerBrandFontFamily: store.headerBrandFontFamily ?? "Playfair Display",
+    headerSubtitleFontFamily: store.headerSubtitleFontFamily ?? "Playfair Display",
+    headerTaglineFontFamily: store.headerTaglineFontFamily ?? "Playfair Display",
+    headerAddressPhoneFontFamily: store.headerAddressPhoneFontFamily ?? "Inter",
+    headerBrandFontSize: store.headerBrandFontSize ?? 28,
+    headerSubtitleFontSize: store.headerSubtitleFontSize ?? 25,
+    headerTaglineFontSize: store.headerTaglineFontSize ?? 13,
+    headerAddressPhoneFontSize: store.headerAddressPhoneFontSize ?? 12,
+    headerLogoSize:     store.headerLogoSize ?? 96,
+    headerColorTheme:   store.headerColorTheme ?? "black",
+    headerShowOrnaments: store.headerShowOrnaments ?? false,
   });
   const [saved, setSaved] = useState(false);
   const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
@@ -100,7 +140,7 @@ export default function SettingsPage() {
     }
   };
 
-  const set = (key: keyof FormSettings, val: string) =>
+  const set = (key: keyof FormSettings, val: any) =>
     setForm((f) => ({ ...f, [key]: val }));
 
   const toggle = (key: keyof FormSettings) =>
@@ -131,6 +171,19 @@ export default function SettingsPage() {
     labelShowPrice: store.labelShowPrice ?? true,
     scannerThresholdMs: store.scannerThresholdMs ?? 100,
     receiptPaperWidth: store.receiptPaperWidth ?? "80mm",
+    headerLayout: store.headerLayout ?? "split",
+    headerFontFamily: store.headerFontFamily ?? "Playfair Display",
+    headerBrandFontFamily: store.headerBrandFontFamily ?? "Playfair Display",
+    headerSubtitleFontFamily: store.headerSubtitleFontFamily ?? "Playfair Display",
+    headerTaglineFontFamily: store.headerTaglineFontFamily ?? "Playfair Display",
+    headerAddressPhoneFontFamily: store.headerAddressPhoneFontFamily ?? "Inter",
+    headerBrandFontSize: store.headerBrandFontSize ?? 28,
+    headerSubtitleFontSize: store.headerSubtitleFontSize ?? 25,
+    headerTaglineFontSize: store.headerTaglineFontSize ?? 13,
+    headerAddressPhoneFontSize: store.headerAddressPhoneFontSize ?? 12,
+    headerLogoSize: store.headerLogoSize ?? 96,
+    headerColorTheme: store.headerColorTheme ?? "black",
+    headerShowOrnaments: store.headerShowOrnaments ?? false,
   });
 
   return (
@@ -161,7 +214,7 @@ export default function SettingsPage() {
       <div className="flex-1 overflow-y-auto pb-32 md:pb-8 p-4 md:p-6 md:max-w-2xl space-y-6">
 
         {/* ── Live Preview ── */}
-        <div className="bg-card border rounded-2xl p-4 space-y-3">
+        <div className="bg-card border rounded-2xl p-4 space-y-4">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Sidebar Header Preview</p>
           <SidebarHeaderPreview
             theme={form.logoBgTheme}
@@ -169,23 +222,28 @@ export default function SettingsPage() {
             logoEmoji={form.logoEmoji}
             logoUrl={form.logoUrl}
           />
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2">Logo Tile (other places)</p>
-          <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-xl shadow-sm shadow-primary/20 shrink-0">
-              {form.logoEmoji || "🏪"}
-            </div>
-            <div>
-              <p className="font-black text-sm leading-tight">{form.name || "Shop Name"}</p>
-              <p className="text-xs text-muted-foreground">{form.appSubtitle || "App Subtitle"}</p>
-            </div>
-          </div>
-          <div className="border rounded-xl overflow-hidden text-center py-4 px-6 bg-white dark:bg-neutral-900 text-black dark:text-white space-y-0.5" style={{ fontFamily: "'Courier New', monospace" }}>
-            <p className="text-base font-black tracking-widest uppercase">{form.name || "Shop Name"}</p>
-            <p className="text-xs">{form.tagline || "Tagline"}</p>
-            {form.phone && <p className="text-xs">📞 {form.phone}</p>}
-            {form.address && <p className="text-xs">{form.address}</p>}
-            {form.gst && <p className="text-xs font-bold">GST: {form.gst}</p>}
-          </div>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2">80mm Receipt Header Preview</p>
+          <ReceiptHeaderPreview
+            logoUrl={form.logoUrl}
+            logoEmoji={form.logoEmoji}
+            name={form.name}
+            tagline={form.tagline}
+            address={form.address}
+            phone={form.phone}
+            email={form.email}
+            layout={form.headerLayout ?? "split"}
+            brandFontFamily={form.headerBrandFontFamily ?? "Playfair Display"}
+            subtitleFontFamily={form.headerSubtitleFontFamily ?? "Playfair Display"}
+            taglineFontFamily={form.headerTaglineFontFamily ?? "Playfair Display"}
+            addressPhoneFontFamily={form.headerAddressPhoneFontFamily ?? "Inter"}
+            brandFontSize={form.headerBrandFontSize ?? 28}
+            subtitleFontSize={form.headerSubtitleFontSize ?? 25}
+            taglineFontSize={form.headerTaglineFontSize ?? 13}
+            addressPhoneFontSize={form.headerAddressPhoneFontSize ?? 12}
+            logoSize={form.headerLogoSize ?? 96}
+            colorTheme={form.headerColorTheme ?? "black"}
+            showOrnaments={form.headerShowOrnaments ?? false}
+          />
         </div>
 
         {/* ── Store Identity ── */}
@@ -246,6 +304,286 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">Or paste / type any emoji</p>
             </div>
           </Field>
+        </Section>
+
+        {/* ── Receipt Header Customization ── */}
+        <Section icon={Receipt} title="Receipt Header Customization" color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30">
+          <Field label="Logo Selection" hint="Choose the graphic to print at the very top of your receipts.">
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => set("logoUrl", "teddy")}
+                className={`py-2 px-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col items-center gap-1.5 ${
+                  form.logoUrl === "teddy"
+                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                    : "border-border hover:border-emerald-400 hover:bg-muted"
+                }`}
+              >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg shrink-0">🧸</div>
+                <span>Default Teddy Bear</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => set("logoUrl", store.logoUrl && store.logoUrl !== "teddy" ? store.logoUrl : "")}
+                className={`py-2 px-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col items-center gap-1.5 ${
+                  form.logoUrl !== "teddy" && form.logoUrl !== ""
+                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                    : "border-border hover:border-emerald-400 hover:bg-muted"
+                }`}
+              >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg shrink-0">🖼️</div>
+                <span>Custom Uploaded Logo</span>
+              </button>
+            </div>
+            {form.logoUrl && form.logoUrl !== "teddy" && (
+              <div className="mt-2 text-[11px] text-muted-foreground">
+                Using custom logo: <span className="font-mono text-emerald-600 truncate block max-w-xs">{form.logoUrl}</span>
+              </div>
+            )}
+          </Field>
+
+          <Field label="Header Layout Style" hint="Configure how the store name and branding are layered.">
+            <div className="flex gap-2">
+              {[
+                { key: "split", label: "Split Line", desc: "Brand & Subtitle split" },
+                { key: "single", label: "Single Row", desc: "Combined in one line" },
+              ].map((layout) => (
+                <button
+                  key={layout.key}
+                  type="button"
+                  onClick={() => set("headerLayout", layout.key)}
+                  className={`flex-1 py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${
+                    form.headerLayout === layout.key
+                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                      : "border-border hover:border-emerald-400 hover:bg-muted"
+                  }`}
+                >
+                  {layout.label}
+                  <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">
+                    {layout.desc}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Header Color Theme" hint="Toggle between clean high-contrast black-only or gold-accented styling.">
+            <div className="flex gap-2">
+              {[
+                { key: "black", label: "Classic Black", desc: "Solid high-contrast black" },
+                { key: "gold-navy", label: "Premium Gold-Navy", desc: "Gold highlights + Navy text" },
+              ].map((theme) => (
+                <button
+                  key={theme.key}
+                  type="button"
+                  onClick={() => set("headerColorTheme", theme.key)}
+                  className={`flex-1 py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${
+                    form.headerColorTheme === theme.key
+                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                      : "border-border hover:border-emerald-400 hover:bg-muted"
+                  }`}
+                >
+                  {theme.label}
+                  <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">
+                    {theme.desc}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+            <div>
+              <p className="text-xs font-bold">Show Ornaments & Lines</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                When enabled, premium top and bottom scrollwork dividers and accent lines are rendered.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => set("headerShowOrnaments", !form.headerShowOrnaments)}
+              className={`ml-4 shrink-0 transition-colors ${form.headerShowOrnaments ? "text-emerald-600" : "text-muted-foreground"}`}
+              aria-label="Toggle header ornaments"
+            >
+              {form.headerShowOrnaments
+                ? <ToggleRight className="w-10 h-10" />
+                : <ToggleLeft  className="w-10 h-10" />}
+            </button>
+          </div>
+
+          <Field label="Shop Name (Brand) Font" hint="Select the font family used for the main shop name.">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {FONT_OPTIONS.map((font) => (
+                <button
+                  key={font.id}
+                  type="button"
+                  onClick={() => set("headerBrandFontFamily", font.id)}
+                  className={`py-2.5 px-2 rounded-xl border-2 text-xs font-bold transition-all truncate ${
+                    form.headerBrandFontFamily === font.id
+                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                      : "border-border hover:border-emerald-400 hover:bg-muted"
+                  }`}
+                >
+                  <span style={{ fontFamily: font.family }}>
+                    {font.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {form.headerLayout === "split" && (
+            <Field label="Subtitle Font Style" hint="Select the font family used for the category/subtitle text.">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {FONT_OPTIONS.map((font) => (
+                  <button
+                    key={font.id}
+                    type="button"
+                    onClick={() => set("headerSubtitleFontFamily", font.id)}
+                    className={`py-2.5 px-2 rounded-xl border-2 text-xs font-bold transition-all truncate ${
+                      form.headerSubtitleFontFamily === font.id
+                        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                        : "border-border hover:border-emerald-400 hover:bg-muted"
+                    }`}
+                  >
+                    <span style={{ fontFamily: font.family }}>
+                      {font.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
+
+          <Field label="Tagline Font Style" hint="Select the font family used for the tagline message.">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {FONT_OPTIONS.map((font) => (
+                <button
+                  key={font.id}
+                  type="button"
+                  onClick={() => set("headerTaglineFontFamily", font.id)}
+                  className={`py-2.5 px-2 rounded-xl border-2 text-xs font-bold transition-all truncate ${
+                    form.headerTaglineFontFamily === font.id
+                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                      : "border-border hover:border-emerald-400 hover:bg-muted"
+                  }`}
+                >
+                  <span style={{ fontFamily: font.family }}>
+                    {font.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Address & Phone Font Style" hint="Select the font family used for the contact details at the bottom of the header.">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {FONT_OPTIONS.map((font) => (
+                <button
+                  key={font.id}
+                  type="button"
+                  onClick={() => set("headerAddressPhoneFontFamily", font.id)}
+                  className={`py-2.5 px-2 rounded-xl border-2 text-xs font-bold transition-all truncate ${
+                    form.headerAddressPhoneFontFamily === font.id
+                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                      : "border-border hover:border-emerald-400 hover:bg-muted"
+                  }`}
+                >
+                  <span style={{ fontFamily: font.family }}>
+                    {font.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {/* Logo Size Control */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span>Logo Print Size</span>
+              <span className="text-[11px] text-muted-foreground font-mono">{form.headerLogoSize ?? 96} px</span>
+            </div>
+            <input
+              type="range"
+              min={40}
+              max={150}
+              step={4}
+              value={form.headerLogoSize ?? 96}
+              onChange={(e) => set("headerLogoSize", Number(e.target.value))}
+              className="w-full accent-emerald-500"
+            />
+          </div>
+
+          {/* Font Sizes Controls */}
+          <div className="space-y-3 pt-2 border-t">
+            <p className="text-xs font-bold text-foreground">Advanced Typography Sizing (Receipt Font Sizes)</p>
+            
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                <span>Shop Name Font Size</span>
+                <span className="font-mono">{form.headerBrandFontSize ?? 28} px</span>
+              </div>
+              <input
+                type="range"
+                min={16}
+                max={48}
+                step={1}
+                value={form.headerBrandFontSize ?? 28}
+                onChange={(e) => set("headerBrandFontSize", Number(e.target.value))}
+                className="w-full accent-emerald-500"
+              />
+            </div>
+
+            {form.headerLayout === "split" && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                  <span>Subtitle Font Size</span>
+                  <span className="font-mono">{form.headerSubtitleFontSize ?? 25} px</span>
+                </div>
+                <input
+                  type="range"
+                  min={12}
+                  max={36}
+                  step={1}
+                  value={form.headerSubtitleFontSize ?? 25}
+                  onChange={(e) => set("headerSubtitleFontSize", Number(e.target.value))}
+                  className="w-full accent-emerald-500"
+                />
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                <span>Tagline Font Size</span>
+                <span className="font-mono">{form.headerTaglineFontSize ?? 13} px</span>
+              </div>
+              <input
+                type="range"
+                min={10}
+                max={20}
+                step={1}
+                value={form.headerTaglineFontSize ?? 13}
+                onChange={(e) => set("headerTaglineFontSize", Number(e.target.value))}
+                className="w-full accent-emerald-500"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                <span>Address / Phone Font Size</span>
+                <span className="font-mono">{form.headerAddressPhoneFontSize ?? 12} px</span>
+              </div>
+              <input
+                type="range"
+                min={9}
+                max={16}
+                step={1}
+                value={form.headerAddressPhoneFontSize ?? 12}
+                onChange={(e) => set("headerAddressPhoneFontSize", Number(e.target.value))}
+                className="w-full accent-emerald-500"
+              />
+            </div>
+          </div>
         </Section>
 
         {/* ── Sidebar Header Theme ── */}
@@ -956,7 +1294,9 @@ function SidebarHeaderPreview({
           <div className="relative shrink-0">
             <div className={`absolute -inset-1 rounded-2xl bg-gradient-to-br ${t.glow} opacity-50 blur-md`} />
             <div className="relative w-9 h-9 rounded-xl bg-white/95 backdrop-blur flex items-center justify-center shadow-xl ring-1 ring-white/50">
-              {logoUrl ? (
+              {logoUrl === "teddy" ? (
+                <span className="text-lg leading-none drop-shadow-sm">🧸</span>
+              ) : logoUrl ? (
                 <img src={logoUrl} alt="" className="w-6 h-6 object-contain drop-shadow-sm" />
               ) : (
                 <span className="text-lg leading-none drop-shadow-sm">{logoEmoji || "🏪"}</span>
@@ -977,6 +1317,285 @@ function SidebarHeaderPreview({
         </div>
       </div>
       <div aria-hidden className={`mt-1 mx-3 h-px bg-gradient-to-r from-transparent ${t.hairline} to-transparent`} />
+    </div>
+  );
+}
+
+function ReceiptHeaderPreview({
+  logoUrl,
+  logoEmoji,
+  name,
+  tagline,
+  address,
+  phone,
+  email,
+  layout,
+  brandFontFamily,
+  subtitleFontFamily,
+  taglineFontFamily,
+  addressPhoneFontFamily,
+  brandFontSize,
+  subtitleFontSize,
+  taglineFontSize,
+  addressPhoneFontSize,
+  logoSize,
+  colorTheme,
+  showOrnaments,
+}: {
+  logoUrl: string;
+  logoEmoji: string;
+  name: string;
+  tagline: string;
+  address: string;
+  phone: string;
+  email: string;
+  layout: "split" | "single";
+  brandFontFamily: string;
+  subtitleFontFamily: string;
+  taglineFontFamily: string;
+  addressPhoneFontFamily: string;
+  brandFontSize: number;
+  subtitleFontSize: number;
+  taglineFontSize: number;
+  addressPhoneFontSize: number;
+  logoSize: number;
+  colorTheme: "black" | "gold-navy";
+  showOrnaments: boolean;
+}) {
+  const textClr = colorTheme === "gold-navy" ? "#0a1c36" : "#000000";
+  const accentClr = colorTheme === "gold-navy" ? "#c5a85a" : "#000000";
+
+  const getFontFamilyCss = (font: string) => {
+    switch (font) {
+      case "Cinzel": return "'Cinzel', Georgia, serif";
+      case "Playfair Display": return "'Playfair Display', Georgia, serif";
+      case "Inter": return "'Inter', sans-serif";
+      case "Courier New": return "'Courier New', monospace";
+      case "Georgia": return "'Georgia', serif";
+      case "Montserrat": return "'Montserrat', sans-serif";
+      case "Lora": return "'Lora', serif";
+      case "Rubik": return "'Rubik', sans-serif";
+      case "Oswald": return "'Oswald', sans-serif";
+      case "Sacramento": return "'Sacramento', cursive";
+      case "Great Vibes": return "'Great Vibes', cursive";
+      default: return "'Playfair Display', Georgia, serif";
+    }
+  };
+
+  const brandFont = getFontFamilyCss(brandFontFamily);
+  const subtitleFont = getFontFamilyCss(subtitleFontFamily);
+  const taglineFont = getFontFamilyCss(taglineFontFamily);
+  const addressPhoneFont = getFontFamilyCss(addressPhoneFontFamily);
+
+  const isTaglineSans = taglineFontFamily.includes("Inter") || taglineFontFamily.includes("Courier") || taglineFontFamily.includes("Montserrat") || taglineFontFamily.includes("Rubik") || taglineFontFamily.includes("Oswald");
+
+  const storeName = name || "Hira & Son Gift Shop";
+  let mainName = storeName;
+  let subName = tagline || "GIFT SHOP";
+
+  if (layout === "split") {
+    const giftShopRegex = /(.*?)\s*\b(gift\s+shop|gifts\s+shop|gift\s+store|gifts)\b/i;
+    const match = storeName.match(giftShopRegex);
+    if (match) {
+      mainName = match[1].trim();
+      subName = match[2].trim();
+    }
+  }
+
+  const ampersandRegex = /(.*?)\s*([&]|and)\s*(.*)/i;
+  const mainNameMatch = layout === "split" ? mainName : storeName;
+  const ampMatch = mainNameMatch.match(ampersandRegex);
+  let renderedName;
+  if (ampMatch) {
+    renderedName = (
+      <>
+        {ampMatch[1]} <span style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: "italic", fontWeight: "normal", fontSize: "1.15em", verticalAlign: "middle", color: accentClr }}>&amp;</span> {ampMatch[3]}
+      </>
+    );
+  } else {
+    renderedName = mainNameMatch;
+  }
+
+  return (
+    <div className="border border-dashed border-muted-foreground/30 rounded-2xl overflow-hidden p-5 bg-white text-black max-w-[320px] mx-auto shadow-sm select-none">
+      <div className="text-center font-bold text-[9px] text-muted-foreground uppercase tracking-widest mb-3 border-b pb-1">
+        80 mm Preview Paper
+      </div>
+
+      <div className="text-center" style={{ padding: '0px 0' }}>
+        {logoUrl === "teddy" ? (
+          <svg className="mx-auto mb-1" style={{ height: `${logoSize * 0.7}px`, width: "auto", color: textClr }} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="50" cy="50" r="30" />
+            <circle cx="23" cy="23" r="10" />
+            <circle cx="23" cy="23" r="5" fill="currentColor" />
+            <circle cx="77" cy="23" r="10" />
+            <circle cx="77" cy="23" r="5" fill="currentColor" />
+            <circle cx="38" cy="45" r="3" fill="currentColor" />
+            <circle cx="62" cy="45" r="3" fill="currentColor" />
+            <ellipse cx="50" cy="58" rx="8" ry="6" strokeWidth="2" />
+            <polygon points="50,54 46,58 54,58" fill="currentColor" />
+            <path d="M50,60 Q47,64 44,62 M50,60 Q53,64 56,62" />
+          </svg>
+        ) : logoUrl ? (
+          <img src={logoUrl} alt=""
+               className="mx-auto object-contain mb-1"
+               style={{ height: `${logoSize * 0.7}px`, maxWidth: "90px" }} />
+        ) : (
+          <div className="text-[24px] mb-1">{logoEmoji || "🧸"}</div>
+        )}
+
+        {showOrnaments && (
+          <div className="flex justify-center mb-1 text-center" style={{ color: accentClr }}>
+            <svg className="w-24 h-3" viewBox="0 0 120 12" fill="none" stroke="currentColor" strokeWidth="1">
+              <path d="M10,6 H50 C54,6 56,2 60,6 C64,2 66,6 70,6 H110" strokeLinecap="round"/>
+              <circle cx="60" cy="6" r="1" fill="currentColor"/>
+              <path d="M57,6 C58,4 62,4 63,6" strokeLinecap="round"/>
+              <polygon points="60,2 58,5 60,8 62,5" fill="currentColor"/>
+            </svg>
+          </div>
+        )}
+
+        <div
+          style={{
+            fontFamily: brandFont,
+            fontWeight: 900,
+            fontSize: `${brandFontSize * 0.75}px`,
+            lineHeight: 1.05,
+            letterSpacing: "0.02em",
+            textTransform: "uppercase",
+            color: textClr,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {renderedName}
+        </div>
+
+        {layout === "split" && (
+          <div className="flex items-center justify-center gap-2 mt-1" style={{ color: accentClr }}>
+            {showOrnaments && (
+              <div className="h-[1px] bg-current flex-1 max-w-[30px] relative">
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0.5 h-0.5 bg-current rotate-45" />
+              </div>
+            )}
+            <span
+              style={{
+                color: textClr,
+                fontFamily: subtitleFont,
+                fontWeight: 900,
+                fontSize: `${subtitleFontSize * 0.75}px`,
+                lineHeight: 1.05,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {subName}
+            </span>
+            {showOrnaments && (
+              <div className="h-[1px] bg-current flex-1 max-w-[30px] relative">
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-0.5 bg-current rotate-45" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {layout === "split" && showOrnaments && (
+          <div className="flex items-center justify-center gap-1.5 my-1" style={{ color: accentClr }}>
+            <svg className="w-10 h-2.5" style={{ transform: "scaleX(-1)" }} viewBox="0 0 60 16" fill="none" stroke="currentColor" strokeWidth="1.2">
+              <path d="M0,8 H30 C38,8 42,14 46,14 C52,14 54,8 46,4 C40,0 34,8 44,10 C46,10.5 48,10 48,10" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.5 7.2c-1-1.5-2.8-2.2-4-1.2-1.3 1.1-.8 3.1 1.2 3.8 1.8.6 2.8-2.6 2.8-2.6z" />
+              <path d="M12.5 7.2c1-1.5 2.8-2.2 4-1.2 1.3 1.1.8 3.1-1.2 3.8-1.8.6-2.8-2.6-2.8-2.6z" />
+              <circle cx="12" cy="7.5" r="1.2" fill="currentColor" />
+              <path d="M 5 9 L 11.25 9 L 11.25 11.5 L 5 11.5 Z" />
+              <path d="M 12.75 9 L 19 9 L 19 11.5 L 12.75 11.5 Z" />
+              <path d="M 6 12.25 L 11.25 12.25 L 11.25 19 L 6 19 Z" />
+              <path d="M 12.75 12.25 L 18 12.25 L 18 19 L 12.75 19 Z" />
+            </svg>
+            <svg className="w-10 h-2.5" viewBox="0 0 60 16" fill="none" stroke="currentColor" strokeWidth="1.2">
+              <path d="M0,8 H30 C38,8 42,14 46,14 C52,14 54,8 46,4 C40,0 34,8 44,10 C46,10.5 48,10 48,10" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        )}
+
+        <div className="flex items-center justify-center gap-1.5 mt-1">
+          {showOrnaments && <div className="h-[1px] flex-1 max-w-[20px]" style={{ background: `linear-gradient(to right, transparent, ${accentClr})` }} />}
+          {showOrnaments && <span className="text-[7px]" style={{ color: accentClr }}>✦</span>}
+          <span
+            style={{
+              fontFamily: taglineFont,
+              fontStyle: isTaglineSans ? "normal" : 'italic',
+              fontSize: `${taglineFontSize * 0.75}px`,
+              fontWeight: 600,
+              color: textClr,
+              letterSpacing: '0.04em'
+            }}
+          >
+            {tagline || "The Complete Gift Store"}
+          </span>
+          {showOrnaments && <span className="text-[7px]" style={{ color: accentClr }}>✦</span>}
+          {showOrnaments && <div className="h-[1px] flex-1 max-w-[20px]" style={{ background: `linear-gradient(to left, transparent, ${accentClr})` }} />}
+        </div>
+
+        {showOrnaments && (
+          <div className="flex justify-center mt-1.5 mb-1" style={{ color: accentClr }}>
+            <svg className="w-24 h-3" viewBox="0 0 120 12" fill="none" stroke="currentColor" strokeWidth="1">
+              <path d="M10,6 H50 C54,6 56,2 60,6 C64,2 66,6 70,6 H110" strokeLinecap="round"/>
+              <circle cx="60" cy="6" r="1" fill="currentColor"/>
+              <path d="M57,6 C58,4 62,4 63,6" strokeLinecap="round"/>
+              <polygon points="60,2 58,5 60,8 62,5" fill="currentColor"/>
+            </svg>
+          </div>
+        )}
+      </div>
+
+      <div className="text-center leading-snug mt-1.5 space-y-0.5 border-b border-dashed pb-2"
+           style={{
+             fontFamily: addressPhoneFont,
+             fontSize: `${addressPhoneFontSize * 0.75}px`,
+             color: textClr
+           }}>
+        {address && (
+          <div className="flex items-center justify-center gap-1 px-1">
+            <svg className="w-2.5 h-2.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+            <span className="font-semibold truncate">{address}</span>
+          </div>
+        )}
+        {phone && (
+          <div className="flex items-center justify-center gap-1">
+            <svg className="w-2.5 h-2.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+            </svg>
+            <span className="font-bold">Phone: {phone}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Mock Receipt Item Table */}
+      <div className="mt-2 text-[8px] font-mono leading-tight space-y-1">
+        <div className="flex justify-between border-b pb-0.5">
+          <span>Item</span>
+          <span>Qty</span>
+          <span>Amt</span>
+        </div>
+        <div className="flex justify-between">
+          <span>🧸 TEDDY BEAR LARGE</span>
+          <span>1</span>
+          <span>₹799.00</span>
+        </div>
+        <div className="flex justify-between">
+          <span>🎁 GIFT BOX SPECIAL</span>
+          <span>1</span>
+          <span>₹120.00</span>
+        </div>
+        <div className="flex justify-between border-t border-dashed pt-0.5 font-bold">
+          <span>NET TOTAL</span>
+          <span className="text-right">₹919.00</span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -31,6 +31,20 @@ export interface StoreSettings {
    *  from Settings → Customization. Default on for the festive feel; turn
    *  off if it feels too busy or for a clinical look. */
   bulbLaariEnabled: boolean;
+  // Header Customization Settings
+  headerLayout?: "split" | "single";
+  headerFontFamily?: "Cinzel" | "Playfair Display" | "Inter" | "Courier New" | "Georgia" | "Montserrat" | "Sacramento" | "Great Vibes" | "Lora" | "Rubik" | "Oswald";
+  headerBrandFontFamily?: "Cinzel" | "Playfair Display" | "Inter" | "Courier New" | "Georgia" | "Montserrat" | "Sacramento" | "Great Vibes" | "Lora" | "Rubik" | "Oswald";
+  headerSubtitleFontFamily?: "Cinzel" | "Playfair Display" | "Inter" | "Courier New" | "Georgia" | "Montserrat" | "Sacramento" | "Great Vibes" | "Lora" | "Rubik" | "Oswald";
+  headerTaglineFontFamily?: "Cinzel" | "Playfair Display" | "Inter" | "Courier New" | "Georgia" | "Montserrat" | "Sacramento" | "Great Vibes" | "Lora" | "Rubik" | "Oswald";
+  headerAddressPhoneFontFamily?: "Cinzel" | "Playfair Display" | "Inter" | "Courier New" | "Georgia" | "Montserrat" | "Sacramento" | "Great Vibes" | "Lora" | "Rubik" | "Oswald";
+  headerBrandFontSize?: number;
+  headerSubtitleFontSize?: number;
+  headerTaglineFontSize?: number;
+  headerAddressPhoneFontSize?: number;
+  headerLogoSize?: number;
+  headerColorTheme?: "black" | "gold-navy";
+  headerShowOrnaments?: boolean;
 }
 
 interface StoreSettingsStore extends StoreSettings {
@@ -69,6 +83,19 @@ const SETTINGS_DEFAULTS: StoreSettings = {
   scannerThresholdMs: 100,
   receiptPaperWidth:  "80mm",
   bulbLaariEnabled:   true,
+  headerLayout:       "split",
+  headerFontFamily:   "Playfair Display",
+  headerBrandFontFamily: "Playfair Display",
+  headerSubtitleFontFamily: "Playfair Display",
+  headerTaglineFontFamily: "Playfair Display",
+  headerAddressPhoneFontFamily: "Inter",
+  headerBrandFontSize: 28,
+  headerSubtitleFontSize: 25,
+  headerTaglineFontSize: 13,
+  headerAddressPhoneFontSize: 12,
+  headerLogoSize:     96,
+  headerColorTheme:   "black",
+  headerShowOrnaments: false,
 };
 
 export const useStoreSettings = create<StoreSettingsStore>()(
