@@ -49,7 +49,11 @@ type Tab = "overview" | "sales" | "receivables" | "inventory" | "customers";
 
 /* ── Utilities ──────────────────────────────────────────────────── */
 function todayIndia() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 const fmt   = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 const fmt2  = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
@@ -193,9 +197,13 @@ export default function Report() {
   }, [date, revDays]);
 
   const stepDate = (delta: number) => {
-    const d = new Date(date);
-    d.setDate(d.getDate() + delta);
-    setDate(d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }));
+    const [yyyy, mm, dd] = date.split("-").map(Number);
+    const d = new Date(Date.UTC(yyyy, mm - 1, dd));
+    d.setUTCDate(d.getUTCDate() + delta);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const dateVal = String(d.getUTCDate()).padStart(2, "0");
+    setDate(`${y}-${m}-${dateVal}`);
   };
 
   const formatDay = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
@@ -208,8 +216,12 @@ export default function Report() {
 
   /* Quick presets */
   const setRelative = (days: number) => {
-    const d = new Date(); d.setDate(d.getDate() - days);
-    setDate(d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }));
+    const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    d.setDate(d.getDate() - days);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    setDate(`${yyyy}-${mm}-${dd}`);
   };
 
   /* CSV builders — colocated with the data so they pick up format changes */

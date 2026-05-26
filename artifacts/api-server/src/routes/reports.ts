@@ -94,9 +94,13 @@ async function dailyTotals(targetDate: string, tenantId: string | null): Promise
 }
 
 function shiftDate(dateStr: string, days: number): string {
-  const d = new Date(dateStr + "T00:00:00");
+  const [yyyy, mm, dd] = dateStr.split("-").map(Number);
+  const d = new Date(Date.UTC(yyyy, mm - 1, dd));
   d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dateVal = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${dateVal}`;
 }
 
 /**
