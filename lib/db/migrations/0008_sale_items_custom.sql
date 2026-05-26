@@ -6,24 +6,53 @@
 -- and don't move inventory or stock logs — they only contribute revenue.
 --
 -- Schema changes:
---   1. sale_items.product_id  → nullable (was NOT NULL)
---   2. sale_items.custom_name → new TEXT column for manual line names
---   3. CHECK constraint        → exactly one of (product_id, custom_name) is set
---      (prevents totally orphaned rows; a sale item must identify itself)
+--   1. sale_items.custom_name → new TEXT column for manual line names
+--   2. sale_items.product_id  → nullable (was NOT NULL)
+--   3. backfill: orphan rows (no product_id, no custom_name) get a labelled
+--      placeholder so the new CHECK constraint can attach cleanly. This is
+--      a NO-DATA-LOSS path — financial fields (price, quantity, subtotal,
+--      sale_id) are untouched. Only the human-readable name is filled in.
+--   4. CHECK constraint → every sale_item must identify itself either by
+--      product_id (catalogue line) or custom_name (manual line).
 --
--- Idempotent.
+-- Fully idempotent. Re-running on a clean DB is a no-op; re-running on a
+-- partially-applied DB (e.g. previous boot got through the column add but
+-- failed on the constraint) finishes the job.
 
+-- 1) Add the custom_name column. Safe to re-run.
 ALTER TABLE sale_items
   ADD COLUMN IF NOT EXISTS custom_name TEXT;
 
--- Drop NOT NULL on product_id if it's still there. ALTER COLUMN ... DROP NOT NULL
--- is a no-op when the column is already nullable, so this is safe to re-run.
+-- 2) Drop NOT NULL on product_id. No-op if already nullable.
 ALTER TABLE sale_items
   ALTER COLUMN product_id DROP NOT NULL;
 
--- Sanity check: a sale item must point at a product OR carry a custom name.
--- We add the constraint via a guarded DO block so re-running the migration
--- doesn't error on "constraint already exists".
+-- 3) Backfill orphan rows BEFORE attempting the CHECK constraint.
+--
+--    Why this is here:
+--    A previous schema state allowed (or somehow ended up with) sale_items
+--    rows where product_id IS NULL — typically pre-NOT-NULL legacy data, or
+--    rows whose referenced product was hard-deleted in an earlier era. The
+--    new constraint says "either product_id OR custom_name must be set".
+--    If we attach it without backfilling, Postgres rejects it with:
+--
+--      check constraint "sale_items_product_or_custom_name_chk"
+--      of relation "sale_items" is violated by some row
+--
+--    and the entire migration aborts (which is exactly what was happening
+--    on the live deploy). The fix is to give those orphan rows a sensible
+--    label so the receipt and customer history stay readable, then attach
+--    the constraint.
+--
+--    This UPDATE only touches the offending rows (both fields NULL). All
+--    other rows are untouched. No quantities, prices, or subtotals change.
+UPDATE sale_items
+   SET custom_name = '(unknown item)'
+ WHERE product_id  IS NULL
+   AND custom_name IS NULL;
+
+-- 4) Attach the CHECK constraint. Guarded so re-runs don't error on
+--    "constraint already exists".
 DO $$
 BEGIN
   IF NOT EXISTS (
