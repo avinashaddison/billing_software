@@ -491,7 +491,7 @@ export default function Bill() {
                     style={{
                       fontFamily: "'Playfair Display', 'Cinzel', 'Palatino Linotype', Palatino, Georgia, serif",
                       fontWeight: 900,
-                      fontSize: mainName.length > 15 ? "20px" : (mainName.length > 10 ? "25px" : "30px"),
+                      fontSize: mainName.length > 15 ? "22px" : (mainName.length > 10 ? "28px" : "34px"),
                       lineHeight: 1.05,
                       letterSpacing: "0.02em",
                       textTransform: "uppercase",
@@ -507,7 +507,7 @@ export default function Bill() {
                     style={{
                       fontFamily: "'Playfair Display', 'Cinzel', 'Palatino Linotype', Palatino, Georgia, serif",
                       fontWeight: 900,
-                      fontSize: subName.length > 12 ? "18px" : (subName.length > 8 ? "22px" : "26px"),
+                      fontSize: subName.length > 12 ? "20px" : (subName.length > 8 ? "25px" : "30px"),
                       lineHeight: 1.05,
                       letterSpacing: "0.04em",
                       textTransform: "uppercase",
