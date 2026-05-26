@@ -13,8 +13,21 @@ export const saleItemsTable = pgTable(
     saleId: uuid("sale_id")
       .notNull()
       .references(() => billsTable.id),
+    /**
+     * Pointer to the product this line came from. NULL when the line is a
+     * MANUAL / NON-INVENTORY item (e.g. a gift brought from outside, an
+     * ad-hoc service charge). For manual lines we store the human label in
+     * `customName` instead. Exactly one of (productId, customName) is set —
+     * enforced by a DB CHECK constraint.
+     */
     productId: uuid("product_id")
       .references(() => productsTable.id),
+    /**
+     * Display name for a MANUAL line item. NULL on regular catalogue lines.
+     * Bills, receipts and customer history fall back to this when productId
+     * is NULL so the line still prints with a meaningful description.
+     */
+    customName: text("custom_name"),
     quantity: integer("quantity").notNull(),
     price: numeric("price", { precision: 15, scale: 2 }).notNull(),
     mrp: numeric("mrp", { precision: 15, scale: 2 }),

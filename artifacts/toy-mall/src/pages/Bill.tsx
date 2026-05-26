@@ -16,6 +16,10 @@ interface BillItem {
   discountType?:    "percent" | "amount" | null;
   discountValue?:   number | null;
   subtotal: number;
+  /** True for MANUAL / non-inventory lines (gift wrap, customer's own
+   *  item, ad-hoc service charge). The server returns this flag so the
+   *  return modal can exclude them — there's no stock to put back. */
+  isManual?: boolean;
 }
 
 interface BillData {
@@ -81,9 +85,13 @@ function numberToIndianWords(num: number): string {
 
 /* ─── Return modal ───────────────────────────────────────────────── */
 function ReturnModal({ billId, items, onClose }: { billId: string; items: BillItem[]; onClose: (restocked: boolean) => void }) {
+  // Manual / non-inventory lines have no stock to restock. We exclude them
+  // from the return UI entirely — refunding cash on a gift-wrap charge is
+  // a different workflow (cashier hands back cash, no backend action).
+  const returnableItems = items.filter((i) => !i.isManual);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qtys, setQtys]         = useState<Record<string, number>>(() =>
-    Object.fromEntries(items.map((i) => [i.id, i.quantity]))
+    Object.fromEntries(returnableItems.map((i) => [i.id, i.quantity]))
   );
   const [processing, setProcessing] = useState(false);
   const [reason, setReason]         = useState("Customer return");
@@ -97,7 +105,7 @@ function ReturnModal({ billId, items, onClose }: { billId: string; items: BillIt
     try {
       /* Build items using productId (not the sale-item id) */
       const returnItems = Array.from(selected).map((saleItemId) => {
-        const item = items.find((i) => i.id === saleItemId)!;
+        const item = returnableItems.find((i) => i.id === saleItemId)!;
         return { productId: item.productId, quantity: qtys[saleItemId] };
       });
       const r = await fetch(`${BASE_URL}/api/returns`, {
@@ -130,7 +138,19 @@ function ReturnModal({ billId, items, onClose }: { billId: string; items: BillIt
         </div>
         <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
           <p className="text-xs text-muted-foreground">Select items to return. Stock will be automatically restocked.</p>
-          {items.map((item) => {
+          {returnableItems.length === 0 && (
+            <div className="rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 px-3 py-3 text-xs text-amber-700 dark:text-amber-300 leading-snug">
+              This bill only contains <b>manual</b> line items (no SKU, no stock).
+              Manual lines can't be returned through this flow — refund the cash
+              directly to the customer.
+            </div>
+          )}
+          {items.some((i) => i.isManual) && returnableItems.length > 0 && (
+            <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-snug">
+              Manual items on this bill are not shown — they have no stock to restock.
+            </p>
+          )}
+          {returnableItems.map((item) => {
             const isSel = selected.has(item.id);
             return (
               <div key={item.id} className={`p-3 rounded-xl border transition-all ${isSel ? "border-orange-400 bg-orange-50 dark:bg-orange-950/20" : "border-border"}`}>

@@ -105,6 +105,7 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
       saleId:      saleItemsTable.saleId,
       productName: productsTable.name,
       productSku:  productsTable.sku,
+      customName:  saleItemsTable.customName,
       quantity:    saleItemsTable.quantity,
       price:       saleItemsTable.price,
       subtotal:    saleItemsTable.subtotal,
@@ -114,7 +115,10 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
     .where(inArray(saleItemsTable.saleId, billIds))
     .orderBy(desc(saleItemsTable.createdAt));
 
-  /* Top 5 most-purchased products (by total quantity) grouped by productId */
+  /* Top 5 most-purchased products (by total quantity) grouped by productId.
+   * Manual / non-inventory lines (productId NULL) are intentionally excluded
+   * — they're one-offs with no SKU, so aggregating them as "top products"
+   * would be meaningless. */
   const topProductsRaw = await db
     .select({
       productId:   saleItemsTable.productId,
@@ -122,7 +126,7 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
       totalQty:    sql<number>`SUM(${saleItemsTable.quantity})`.as("total_qty"),
     })
     .from(saleItemsTable)
-    .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
+    .innerJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
     .where(inArray(saleItemsTable.saleId, billIds))
     .groupBy(saleItemsTable.productId, productsTable.name)
     .orderBy(desc(sql`SUM(${saleItemsTable.quantity})`))
@@ -175,7 +179,8 @@ router.get("/customers/:phone", async (req, res): Promise<void> => {
         refundedAmount,
         items: (itemsByBill[b.id] ?? []).map((i) => ({
           ...i,
-          productName: i.productName ?? "Deleted Product",
+          // Fallback chain: catalogue name → manual line name → "Deleted Product".
+          productName: i.productName ?? i.customName ?? "Deleted Product",
           productSku:  i.productSku  ?? "—",
           price:       Number(i.price),
           subtotal:    Number(i.subtotal),

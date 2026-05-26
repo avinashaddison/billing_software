@@ -15,6 +15,12 @@ export interface CartItem {
   discountAmount?: number;
   /** Which discount mode is active for this line. Default: "percent". */
   discountType?: LineDiscountType;
+  /** True when this is a MANUAL / non-inventory line (e.g. customer's own
+   *  gift, ad-hoc service charge). Manual lines have no SKU, no stock, no
+   *  MRP, and don't sync to the shared cart. The `productId` for manual
+   *  items is a client-generated string prefixed with "manual-" so it
+   *  remains a stable React key without colliding with real product UUIDs. */
+  isManual?: boolean;
 }
 
 interface CartContextType {
@@ -22,6 +28,11 @@ interface CartContextType {
   count:            number;
   total:            number;
   addItem:          (item: Omit<CartItem, "quantity">) => void;
+  /** Add a manual / non-inventory line (gift wrap, customer's own item,
+   *  ad-hoc service). Each call creates a NEW line — manual items are
+   *  never deduplicated, since two "Custom" entries with the same name
+   *  may legitimately represent two different things at the same price. */
+  addCustomItem:    (input: { name: string; price: number; quantity?: number }) => void;
   removeItem:       (productId: string) => void;
   updateQty:        (productId: string, qty: number) => void;
   setLineDiscount:  (productId: string, type: LineDiscountType, value: number) => void;
@@ -130,16 +141,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
      Called by use-realtime.ts when a cart_updated SSE event arrives.
      Compares count + total to avoid re-renders when we're the source
      of the event (echo-loop prevention).
+
+     Manual / non-inventory lines (productId starts with "manual-") are
+     preserved across server syncs — they're device-local by design and
+     wouldn't be present in the shared cart payload, so we re-attach
+     them on top of whatever the server sent.
   ─────────────────────────────────────────────────────────────────── */
   const syncFromServer = useCallback((serverItems: CartItem[]) => {
     setItems((prev) => {
-      const prevCount  = prev.reduce((s, i) => s + i.quantity, 0);
+      const localManual = prev.filter((i) => i.productId.startsWith("manual-"));
+      // Compare ONLY the catalogue portion against the server payload.
+      const prevCatalogue  = prev.filter((i) => !i.productId.startsWith("manual-"));
+      const prevCount  = prevCatalogue.reduce((s, i) => s + i.quantity, 0);
       const srvCount   = serverItems.reduce((s, i) => s + i.quantity, 0);
-      const prevTotal  = prev.reduce((s, i) => s + i.price * i.quantity, 0);
+      const prevTotal  = prevCatalogue.reduce((s, i) => s + i.price * i.quantity, 0);
       const srvTotal   = serverItems.reduce((s, i) => s + i.price * i.quantity, 0);
       // Skip if state is already identical (avoids echo from own SSE broadcast)
       if (prevCount === srvCount && Math.abs(prevTotal - srvTotal) < 0.01) return prev;
-      return serverItems;
+      // Server replaces the catalogue portion; manual lines stay.
+      return [...serverItems, ...localManual];
     });
   }, []);
 
@@ -164,20 +184,57 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const addCustomItem = useCallback(
+    ({ name, price, quantity = 1 }: { name: string; price: number; quantity?: number }) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const safePrice = Math.max(0, Number.isFinite(price) ? price : 0);
+      const safeQty   = Math.max(1, Math.floor(Number.isFinite(quantity) ? quantity : 1));
+      // Stable client-side ID — prefixed with "manual-" so we can detect it
+      // anywhere in the cart pipeline. crypto.randomUUID is available in
+      // every supported browser (and Node 19+, for the rare SSR case).
+      const id = `manual-${
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      }`;
+      setItems((prev) => [
+        ...prev,
+        {
+          productId: id,
+          sku:       "—",
+          name:      trimmed,
+          quantity:  safeQty,
+          price:     safePrice,
+          isManual:  true,
+        },
+      ]);
+      // Manual lines stay LOCAL to this device. The shared-cart endpoint
+      // is keyed by productId and assumes a real catalogue row; pushing
+      // a "manual-…" id there would either be rejected or echo back to
+      // other devices that can't render it. Keep it on-device.
+    },
+    [],
+  );
+
   const removeItem = useCallback((productId: string) => {
     setItems((prev) => prev.filter((i) => i.productId !== productId));
-    serverSync("DELETE", `/${encodeURIComponent(productId)}`);
+    // Manual lines are device-local — no shared-cart row to delete.
+    if (!productId.startsWith("manual-")) {
+      serverSync("DELETE", `/${encodeURIComponent(productId)}`);
+    }
   }, []);
 
   const updateQty = useCallback((productId: string, qty: number) => {
+    const isManual = productId.startsWith("manual-");
     if (qty <= 0) {
       setItems((prev) => prev.filter((i) => i.productId !== productId));
-      serverSync("DELETE", `/${encodeURIComponent(productId)}`);
+      if (!isManual) serverSync("DELETE", `/${encodeURIComponent(productId)}`);
     } else {
       setItems((prev) =>
         prev.map((i) => (i.productId === productId ? { ...i, quantity: qty } : i))
       );
-      serverSync("PATCH", `/${encodeURIComponent(productId)}`, { quantity: qty });
+      if (!isManual) serverSync("PATCH", `/${encodeURIComponent(productId)}`, { quantity: qty });
     }
   }, []);
 
@@ -220,8 +277,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ items, count, total, addItem, removeItem, updateQty, setLineDiscount, clearCart, syncFromServer }),
-    [items, count, total, addItem, removeItem, updateQty, setLineDiscount, clearCart, syncFromServer]
+    () => ({ items, count, total, addItem, addCustomItem, removeItem, updateQty, setLineDiscount, clearCart, syncFromServer }),
+    [items, count, total, addItem, addCustomItem, removeItem, updateQty, setLineDiscount, clearCart, syncFromServer]
   );
 
   return (
