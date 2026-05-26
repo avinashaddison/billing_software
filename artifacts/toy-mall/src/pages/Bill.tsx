@@ -284,23 +284,29 @@ export default function Bill() {
         // CSS @page margin so the safe area itself isn't squeezed further.
         const contentWidth = paperWidth === "58mm" ? "54mm" : "72mm";
 
-        // ── Why a giant fixed page height instead of `auto` ──
+        // ── Page height: let the content determine it ──
         // `size: 80mm auto` is the spec-compliant way to ask the browser
-        // for "one page, as tall as the content". In practice, many
-        // Windows thermal drivers (incl. the generic "80mm Series Printer")
-        // report a FIXED default paper length (often ~297mm), and Chrome
-        // paginates against that — so any receipt taller than ~297mm is
-        // split into 2 sheets in the print preview, which becomes 2 cut
-        // receipts on a continuous roll.
+        // for "one page, as tall as the content". This is what we want for
+        // a continuous thermal roll — the printer feeds paper only for the
+        // actual ink marks.
         //
-        // Declaring a very tall page height (3276mm is Chromium's max)
-        // forces the receipt onto a single logical page. The thermal
-        // printer only feeds paper for actual ink marks, so no blank
-        // tape is wasted.
+        // We previously hard-coded a giant 3276mm height to dodge a corner
+        // case where some Windows drivers report a fixed paper length and
+        // would split a long bill across 2 sheets. That workaround had a
+        // worse side-effect: when the user's selected paper preset has a
+        // FIXED length (e.g. the common "80(72) x 297 mm" option on the
+        // generic 80mm Series Printer), Chrome scales the 3276mm logical
+        // page down to fit one 297mm sheet, shrinking the whole receipt
+        // ~11x and rendering it as a thumbnail at the top of a blank page.
+        //
+        // `auto` prints at the correct physical size on every printer we
+        // care about. If a fixed-length driver eventually paginates a very
+        // long bill, that's an acceptable trade-off versus an unreadable
+        // print.
         return (
           <style>{`
             @page {
-              size: ${paperWidth} 3276mm;
+              size: ${paperWidth} auto;
               margin: 0;
             }
 
