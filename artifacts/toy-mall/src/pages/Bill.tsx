@@ -491,11 +491,12 @@ export default function Bill() {
                     style={{
                       fontFamily: "'Playfair Display', 'Cinzel', 'Palatino Linotype', Palatino, Georgia, serif",
                       fontWeight: 900,
-                      fontSize: mainName.length > 15 ? "32px" : "38px",
+                      fontSize: mainName.length > 15 ? "20px" : (mainName.length > 10 ? "25px" : "30px"),
                       lineHeight: 1.05,
                       letterSpacing: "0.02em",
                       textTransform: "uppercase",
                       color: "#000",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {renderedMainName}
@@ -506,12 +507,13 @@ export default function Bill() {
                     style={{
                       fontFamily: "'Playfair Display', 'Cinzel', 'Palatino Linotype', Palatino, Georgia, serif",
                       fontWeight: 900,
-                      fontSize: subName.length > 12 ? "26px" : "32px",
+                      fontSize: subName.length > 12 ? "18px" : (subName.length > 8 ? "22px" : "26px"),
                       lineHeight: 1.05,
                       letterSpacing: "0.04em",
                       textTransform: "uppercase",
                       color: "#000",
                       marginTop: "2px",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {subName}
