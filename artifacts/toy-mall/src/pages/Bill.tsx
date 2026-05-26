@@ -323,7 +323,7 @@ export default function Bill() {
         // thumbnail, so `auto` is the right default.
         return (
           <style>{`
-            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700&display=swap');
 
             @page {
               size: ${paperWidth} auto;
@@ -332,6 +332,12 @@ export default function Bill() {
 
 
             @media print {
+              /* Ensure the gold accents and premium styling elements print with exact colors */
+              .receipt-gold-print, .receipt-gold-print * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+
               /* Hard-hide the screen-only chrome (top bar, etc.). Using
                  display:none (not visibility:hidden) so the elements no
                  longer reserve layout space and the receipt can sit at
@@ -443,84 +449,168 @@ export default function Bill() {
           <div className="px-4 py-4 text-[12px] leading-snug">
 
             {/* ── STORE HEADER ── */}
-            {store.logoUrl ? (
-              /* Centered logo above large elegant store name */
-              <div className="text-center">
-                <img src={store.logoUrl} alt={store.name}
-                     className="mx-auto h-16 w-auto max-w-[80px] object-contain mb-2"
-                     style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
-                <div
-                  style={{
-                    fontFamily: "'Cinzel', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif",
-                    fontWeight: 900,
-                    fontSize: store.name.length > 20 ? "24px" : "30px",
-                    lineHeight: 1.1,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "#000",
-                  } as any}
-                >
-                  {store.name}
-                </div>
-                {store.tagline && (
-                  <div
-                    style={{
-                      fontFamily: "'Cinzel', Georgia, serif",
-                      fontSize: "10px",
-                      fontStyle: "italic",
-                      letterSpacing: "0.1em",
-                      color: "#444",
-                      marginTop: "5px",
-                    } as any}
-                  >
-                    ✦ {store.tagline} ✦
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Elegant centered header with decorative ornament frame */
-              <div className="text-center" style={{ padding: '4px 0' }}>
-                <div style={{ fontSize: '9px', letterSpacing: '0.4em', color: '#999', marginBottom: '5px' }}>
-                  ✦ ─────── ✦
-                </div>
-                <div
-                  style={{
-                    fontFamily: "'Cinzel', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif",
-                    fontWeight: 900,
-                    fontSize: store.name.length > 22 ? "26px" : "32px",
-                    lineHeight: 1.05,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    color: "#000",
-                  } as any}
-                >
-                  {store.name}
-                </div>
-                {store.tagline && (
-                  <div
-                    style={{
-                      fontFamily: "'Cinzel', Georgia, serif",
-                      fontSize: "11px",
-                      fontStyle: "italic",
-                      letterSpacing: "0.08em",
-                      color: "#444",
-                      marginTop: "5px",
-                    } as any}
-                  >
-                    ─ {store.tagline} ─
-                  </div>
-                )}
-                <div style={{ fontSize: '9px', letterSpacing: '0.4em', color: '#999', marginTop: '5px' }}>
-                  ✦ ─────── ✦
-                </div>
-              </div>
-            )}
+            {(() => {
+              const storeName = store.name || "HIRA & SON GIFT SHOP";
+              let mainName = storeName;
+              let subName = store.tagline || "GIFT SHOP";
 
-            <div className="text-center text-[10.5px] leading-tight mt-2.5 space-y-px">
-              <div>{store.address}</div>
-              <div>Phone : <span className="font-semibold">{store.phone}</span></div>
+              // Try to split at "Gift Shop" or "Gifts"
+              const giftShopRegex = /(.*?)\s*\b(gift\s+shop|gifts\s+shop|gift\s+store|gifts)\b/i;
+              const match = storeName.match(giftShopRegex);
+              if (match) {
+                mainName = match[1].trim();
+                subName = match[2].trim();
+              }
+
+              // Style the ampersand if it exists
+              const ampersandRegex = /(.*?)\s*([&]|and)\s*(.*)/i;
+              const ampMatch = mainName.match(ampersandRegex);
+              let renderedMainName;
+              if (ampMatch) {
+                renderedMainName = (
+                  <>
+                    {ampMatch[1]} <span className="font-playfair italic text-[#c5a85a] font-normal" style={{ fontSize: "1.1em", verticalAlign: "middle" }}>&amp;</span> {ampMatch[3]}
+                  </>
+                );
+              } else {
+                renderedMainName = mainName;
+              }
+
+              return (
+                <div className="text-center receipt-gold-print" style={{ padding: '4px 0' }}>
+                  {store.logoUrl && (
+                    <img src={store.logoUrl} alt={store.name}
+                         className="mx-auto h-12 w-auto max-w-[70px] object-contain mb-2"
+                         style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
+                  )}
+
+                  {/* Top Ornament */}
+                  <div className="flex justify-center mb-1">
+                    <svg className="w-32 h-4 text-[#c5a85a]" viewBox="0 0 120 12" fill="none" stroke="currentColor" strokeWidth="1">
+                      <path d="M10,6 H50 C54,6 56,2 60,6 C64,2 66,6 70,6 H110" strokeLinecap="round"/>
+                      <circle cx="60" cy="6" r="1" fill="currentColor"/>
+                      <path d="M57,6 C58,4 62,4 63,6" strokeLinecap="round"/>
+                      <polygon points="60,2 58,5 60,8 62,5" fill="currentColor"/>
+                    </svg>
+                  </div>
+
+                  {/* Main Shop Name */}
+                  <div
+                    style={{
+                      fontFamily: "'Playfair Display', 'Cinzel', 'Palatino Linotype', Palatino, Georgia, serif",
+                      fontWeight: 900,
+                      fontSize: mainName.length > 15 ? "28px" : "34px",
+                      lineHeight: 1.1,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      color: "#0a1c36",
+                    }}
+                  >
+                    {renderedMainName}
+                  </div>
+
+                  {/* GIFT SHOP Subtitle with lines */}
+                  <div className="flex items-center justify-center gap-3 my-1">
+                    <div className="h-[1px] bg-[#c5a85a] flex-1 max-w-[60px] relative">
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-1 bg-[#c5a85a] rotate-45" />
+                    </div>
+                    <span
+                      style={{
+                        color: '#c5a85a',
+                        fontFamily: "'Cinzel', 'Playfair Display', serif",
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        letterSpacing: '0.25em',
+                        textTransform: 'uppercase'
+                      }}
+                    >
+                      {subName}
+                    </span>
+                    <div className="h-[1px] bg-[#c5a85a] flex-1 max-w-[60px] relative">
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1 bg-[#c5a85a] rotate-45" />
+                    </div>
+                  </div>
+
+                  {/* Gift Icon & Flourish */}
+                  <div className="flex items-center justify-center gap-2 my-1.5">
+                    {/* Left Flourish SVG */}
+                    <svg className="w-14 h-3.5 text-[#c5a85a]" style={{ transform: "scaleX(-1)" }} viewBox="0 0 60 16" fill="none" stroke="currentColor" strokeWidth="1.2">
+                      <path d="M0,8 H30 C38,8 42,14 46,14 C52,14 54,8 46,4 C40,0 34,8 44,10 C46,10.5 48,10 48,10" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+
+                    {/* Gift Box SVG with cutouts */}
+                    <svg className="w-6 h-6 text-[#c5a85a]" viewBox="0 0 24 24" fill="currentColor">
+                      {/* Left loop of the bow */}
+                      <path d="M11.5 7.2c-1-1.5-2.8-2.2-4-1.2-1.3 1.1-.8 3.1 1.2 3.8 1.8.6 2.8-2.6 2.8-2.6z" />
+                      {/* Right loop of the bow */}
+                      <path d="M12.5 7.2c1-1.5 2.8-2.2 4-1.2 1.3 1.1.8 3.1-1.2 3.8-1.8.6-2.8-2.6-2.8-2.6z" />
+                      {/* Center knot */}
+                      <circle cx="12" cy="7.5" r="1.2" fill="currentColor" />
+                      {/* Lid (divided by vertical ribbon space) */}
+                      <path d="M 5 9 L 11.25 9 L 11.25 11.5 L 5 11.5 Z" />
+                      <path d="M 12.75 9 L 19 9 L 19 11.5 L 12.75 11.5 Z" />
+                      {/* Box body (divided by vertical ribbon space) */}
+                      <path d="M 6 12.25 L 11.25 12.25 L 11.25 19 L 6 19 Z" />
+                      <path d="M 12.75 12.25 L 18 12.25 L 18 19 L 12.75 19 Z" />
+                    </svg>
+
+                    {/* Right Flourish SVG */}
+                    <svg className="w-14 h-3.5 text-[#c5a85a]" viewBox="0 0 60 16" fill="none" stroke="currentColor" strokeWidth="1.2">
+                      <path d="M0,8 H30 C38,8 42,14 46,14 C52,14 54,8 46,4 C40,0 34,8 44,10 C46,10.5 48,10 48,10" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+
+                  {/* Tagline / Complete Gift Store */}
+                  <div className="flex items-center justify-center gap-2.5 my-1">
+                    <div className="h-[1px] bg-gradient-to-r from-transparent to-[#c5a85a] flex-1 max-w-[30px]" style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
+                    <span className="text-[#c5a85a] text-[9px] relative -top-[1px]">✦</span>
+                    <span
+                      style={{
+                        fontFamily: "'Playfair Display', Georgia, serif",
+                        fontStyle: 'italic',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        color: '#444',
+                        letterSpacing: '0.04em'
+                      }}
+                    >
+                      {store.tagline || "The Complete Gift Store"}
+                    </span>
+                    <span className="text-[#c5a85a] text-[9px] relative -top-[1px]">✦</span>
+                    <div className="h-[1px] bg-gradient-to-l from-transparent to-[#c5a85a] flex-1 max-w-[30px]" style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
+                  </div>
+
+                  {/* Bottom Ornament */}
+                  <div className="flex justify-center mt-2 mb-1">
+                    <svg className="w-32 h-4 text-[#c5a85a]" viewBox="0 0 120 12" fill="none" stroke="currentColor" strokeWidth="1">
+                      <path d="M10,6 H50 C54,6 56,10 60,6 C64,10 66,6 70,6 H110" strokeLinecap="round"/>
+                      <circle cx="60" cy="6" r="1" fill="currentColor"/>
+                      <path d="M57,6 C58,8 62,8 63,6" strokeLinecap="round"/>
+                      <polygon points="60,10 58,7 60,4 62,7" fill="currentColor"/>
+                    </svg>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="text-center text-[10.5px] leading-tight mt-2.5 space-y-1">
+              {store.address && (
+                <div className="flex items-center justify-center gap-1.5 px-2">
+                  <svg className="w-3.5 h-3.5 text-[#0a1c36] shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                  </svg>
+                  <span>{store.address}</span>
+                </div>
+              )}
+              {store.phone && (
+                <div className="flex items-center justify-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-[#0a1c36] shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+                  </svg>
+                  <span>Phone : <span className="font-semibold">{store.phone}</span></span>
+                </div>
+              )}
               {store.email && <div>E-Mail : {store.email}</div>}
-              {store.gst && <div>GSTIN : <span className="font-semibold">{store.gst}</span></div>}
             </div>
 
             <div className="text-center font-black text-[11px] tracking-[0.25em] mt-2.5 mb-1.5 border-y border-black py-0.5 uppercase">Invoice</div>
