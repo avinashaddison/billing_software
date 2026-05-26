@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, PencilLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -28,15 +28,30 @@ export function SideNav() {
   const perm    = (resource: string) => getLevel(role, permissions, resource);
   const visible = (resource: string) => perm(resource) !== "none";
 
+  /* See BottomNav for context. When already on /checkout, wouter's Link
+     doesn't remount Checkout — so the URL flag wouldn't open the dialog.
+     Fire an event in that case to nudge the open-state directly. */
+  const isOnCheckout = location === "/checkout";
+  const handleManualClick = (e: React.MouseEvent) => {
+    if (isOnCheckout) {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent("checkout:open-manual"));
+    }
+  };
+
   /* Profile intentionally NOT here — it lives in the footer chip (clickable),
    * which both avoids the two-paths-to-same-page redundancy and frees a slot
    * in the main nav for the busier daily-driver pages. */
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: Home,         highlight: false, resource: "dashboard" },
-    { name: "Products",  href: "/products",  icon: Package,      highlight: false, resource: "products"  },
-    { name: "Scan",      href: "/scan",      icon: ScanLine,     highlight: true,  resource: "scan"      },
-    { name: "Billing",   href: "/billing",   icon: IndianRupee,  highlight: false, resource: "billing"   },
-    { name: "Logs",      href: "/logs",      icon: Clock,        highlight: false, resource: "logs"      },
+    { name: "Dashboard",   href: "/dashboard",         icon: Home,        highlight: false, resource: "dashboard" },
+    { name: "Products",    href: "/products",          icon: Package,     highlight: false, resource: "products"  },
+    { name: "Scan",        href: "/scan",              icon: ScanLine,    highlight: true,  resource: "scan"      },
+    /* Manual Bill — deep-links to /checkout with ?manual=1 so the dialog
+       auto-opens on arrival. Sits next to the bread-and-butter Billing
+       link because it creates a bill the same way. */
+    { name: "Manual Bill", href: "/checkout?manual=1", icon: PencilLine,  highlight: false, resource: "billing"   },
+    { name: "Billing",     href: "/billing",           icon: IndianRupee, highlight: false, resource: "billing"   },
+    { name: "Logs",        href: "/logs",              icon: Clock,       highlight: false, resource: "logs"      },
   ].filter((item) => !item.resource || visible(item.resource));
 
   const extraItems = [
@@ -190,6 +205,7 @@ export function SideNav() {
 
           return (
             <Link key={item.name} href={item.href}
+              onClick={item.name === "Manual Bill" ? handleManualClick : undefined}
               className={cn(
                 "flex items-center gap-3 px-3 py-3 rounded-xl font-semibold transition-all",
                 isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"

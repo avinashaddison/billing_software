@@ -43,20 +43,39 @@ export async function refundsByBill(billIds: string[]): Promise<Map<string, numb
 
 type PaymentMode = "cash" | "upi" | "credit";
 
+/** Catalogue (real product) line item shape. */
+type CatalogLineItem = {
+  productId:        string;
+  quantity:         number;
+  price:            number;
+  mrp?:             number;
+  preDiscountPrice?: number;
+  discountType?:    "percent" | "amount";
+  discountValue?:   number;
+};
+
+/** Manual / non-inventory line item shape (e.g. customer's own gift,
+ *  one-off service charge). No stock movement, no SKU, no MRP. */
+type ManualLineItem = {
+  /** Display name printed on the receipt. */
+  name:     string;
+  quantity: number;
+  price:    number;
+};
+
+type CheckoutLineItem = CatalogLineItem | ManualLineItem;
+
+function isManualLine(it: CheckoutLineItem): it is ManualLineItem {
+  return typeof (it as ManualLineItem).name === "string"
+      && typeof (it as CatalogLineItem).productId !== "string";
+}
+
 function isValidCheckoutBody(body: unknown): body is {
-  items: Array<{
-    productId: string;
-    quantity: number;
-    price: number;
-    mrp?: number;
-    preDiscountPrice?: number;
-    discountType?: "percent" | "amount";
-    discountValue?: number;
-  }>;
-  paymentMode: PaymentMode;
+  items:        CheckoutLineItem[];
+  paymentMode:  PaymentMode;
   customerName?: string;
   customerPhone?: string;
-  discount?: number;
+  discount?:     number;
   discountType?: "percent" | "amount";
 } {
   if (!body || typeof body !== "object") return false;
@@ -87,9 +106,22 @@ function isValidCheckoutBody(body: unknown): body is {
   return b.items.every((item) => {
     if (!item || typeof item !== "object") return false;
     const it = item as Record<string, unknown>;
-    if (typeof it.productId !== "string") return false;
+
+    // Common fields for both shapes
     if (typeof it.quantity !== "number" || (it.quantity as number) <= 0) return false;
-    if (typeof it.price !== "number" || (it.price as number) < 0) return false;
+    if (typeof it.price    !== "number" || (it.price    as number) <  0) return false;
+
+    // Manual line: requires `name`, forbids productId/MRP/discount fields
+    if (typeof it.name === "string" && typeof it.productId !== "string") {
+      const name = (it.name as string).trim();
+      if (name.length === 0 || name.length > 80) return false;
+      // Manual lines don't carry MRP, preDiscount, or per-line discounts —
+      // the cashier types the final price directly.
+      return true;
+    }
+
+    // Catalogue line
+    if (typeof it.productId !== "string") return false;
     if (it.mrp !== undefined && it.mrp !== null) {
       if (typeof it.mrp !== "number" || (it.mrp as number) <= 0) return false;
     }
@@ -120,9 +152,14 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
   try {
     const result = await db.transaction(async (tx) => {
       const processedItems: {
-        productId:        string;
+        /** NULL for manual / non-inventory lines. */
+        productId:        string | null;
+        /** Display name (product.name for catalogue, manual.name for manual). */
         productName:      string;
+        /** Catalogue SKU, or "—" for manual lines (no inventory). */
         productSku:       string;
+        /** Set only on manual lines so we can write `custom_name` on insert. */
+        customName:       string | null;
         quantity:         number;
         price:            number;
         mrp?:             number;
@@ -130,11 +167,36 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         discountType?:    "percent" | "amount";
         discountValue?:   number;
         subtotal:         number;
+        /** Stock fields populated only for catalogue lines (used by low-stock
+         *  Telegram alert). Manual lines set these to safe placeholders so the
+         *  alert filter naturally excludes them. */
         newStock:         number;
         threshold:        number;
       }[] = [];
 
       for (const item of items) {
+        if (isManualLine(item)) {
+          // ── Manual / non-inventory line ──
+          // No product lookup, no stock decrement, no stock log. We just
+          // record the cashier-typed name + price as a billable line.
+          const name = item.name.trim();
+          processedItems.push({
+            productId:   null,
+            productName: name,
+            productSku:  "—",
+            customName:  name,
+            quantity:    item.quantity,
+            price:       item.price,
+            subtotal:    item.price * item.quantity,
+            // Sentinels well above any realistic threshold so the low-stock
+            // filter (newStock <= threshold) never picks up manual lines.
+            newStock:    Number.MAX_SAFE_INTEGER,
+            threshold:   0,
+          });
+          continue;
+        }
+
+        // ── Catalogue line ──
         const [product] = await tx
           .select()
           .from(productsTable)
@@ -168,6 +230,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           productId:        item.productId,
           productName:      product.name,
           productSku:       product.sku,
+          customName:       null,
           quantity:         item.quantity,
           price:            item.price,
           mrp:              item.mrp,
@@ -219,7 +282,8 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           processedItems.map((i) => ({
             tenantId:         tenantId,
             saleId:           bill.id,
-            productId:        i.productId,
+            productId:        i.productId,                    // NULL for manual lines
+            customName:       i.customName,                   // set only for manual lines
             quantity:         i.quantity,
             price:            String(i.price),
             mrp:              i.mrp != null ? String(i.mrp) : null,
@@ -304,6 +368,7 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
       productId:        saleItemsTable.productId,
       productName:      productsTable.name,
       productSku:       productsTable.sku,
+      customName:       saleItemsTable.customName,
       quantity:         saleItemsTable.quantity,
       price:            saleItemsTable.price,
       mrp:              saleItemsTable.mrp,
@@ -327,8 +392,13 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
     },
     items: items.map((i) => ({
       ...i,
-      productName:      i.productName ?? "Deleted Product",
+      // Fallback chain: catalogue name → manual line custom name → "Deleted Product".
+      // `customName` is non-null exactly when productId is null (DB CHECK), so this
+      // ordering keeps manual lines readable on the printed receipt and history.
+      productName:      i.productName ?? i.customName ?? "Deleted Product",
       productSku:       i.productSku  ?? "—",
+      /** True when this line is a manual / non-inventory entry (no product). */
+      isManual:         i.productId === null,
       price:            Number(i.price),
       mrp:              i.mrp != null ? Number(i.mrp) : null,
       preDiscountPrice: i.preDiscountPrice != null ? Number(i.preDiscountPrice) : null,

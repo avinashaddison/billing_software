@@ -54,6 +54,7 @@ const MIGRATION_FILES = [
   //   sale prices that the merchant had just set. Disabled permanently.
   "0006_bill_customer_name.sql",
   "0007_bill_receivables.sql",
+  "0008_sale_items_custom.sql",
 ];
 
 function findMigration(name: string): string | null {

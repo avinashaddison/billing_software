@@ -4,7 +4,7 @@ import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
   Phone, User, Wallet, Banknote, Smartphone, Minus, Plus,
   Trash2, ScanLine, WifiOff, RefreshCw, QrCode, BadgeCheck, Tag,
-  HandCoins,
+  HandCoins, PencilLine,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -18,13 +18,27 @@ const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 type PaymentMode = "cash" | "upi" | "credit";
 
+/** A single line in the checkout payload — either a real catalogue product
+ *  or a MANUAL / non-inventory entry (no productId, just a typed-in name). */
+type CheckoutPayloadItem =
+  | {
+      productId: string;
+      quantity:  number;
+      price:     number;
+      mrp?:      number;
+      preDiscountPrice?: number;
+      discountType?:    LineDiscountType;
+      discountValue?:   number;
+    }
+  | {
+      /** Display name for a manual line (e.g. "Customer's gift wrap"). */
+      name:     string;
+      quantity: number;
+      price:    number;
+    };
+
 async function postCheckout(payload: {
-  items: {
-    productId: string; quantity: number; price: number; mrp?: number;
-    preDiscountPrice?: number;
-    discountType?:    LineDiscountType;
-    discountValue?:   number;
-  }[];
+  items: CheckoutPayloadItem[];
   paymentMode: PaymentMode;
   customerName?: string;
   customerPhone?: string;
@@ -102,13 +116,15 @@ interface CartItemRowProps {
     discountPercent?: number;
     discountAmount?:  number;
     discountType?:    LineDiscountType;
+    isManual?: boolean;
   };
   onQtyChange: (productId: string, qty: number) => void;
   onRemove: (productId: string) => void;
   onLineDiscount: (productId: string, type: LineDiscountType, value: number) => void;
 }
 const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onLineDiscount }: CartItemRowProps) {
-  const onSale     = item.mrp != null && item.mrp > item.price;
+  const isManual   = !!item.isManual;
+  const onSale     = !isManual && item.mrp != null && item.mrp > item.price;
   const eff        = effectivePrice(item);
   const dType      = item.discountType ?? "percent";
   const pct        = item.discountPercent ?? 0;
@@ -117,32 +133,40 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
   const subtotal   = eff * item.quantity;
   return (
     <div className={`rounded-2xl px-4 py-3 border bg-card transition-all ${
-      hasLineDiscount ? "border-amber-300 dark:border-amber-700" : onSale ? "border-red-200 dark:border-red-800" : "border-border"
+      isManual ? "border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-950/10"
+        : hasLineDiscount ? "border-amber-300 dark:border-amber-700"
+        : onSale ? "border-red-200 dark:border-red-800"
+        : "border-border"
     }`}>
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-bold text-sm truncate text-foreground">{item.name}</p>
+            {isManual && (
+              <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 leading-none flex items-center gap-1">
+                <PencilLine className="w-2.5 h-2.5" /> MANUAL
+              </span>
+            )}
             {onSale && (
               <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 leading-none">
                 SALE
               </span>
             )}
-            {hasLineDiscount && (
+            {!isManual && hasLineDiscount && (
               <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 leading-none">
                 {dType === "percent" ? `-${pct}%` : `-₹${amt}`}
               </span>
             )}
           </div>
-          <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
+          {!isManual && <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>}
           <p className="text-xs text-muted-foreground mt-0.5">
-            {item.mrp != null && item.mrp > eff && (
+            {!isManual && item.mrp != null && item.mrp > eff && (
               <span className="line-through mr-1">MRP ₹{item.mrp.toLocaleString("en-IN")}</span>
             )}
-            {!item.mrp && hasLineDiscount && (
+            {!isManual && !item.mrp && hasLineDiscount && (
               <span className="line-through mr-1">₹{item.price.toLocaleString("en-IN")}</span>
             )}
-            <span className={`font-bold ${(hasLineDiscount || onSale) ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
+            <span className={`font-bold ${(!isManual && (hasLineDiscount || onSale)) ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
               ₹{eff.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             {" × "}{item.quantity} ={" "}
@@ -173,7 +197,10 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
           <X className="w-3.5 h-3.5 text-red-500" />
         </button>
       </div>
-      {/* ── Per-line discount input (% or ₹) ── */}
+      {/* Per-line discount input — catalogue items only. Manual lines have
+          no MRP / sticker reference, so a "discount %" doesn't apply: the
+          cashier types the final price directly in the modal. */}
+      {!isManual && (
       <div className="flex items-center gap-2 mt-2 pl-1 flex-wrap">
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
           <Tag className="w-3 h-3" />
@@ -239,16 +266,204 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
           </button>
         )}
       </div>
+      )}
     </div>
   );
 });
+
+/* ── Manual / non-inventory item dialog ─────────────────────────
+   Lets the cashier bill for something that isn't in the products
+   catalogue: a customer's own gift brought in for wrapping, a service
+   charge, an ad-hoc one-off item. The line has no SKU, doesn't move
+   stock, and prints on the receipt with whatever name was typed here.
+─────────────────────────────────────────────────────────────────── */
+interface ManualItemModalProps {
+  onClose: () => void;
+  onAdd:   (input: { name: string; price: number; quantity: number }) => void;
+}
+function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
+  const [name, setName]         = useState("");
+  const [priceStr, setPriceStr] = useState("");
+  const [qty, setQty]           = useState(1);
+  const nameRef                 = useRef<HTMLInputElement>(null);
+  useEffect(() => { nameRef.current?.focus(); }, []);
+
+  const price       = parseFloat(priceStr);
+  const validPrice  = Number.isFinite(price) && price >= 0;
+  const validName   = name.trim().length > 0 && name.trim().length <= 80;
+  const canSubmit   = validPrice && validName && qty > 0;
+
+  const submit = () => {
+    if (!canSubmit) return;
+    onAdd({ name: name.trim(), price, quantity: qty });
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full md:max-w-sm bg-card rounded-t-3xl md:rounded-3xl border shadow-2xl animate-in slide-in-from-bottom-4 md:zoom-in-95 duration-250 overflow-hidden">
+        <div className="md:hidden flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
+
+        <div className="px-5 pt-4 pb-3 border-b flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-black text-foreground flex items-center gap-2">
+              <PencilLine className="w-5 h-5 text-amber-500" />
+              Manual Item
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Bill a one-off item that isn't in your products list
+            </p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center transition-all">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {/* Name */}
+          <div>
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
+              Item description
+            </label>
+            <input
+              ref={nameRef}
+              type="text"
+              maxLength={80}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Customer's gift wrap"
+              className="w-full h-11 px-3.5 rounded-xl bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition-all"
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+            />
+          </div>
+
+          {/* Price */}
+          <div>
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
+              Price (₹) per unit
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground select-none">₹</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                inputMode="decimal"
+                value={priceStr}
+                onChange={(e) => setPriceStr(e.target.value)}
+                placeholder="0.00"
+                className="w-full h-11 pl-8 pr-3 rounded-xl bg-muted border border-border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition-all"
+                onKeyDown={(e) => e.key === "Enter" && submit()}
+              />
+            </div>
+          </div>
+
+          {/* Quantity stepper */}
+          <div>
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
+              Quantity
+            </label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setQty((q) => Math.max(1, q - 1))}
+                className="w-10 h-10 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border"
+              >
+                <Minus className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <input
+                type="number"
+                min={1}
+                value={qty}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (Number.isFinite(v) && v >= 1) setQty(v);
+                }}
+                className="flex-1 h-10 text-center font-black text-lg bg-card border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400/40 tabular-nums"
+              />
+              <button
+                type="button"
+                onClick={() => setQty((q) => q + 1)}
+                className="w-10 h-10 rounded-full bg-muted hover:bg-muted/80 active:scale-90 flex items-center justify-center transition-all border"
+              >
+                <Plus className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
+
+          {/* Live total */}
+          {validPrice && (
+            <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 flex items-center justify-between text-sm">
+              <span className="text-amber-700 dark:text-amber-300 font-bold">Line total</span>
+              <span className="font-black text-amber-700 dark:text-amber-300 tabular-nums">
+                ₹{(price * qty).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 pb-6 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="py-3.5 rounded-2xl border border-border text-muted-foreground font-bold text-sm hover:bg-muted active:scale-95 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!canSubmit}
+            className="py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-4 h-4" />
+            Add to Cart
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    Ongoing Checkout page
 ═══════════════════════════════════════════════════════════════════ */
 export default function Checkout() {
   const [, setLocation] = useLocation();
-  const { items, count, total, removeItem, updateQty, setLineDiscount, clearCart } = useCart();
+  const { items, count, total, removeItem, updateQty, setLineDiscount, addCustomItem, clearCart } = useCart();
+  const [showManualModal, setShowManualModal] = useState(false);
+
+  /* ── Deep-link: open Manual Item dialog from the nav ──
+     The "Manual Bill" entry in BottomNav / SideNav both navigates to
+     /checkout?manual=1 AND dispatches a window event. We honour either
+     trigger so the dialog opens on a cold load (URL flag) or while
+     already on this page (event), and we strip the flag so a refresh /
+     back navigation doesn't keep re-opening it. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const consumeUrlFlag = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("manual") === "1") {
+        setShowManualModal(true);
+        params.delete("manual");
+        const cleaned = params.toString();
+        const newUrl = window.location.pathname + (cleaned ? `?${cleaned}` : "") + window.location.hash;
+        window.history.replaceState({}, "", newUrl);
+      }
+    };
+
+    consumeUrlFlag();
+
+    const onOpen = () => setShowManualModal(true);
+    window.addEventListener("checkout:open-manual", onOpen);
+    return () => window.removeEventListener("checkout:open-manual", onOpen);
+  }, []);
 
   /* "You save" = sale-price savings + per-line discount savings (does NOT include
      the global Discount field, which is added separately further below). */
@@ -357,9 +572,20 @@ export default function Checkout() {
   /* Build the items payload sent to /api/bills/checkout. We send the
      EFFECTIVE per-unit price (after the line discount) as `price`, and the
      reference (MRP, or sticker if no MRP) as `mrp` so the receipt can show
-     the savings line correctly. */
-  const buildCheckoutItems = () =>
+     the savings line correctly.
+
+     Manual / non-inventory cart lines (`isManual`) are sent as
+     `{ name, price, quantity }` with NO productId — the server skips the
+     stock decrement and writes the typed name as `custom_name`. */
+  const buildCheckoutItems = (): CheckoutPayloadItem[] =>
     items.map((i) => {
+      if (i.isManual) {
+        return {
+          name:     i.name,
+          quantity: i.quantity,
+          price:    i.price,
+        };
+      }
       const eff       = effectivePrice(i);
       const hasLine   = eff < i.price - 0.001;
       const reference = i.mrp != null ? i.mrp : (hasLine ? i.price : undefined);
@@ -436,6 +662,15 @@ export default function Checkout() {
   return (
     <div className="relative flex flex-col h-full bg-background text-foreground">
       {successBillId && <SuccessOverlay billId={successBillId} />}
+      {showManualModal && (
+        <ManualItemModal
+          onClose={() => setShowManualModal(false)}
+          onAdd={(input) => {
+            addCustomItem(input);
+            playTick();
+          }}
+        />
+      )}
 
       {/* ── Offline / pending sync banner ── */}
       {(!isOnline || pendingCount > 0) && (
@@ -494,13 +729,22 @@ export default function Checkout() {
               No items added yet. Go to the Scan page, scan products, and they'll appear here.
             </p>
           </div>
-          <button
-            onClick={() => setLocation("/scan")}
-            className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm shadow-lg active:scale-95 transition-all"
-          >
-            <ScanLine className="w-4 h-4" />
-            Start Scanning
-          </button>
+          <div className="flex flex-col gap-2 w-full max-w-xs">
+            <button
+              onClick={() => setLocation("/scan")}
+              className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm shadow-lg active:scale-95 transition-all"
+            >
+              <ScanLine className="w-4 h-4" />
+              Start Scanning
+            </button>
+            <button
+              onClick={() => setShowManualModal(true)}
+              className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl border-2 border-amber-400 text-amber-600 dark:text-amber-400 font-bold text-sm hover:bg-amber-50 dark:hover:bg-amber-950/20 active:scale-95 transition-all"
+            >
+              <PencilLine className="w-4 h-4" />
+              Add Manual Item
+            </button>
+          </div>
         </div>
       )}
 
@@ -514,12 +758,20 @@ export default function Checkout() {
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                   Cart · {count} item{count !== 1 ? "s" : ""}
                 </p>
-                <button
-                  onClick={clearCart}
-                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-semibold transition-colors"
-                >
-                  <Trash2 className="w-3 h-3" /> Clear all
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowManualModal(true)}
+                    className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 font-semibold transition-colors"
+                  >
+                    <PencilLine className="w-3 h-3" /> Manual item
+                  </button>
+                  <button
+                    onClick={clearCart}
+                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-semibold transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" /> Clear all
+                  </button>
+                </div>
               </div>
               {items.map((item) => (
                 <CartItemRow

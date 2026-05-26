@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, IndianRupee, ShoppingCart, ArrowRight } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, IndianRupee, ShoppingCart, ArrowRight, PencilLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
@@ -21,6 +21,10 @@ export function BottomNav() {
     { name: "Home",    href: "/dashboard", icon: Home,       resource: "dashboard" },
     { name: "Products",href: "/products", icon: Package,    resource: "products"  },
     { name: "Scan",    href: "/scan",     icon: ScanLine,   resource: "scan",    highlight: true },
+    /* Manual Bill — deep-links into /checkout with ?manual=1 so the
+       dialog auto-opens. Same permission gate as billing since it
+       creates a bill row. */
+    { name: "Manual",  href: "/checkout?manual=1", icon: PencilLine, resource: "billing" },
     { name: "Billing", href: "/billing",  icon: IndianRupee,resource: "billing"  },
     { name: "Logs",    href: "/logs",     icon: Clock,      resource: "logs"     },
     { name: "Profile", href: "/profile",  icon: User,       resource: null       },
@@ -29,6 +33,19 @@ export function BottomNav() {
   const navItems = allItems.filter((item) => !item.resource || visible(item.resource));
 
   const isOnCheckout = location === "/checkout";
+
+  /* Click handler for the Manual Bill entry. Wouter's <Link> is enough
+     for the URL flag (?manual=1) to fire on a *cold* navigation, but if
+     the cashier is already on /checkout it would no-op — same component,
+     no remount, useEffect doesn't re-run. We additionally fire a
+     window event that Checkout listens for, so the dialog opens in both
+     cases. */
+  const handleManualClick = (e: React.MouseEvent) => {
+    if (isOnCheckout) {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent("checkout:open-manual"));
+    }
+  };
 
   return (
     <>
@@ -109,6 +126,7 @@ export function BottomNav() {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={item.name === "Manual" ? handleManualClick : undefined}
                 className={cn(
                   "flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors",
                   isActive ? "text-primary" : "text-muted-foreground",
