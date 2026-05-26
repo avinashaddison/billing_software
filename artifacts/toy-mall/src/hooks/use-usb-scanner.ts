@@ -86,6 +86,8 @@ export function useUsbScanner(
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
       const target = e.target as HTMLElement;
       const allowed = optionsRef.current?.allowedInput;
       const isAllowedInput =
@@ -101,6 +103,33 @@ export function useUsbScanner(
 
       if (isOtherInput) {
         reset();
+        return;
+      }
+
+      if (isAllowedInput) {
+        if (e.key === "Enter") {
+          const value = (target as HTMLInputElement).value.trim();
+          if (value.length >= MIN_CODE_LENGTH) {
+            e.stopPropagation();
+            e.preventDefault();
+            const capturedMax = maxElapsed;
+            reset();
+            dispatchScan(value.toUpperCase(), capturedMax, true);
+          } else {
+            reset();
+          }
+        } else {
+          // Track keystroke timing to log scanner speed even when typing in the input
+          const now = Date.now();
+          const elapsed = lastTime ? now - lastTime : 0;
+          lastTime = now;
+          if (e.key.length === 1) {
+            if (elapsed > maxElapsed) maxElapsed = elapsed;
+          }
+          // Clear background scanning buffer and timers
+          clearTimer();
+          buffer = "";
+        }
         return;
       }
 
@@ -123,7 +152,9 @@ export function useUsbScanner(
 
       if (e.key.length !== 1) return;
 
-      const threshold = optionsRef.current?.thresholdMs ?? STORE_INFO.scannerThresholdMs;
+      const baseThreshold = optionsRef.current?.thresholdMs ?? STORE_INFO.scannerThresholdMs;
+      // Tolerate up to 200ms delay between keys once scanning starts to survive browser lag spikes
+      const threshold = buffer.length > 0 ? Math.max(baseThreshold, 200) : baseThreshold;
 
       if (buffer.length === 0 || elapsed < threshold) {
         if (elapsed > maxElapsed) maxElapsed = elapsed;

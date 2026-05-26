@@ -87,7 +87,7 @@ export default function BulkSalePrice() {
 
   useUsbScanner(onScan, {
     enabled: !saving,
-    allowedInput: priceRef.current ? { ref: priceRef, onClear: () => setPriceInput("") } : undefined,
+    allowedInput: { ref: priceRef, onClear: () => setPriceInput("") },
   });
 
   // Pause the camera when a product is being filled in so the camera doesn't
