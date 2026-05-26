@@ -438,6 +438,33 @@ export default function Checkout() {
   const { items, count, total, removeItem, updateQty, setLineDiscount, addCustomItem, clearCart } = useCart();
   const [showManualModal, setShowManualModal] = useState(false);
 
+  /* ── Deep-link: open Manual Item dialog from the nav ──
+     The "Manual Bill" entry in BottomNav / SideNav both navigates to
+     /checkout?manual=1 AND dispatches a window event. We honour either
+     trigger so the dialog opens on a cold load (URL flag) or while
+     already on this page (event), and we strip the flag so a refresh /
+     back navigation doesn't keep re-opening it. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const consumeUrlFlag = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("manual") === "1") {
+        setShowManualModal(true);
+        params.delete("manual");
+        const cleaned = params.toString();
+        const newUrl = window.location.pathname + (cleaned ? `?${cleaned}` : "") + window.location.hash;
+        window.history.replaceState({}, "", newUrl);
+      }
+    };
+
+    consumeUrlFlag();
+
+    const onOpen = () => setShowManualModal(true);
+    window.addEventListener("checkout:open-manual", onOpen);
+    return () => window.removeEventListener("checkout:open-manual", onOpen);
+  }, []);
+
   /* "You save" = sale-price savings + per-line discount savings (does NOT include
      the global Discount field, which is added separately further below). */
   const totalSavings = items.reduce((sum, i) => {
