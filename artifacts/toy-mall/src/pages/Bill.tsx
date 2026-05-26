@@ -328,6 +328,7 @@ export default function Bill() {
         // to a safe inner width so nothing gets clipped, and zero out the
         // CSS @page margin so the safe area itself isn't squeezed further.
         const contentWidth = paperWidth === "58mm" ? "54mm" : "72mm";
+        const sidePadding = paperWidth === "58mm" ? "2.5mm" : "4.5mm";
 
         // ── @page height: `auto` vs a fixed giant value ──
         //
@@ -371,10 +372,10 @@ export default function Bill() {
 
               /* Turn every ancestor of the receipt into a transparent
                  passthrough: no background, no shadow, no max-height, no
-                 scrolling. This is critical for long receipts — the screen
-                 'overflow-y-auto' on .receipt-shell would otherwise clip
-                 the print to the visible viewport height. */
+                 scrolling. Force layout containers to block to ensure proper centering
+                 and prevent Chrome print engine flexbox rendering issues. */
               html, body, .receipt-shell, .receipt-shell > div {
+                display: block !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 background: white !important;
@@ -384,6 +385,7 @@ export default function Bill() {
                 min-height: 0 !important;
                 max-height: none !important;
                 overflow: visible !important;
+                width: 100% !important;
               }
 
               /* The receipt flows in NORMAL document order (not fixed) so
@@ -412,12 +414,13 @@ export default function Bill() {
               }
 
               /* Kill the screen-only my-6 + py-4 padding above the store
-                 logo so the print starts right at the top of the paper. */
+                 logo so the print starts right at the top of the paper.
+                 Add dynamic safe side padding to prevent cutoffs. */
               .receipt-print-only > div:first-child {
                 padding-top: 1mm !important;
                 padding-bottom: 1mm !important;
-                padding-left: 1.5mm !important;
-                padding-right: 1.5mm !important;
+                padding-left: ${sidePadding} !important;
+                padding-right: ${sidePadding} !important;
               }
 
               /* Don't split an item row across a page break. Browsers
