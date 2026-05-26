@@ -451,19 +451,29 @@ export default function Bill() {
             {/* ── STORE HEADER ── */}
             {(() => {
               const storeName = store.name || "HIRA & SON GIFT SHOP";
+              let mainName = storeName;
+              let subName = store.tagline || "GIFT SHOP";
 
-              // Style the ampersand if it exists in the full storeName
+              // Try to split at "Gift Shop" or "Gifts"
+              const giftShopRegex = /(.*?)\s*\b(gift\s+shop|gifts\s+shop|gift\s+store|gifts)\b/i;
+              const match = storeName.match(giftShopRegex);
+              if (match) {
+                mainName = match[1].trim();
+                subName = match[2].trim();
+              }
+
+              // Style the ampersand if it exists in the mainName
               const ampersandRegex = /(.*?)\s*([&]|and)\s*(.*)/i;
-              const ampMatch = storeName.match(ampersandRegex);
-              let renderedStoreName;
+              const ampMatch = mainName.match(ampersandRegex);
+              let renderedMainName;
               if (ampMatch) {
-                renderedStoreName = (
+                renderedMainName = (
                   <>
                     {ampMatch[1]} <span className="font-playfair italic font-normal" style={{ fontSize: "1.15em", verticalAlign: "middle", color: "#000" }}>&amp;</span> {ampMatch[3]}
                   </>
                 );
               } else {
-                renderedStoreName = storeName;
+                renderedMainName = mainName;
               }
 
               return (
@@ -476,19 +486,35 @@ export default function Bill() {
                     <div className="text-[28px] mb-1">🧸</div>
                   )}
 
-                  {/* Main Shop Name (all in one row) */}
+                  {/* Main Shop Name (Row 1) */}
                   <div
                     style={{
                       fontFamily: "'Playfair Display', 'Cinzel', 'Palatino Linotype', Palatino, Georgia, serif",
                       fontWeight: 900,
-                      fontSize: storeName.length > 22 ? "22px" : (storeName.length > 15 ? "26px" : "32px"),
+                      fontSize: mainName.length > 15 ? "32px" : "38px",
                       lineHeight: 1.05,
                       letterSpacing: "0.02em",
                       textTransform: "uppercase",
                       color: "#000",
                     }}
                   >
-                    {renderedStoreName}
+                    {renderedMainName}
+                  </div>
+
+                  {/* Subtitle GIFT SHOP (Row 2) - also big */}
+                  <div
+                    style={{
+                      fontFamily: "'Playfair Display', 'Cinzel', 'Palatino Linotype', Palatino, Georgia, serif",
+                      fontWeight: 900,
+                      fontSize: subName.length > 12 ? "26px" : "32px",
+                      lineHeight: 1.05,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      color: "#000",
+                      marginTop: "2px",
+                    }}
+                  >
+                    {subName}
                   </div>
 
                   {/* Tagline / Complete Gift Store */}
