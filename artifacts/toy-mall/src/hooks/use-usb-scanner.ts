@@ -108,23 +108,19 @@ export function useUsbScanner(
 
       if (isAllowedInput) {
         if (e.key === "Enter") {
+          // Always swallow Enter while focus is on the allowed input, even
+          // if the input is empty (e.g. scanner sent a trailing LF after
+          // the barcode CR). Without this, the Scan page's global 'Enter
+          // opens checkout modal' shortcut fires after every scan.
+          e.stopPropagation();
+          e.preventDefault();
           const value = (target as HTMLInputElement).value.trim();
           if (value.length >= MIN_CODE_LENGTH) {
-            e.stopPropagation();
-            e.preventDefault();
             const capturedMax = maxElapsed;
             reset();
             dispatchScan(value.toUpperCase(), capturedMax, true);
           } else {
             reset();
-          }
-        } else {
-          // Track keystroke timing to log scanner speed even when typing in the input
-          const now = Date.now();
-          const elapsed = lastTime ? now - lastTime : 0;
-          lastTime = now;
-          if (e.key.length === 1) {
-            if (elapsed > maxElapsed) maxElapsed = elapsed;
           }
           // Clear background scanning buffer and timers
           clearTimer();

@@ -146,6 +146,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
      preserved across server syncs — they're device-local by design and
      wouldn't be present in the shared cart payload, so we re-attach
      them on top of whatever the server sent.
+
+     Important: we treat local state as authoritative when the server
+     has FEWER (but non-zero) items than us.  This avoids two problems:
+
+     1. Fast-scanning race: items A and B are scanned in quick succession.
+        The SSE echo for item A arrives before item B's serverSync request
+        reaches the server.  Server broadcasts [A], but local already has
+        [A, B].  Without this guard, B would be silently dropped.
+
+     2. Server-restart data loss (common on Render free tier): the server's
+        in-memory shared-cart is wiped on restart.  The next scan only
+        puts that ONE item in the server, which would otherwise overwrite
+        the full local cart that localStorage preserved.
+
+     srvCount === 0 still clears local (someone else completed checkout).
   ─────────────────────────────────────────────────────────────────── */
   const syncFromServer = useCallback((serverItems: CartItem[]) => {
     setItems((prev) => {
@@ -158,10 +173,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const srvTotal   = serverItems.reduce((s, i) => s + i.price * i.quantity, 0);
       // Skip if state is already identical (avoids echo from own SSE broadcast)
       if (prevCount === srvCount && Math.abs(prevTotal - srvTotal) < 0.01) return prev;
-      // Server replaces the catalogue portion; manual lines stay.
+      // Server is non-empty but behind local → server hasn't caught up yet
+      // (fast-scan race or post-restart stale state).  Keep local so we don't
+      // lose items that were already committed to localStorage.
+      if (srvCount > 0 && srvCount < prevCount) return prev;
+      // srvCount === 0 → explicit checkout/clear on another tab or device.
+      // srvCount > prevCount → another device added items (cross-device add).
+      // In both cases, server is authoritative; catalogue lines are replaced.
       return [...serverItems, ...localManual];
     });
   }, []);
+
 
   /* ── Cart mutations — optimistic local update + server sync ─────── */
 
