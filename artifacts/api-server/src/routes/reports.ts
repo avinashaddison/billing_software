@@ -21,7 +21,7 @@ router.get("/reports/revenue", async (req, res): Promise<void> => {
     })
     .from(billsTable)
     .where(and(
-      gte(billsTable.createdAt, sql`NOW() - INTERVAL '${sql.raw(String(days))} days'`),
+      gte(billsTable.createdAt, sql`NOW() - make_interval(days => ${days})`),
       tenantWhere(billsTable.tenantId, req.tenantId),
     ))
     .groupBy(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`)
