@@ -7,6 +7,7 @@ export * from "./sales";
 export * from "./bills";
 export * from "./sale_items";
 export * from "./suppliers";
+export * from "./supplier_payments";
 export * from "./returns";
 export * from "./categories";
 export * from "./staff";

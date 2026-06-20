@@ -55,6 +55,7 @@ const MIGRATION_FILES = [
   "0006_bill_customer_name.sql",
   "0007_bill_receivables.sql",
   "0008_sale_items_custom.sql",
+  "0009_supplier_payments.sql",
 ];
 
 function findMigration(name: string): string | null {
