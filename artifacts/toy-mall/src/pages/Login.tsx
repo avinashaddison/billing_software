@@ -76,7 +76,7 @@ export default function Login() {
     if (!emailUser) return;
     setLoadingStaff(true);
     fetch(`${BASE_URL}/api/staff`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : []))
       .then((data) => setStaff(Array.isArray(data) ? data.filter((s: StaffMember) => s.isActive) : []))
       .catch(() => toast.error("Could not load staff list"))
       .finally(() => setLoadingStaff(false));

@@ -111,10 +111,19 @@ function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; st
 
   const { isLoading } = useQuery<PermissionMap>({
     queryKey: ["staff-perms", staffId],
+    retry: 1,
     queryFn: async () => {
       const r = await fetch(api(`staff/${staffId}/permissions`));
-      const data = await r.json();
-      const merged = { ...DEFAULT_STAFF_PERMISSIONS, ...data } as PermissionMap;
+      // Never enable Save with fabricated defaults on a failed/non-JSON
+      // response — that could silently overwrite this member's real
+      // permissions. Throw instead so the dialog shows an error and Save stays
+      // disabled (gated on `loaded`) until the real permissions load.
+      if (!r.ok) throw new Error("Failed to load permissions");
+      const raw = await r.json().catch(() => null);
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        throw new Error("Malformed permissions response");
+      }
+      const merged = { ...DEFAULT_STAFF_PERMISSIONS, ...raw } as PermissionMap;
       setPerms(merged);
       setLoaded(true);
       return merged;
@@ -153,9 +162,17 @@ function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; st
           </p>
         </DialogHeader>
 
-        {isLoading || !loaded ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : !loaded ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+            <p className="text-sm font-bold">Couldn't load permissions</p>
+            <p className="text-xs text-muted-foreground px-6">
+              Please close and reopen this dialog to try again. Saving is disabled
+              until the current permissions load.
+            </p>
           </div>
         ) : (
           <div className="space-y-1.5 py-2">

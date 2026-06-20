@@ -118,12 +118,18 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items }),
       });
-      const data = await r.json();
+      // Parse defensively and never show a success toast on a failed import —
+      // a non-2xx (or non-JSON) response previously slipped through as
+      // "Import done: undefined updated…".
+      const data = await r.json().catch(() => null);
+      if (!r.ok || !data || typeof data !== "object") {
+        throw new Error((data && data.error) || `Server returned ${r.status}`);
+      }
       setResult(data);
       qc.invalidateQueries({ queryKey: getListProductsQueryKey() });
-      toast.success(`Import done: ${data.updated} updated, ${data.created ?? 0} created, ${data.skipped} skipped`);
-    } catch {
-      toast.error("Import failed");
+      toast.success(`Import done: ${data.updated ?? 0} updated, ${data.created ?? 0} created, ${data.skipped ?? 0} skipped`);
+    } catch (e) {
+      toast.error((e as Error).message || "Import failed");
     } finally { setImporting(false); }
   };
 

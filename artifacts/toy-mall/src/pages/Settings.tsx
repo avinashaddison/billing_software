@@ -121,8 +121,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetch(`${API}/telegram/status`)
-      .then((r) => r.json())
-      .then((d) => { setTgConfigured(d.configured); setTgRecipients(d.recipients ?? 0); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { setTgConfigured(d?.configured ?? false); setTgRecipients(d?.recipients ?? 0); })
       .catch(() => setTgConfigured(false));
   }, []);
 
@@ -130,9 +130,9 @@ export default function SettingsPage() {
     setTgTesting(true);
     try {
       const r = await fetch(`${API}/telegram/test`, { method: "POST" });
-      const d = await r.json();
+      const d = await r.json().catch(() => null);
       if (r.ok) toast.success("Test alert sent! Check your Telegram.");
-      else toast.error(d.error || "Failed to send test alert");
+      else toast.error(d?.error || "Failed to send test alert");
     } catch {
       toast.error("Could not reach server");
     } finally {

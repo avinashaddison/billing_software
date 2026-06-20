@@ -647,11 +647,13 @@ export default function Customers() {
     setDetailLoading(true);
     try {
       const r    = await fetch(`${BASE_URL}/api/customers/${phone}`);
-      const data = await r.json();
+      // Parse defensively — a proxy/auth error can return a non-JSON HTML page,
+      // which would otherwise throw and look like a crash.
+      const data = await r.json().catch(() => null);
       // Don't render the detail view from an error payload — it would look
       // broken (no bills, no name, etc.). Surface the error to the user instead.
-      if (!r.ok) {
-        toast.error(data?.error || `No record for +91 ${phone}`);
+      if (!r.ok || !data || typeof data !== "object") {
+        toast.error((data && data.error) || `No record for +91 ${phone}`);
         return;
       }
       setSelected(data);
