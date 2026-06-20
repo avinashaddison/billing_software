@@ -30,9 +30,11 @@ A multi-tenant billing and inventory web app for retail shops. It includes an Ex
 - Run: `NODE_ENV=production node artifacts/api-server/dist/index.mjs`.
 - In production the API serves static SPA files from `artifacts/toy-mall/dist/public` with SPA fallback.
 - Relevant env vars: `DATABASE_URL` (required), `SESSION_SECRET`, `PORT` (provided by platform), optional `CORS_ORIGIN`, `STRICT_TENANT`, Cloudinary and Telegram settings.
+- `STRICT_TENANT` now defaults to **strict** tenant isolation (each shop sees only its own rows). Set `STRICT_TENANT=false` ONLY to temporarily re-expose legacy null-tenant rows to real tenants while backfilling a migration. The legacy null-tenant owner always sees its own (`tenant_id IS NULL`) data regardless of this flag.
 
 ## Notes
 - On first boot with an empty staff table, the API bootstraps a default Owner with PIN `1234` (logged as a warning). Change this PIN immediately in Staff Management on any real deployment.
+- Tenant isolation: reads use `tenantWhere` (strict by default — see `STRICT_TENANT` above) and all mutations use `tenantWhereWrite` (always strict, never the NULL fallback). New shops created via the platform admin are fully isolated from each other and from the legacy null-tenant data.
 
 ## User preferences
 (None recorded yet.)

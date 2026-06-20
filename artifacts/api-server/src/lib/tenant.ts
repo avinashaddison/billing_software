@@ -1,30 +1,40 @@
 /**
- * Tenant-scoping helpers used by every route in the multi-tenant migration.
+ * Tenant-scoping helpers used by every route.
  *
- * Rule (per migration spec):
+ * Default rule (STRICT tenant isolation):
  *
- *   WHERE tenant_id = req.tenantId OR tenant_id IS NULL
+ *   WHERE tenant_id = req.tenantId   — for a real tenant
+ *   WHERE tenant_id IS NULL          — for the legacy null-tenant owner
  *
- * The IS-NULL fallback is required during the migration window so legacy
- * Hira & Sons rows (which have not been backfilled yet) remain visible to
- * authenticated users. Flip STRICT_TENANT=true to drop the fallback once
- * every row has been backfilled and verified.
+ * A real tenant only ever sees its OWN rows. The legacy null-tenant owner
+ * (and any staff created under it) only ever sees the legacy NULL rows.
+ * This prevents legacy Hira & Sons rows from leaking into newly created
+ * shops (the "new shop already shows products / bills appear under another
+ * account" class of bug).
+ *
+ * The old migration-window fallback (real tenants ALSO see legacy NULL rows)
+ * is now OPT-IN: set STRICT_TENANT=false to temporarily restore it while
+ * backfilling un-migrated legacy rows.
  */
 import { or, eq, isNull, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 
 /**
- * Migration switch. While `false` (default), reads use
- *   tenant_id = :tenantId OR tenant_id IS NULL
- * Once flipped to `true`, the IS-NULL fallback is removed so no tenant
- * can see another tenant's rows AND legacy null-tenant rows are hidden
- * from non-admin requests.
+ * Tenant-isolation switch. Strict isolation is now the DEFAULT.
  *
- * Read via env each call — flipping the env var on a running server
- * takes effect on the next request without redeploy.
+ *   strict (default)     → reads use `tenant_id = :tenantId`
+ *   STRICT_TENANT=false  → reads use `tenant_id = :tenantId OR tenant_id IS NULL`
+ *
+ * The opt-out exists only to temporarily re-expose un-backfilled legacy NULL
+ * rows during a migration. A null-tenant caller ALWAYS scopes to
+ * `tenant_id IS NULL` regardless of this flag, so the legacy owner is never
+ * locked out of its own data.
+ *
+ * Read via env each call — flipping the env var on a running server takes
+ * effect on the next request without redeploy.
  */
 export function strictTenantEnabled(): boolean {
-  return process.env["STRICT_TENANT"] === "true";
+  return process.env["STRICT_TENANT"] !== "false";
 }
 
 /**
