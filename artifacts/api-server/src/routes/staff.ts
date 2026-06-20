@@ -2,7 +2,8 @@ import { Router, type IRouter } from "express";
 import { eq, asc, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, staffProfilesTable, staffPermissionsTable, authUsersTable, tenantsTable } from "@workspace/db";
-import { tenantWhere } from "../lib/tenant";
+import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { requireAdmin } from "../middlewares/auth";
 import {
   TENANT_COOKIE_NAME,
   signTenantCookie,
@@ -249,8 +250,9 @@ router.get("/auth/me", async (req, res): Promise<void> => {
   } catch { res.status(500).json({ error: "Failed to load session" }); }
 });
 
-/* ── POST /api/staff ── create ──────────────────────────────────── */
-router.post("/staff", async (req, res): Promise<void> => {
+/* ── POST /api/staff ── create (owner-only: creating staff, esp. another
+ *    owner, is a privilege-escalation vector) ─────────────────────── */
+router.post("/staff", requireAdmin, async (req, res): Promise<void> => {
   const { name, pin, role } = req.body ?? {};
   if (!name || typeof name !== "string" || name.trim().length < 2) {
     res.status(400).json({ error: "Name must be at least 2 characters" }); return;
@@ -275,8 +277,9 @@ router.post("/staff", async (req, res): Promise<void> => {
   } catch { res.status(500).json({ error: "Failed to create staff member" }); }
 });
 
-/* ── PUT /api/staff/:id ── update ───────────────────────────────── */
-router.put("/staff/:id", async (req, res): Promise<void> => {
+/* ── PUT /api/staff/:id ── update (owner-only: resetting another member's
+ *    PIN or deactivating the owner is a takeover/lockout vector) ──── */
+router.put("/staff/:id", requireAdmin, async (req, res): Promise<void> => {
   const { name, pin, isActive } = req.body ?? {};
   const updates: Record<string, unknown> = {};
 
@@ -301,8 +304,8 @@ router.put("/staff/:id", async (req, res): Promise<void> => {
       .update(staffProfilesTable)
       .set(updates)
       .where(and(
-        eq(staffProfilesTable.id, req.params.id),
-        tenantWhere(staffProfilesTable.tenantId, req.tenantId),
+        eq(staffProfilesTable.id, String(req.params.id)),
+        tenantWhereWrite(staffProfilesTable.tenantId, req.tenantId),
       ))
       .returning({ id: staffProfilesTable.id, name: staffProfilesTable.name, role: staffProfilesTable.role, isActive: staffProfilesTable.isActive, createdAt: staffProfilesTable.createdAt });
     if (!member) { res.status(404).json({ error: "Staff member not found" }); return; }
@@ -310,14 +313,14 @@ router.put("/staff/:id", async (req, res): Promise<void> => {
   } catch { res.status(500).json({ error: "Failed to update staff member" }); }
 });
 
-/* ── DELETE /api/staff/:id ── delete ────────────────────────────── */
-router.delete("/staff/:id", async (req, res): Promise<void> => {
+/* ── DELETE /api/staff/:id ── delete (owner-only) ───────────────── */
+router.delete("/staff/:id", requireAdmin, async (req, res): Promise<void> => {
   try {
     const [member] = await db
       .delete(staffProfilesTable)
       .where(and(
-        eq(staffProfilesTable.id, req.params.id),
-        tenantWhere(staffProfilesTable.tenantId, req.tenantId),
+        eq(staffProfilesTable.id, String(req.params.id)),
+        tenantWhereWrite(staffProfilesTable.tenantId, req.tenantId),
       ))
       .returning();
     if (!member) { res.status(404).json({ error: "Staff member not found" }); return; }
@@ -334,7 +337,7 @@ router.get("/staff/:id/permissions", async (req, res): Promise<void> => {
       .select({ id: staffProfilesTable.id })
       .from(staffProfilesTable)
       .where(and(
-        eq(staffProfilesTable.id, req.params.id),
+        eq(staffProfilesTable.id, String(req.params.id)),
         tenantWhere(staffProfilesTable.tenantId, req.tenantId),
       ));
     if (!member) { res.status(404).json({ error: "Staff member not found" }); return; }
@@ -342,15 +345,16 @@ router.get("/staff/:id/permissions", async (req, res): Promise<void> => {
     const perms = await db
       .select()
       .from(staffPermissionsTable)
-      .where(eq(staffPermissionsTable.staffId, req.params.id));
+      .where(eq(staffPermissionsTable.staffId, String(req.params.id)));
     const map: Record<string, string> = {};
     for (const p of perms) map[p.resource] = p.level;
     res.json(map);
   } catch { res.status(500).json({ error: "Failed to fetch permissions" }); }
 });
 
-/* ── PUT /api/staff/:id/permissions ─────────────────────────────── */
-router.put("/staff/:id/permissions", async (req, res): Promise<void> => {
+/* ── PUT /api/staff/:id/permissions ── (owner-only: granting permissions
+ *    to yourself/others is the core escalation vector) ─────────────── */
+router.put("/staff/:id/permissions", requireAdmin, async (req, res): Promise<void> => {
   const { permissions } = req.body ?? {};
   if (!permissions || typeof permissions !== "object") {
     res.status(400).json({ error: "permissions object required" }); return;
@@ -362,8 +366,8 @@ router.put("/staff/:id/permissions", async (req, res): Promise<void> => {
       .select({ id: staffProfilesTable.id, tenantId: staffProfilesTable.tenantId })
       .from(staffProfilesTable)
       .where(and(
-        eq(staffProfilesTable.id, req.params.id),
-        tenantWhere(staffProfilesTable.tenantId, req.tenantId),
+        eq(staffProfilesTable.id, String(req.params.id)),
+        tenantWhereWrite(staffProfilesTable.tenantId, req.tenantId),
       ));
     if (!member) { res.status(404).json({ error: "Staff member not found" }); return; }
 
@@ -372,7 +376,7 @@ router.put("/staff/:id/permissions", async (req, res): Promise<void> => {
       await db
         .insert(staffPermissionsTable)
         .values({
-          staffId: req.params.id,
+          staffId: String(req.params.id),
           resource,
           level: String(level),
           tenantId: member.tenantId, // mirror the staff row's tenant
@@ -385,7 +389,7 @@ router.put("/staff/:id/permissions", async (req, res): Promise<void> => {
     const updated = await db
       .select()
       .from(staffPermissionsTable)
-      .where(eq(staffPermissionsTable.staffId, req.params.id));
+      .where(eq(staffPermissionsTable.staffId, String(req.params.id)));
     const map: Record<string, string> = {};
     for (const p of updated) map[p.resource] = p.level;
     res.json(map);

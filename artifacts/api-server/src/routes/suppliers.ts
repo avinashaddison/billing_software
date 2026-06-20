@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc, and } from "drizzle-orm";
 import { db, suppliersTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
-import { tenantWhere } from "../lib/tenant";
+import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -57,7 +57,7 @@ router.patch("/suppliers/:id", async (req, res): Promise<void> => {
     .set(updates)
     .where(and(
       eq(suppliersTable.id, id),
-      tenantWhere(suppliersTable.tenantId, req.tenantId),
+      tenantWhereWrite(suppliersTable.tenantId, req.tenantId),
     ))
     .returning();
   if (!row) { res.status(404).json({ error: "Supplier not found" }); return; }
@@ -70,7 +70,7 @@ router.delete("/suppliers/:id", async (req, res): Promise<void> => {
     .delete(suppliersTable)
     .where(and(
       eq(suppliersTable.id, id),
-      tenantWhere(suppliersTable.tenantId, req.tenantId),
+      tenantWhereWrite(suppliersTable.tenantId, req.tenantId),
     ))
     .returning();
   if (!row) { res.status(404).json({ error: "Supplier not found" }); return; }

@@ -3,10 +3,14 @@ import { eq, desc, and, sql } from "drizzle-orm";
 import { db, returnsTable, productsTable, billsTable, saleItemsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { logger } from "../lib/logger";
-import { tenantWhere } from "../lib/tenant";
+import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { computeBillStatus } from "./bills";
 
 const router: IRouter = Router();
+
+/** Thrown inside the returns transaction to roll the whole return back and
+ *  surface a 400 (instead of a generic 500) to the caller. */
+class ReturnValidationError extends Error {}
 
 /** GET /api/returns?billId=... */
 router.get("/returns", async (req, res): Promise<void> => {
@@ -69,123 +73,202 @@ router.post("/returns", async (req, res): Promise<void> => {
     return;
   }
 
-  /* Validate bill exists AND belongs to caller's tenant */
+  /* Aggregate duplicate productIds up-front so two lines for the same product
+     are validated against the eligible quantity TOGETHER, not independently
+     (otherwise 2 lines of qty 3 could each pass a "≤ 5 sold" check and over-
+     return 6). */
+  const requestedByProduct = new Map<string, number>();
+  for (const line of lineItems) {
+    if (!line.productId || !Number.isFinite(line.quantity) || line.quantity < 1) continue;
+    requestedByProduct.set(
+      line.productId,
+      (requestedByProduct.get(line.productId) ?? 0) + line.quantity,
+    );
+  }
+  if (requestedByProduct.size === 0) {
+    res.status(400).json({ error: "No valid return line items" });
+    return;
+  }
+
+  /* Validate bill exists AND belongs to caller's tenant. tenantWhereWrite
+     means a real tenant can never return against another tenant's (or a
+     legacy null-tenant) bill. */
   const [bill] = await db
     .select()
     .from(billsTable)
     .where(and(
       eq(billsTable.id, billId),
-      tenantWhere(billsTable.tenantId, req.tenantId),
+      tenantWhereWrite(billsTable.tenantId, req.tenantId),
     ));
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
 
-  /* Process each line item in a single transaction */
-  const result = await db.transaction(async (tx) => {
-    let totalRefund = 0;
-    const returnRows: Array<typeof returnsTable.$inferSelect> = [];
+  try {
+    /* All line items processed in ONE transaction. Any validation failure
+       throws ReturnValidationError → the whole transaction rolls back, so a
+       return is all-or-nothing (never a partial restock + partial refund). */
+    const result = await db.transaction(async (tx) => {
+      let totalRefund = 0;
+      const returnRows: Array<typeof returnsTable.$inferSelect> = [];
+      const stockEvents: Array<{
+        productId: string; productName: string; productSku: string;
+        quantity: number; newStock: number; tenantId: string | null;
+      }> = [];
 
-    for (const line of lineItems) {
-      if (!line.productId || !line.quantity || line.quantity < 1) continue;
+      for (const [pid, qty] of requestedByProduct) {
+        const [product] = await tx
+          .select()
+          .from(productsTable)
+          .where(and(
+            eq(productsTable.id, pid),
+            tenantWhereWrite(productsTable.tenantId, req.tenantId),
+          ));
+        if (!product) {
+          throw new ReturnValidationError(
+            "One or more products on this return don't belong to this shop.",
+          );
+        }
 
-      const [product] = await tx
-        .select()
-        .from(productsTable)
-        .where(and(
-          eq(productsTable.id, line.productId),
-          tenantWhere(productsTable.tenantId, req.tenantId),
-        ));
-      if (!product) continue;
+        /* How many of this product were actually sold on this bill … */
+        const [soldRow] = await tx
+          .select({ sold: sql<string>`coalesce(sum(${saleItemsTable.quantity}), 0)` })
+          .from(saleItemsTable)
+          .where(and(
+            eq(saleItemsTable.saleId, billId),
+            eq(saleItemsTable.productId, pid),
+          ));
+        const sold = Number(soldRow?.sold ?? 0);
 
-      /* Refund at the HISTORICAL price the customer actually paid (from sale_items),
-         not the current product.price. Falls back to product.price only if the
-         sale_items row is missing (e.g. product was deleted-cascade-nulled). */
-      const [saleItem] = await tx
-        .select({ price: saleItemsTable.price })
-        .from(saleItemsTable)
-        .where(and(
-          eq(saleItemsTable.saleId, billId),
-          eq(saleItemsTable.productId, line.productId),
-        ))
-        .limit(1);
+        /* … and how many were already returned on PRIOR return transactions. */
+        const [priorRow] = await tx
+          .select({ returned: sql<string>`coalesce(sum(${returnsTable.quantity}), 0)` })
+          .from(returnsTable)
+          .where(and(
+            eq(returnsTable.billId, billId),
+            eq(returnsTable.productId, pid),
+          ));
+        const priorReturned = Number(priorRow?.returned ?? 0);
+        const eligible = sold - priorReturned;
 
-      const unitPrice = saleItem
-        ? Number(saleItem.price)
-        : Number(product.price);
+        if (sold === 0) {
+          throw new ReturnValidationError(`"${product.name}" was not sold on this bill.`);
+        }
+        if (qty > eligible) {
+          throw new ReturnValidationError(
+            `Cannot return ${qty} × "${product.name}" — only ${Math.max(0, eligible)} eligible ` +
+            `(sold ${sold}, already returned ${priorReturned}).`,
+          );
+        }
 
-      if (!saleItem) {
-        logger.warn(
-          { billId, productId: line.productId },
-          "Return: no sale_items row found for this bill+product, falling back to current product.price for refund",
-        );
+        /* Refund at the HISTORICAL price the customer actually paid (from
+           sale_items), not the current product.price. Falls back to
+           product.price only if the sale_items row is missing. */
+        const [saleItem] = await tx
+          .select({ price: saleItemsTable.price })
+          .from(saleItemsTable)
+          .where(and(
+            eq(saleItemsTable.saleId, billId),
+            eq(saleItemsTable.productId, pid),
+          ))
+          .limit(1);
+
+        const unitPrice = saleItem ? Number(saleItem.price) : Number(product.price);
+        if (!saleItem) {
+          logger.warn(
+            { billId, productId: pid },
+            "Return: no sale_items row found for this bill+product, falling back to current product.price for refund",
+          );
+        }
+
+        const refundAmount = unitPrice * qty;
+        totalRefund += refundAmount;
+
+        const [ret] = await tx
+          .insert(returnsTable)
+          .values({
+            tenantId:     bill.tenantId, // mirror the bill's tenant (NULL stays NULL for legacy)
+            billId,
+            productId:    pid,
+            quantity:     qty,
+            refundAmount: String(refundAmount),
+            reason:       reason || "customer_return",
+            notes:        notes || null,
+          })
+          .returning();
+
+        /* Atomic restock so concurrent returns can't lose an increment. */
+        const [restocked] = await tx
+          .update(productsTable)
+          .set({ stock: sql`${productsTable.stock} + ${qty}` })
+          .where(eq(productsTable.id, pid))
+          .returning({ stock: productsTable.stock });
+
+        stockEvents.push({
+          productId:   pid,
+          productName: product.name,
+          productSku:  product.sku,
+          quantity:    qty,
+          newStock:    restocked?.stock ?? product.stock + qty,
+          tenantId:    product.tenantId,
+        });
+
+        returnRows.push(ret);
       }
 
-      const refundAmount = unitPrice * line.quantity;
-      totalRefund += refundAmount;
+      /* Recompute the bill's paymentStatus now that refunds may have shrunk
+       * the outstanding amount. Without this, a credit bill stays "unpaid"
+       * even after the customer returns enough goods to settle it. */
+      const [refundTotalRow] = await tx
+        .select({ refunded: sql<string>`coalesce(sum(${returnsTable.refundAmount}), 0)` })
+        .from(returnsTable)
+        .where(eq(returnsTable.billId, billId));
+      const refunded   = Number(refundTotalRow?.refunded ?? 0);
+      const totalAmt   = Number(bill.totalAmount);
+      const paidAmt    = Number(bill.amountPaid);
+      const newStatus  = computeBillStatus(totalAmt, paidAmt, refunded);
+      if (newStatus !== bill.paymentStatus) {
+        await tx
+          .update(billsTable)
+          .set({ paymentStatus: newStatus })
+          .where(eq(billsTable.id, billId));
+      }
 
-      const [ret] = await tx
-        .insert(returnsTable)
-        .values({
-          tenantId:     bill.tenantId, // mirror the bill's tenant (NULL stays NULL for legacy)
-          billId,
-          productId:    line.productId,
-          quantity:     line.quantity,
-          refundAmount: String(refundAmount),
-          reason:       reason || "customer_return",
-          notes:        notes || null,
-        })
-        .returning();
+      return { returns: returnRows, totalRefund, newStatus, refunded, stockEvents };
+    });
 
-      await tx
-        .update(productsTable)
-        .set({ stock: product.stock + line.quantity })
-        .where(eq(productsTable.id, line.productId));
-
+    /* Emit stock + receivable events only AFTER the transaction commits, so a
+       rolled-back return never broadcasts a phantom stock movement. */
+    for (const ev of result.stockEvents) {
       broadcast("stock_updated", {
-        productId:   line.productId,
-        productName: product.name,
-        productSku:  product.sku,
+        productId:   ev.productId,
+        productName: ev.productName,
+        productSku:  ev.productSku,
         type:        "IN",
-        quantity:    line.quantity,
-        newStock:    product.stock + line.quantity,
-      }, product.tenantId);
-
-      returnRows.push(ret);
+        quantity:    ev.quantity,
+        newStock:    ev.newStock,
+      }, ev.tenantId);
     }
 
-    /* Recompute the bill's paymentStatus now that refunds may have shrunk
-     * the outstanding amount. Without this, a credit bill stays "unpaid"
-     * even after the customer returns enough goods to settle it. */
-    const [refundTotalRow] = await tx
-      .select({ refunded: sql<string>`coalesce(sum(${returnsTable.refundAmount}), 0)` })
-      .from(returnsTable)
-      .where(eq(returnsTable.billId, billId));
-    const refunded   = Number(refundTotalRow?.refunded ?? 0);
-    const totalAmt   = Number(bill.totalAmount);
-    const paidAmt    = Number(bill.amountPaid);
-    const newStatus  = computeBillStatus(totalAmt, paidAmt, refunded);
-    if (newStatus !== bill.paymentStatus) {
-      await tx
-        .update(billsTable)
-        .set({ paymentStatus: newStatus })
-        .where(eq(billsTable.id, billId));
+    /* Tell live dashboards the receivable just shifted so the tile / debtor
+     * list re-fetch instead of waiting for a manual refresh. */
+    broadcast("bill_payment", {
+      billId,
+      amountPaid: Number(bill.amountPaid),
+      status:     result.newStatus,
+    }, bill.tenantId);
+
+    res.status(201).json({
+      returns:     result.returns.map((r) => ({ ...r, refundAmount: Number(r.refundAmount) })),
+      totalRefund: result.totalRefund,
+      count:       result.returns.length,
+    });
+  } catch (err) {
+    if (err instanceof ReturnValidationError) {
+      res.status(400).json({ error: err.message });
+      return;
     }
-
-    return { returns: returnRows, totalRefund, newStatus, refunded };
-  });
-
-  /* Tell live dashboards the receivable just shifted so the tile / debtor
-   * list re-fetch instead of waiting for a manual refresh. */
-  broadcast("bill_payment", {
-    billId,
-    amountPaid: Number(bill.amountPaid),
-    status:     result.newStatus,
-  }, bill.tenantId);
-
-  res.status(201).json({
-    returns:     result.returns.map((r) => ({ ...r, refundAmount: Number(r.refundAmount) })),
-    totalRefund: result.totalRefund,
-    count:       result.returns.length,
-  });
+    logger.error({ err, billId }, "Return processing failed");
+    res.status(500).json({ error: "Failed to process return" });
+  }
 });
 
 export default router;

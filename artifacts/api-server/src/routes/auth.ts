@@ -20,11 +20,12 @@
  * legacy NULL-tenant users during migration). Writes stamp
  * `tenant_id = req.tenantId`.
  */
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter } from "express";
 import { eq, and, asc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, authUsersTable, staffProfilesTable } from "@workspace/db";
-import { tenantWhere } from "../lib/tenant";
+import { db, authUsersTable } from "@workspace/db";
+import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { requireAdmin } from "../middlewares/auth";
 import {
   TENANT_COOKIE_NAME,
   signTenantCookie,
@@ -68,47 +69,6 @@ function isValidEmail(e: unknown): e is string {
 
 function normaliseEmail(e: string): string {
   return e.trim().toLowerCase();
-}
-
-/* ───── admin-only gate ─────
- *
- * Allows the request through if the cookie belongs to one of:
- *  - an auth_users row with role IN (owner, admin) within the caller's tenant
- *  - a staff_profiles row with role = 'owner' within the caller's tenant
- *    (covers the legacy Hira & Sons owner who still uses PIN login).
- */
-async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    if (req.authKind === "email" && req.userId) {
-      const [me] = await db
-        .select({ role: authUsersTable.role, isActive: authUsersTable.isActive, tenantId: authUsersTable.tenantId })
-        .from(authUsersTable)
-        .where(eq(authUsersTable.id, req.userId));
-      if (!me || !me.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
-      if (me.role !== "owner" && me.role !== "admin") {
-        res.status(403).json({ error: "Admin access required" });
-        return;
-      }
-      next();
-      return;
-    }
-    if (req.staffId) {
-      const [me] = await db
-        .select({ role: staffProfilesTable.role, isActive: staffProfilesTable.isActive, tenantId: staffProfilesTable.tenantId })
-        .from(staffProfilesTable)
-        .where(eq(staffProfilesTable.id, req.staffId));
-      if (!me || !me.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
-      if (me.role !== "owner") {
-        res.status(403).json({ error: "Owner access required" });
-        return;
-      }
-      next();
-      return;
-    }
-    res.status(401).json({ error: "Not authenticated" });
-  } catch {
-    res.status(500).json({ error: "Authorization check failed" });
-  }
 }
 
 /* ── POST /api/auth/login-email ─────────────────────────────────── */
@@ -273,7 +233,7 @@ router.patch("/auth/users/:id", requireAdmin, async (req, res): Promise<void> =>
       .set(updates)
       .where(and(
         eq(authUsersTable.id, String(req.params.id)),
-        tenantWhere(authUsersTable.tenantId, req.tenantId),
+        tenantWhereWrite(authUsersTable.tenantId, req.tenantId),
       ))
       .returning();
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
@@ -306,7 +266,7 @@ router.post("/auth/users/:id/password", requireAdmin, async (req, res): Promise<
       })
       .where(and(
         eq(authUsersTable.id, String(req.params.id)),
-        tenantWhere(authUsersTable.tenantId, req.tenantId),
+        tenantWhereWrite(authUsersTable.tenantId, req.tenantId),
       ))
       .returning();
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
@@ -322,7 +282,7 @@ router.post("/auth/users/:id/disable", requireAdmin, async (req, res): Promise<v
       .set({ isActive: false, updatedAt: new Date() })
       .where(and(
         eq(authUsersTable.id, String(req.params.id)),
-        tenantWhere(authUsersTable.tenantId, req.tenantId),
+        tenantWhereWrite(authUsersTable.tenantId, req.tenantId),
       ))
       .returning();
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
@@ -338,7 +298,7 @@ router.post("/auth/users/:id/enable", requireAdmin, async (req, res): Promise<vo
       .set({ isActive: true, updatedAt: new Date() })
       .where(and(
         eq(authUsersTable.id, String(req.params.id)),
-        tenantWhere(authUsersTable.tenantId, req.tenantId),
+        tenantWhereWrite(authUsersTable.tenantId, req.tenantId),
       ))
       .returning();
     if (!user) { res.status(404).json({ error: "User not found" }); return; }

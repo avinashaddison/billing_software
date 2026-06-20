@@ -50,3 +50,26 @@ export function tenantWhere(
   // Migration mode: include legacy NULL rows.
   return or(eq(column, tenantId), isNull(column)) as SQL;
 }
+
+/**
+ * WHERE clause for MUTATIONS (UPDATE / DELETE and the lookups that gate them).
+ *
+ * Unlike `tenantWhere`, this NEVER includes the legacy `IS NULL` fallback for a
+ * non-null tenant — regardless of STRICT_TENANT. A real tenant must only ever
+ * touch its OWN rows; it must not be able to update or delete legacy
+ * null-tenant rows or another tenant's rows. The null-tenant session (legacy
+ * Hira & Sons / admin) still scopes to `IS NULL`, so legacy data stays
+ * editable by its rightful owner.
+ *
+ * - tenantId == null  → `tenant_id IS NULL`     (legacy / admin session)
+ * - tenantId != null  → `tenant_id = :tenantId` (strict, no NULL fallback)
+ */
+export function tenantWhereWrite(
+  column: PgColumn,
+  tenantId: string | null | undefined,
+): SQL {
+  if (tenantId == null) {
+    return isNull(column) as SQL;
+  }
+  return eq(column, tenantId);
+}

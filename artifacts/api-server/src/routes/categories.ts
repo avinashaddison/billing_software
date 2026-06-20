@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, asc, sql, and } from "drizzle-orm";
 import { db, categoriesTable, productsTable } from "@workspace/db";
-import { tenantWhere } from "../lib/tenant";
+import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -77,7 +77,7 @@ router.put("/categories/:id", async (req, res): Promise<void> => {
       .set(updates)
       .where(and(
         eq(categoriesTable.id, req.params.id),
-        tenantWhere(categoriesTable.tenantId, req.tenantId),
+        tenantWhereWrite(categoriesTable.tenantId, req.tenantId),
       ))
       .returning();
     if (!row) { res.status(404).json({ error: "Category not found" }); return; }
@@ -98,7 +98,7 @@ router.delete("/categories/:id", async (req, res): Promise<void> => {
       .delete(categoriesTable)
       .where(and(
         eq(categoriesTable.id, req.params.id),
-        tenantWhere(categoriesTable.tenantId, req.tenantId),
+        tenantWhereWrite(categoriesTable.tenantId, req.tenantId),
       ))
       .returning();
     if (!row) { res.status(404).json({ error: "Category not found" }); return; }

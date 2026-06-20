@@ -47,6 +47,54 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * Global 401 guard. The API now enforces authentication server-side, so a
+ * stale / expired / revoked session returns 401 on protected /api routes.
+ * Without this the SPA would show a broken, empty page instead of bouncing
+ * the user back to the login screen.
+ *
+ * Scope is deliberately narrow: it only reacts to 401s on protected /api
+ * calls, and only when we currently believe we're logged in — so login,
+ * platform-admin, and the auth-probe (/auth/me) requests never trigger a
+ * spurious logout/redirect loop.
+ */
+function AuthFetchGuard() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    const original = window.fetch;
+    window.fetch = async (...args: Parameters<typeof window.fetch>) => {
+      const response = await original(...args);
+      try {
+        if (response.status === 401) {
+          const input = args[0];
+          const url =
+            typeof input === "string"
+              ? input
+              : input instanceof URL
+                ? input.toString()
+                : input instanceof Request
+                  ? input.url
+                  : "";
+          const isApi = url.includes("/api/");
+          const isExempt =
+            url.includes("/api/auth/login") || // login + login-email
+            url.includes("/api/auth/me") ||    // session probe on boot
+            url.includes("/api/platform/");    // vendor /admin console
+          if (isApi && !isExempt && useAuth.getState().isLoggedIn) {
+            useAuth.getState().logout();
+            setLocation("/login");
+          }
+        }
+      } catch {
+        /* never let the guard break a real request */
+      }
+      return response;
+    };
+    return () => { window.fetch = original; };
+  }, [setLocation]);
+  return null;
+}
+
 function RealtimeProvider({ children }: { children: React.ReactNode }) {
   useRealtime();
   // One-shot: pull settings from the server so they persist across devices

@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, and, lte, inArray, sql, desc, isNull } from "drizzle-orm";
+import { eq, ilike, or, and, lte, gte, inArray, sql, desc, isNull } from "drizzle-orm";
 import { db, productsTable, stockLogsTable, salesTable, saleItemsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
-import { tenantWhere } from "../lib/tenant";
+import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import {
   ListProductsQueryParams,
   CreateProductBody,
@@ -256,7 +256,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     .from(productsTable)
     .where(and(
       eq(productsTable.id, params.data.id),
-      tenantWhere(productsTable.tenantId, req.tenantId),
+      tenantWhereWrite(productsTable.tenantId, req.tenantId),
     ));
 
   if (!existing) {
@@ -330,7 +330,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     .set(updates)
     .where(and(
       eq(productsTable.id, params.data.id),
-      tenantWhere(productsTable.tenantId, req.tenantId),
+      tenantWhereWrite(productsTable.tenantId, req.tenantId),
     ))
     .returning();
 
@@ -361,7 +361,7 @@ router.delete("/products/:id", async (req, res): Promise<void> => {
       .from(productsTable)
       .where(and(
         eq(productsTable.id, id),
-        tenantWhere(productsTable.tenantId, req.tenantId),
+        tenantWhereWrite(productsTable.tenantId, req.tenantId),
       ));
     if (!owned) return [undefined];
 
@@ -404,70 +404,94 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
 
   const { type, quantity, userId } = parsed.data;
 
-  const [product] = await db
-    .select()
-    .from(productsTable)
-    .where(and(
-      eq(productsTable.id, params.data.id),
-      tenantWhere(productsTable.tenantId, req.tenantId),
-    ));
+  /* All reads + writes run inside one transaction so the stock change, the
+     stock-log row and any sale row commit (or roll back) together. OUT uses
+     an atomic GUARDED decrement so two concurrent OUTs can't oversell. */
+  const outcome = await db.transaction(async (tx) => {
+    const [product] = await tx
+      .select()
+      .from(productsTable)
+      .where(and(
+        eq(productsTable.id, params.data.id),
+        tenantWhereWrite(productsTable.tenantId, req.tenantId),
+      ));
 
-  if (!product) {
+    if (!product) return { status: "not_found" as const };
+
+    let updatedProduct: typeof productsTable.$inferSelect | undefined;
+    if (type === "IN") {
+      [updatedProduct] = await tx
+        .update(productsTable)
+        .set({ stock: sql`${productsTable.stock} + ${quantity}` })
+        .where(eq(productsTable.id, params.data.id))
+        .returning();
+    } else if (type === "OUT") {
+      /* Guarded decrement: the row only updates if enough stock is still on
+         hand at write time, so concurrent OUTs can never drive stock negative. */
+      [updatedProduct] = await tx
+        .update(productsTable)
+        .set({ stock: sql`${productsTable.stock} - ${quantity}` })
+        .where(and(
+          eq(productsTable.id, params.data.id),
+          gte(productsTable.stock, quantity),
+        ))
+        .returning();
+      if (!updatedProduct) return { status: "insufficient" as const };
+    } else {
+      // ADJUSTMENT — set absolute value
+      [updatedProduct] = await tx
+        .update(productsTable)
+        .set({ stock: quantity })
+        .where(eq(productsTable.id, params.data.id))
+        .returning();
+    }
+
+    const [log] = await tx
+      .insert(stockLogsTable)
+      .values({
+        tenantId: product.tenantId, // inherit the product's tenant so legacy NULL rows stay NULL
+        productId: params.data.id,
+        type,
+        quantity,
+        userId: userId ?? null,
+      })
+      .returning();
+
+    let sale: Record<string, unknown> | null = null;
+    if (type === "OUT") {
+      const salePrice = effectiveSalePrice(product);
+      const price = salePrice ?? Number(product.price);
+      const [saleRecord] = await tx
+        .insert(salesTable)
+        .values({
+          tenantId: product.tenantId,
+          productId: params.data.id,
+          quantity,
+          totalPrice: String(price * quantity),
+        })
+        .returning();
+      sale = {
+        ...saleRecord,
+        totalPrice: Number(saleRecord.totalPrice),
+        productName: product.name,
+        productSku: product.sku,
+      };
+    }
+
+    return { status: "ok" as const, product, updatedProduct: updatedProduct!, log, sale };
+  });
+
+  if (outcome.status === "not_found") {
     res.status(404).json({ error: "Product not found" });
     return;
   }
-
-  let newStock = product.stock;
-
-  if (type === "IN") {
-    newStock = product.stock + quantity;
-  } else if (type === "OUT") {
-    if (product.stock < quantity) {
-      res.status(400).json({ error: "Insufficient stock" });
-      return;
-    }
-    newStock = product.stock - quantity;
-  } else if (type === "ADJUSTMENT") {
-    newStock = quantity;
+  if (outcome.status === "insufficient") {
+    res.status(400).json({ error: "Insufficient stock" });
+    return;
   }
 
-  const [updatedProduct] = await db
-    .update(productsTable)
-    .set({ stock: newStock })
-    .where(eq(productsTable.id, params.data.id))
-    .returning();
-
-  const [log] = await db
-    .insert(stockLogsTable)
-    .values({
-      tenantId: product.tenantId, // inherit the product's tenant so legacy NULL rows stay NULL
-      productId: params.data.id,
-      type,
-      quantity,
-      userId: userId ?? null,
-    })
-    .returning();
-
-  let sale = null;
-  if (type === "OUT") {
-    const salePrice = effectiveSalePrice(product);
-    const price = salePrice ?? Number(product.price);
-    const [saleRecord] = await db
-      .insert(salesTable)
-      .values({
-        tenantId: product.tenantId,
-        productId: params.data.id,
-        quantity,
-        totalPrice: String(price * quantity),
-      })
-      .returning();
-    sale = {
-      ...saleRecord,
-      totalPrice: Number(saleRecord.totalPrice),
-      productName: product.name,
-      productSku: product.sku,
-    };
-  }
+  const { product, updatedProduct, log, sale } = outcome;
+  const newStock = updatedProduct.stock;
 
   // Broadcast stock change to SSE clients
   broadcast("stock_updated", {
@@ -557,7 +581,7 @@ router.post("/products/bulk-assign-supplier", async (req, res): Promise<void> =>
     .set({ supplierId })
     .where(and(
       inArray(productsTable.id, productIds),
-      tenantWhere(productsTable.tenantId, req.tenantId),
+      tenantWhereWrite(productsTable.tenantId, req.tenantId),
     ))
     .returning({ id: productsTable.id, name: productsTable.name, sku: productsTable.sku });
 
@@ -589,7 +613,7 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
       .from(productsTable)
       .where(and(
         eq(productsTable.sku, sku),
-        tenantWhere(productsTable.tenantId, req.tenantId),
+        tenantWhereWrite(productsTable.tenantId, req.tenantId),
       ));
 
     if (!existing) {
@@ -659,7 +683,7 @@ router.post("/products/bulk-import", async (req, res): Promise<void> => {
       .set(updates)
       .where(and(
         eq(productsTable.sku, sku),
-        tenantWhere(productsTable.tenantId, req.tenantId),
+        tenantWhereWrite(productsTable.tenantId, req.tenantId),
       ));
     results.updated++;
   }
@@ -761,14 +785,18 @@ router.post("/products/sale-price-recovery/apply", async (req, res): Promise<voi
 
   let restored = 0;
   for (const c of candidates) {
-    await db
+    const [updated] = await db
       .update(productsTable)
       .set({
         salePrice: String(c.recoveredSalePrice),
         salePriceUntil: null,
       })
-      .where(eq(productsTable.id, c.id));
-    restored++;
+      .where(and(
+        eq(productsTable.id, c.id),
+        tenantWhereWrite(productsTable.tenantId, req.tenantId),
+      ))
+      .returning({ id: productsTable.id });
+    if (updated) restored++;
   }
 
   if (restored > 0) {

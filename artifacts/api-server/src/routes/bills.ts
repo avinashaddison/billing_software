@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, inArray, gte } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
-import { tenantWhere } from "../lib/tenant";
+import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 
 const router: IRouter = Router();
@@ -202,21 +202,29 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           .from(productsTable)
           .where(and(
             eq(productsTable.id, item.productId),
-            tenantWhere(productsTable.tenantId, tenantId),
+            tenantWhereWrite(productsTable.tenantId, tenantId),
           ));
 
         if (!product) throw new Error(`Product not found: ${item.productId}`);
 
-        if (product.stock < item.quantity) {
+        /* Atomic GUARDED decrement — only succeeds if enough stock is still on
+           hand at write time, so two concurrent checkouts can't oversell the
+           same unit. A non-matching row (insufficient stock) returns nothing,
+           and throwing here rolls the whole bill transaction back. */
+        const [decremented] = await tx
+          .update(productsTable)
+          .set({ stock: sql`${productsTable.stock} - ${item.quantity}` })
+          .where(and(
+            eq(productsTable.id, item.productId),
+            gte(productsTable.stock, item.quantity),
+          ))
+          .returning({ stock: productsTable.stock });
+
+        if (!decremented) {
           throw new Error(
             `Insufficient stock for "${product.name}" (available: ${product.stock}, requested: ${item.quantity})`
           );
         }
-
-        await tx
-          .update(productsTable)
-          .set({ stock: product.stock - item.quantity })
-          .where(eq(productsTable.id, item.productId));
 
         await tx.insert(stockLogsTable).values({
           tenantId:  product.tenantId, // mirror the product's tenant (NULL stays NULL for legacy rows)
@@ -238,7 +246,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           discountType:     item.discountType,
           discountValue:    item.discountValue,
           subtotal:         item.price * item.quantity,
-          newStock:         product.stock - item.quantity,
+          newStock:         decremented.stock,
           threshold:        product.lowStockThreshold,
         });
       }
@@ -435,7 +443,7 @@ router.post("/bills/:id/payment", async (req, res): Promise<void> => {
         .from(billsTable)
         .where(and(
           eq(billsTable.id, id),
-          tenantWhere(billsTable.tenantId, req.tenantId),
+          tenantWhereWrite(billsTable.tenantId, req.tenantId),
         ));
       if (!bill) throw new Error("Bill not found");
 

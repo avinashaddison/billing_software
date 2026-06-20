@@ -21,6 +21,7 @@ import settingsRouter    from "./settings";
 import platformRouter    from "./platform";
 import updatesRouter     from "./updates";
 import authRouter        from "./auth";
+import { PUBLIC_PATHS, requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -31,18 +32,12 @@ const router: IRouter = Router();
  *
  * Anonymous requests (tenantId null) pass through — auth/login/health
  * endpoints must remain reachable before a session exists.
+ *
+ * The public allowlist is shared with `requireAuth` (see middlewares/auth)
+ * so the two gates can never disagree about which paths are public.
  */
-const TENANT_PUBLIC_PATHS = new Set([
-  "/auth/login",
-  "/auth/login-email",
-  "/auth/logout",
-  "/auth/me",
-  "/health",
-  "/healthz",
-]);
-
 async function tenantActiveGate(req: Request, res: Response, next: NextFunction): Promise<void> {
-  if (TENANT_PUBLIC_PATHS.has(req.path)) { next(); return; }
+  if (PUBLIC_PATHS.has(req.path)) { next(); return; }
   if (!req.tenantId) { next(); return; }
   try {
     const [t] = await db
@@ -79,6 +74,12 @@ router.use(platformRouter);
 
 // Per-tenant suspend gate (the cloud equivalent of the old license gate).
 router.use(tenantActiveGate);
+
+// Global authentication gate — everything past this point (except the public
+// allowlist in PUBLIC_PATHS) requires a valid PIN or email session. Mounted
+// AFTER the platform routes (which have their own admin gate) and the tenant
+// suspend gate, but BEFORE every tenant data/mutation router below.
+router.use(requireAuth);
 
 router.use(updatesRouter);
 router.use(authRouter);
