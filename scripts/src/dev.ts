@@ -40,7 +40,7 @@ const api = launch("api", 36, {
 
 const web = launch("web", 32, {
   WORKSPACE_PKG: "@workspace/toy-mall",
-  PORT: "5173",
+  PORT: process.env.WEB_PORT ?? "5000",
   API_PORT: "8080",
   NODE_ENV: "development",
 });
