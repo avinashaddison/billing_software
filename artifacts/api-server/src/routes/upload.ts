@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
+import { logger } from "../lib/logger";
+import { badRequest } from "../lib/errors";
 
 const router: IRouter = Router();
 
@@ -15,7 +17,7 @@ const upload = multer({
   limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB max
   fileFilter(_req, file, cb) {
     if (!file.mimetype.startsWith("image/")) {
-      cb(new Error("Only image files are allowed"));
+      cb(badRequest("Only image files are allowed"));
       return;
     }
     cb(null, true);
@@ -57,8 +59,11 @@ router.post(
       );
 
       res.json({ url: result.secure_url, publicId: result.public_id });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message ?? "Upload failed" });
+    } catch (err) {
+      // Cloudinary is an upstream dependency — log the real cause but return a
+      // safe, generic message (raw err.message could leak account/config detail).
+      logger.error({ err }, "Cloudinary image upload failed");
+      res.status(502).json({ error: "Image upload failed" });
     }
   },
 );
@@ -76,8 +81,9 @@ router.delete("/upload/product-image", async (req, res): Promise<void> => {
   try {
     await cloudinary.uploader.destroy(publicId);
     res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message ?? "Delete failed" });
+  } catch (err) {
+    logger.error({ err }, "Cloudinary image delete failed");
+    res.status(502).json({ error: "Image delete failed" });
   }
 });
 

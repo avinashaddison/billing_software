@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { tenantContext } from "./middlewares/tenant";
+import { apiNotFound, errorHandler } from "./middlewares/error";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -141,6 +142,10 @@ app.use("/api",                   apiLimiter);
 
 app.use("/api", router);
 
+/* Unmatched /api/* → JSON 404. Must come after the router but before the SPA
+   fallback so a missing endpoint never resolves to index.html. */
+app.use("/api", apiNotFound);
+
 // In production, serve the compiled frontend and handle SPA routing.
 if (process.env.NODE_ENV === "production") {
   // STATIC_DIR can be overridden; default is the Vite build output relative
@@ -157,5 +162,10 @@ if (process.env.NODE_ENV === "production") {
     res.sendFile(path.join(staticDir, "index.html"));
   });
 }
+
+/* Centralized error handler — MUST be registered last. Express 5 forwards
+   rejected async route handlers here, so a DB failure returns a clean JSON
+   error instead of hanging the request. */
+app.use(errorHandler);
 
 export default app;
