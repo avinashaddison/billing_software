@@ -47,6 +47,8 @@ export const saleItemsTable = pgTable(
   },
   (table) => [
     index("sale_items_tenant_idx").on(table.tenantId),
+    index("sale_items_sale_id_idx").on(table.saleId),
+    index("sale_items_product_id_idx").on(table.productId),
   ],
 );
 

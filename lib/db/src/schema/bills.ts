@@ -30,6 +30,7 @@ export const billsTable = pgTable(
     index("bills_tenant_idx").on(table.tenantId),
     index("bills_tenant_created_idx").on(table.tenantId, table.createdAt),
     index("bills_tenant_status_idx").on(table.tenantId, table.paymentStatus),
+    index("bills_customer_phone_idx").on(table.customerPhone),
   ],
 );
 

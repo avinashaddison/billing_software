@@ -19,6 +19,7 @@ export const stockLogsTable = pgTable(
   },
   (table) => [
     index("stock_logs_tenant_idx").on(table.tenantId),
+    index("stock_logs_product_id_idx").on(table.productId),
   ],
 );
 

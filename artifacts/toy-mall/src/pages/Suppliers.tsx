@@ -44,13 +44,16 @@ const methodLabel = (m: string) => PAYMENT_METHODS.find((x) => x.value === m)?.l
 
 async function fetchSuppliers(): Promise<Supplier[]> {
   const r = await fetch(`${BASE_URL}/api/suppliers`);
-  return r.json();
+  if (!r.ok) return [];
+  const data = await r.json();
+  return Array.isArray(data) ? data : [];
 }
 
 async function fetchProducts(): Promise<ProductLite[]> {
   const r = await fetch(`${BASE_URL}/api/products`);
   if (!r.ok) return [];
-  return r.json();
+  const data = await r.json();
+  return Array.isArray(data) ? data : [];
 }
 
 async function fetchPayments(supplierId: string): Promise<Payment[]> {

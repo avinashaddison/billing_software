@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { desc, gte, sql, and, eq } from "drizzle-orm";
-import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable } from "@workspace/db";
+import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable, billPaymentsTable } from "@workspace/db";
 import { tenantWhere } from "../lib/tenant";
 
 const router: IRouter = Router();
@@ -144,8 +144,9 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
       .limit(10),
 
     db.select({
-        totalCost:    sql<string>`COALESCE(SUM(${productsTable.purchasePrice} * ${saleItemsTable.quantity}), 0)`.as("total_cost"),
-        coveredItems: sql<number>`COUNT(DISTINCT CASE WHEN ${productsTable.purchasePrice} IS NOT NULL THEN ${saleItemsTable.productId} END)::int`.as("covered_items"),
+        totalCost:      sql<string>`COALESCE(SUM(${productsTable.purchasePrice} * ${saleItemsTable.quantity}), 0)`.as("total_cost"),
+        coveredItems:   sql<number>`COUNT(DISTINCT CASE WHEN ${productsTable.purchasePrice} IS NOT NULL THEN ${saleItemsTable.productId} END)::int`.as("covered_items"),
+        coveredRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${productsTable.purchasePrice} IS NOT NULL THEN ${saleItemsTable.subtotal} ELSE 0 END), 0)`.as("covered_revenue"),
       })
       .from(saleItemsTable)
       .innerJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
@@ -201,18 +202,19 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
       .orderBy(desc(sql`SUM(${billsTable.totalAmount})`))
       .limit(5),
 
-    /* Dues collected today: sum of (amountPaid) on bills whose latest
-     * activity is today. This is an approximation — without a payments
-     * ledger table, we can't precisely tag each cashflow to its date.
-     * Good enough for the EOD view; a true cash drawer report would need
-     * a payments table. */
+    /* Dues collected today: real cashflow from the bill_payments ledger,
+     * counting only 'collection' rows (payments made against previously
+     * outstanding credit/partial bills) on this IST date. At-checkout 'sale'
+     * payments are excluded so we never double-count cash/UPI sales that
+     * already appear in cashSales/upiSales. */
     db.select({
-        collected: sql<string>`COALESCE(SUM(${billsTable.amountPaid}), 0)`.as("collected"),
+        collected: sql<string>`COALESCE(SUM(${billPaymentsTable.amount}), 0)`.as("collected"),
       })
-      .from(billsTable)
+      .from(billPaymentsTable)
       .where(and(
-        sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`,
-        tenantWhere(billsTable.tenantId, tenantId),
+        sql`${billPaymentsTable.kind} = 'collection'`,
+        sql`DATE(${billPaymentsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`,
+        tenantWhere(billPaymentsTable.tenantId, tenantId),
       ))
       .then((rows) => rows[0] ?? { collected: 0 }),
 
@@ -229,14 +231,19 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
       .then((rows) => rows[0] ?? { total: 0, count: 0 }),
   ]);
 
-  const totalCost   = Number(profitSummary?.totalCost ?? 0);
-  const grossProfit = today.totalAmount - totalCost;
-  const margin      = today.totalAmount > 0 ? (grossProfit / today.totalAmount) * 100 : 0;
+  const totalCost      = Number(profitSummary?.totalCost ?? 0);
+  /* Profit is computed ONLY over items whose purchase (cost) price is set, so
+   * we compare like-with-like revenue. Mixing full revenue with partial cost
+   * (the old behaviour) overstated profit. profitCoverage tells the UI how many
+   * items are included so it can label the figure ("based on N priced items"). */
+  const coveredRevenue = Number(profitSummary?.coveredRevenue ?? 0);
+  const grossProfit    = coveredRevenue - totalCost;
+  const margin         = coveredRevenue > 0 ? (grossProfit / coveredRevenue) * 100 : 0;
 
   /* Receivables created today = credit sales (the entire bill is unpaid).
-   * Receivables collected today = amountPaid on today's bills (cash/UPI bills
-   * count their own total here; credit bills paid against later won't show
-   * here, which is the limitation called out above). */
+   * Receivables collected today = ledger 'collection' payments dated today
+   * (see paymentsToday above) — accurate cash collected against outstanding
+   * dues regardless of when the original bill was raised. */
   const duesCreated   = today.creditSales;
   const duesCollected = Number(paymentsToday?.collected ?? 0);
 
@@ -264,6 +271,7 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
     grossProfit,
     totalCost,
     margin,
+    coveredRevenue,
     profitCoverage:  profitSummary?.coveredItems ?? 0,
 
     // Payment-mode split (now includes credit)

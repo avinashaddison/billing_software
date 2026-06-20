@@ -20,6 +20,8 @@ export const returnsTable = pgTable(
   },
   (table) => [
     index("returns_tenant_idx").on(table.tenantId),
+    index("returns_bill_id_idx").on(table.billId),
+    index("returns_product_id_idx").on(table.productId),
   ],
 );
 

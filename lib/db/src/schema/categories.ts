@@ -3,12 +3,11 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 /**
- * NOTE — multi-tenant migration:
- * `name` retains its global UNIQUE constraint to keep the existing live
- * schema intact (non-destructive migration). This means category names
- * are unique across ALL tenants during the migration window. A future
- * migration may swap this for a partial unique index keyed on
- * `(tenant_id, name)` once STRICT_TENANT is fully enabled.
+ * NOTE — multi-tenant uniqueness:
+ * Category `name` uniqueness is enforced PER TENANT via migration 0010
+ * (categories_tenant_name_uq), NOT a global UNIQUE — so each shop can have
+ * its own "Toys"/"Snacks" category without colliding with another shop.
+ * Legacy NULL-tenant rows are grouped under a sentinel in that index.
  */
 export const categoriesTable = pgTable(
   "categories",
@@ -16,7 +15,7 @@ export const categoriesTable = pgTable(
     id:        uuid("id").primaryKey().defaultRandom(),
     /** Tenant owner. NULL = legacy Hira & Sons row. */
     tenantId:  text("tenant_id"),
-    name:      text("name").notNull().unique(),
+    name:      text("name").notNull(),
     emoji:     text("emoji").notNull().default("🎁"),
     skuCode:   text("sku_code").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

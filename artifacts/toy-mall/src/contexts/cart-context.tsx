@@ -123,14 +123,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   ─────────────────────────────────────────────────────────────────── */
   useEffect(() => {
     fetch(`${BASE_URL}/api/shared-cart`)
-      .then((r) => r.json())
-      .then((data: { items: CartItem[] }) => {
-        if (Array.isArray(data.items) && data.items.length > 0) {
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((data: { items?: CartItem[] }) => {
+        const incoming = data?.items;
+        if (Array.isArray(incoming) && incoming.length > 0) {
           setItems((prev) => {
             // If we already have local items (localStorage or already scanned),
             // keep local state and let it remain authoritative.
             if (prev.length > 0) return prev;
-            return data.items;
+            return incoming;
           });
         }
       })

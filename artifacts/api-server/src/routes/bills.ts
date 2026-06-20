@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, sql, inArray, gte } from "drizzle-orm";
-import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable } from "@workspace/db";
+import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable, billPaymentsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
@@ -303,6 +303,20 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         )
         .returning();
 
+      // Money-movement ledger: a non-credit bill is fully paid at checkout.
+      // Record it as a 'sale' payment. The EOD "dues collected" figure ignores
+      // 'sale' rows (already in cash/UPI sales) and counts only later
+      // 'collection' payments, so this never double-counts.
+      if (!isCredit && totalAmount > 0) {
+        await tx.insert(billPaymentsTable).values({
+          tenantId,
+          billId:      bill.id,
+          amount:      String(totalAmount),
+          paymentMode,
+          kind:        "sale",
+        });
+      }
+
       return {
         bill: { ...bill, totalAmount: Number(bill.totalAmount) },
         items: processedItems,
@@ -438,13 +452,17 @@ router.post("/bills/:id/payment", async (req, res): Promise<void> => {
 
   try {
     const updated = await db.transaction(async (tx) => {
+      // Lock the bill row for the duration of the tx so two concurrent
+      // payments can't both read the same prevPaid and double-insert ledger
+      // rows / over-collect.
       const [bill] = await tx
         .select()
         .from(billsTable)
         .where(and(
           eq(billsTable.id, id),
           tenantWhereWrite(billsTable.tenantId, req.tenantId),
-        ));
+        ))
+        .for("update");
       if (!bill) throw new Error("Bill not found");
 
       const total       = Number(bill.totalAmount);
@@ -470,6 +488,21 @@ router.post("/bills/:id/payment", async (req, res): Promise<void> => {
         })
         .where(eq(billsTable.id, id))
         .returning();
+
+      // Money-movement ledger: record the ACTUAL amount applied (the delta,
+      // which can be smaller than requested when the refund cap clamps it) as a
+      // 'collection'. This is what the EOD "dues collected" figure sums.
+      const applied = newPaid - prevPaid;
+      if (applied > 0) {
+        await tx.insert(billPaymentsTable).values({
+          tenantId:    bill.tenantId,
+          billId:      id,
+          amount:      String(applied),
+          paymentMode: newPaymentMode ?? "cash",
+          kind:        "collection",
+        });
+      }
+
       return row;
     });
 

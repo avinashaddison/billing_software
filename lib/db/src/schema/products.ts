@@ -9,8 +9,11 @@ export const productsTable = pgTable(
     /** Tenant owner. NULL = legacy Hira & Sons row (visible to all during migration). */
     tenantId:          text("tenant_id"),
     name:              text("name").notNull(),
-    sku:               text("sku").notNull().unique(),
-    barcode:           text("barcode").unique(),
+    /* Uniqueness for sku & barcode is enforced PER TENANT via migration 0010
+       (products_tenant_sku_uq / products_tenant_barcode_uq), NOT a global
+       UNIQUE — so different shops may reuse the same SKU/barcode. */
+    sku:               text("sku").notNull(),
+    barcode:           text("barcode"),
     category:          text("category").notNull(),
     price:             numeric("price", { precision: 10, scale: 2 }).notNull(),
     salePrice:         numeric("sale_price", { precision: 10, scale: 2 }),
