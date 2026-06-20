@@ -25,7 +25,7 @@ router.post("/shared-cart/add", (req, res) => {
     { productId, name, sku, price, mrp: typeof mrp === "number" ? mrp : undefined },
     req.tenantId,
   );
-  broadcast("cart_updated", summary, req.tenantId);
+  broadcast("cart_updated", summary, req.tenantId, true);
   res.json(summary);
 });
 
@@ -38,21 +38,21 @@ router.patch("/shared-cart/:productId", (req, res) => {
     return;
   }
   const summary = sharedCart.setQty(productId, quantity, req.tenantId);
-  broadcast("cart_updated", summary, req.tenantId);
+  broadcast("cart_updated", summary, req.tenantId, true);
   res.json(summary);
 });
 
 /* DELETE /api/shared-cart/:productId — remove one item */
 router.delete("/shared-cart/:productId", (req, res) => {
   const summary = sharedCart.removeItem(req.params.productId, req.tenantId);
-  broadcast("cart_updated", summary, req.tenantId);
+  broadcast("cart_updated", summary, req.tenantId, true);
   res.json(summary);
 });
 
 /* DELETE /api/shared-cart — clear entire cart */
 router.delete("/shared-cart", (req, res) => {
   const summary = sharedCart.clearCart(req.tenantId);
-  broadcast("cart_updated", summary, req.tenantId);
+  broadcast("cart_updated", summary, req.tenantId, true);
   res.json(summary);
 });
 
@@ -64,7 +64,7 @@ router.put("/shared-cart", (req, res) => {
     return;
   }
   const summary = sharedCart.replaceCart(items, req.tenantId);
-  broadcast("cart_updated", summary, req.tenantId);
+  broadcast("cart_updated", summary, req.tenantId, true);
   res.json(summary);
 });
 

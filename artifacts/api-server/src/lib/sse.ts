@@ -71,9 +71,19 @@ export function addClient(
  * - tenantId === string → broadcast to clients with that tenant +
  *   to legacy NULL clients (so the Hira owner still sees everything
  *   during migration).
+ *
+ * forceStrict === true → ignore the migration "see everything" fan-out and
+ *   deliver ONLY to clients whose tenant matches exactly (null matches null).
+ *   Use this for ephemeral, per-shop UI state (e.g. the live shared cart) that
+ *   must never cross shops, even while STRICT_TENANT is disabled.
  */
-export function broadcast(event: string, data: unknown, tenantId?: string | null): void {
-  const strict = strictTenantEnabled();
+export function broadcast(
+  event: string,
+  data: unknown,
+  tenantId?: string | null,
+  forceStrict = false,
+): void {
+  const strict = forceStrict || strictTenantEnabled();
   for (const client of clients) {
     let shouldSend: boolean;
 
