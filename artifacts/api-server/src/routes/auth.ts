@@ -93,13 +93,23 @@ router.post("/auth/login-email", async (req, res): Promise<void> => {
       .from(authUsersTable)
       .where(eq(authUsersTable.email, email));
 
-    /* Constant-time-ish behaviour: always run a bcrypt compare so an
-       attacker cannot enumerate emails by response timing. */
-    const user = matches[0];
-    const hashToCheck = user?.passwordHash ?? "$2b$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv";
-    const ok = await bcrypt.compare(password, hashToCheck);
+    /* The same email can legitimately exist in more than one tenant
+       (uniqueness is enforced PER tenant). Verify the password against EVERY
+       candidate row and keep the one it actually matches, so a user is never
+       authenticated against the wrong shop — and a valid login is never
+       rejected just because another tenant's row happened to sort first. */
+    let user: (typeof matches)[number] | undefined;
+    for (const candidate of matches) {
+      const matched = await bcrypt.compare(password, candidate.passwordHash);
+      if (matched && !user) user = candidate;
+    }
+    /* No candidate rows at all → still run one compare so response timing
+       can't be used to tell whether the email exists. */
+    if (matches.length === 0) {
+      await bcrypt.compare(password, "$2b$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv");
+    }
 
-    if (!user || !ok || !user.isActive) {
+    if (!user || !user.isActive) {
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }

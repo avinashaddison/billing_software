@@ -39,10 +39,40 @@ export const PUBLIC_PATHS: ReadonlySet<string> = new Set([
  * Everything else gets a 401 so anonymous callers can't reach tenant data
  * or mutate state by hitting the API directly.
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (PUBLIC_PATHS.has(req.path)) { next(); return; }
-  if (req.staffId || req.userId) { next(); return; }
-  res.status(401).json({ error: "Not authenticated" });
+  if (!req.staffId && !req.userId) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  /* A valid signature isn't enough: the session cookie lives for a year, so we
+     must confirm the account is STILL active on every request. Otherwise a
+     staff member the owner just disabled (e.g. a fired cashier) would keep full
+     API access until their cookie expired. requireAdmin already does this for
+     privileged routes — this extends the same guarantee to every data route. */
+  try {
+    if (req.authKind === "email" && req.userId) {
+      const [u] = await db
+        .select({ isActive: authUsersTable.isActive })
+        .from(authUsersTable)
+        .where(eq(authUsersTable.id, req.userId));
+      if (!u || !u.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
+      next();
+      return;
+    }
+    if (req.staffId) {
+      const [s] = await db
+        .select({ isActive: staffProfilesTable.isActive })
+        .from(staffProfilesTable)
+        .where(eq(staffProfilesTable.id, req.staffId));
+      if (!s || !s.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
+      next();
+      return;
+    }
+    res.status(401).json({ error: "Not authenticated" });
+  } catch {
+    res.status(500).json({ error: "Authentication check failed" });
+  }
 }
 
 /* ───── admin-only gate ─────

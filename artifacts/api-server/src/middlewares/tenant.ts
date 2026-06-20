@@ -46,6 +46,15 @@ declare global {
 function loadSecret(): string {
   const fromEnv = process.env["SESSION_SECRET"]?.trim();
   if (fromEnv) return fromEnv;
+  /* In production we MUST have a real secret. Falling back to the built-in
+     default here would mean every signed session cookie could be forged by
+     anyone who has seen this (public) source — i.e. any tenant could be
+     impersonated. Fail fast at startup instead of booting insecurely. */
+  if (process.env["NODE_ENV"] === "production") {
+    throw new Error(
+      "SESSION_SECRET is required in production (refusing to start with the insecure built-in default).",
+    );
+  }
   return "tenant-session-default-secret-do-not-leak";
 }
 
