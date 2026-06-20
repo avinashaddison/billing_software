@@ -636,8 +636,8 @@ export default function Customers() {
   const fetchCustomers = useCallback((p: Period) => {
     setLoading(true);
     fetch(`${BASE_URL}/api/customers?period=${p}`)
-      .then((r) => r.json())
-      .then(setCustomers)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setCustomers(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
   }, []);
 

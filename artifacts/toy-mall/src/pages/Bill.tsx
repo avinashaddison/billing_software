@@ -236,7 +236,7 @@ export default function Bill() {
     if (!billId) return;
     setLoading(true);
     fetch(`${BASE_URL}/api/bills/${billId}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("not ok"))))
       .then(setData)
       .catch(() => setError("Could not load bill"))
       .finally(() => setLoading(false));

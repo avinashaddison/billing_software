@@ -189,10 +189,11 @@ export default function Report() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch(`${BASE_URL}/api/reports/end-of-day?date=${date}`).then((r) => r.json()),
-      fetch(`${BASE_URL}/api/reports/revenue?days=${revDays}`).then((r) => r.json()),
+      fetch(`${BASE_URL}/api/reports/end-of-day?date=${date}`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`${BASE_URL}/api/reports/revenue?days=${revDays}`).then((r) => (r.ok ? r.json() : [])),
     ])
-      .then(([e, r]) => { setEod(e); setRevenue(r); })
+      .then(([e, r]) => { setEod(e); setRevenue(Array.isArray(r) ? r : []); })
+      .catch(() => { setEod(null); setRevenue([]); })
       .finally(() => setLoading(false));
   }, [date, revDays]);
 

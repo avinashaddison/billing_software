@@ -30,8 +30,8 @@ function RevenueChart() {
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/reports/revenue?days=7`)
-      .then((r) => r.json())
-      .then(setData)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setData(Array.isArray(d) ? d : []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

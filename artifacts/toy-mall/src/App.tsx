@@ -12,6 +12,7 @@ import { useAuth, usePermission } from "@/hooks/use-auth";
 import { useStoreSettings }    from "@/lib/store-info";
 import { type ResourceKey } from "@/lib/permissions";
 import NotFound from "@/pages/not-found";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import Dashboard      from "@/pages/Dashboard";
 import Products       from "@/pages/Products";
@@ -92,6 +93,42 @@ function AuthFetchGuard() {
     };
     return () => { window.fetch = original; };
   }, [setLocation]);
+  return null;
+}
+
+/**
+ * Boot-time session reconciliation. The client persists `isLoggedIn` in
+ * localStorage, but the real session lives in an httpOnly cookie. A deploy
+ * that rotates SESSION_SECRET (or a server-side logout) invalidates that
+ * cookie while the browser still believes it's logged in — which would
+ * render the whole app shell against a dead session and crash on the first
+ * 401. We probe /api/auth/me once on boot and, ONLY on a definitive 401,
+ * drop the client session so the router cleanly sends the user to /login.
+ * Network errors are ignored so a brief blip never logs anyone out.
+ */
+function SessionSync() {
+  useEffect(() => {
+    if (!useAuth.getState().isLoggedIn) return;
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`${base}/api/auth/me`);
+        if (cancelled) return;
+        if (r.status === 401) { useAuth.getState().logout(); return; }
+        if (r.ok) {
+          /* Client `isLoggedIn` means a COMPLETED staff (PIN) session. If the
+             cookie only carries the pre-PIN email step (kind:"email") or any
+             other shape, the persisted full-login is stale — drop it so the
+             user re-selects staff + PIN instead of running with old, possibly
+             wrong, permissions. */
+          const me = await r.json().catch(() => null);
+          if (!cancelled && me?.kind !== "pin") useAuth.getState().logout();
+        }
+      } catch { /* offline / transient — keep the session as-is */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   return null;
 }
 
@@ -178,11 +215,14 @@ function Router() {
 
 function App() {
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <CartProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <RealtimeProvider>
+              <AuthFetchGuard />
+              <SessionSync />
               <SnowOverlay />
               <Router />
               <PwaInstallPrompt />
@@ -192,6 +232,7 @@ function App() {
         <Toaster richColors position="top-right" />
       </TooltipProvider>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -31,8 +31,8 @@ export default function Billing() {
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/bills`)
-      .then((r) => r.json())
-      .then(setBills)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setBills(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
   }, []);
 
