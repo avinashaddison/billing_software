@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ShieldCheck, LogOut, RefreshCw, Plus, Search, Building2, Users, Package,
   Receipt, Loader2, AlertTriangle, Mail, Lock, KeyRound, Power, PowerOff,
-  CheckCircle2, CalendarClock, Infinity,
+  CheckCircle2, CalendarClock, Infinity, Pencil, Copy, ScrollText, X, Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -199,6 +199,11 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [search, setSearch]   = useState("");
+  const [sortBy, setSortBy]   = useState<"newest" | "name" | "expiry">("newest");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended" | "expired">("all");
+  const [editing, setEditing] = useState<TenantRow | null>(null);
+  const [viewingUsers, setViewingUsers] = useState<TenantRow | null>(null);
+  const [auditOpen, setAuditOpen] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -235,10 +240,31 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
   };
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return tenants;
-    const q = search.toLowerCase();
-    return tenants.filter((t) => t.id.toLowerCase().includes(q) || t.name.toLowerCase().includes(q));
-  }, [tenants, search]);
+    const q = search.trim().toLowerCase();
+    const now = Date.now();
+    const isExpired = (t: TenantRow) => !!t.expiresAt && new Date(t.expiresAt).getTime() < now;
+    const rows = tenants.filter((t) => {
+      if (q
+        && !t.id.toLowerCase().includes(q)
+        && !t.name.toLowerCase().includes(q)
+        && !(t.ownerEmail ?? "").toLowerCase().includes(q)) return false;
+      if (statusFilter === "active"    && (!t.isActive || isExpired(t))) return false;
+      if (statusFilter === "suspended" && t.isActive)                    return false;
+      if (statusFilter === "expired"   && !isExpired(t))                 return false;
+      return true;
+    });
+    /* Lifetime tenants (no expiry) sort to the very end of "expiry soonest". */
+    const NEVER = Number.MAX_SAFE_INTEGER;
+    return [...rows].sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "expiry") {
+        const ax = a.expiresAt ? new Date(a.expiresAt).getTime() : NEVER;
+        const bx = b.expiresAt ? new Date(b.expiresAt).getTime() : NEVER;
+        return ax - bx;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [tenants, search, statusFilter, sortBy]);
 
   const toggleActive = async (t: TenantRow) => {
     const next = !t.isActive;
@@ -306,6 +332,9 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => setAuditOpen(true)} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted" title="Audit log">
+              <ScrollText className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Audit Log</span>
+            </button>
             <button onClick={refresh} className="p-2 rounded-xl bg-card border hover:bg-muted transition-colors" title="Refresh">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -332,10 +361,31 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tenants by name or id…"
+              placeholder="Search by name, id, or owner email…"
               className="w-full pl-9 pr-3 py-2.5 rounded-xl border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            title="Filter by status"
+            className="px-3 py-2.5 rounded-xl border bg-card text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+            <option value="expired">Expired</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            title="Sort tenants"
+            className="px-3 py-2.5 rounded-xl border bg-card text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            <option value="newest">Newest first</option>
+            <option value="name">Name A–Z</option>
+            <option value="expiry">Expiry soonest</option>
+          </select>
           <button
             onClick={() => setCreating(true)}
             className="px-4 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30 flex items-center gap-1.5"
@@ -395,6 +445,12 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
                       <span className="flex items-center gap-1"><Receipt  className="w-3 h-3" /> {t.saleCount} sales</span>
                     </div>
                     <div className="mt-2 flex items-center gap-2 flex-wrap relative">
+                      <button onClick={() => setEditing(t)} className="px-2.5 py-1.5 rounded-lg border bg-card text-[11px] font-bold flex items-center gap-1.5 hover:bg-muted">
+                        <Pencil className="w-3 h-3" /> Edit
+                      </button>
+                      <button onClick={() => setViewingUsers(t)} className="px-2.5 py-1.5 rounded-lg border bg-card text-[11px] font-bold flex items-center gap-1.5 hover:bg-muted">
+                        <Users className="w-3 h-3" /> Users
+                      </button>
                       <button onClick={() => resetOwnerPwd(t)} className="px-2.5 py-1.5 rounded-lg border bg-card text-[11px] font-bold flex items-center gap-1.5 hover:bg-muted">
                         <KeyRound className="w-3 h-3" /> Reset Owner Password
                       </button>
@@ -439,6 +495,9 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
       </div>
 
       {creating && <CreateTenantDialog onClose={() => setCreating(false)} onCreated={() => { setCreating(false); void refresh(); }} />}
+      {editing && <EditTenantDialog tenant={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void refresh(); }} />}
+      {viewingUsers && <ViewUsersDialog tenant={viewingUsers} onClose={() => setViewingUsers(null)} />}
+      {auditOpen && <AuditLogDialog onClose={() => setAuditOpen(false)} />}
     </div>
   );
 }
@@ -465,6 +524,9 @@ function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCre
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  /* On success we flip to a credentials hand-off screen instead of closing
+     immediately, so the vendor can copy the login the client will need. */
+  const [created, setCreated] = useState<{ name: string; email: string; password: string; pin: string | null } | null>(null);
   /* Access duration — drives `expiresAt` on the server. Default to 1 year
      since that's the most common paid SaaS subscription length. */
   const [access, setAccess] = useState<AccessKey>("365d");
@@ -513,11 +575,65 @@ function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCre
         toast.error(data.error || "Could not create tenant");
         return;
       }
+      const data = await r.json().catch(() => ({}));
+      /* Surface the credentials once. The password is the one just typed
+         (the API never returns it); the staff PIN comes from the response. */
+      setCreated({
+        name:     name.trim(),
+        email:    email.trim().toLowerCase(),
+        password,
+        /* Only surface a PIN the server actually returned — never fabricate
+           one, or we could hand the client a PIN that isn't really set. */
+        pin:      typeof data?.staff?.pin === "string" ? data.staff.pin : null,
+      });
       toast.success("Tenant created");
-      onCreated();
     } catch { toast.error("Server unreachable"); }
     finally { setBusy(false); }
   };
+
+  if (created) {
+    const loginUrl = `${typeof window !== "undefined" ? window.location.origin : ""}${BASE}/login`;
+    return (
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCreated}>
+        <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-3xl border bg-card p-6 space-y-4 shadow-2xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white">
+              <CheckCircle2 className="w-5 h-5" strokeWidth={2.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black">{created.name} is ready</h2>
+              <p className="text-xs text-muted-foreground">Hand these credentials to the client.</p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border bg-muted/30 divide-y">
+            <CredRow label="Login URL"      value={loginUrl} />
+            <CredRow label="Owner Email"    value={created.email} mono />
+            <CredRow label="Owner Password" value={created.password} mono />
+            {created.pin
+              ? <CredRow label="Staff PIN" value={created.pin} mono hint="Default — change it in Staff Management." />
+              : (
+                <div className="px-3 py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Staff PIN</p>
+                  <p className="text-sm text-muted-foreground">Unavailable — set it in Staff Management after the owner logs in.</p>
+                </div>
+              )}
+          </div>
+
+          <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 px-3 py-2 flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-700 dark:text-amber-300">
+              Copy the password now — it is stored only as a hash and cannot be retrieved later.
+            </p>
+          </div>
+
+          <button onClick={onCreated} className="w-full px-4 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30">
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -615,5 +731,278 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {children}
       {hint && <span className="text-[10px] text-muted-foreground block">{hint}</span>}
     </label>
+  );
+}
+
+/* ───────── Credential row with copy-to-clipboard ───────── */
+function CredRow({ label, value, mono, hint }: { label: string; value: string; mono?: boolean; hint?: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { toast.error("Copy failed — copy it manually"); }
+  };
+  return (
+    <div className="flex items-center gap-2 px-3 py-2.5">
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+        <p className={`text-sm truncate ${mono ? "font-mono" : ""}`} title={value}>{value}</p>
+        {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
+      </div>
+      <button type="button" onClick={copy} className="p-2 rounded-lg border bg-card hover:bg-muted shrink-0" title="Copy">
+        {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+      </button>
+    </div>
+  );
+}
+
+/* ───────── Edit Tenant Dialog (rename + change owner email) ───────── */
+function EditTenantDialog({ tenant, onClose, onSaved }: { tenant: TenantRow; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(tenant.name);
+  const [ownerEmail, setOwnerEmail] = useState(tenant.ownerEmail ?? "");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const body: Record<string, unknown> = {};
+    if (name.trim() && name.trim() !== tenant.name) body.name = name.trim();
+    if (ownerEmail.trim().toLowerCase() !== (tenant.ownerEmail ?? "").toLowerCase()) {
+      body.ownerEmail = ownerEmail.trim();
+    }
+    if (Object.keys(body).length === 0) { toast.info("No changes to save"); onClose(); return; }
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/platform/tenants/${tenant.id}`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        toast.error(data.error || "Could not save changes");
+        return;
+      }
+      toast.success("Tenant updated");
+      onSaved();
+    } catch { toast.error("Server unreachable"); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-3xl border bg-card p-6 space-y-4 shadow-2xl">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white">
+            <Pencil className="w-5 h-5" strokeWidth={2.5} />
+          </div>
+          <div>
+            <h2 className="text-lg font-black">Edit Tenant</h2>
+            <p className="text-xs text-muted-foreground font-mono">{tenant.id}</p>
+          </div>
+        </div>
+
+        <Field label="Shop Name">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </Field>
+
+        <Field label="Owner Email" hint="Updates the owner's email login used at /login.">
+          <input
+            type="email"
+            value={ownerEmail}
+            onChange={(e) => setOwnerEmail(e.target.value)}
+            placeholder="owner@shop.com"
+            className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </Field>
+
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border bg-card text-sm font-bold hover:bg-muted">
+            Cancel
+          </button>
+          <button type="submit" disabled={busy || !name.trim()}
+            className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30 disabled:opacity-50">
+            {busy ? "Saving…" : "Save Changes"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+interface TenantUserRow  { id: string; email: string; role: string; isActive: boolean; lastLoginAt: string | null; createdAt: string }
+interface TenantStaffRow { id: string; name: string; role: string; isActive: boolean; createdAt: string }
+
+/* ───────── View Users Dialog (email logins + PIN staff) ───────── */
+function ViewUsersDialog({ tenant, onClose }: { tenant: TenantRow; onClose: () => void }) {
+  const [users, setUsers] = useState<TenantUserRow[]>([]);
+  const [staff, setStaff] = useState<TenantStaffRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`${API}/platform/tenants/${tenant.id}/users`, { credentials: "include" });
+        if (!r.ok) { if (alive) toast.error("Could not load users"); return; }
+        const d = await r.json();
+        if (!alive) return;
+        setUsers(Array.isArray(d.users) ? d.users : []);
+        setStaff(Array.isArray(d.staff) ? d.staff : []);
+      } catch { if (alive) toast.error("Could not load users"); }
+      finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, [tenant.id]);
+
+  const Badge = ({ active }: { active: boolean }) => active
+    ? <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider">Active</span>
+    : <span className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-black uppercase tracking-wider">Off</span>;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-3xl border bg-card p-6 space-y-4 shadow-2xl">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white">
+              <Users className="w-5 h-5" strokeWidth={2.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black">{tenant.name}</h2>
+              <p className="text-xs text-muted-foreground">Logins &amp; staff accounts</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg border bg-card hover:bg-muted"><X className="w-4 h-4" /></button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="space-y-4">
+            <section>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Email Logins ({users.length})</p>
+              {users.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No email logins.</p>
+              ) : (
+                <div className="rounded-2xl border divide-y">
+                  {users.map((u) => (
+                    <div key={u.id} className="px-3 py-2.5 flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-mono truncate" title={u.email}>{u.email}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Last login: {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : "never"}
+                        </p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-muted text-[10px] font-black uppercase tracking-wider">{u.role}</span>
+                      <Badge active={u.isActive} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Staff (PIN) ({staff.length})</p>
+              {staff.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No staff profiles.</p>
+              ) : (
+                <div className="rounded-2xl border divide-y">
+                  {staff.map((s) => (
+                    <div key={s.id} className="px-3 py-2.5 flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate" title={s.name}>{s.name}</p>
+                        <p className="text-[11px] text-muted-foreground">Added {new Date(s.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-muted text-[10px] font-black uppercase tracking-wider">{s.role}</span>
+                      <Badge active={s.isActive} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface AuditRow {
+  id: string;
+  action: string;
+  actorEmail: string;
+  targetTenant: string | null;
+  ip: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+/* ───────── Audit Log Dialog (recent platform actions) ───────── */
+function AuditLogDialog({ onClose }: { onClose: () => void }) {
+  const [events, setEvents] = useState<AuditRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`${API}/platform/audit?limit=100`, { credentials: "include" });
+        if (!r.ok) { if (alive) toast.error("Could not load audit log"); return; }
+        const d = await r.json();
+        if (alive) setEvents(Array.isArray(d.events) ? d.events : []);
+      } catch { if (alive) toast.error("Could not load audit log"); }
+      finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl max-h-[85dvh] flex flex-col rounded-3xl border bg-card shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between gap-3 p-6 border-b">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white">
+              <ScrollText className="w-5 h-5" strokeWidth={2.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black">Audit Log</h2>
+              <p className="text-xs text-muted-foreground">Most recent platform actions</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg border bg-card hover:bg-muted"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="overflow-y-auto p-4">
+          {loading ? (
+            <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+          ) : events.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-10">No audit events yet.</p>
+          ) : (
+            <div className="rounded-2xl border divide-y">
+              {events.map((ev) => (
+                <div key={ev.id} className="px-3 py-2.5 flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-full bg-muted text-[10px] font-black uppercase tracking-wider font-mono">{ev.action}</span>
+                      {ev.targetTenant && <span className="text-[11px] text-muted-foreground font-mono truncate">→ {ev.targetTenant}</span>}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1 truncate" title={ev.actorEmail}>
+                      {ev.actorEmail}{ev.ip ? ` · ${ev.ip}` : ""}
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground shrink-0 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {new Date(ev.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

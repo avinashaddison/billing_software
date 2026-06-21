@@ -12,7 +12,7 @@
  *     (cookie alone is not trusted).
  */
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import {
   db,
@@ -23,6 +23,7 @@ import {
   storeSettingsTable,
   productsTable,
   salesTable,
+  auditEventsTable,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { recordAudit } from "../lib/audit";
@@ -445,17 +446,58 @@ router.patch("/platform/tenants/:id", requirePlatformAdmin, async (req, res): Pr
     try { updates.expiresAt = resolveExpiry(req.body.expiresAt); }
     catch (e: any) { res.status(400).json({ error: e?.message ?? "Invalid expiresAt" }); return; }
   }
-  if (Object.keys(updates).length === 0) {
+
+  /* Optional owner-email change. Targets the SAME owner the panel displays
+     (earliest-created) and is applied in the same transaction as the tenant
+     update so a rename + email change can never half-apply. */
+  let newOwnerEmail: string | null = null;
+  if (req.body?.ownerEmail !== undefined) {
+    if (!isValidEmail(req.body.ownerEmail)) {
+      res.status(400).json({ error: "Valid owner email required" }); return;
+    }
+    newOwnerEmail = String(req.body.ownerEmail).trim().toLowerCase();
+  }
+
+  if (Object.keys(updates).length === 0 && newOwnerEmail == null) {
     res.status(400).json({ error: "Nothing to update" });
     return;
   }
   try {
-    const [tenant] = await db
-      .update(tenantsTable)
-      .set(updates)
-      .where(eq(tenantsTable.id, id))
-      .returning();
-    if (!tenant) { res.status(404).json({ error: "Tenant not found" }); return; }
+    const { tenant, ownerEmailChanged } = await db.transaction(async (tx) => {
+      let tenant: typeof tenantsTable.$inferSelect | undefined;
+      if (Object.keys(updates).length > 0) {
+        [tenant] = await tx
+          .update(tenantsTable)
+          .set(updates)
+          .where(eq(tenantsTable.id, id))
+          .returning();
+      } else {
+        [tenant] = await tx
+          .select()
+          .from(tenantsTable)
+          .where(eq(tenantsTable.id, id));
+      }
+      /* Throw (not return) on the not-found paths so the surrounding
+         transaction rolls back any tenant update already staged above. */
+      if (!tenant) throw Object.assign(new Error("Tenant not found"), { httpStatus: 404 });
+
+      let ownerEmailChanged: string | undefined;
+      if (newOwnerEmail != null) {
+        const [owner] = await tx
+          .select({ id: authUsersTable.id })
+          .from(authUsersTable)
+          .where(sql`${authUsersTable.tenantId} = ${id} AND ${authUsersTable.role} = 'owner'`)
+          .orderBy(authUsersTable.createdAt);
+        if (!owner) throw Object.assign(new Error("Owner not found for this tenant"), { httpStatus: 404 });
+        await tx
+          .update(authUsersTable)
+          .set({ email: newOwnerEmail, updatedAt: new Date() })
+          .where(eq(authUsersTable.id, owner.id));
+        ownerEmailChanged = newOwnerEmail;
+      }
+      return { tenant, ownerEmailChanged };
+    });
+
     /* Split the audit verb so suspend/activate show up distinctly in the
        log instead of being lumped under a generic "tenant.update". */
     const action =
@@ -468,10 +510,12 @@ router.patch("/platform/tenants/:id", requirePlatformAdmin, async (req, res): Pr
       actorEmail:   req.platformActor!.email,
       targetTenant: tenant.id,
       ip:           req.ip,
-      metadata:     updates,
+      metadata:     { ...updates, ...(ownerEmailChanged ? { ownerEmail: ownerEmailChanged } : {}) },
     });
     res.json({ tenant });
-  } catch {
+  } catch (err: any) {
+    if (err?.httpStatus) { res.status(err.httpStatus).json({ error: err.message }); return; }
+    if (err?.code === "23505") { res.status(409).json({ error: "That email is already in use by another login" }); return; }
     res.status(500).json({ error: "Failed to update tenant" });
   }
 });
@@ -557,15 +601,30 @@ router.get("/platform/tenants/:id/users", requirePlatformAdmin, async (req, res)
   try {
     const emailUsers = await db
       .select({
-        id:       authUsersTable.id,
-        email:    authUsersTable.email,
-        role:     authUsersTable.role,
-        isActive: authUsersTable.isActive,
+        id:          authUsersTable.id,
+        email:       authUsersTable.email,
+        role:        authUsersTable.role,
+        isActive:    authUsersTable.isActive,
         lastLoginAt: authUsersTable.lastLoginAt,
+        createdAt:   authUsersTable.createdAt,
       })
       .from(authUsersTable)
-      .where(eq(authUsersTable.tenantId, id));
-    res.json({ users: emailUsers });
+      .where(eq(authUsersTable.tenantId, id))
+      .orderBy(authUsersTable.createdAt);
+    /* PIN-based staff profiles live in a separate table from the email logins
+       above; the panel shows both so the vendor sees the full roster. */
+    const staff = await db
+      .select({
+        id:        staffProfilesTable.id,
+        name:      staffProfilesTable.name,
+        role:      staffProfilesTable.role,
+        isActive:  staffProfilesTable.isActive,
+        createdAt: staffProfilesTable.createdAt,
+      })
+      .from(staffProfilesTable)
+      .where(eq(staffProfilesTable.tenantId, id))
+      .orderBy(staffProfilesTable.createdAt);
+    res.json({ users: emailUsers, staff });
   } catch {
     res.status(500).json({ error: "Failed to list users" });
   }
@@ -625,6 +684,39 @@ router.get("/platform/stats", requirePlatformAdmin, async (_req, res): Promise<v
     });
   } catch {
     res.status(500).json({ error: "Failed to load stats" });
+  }
+});
+
+/* ───── GET /api/platform/audit — recent platform-admin actions ─────
+ *
+ * Read-only view over the append-only audit_events log. Optional
+ * `?tenant=<id>` narrows to one tenant; `?limit=` caps rows (default 100,
+ * max 200). Newest first.
+ */
+router.get("/platform/audit", requirePlatformAdmin, async (req, res): Promise<void> => {
+  const tenant = typeof req.query.tenant === "string" && req.query.tenant.trim()
+    ? req.query.tenant.trim()
+    : null;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 200);
+  try {
+    const cols = {
+      id:           auditEventsTable.id,
+      action:       auditEventsTable.action,
+      actorEmail:   auditEventsTable.actorEmail,
+      targetTenant: auditEventsTable.targetTenant,
+      ip:           auditEventsTable.ip,
+      metadata:     auditEventsTable.metadata,
+      createdAt:    auditEventsTable.createdAt,
+    };
+    const events = tenant
+      ? await db.select(cols).from(auditEventsTable)
+          .where(eq(auditEventsTable.targetTenant, tenant))
+          .orderBy(desc(auditEventsTable.createdAt)).limit(limit)
+      : await db.select(cols).from(auditEventsTable)
+          .orderBy(desc(auditEventsTable.createdAt)).limit(limit);
+    res.json({ events });
+  } catch {
+    res.status(500).json({ error: "Failed to load audit log" });
   }
 });
 
