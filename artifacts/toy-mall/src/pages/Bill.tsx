@@ -327,7 +327,6 @@ export default function Bill() {
         // side on 80mm rolls, ~2mm on 58mm). We shrink the rendered content
         // to a safe inner width so nothing gets clipped, and zero out the
         // CSS @page margin so the safe area itself isn't squeezed further.
-        const contentWidth = paperWidth === "58mm" ? "54mm" : "72mm";
         const sidePadding = paperWidth === "58mm" ? "2.5mm" : "4.5mm";
 
         // ── @page height: `auto` vs a fixed giant value ──
@@ -396,8 +395,8 @@ export default function Bill() {
                 position: static !important;
                 display: block !important;
                 margin: 0 auto !important;
-                width: ${contentWidth} !important;
-                max-width: ${contentWidth} !important;
+                width: 100% !important;
+                max-width: 100% !important;
                 box-sizing: border-box !important;
                 padding: 0 !important;
                 background: white !important;
@@ -408,7 +407,10 @@ export default function Bill() {
               }
 
               /* Force every descendant to honour border-box so a stray
-                 padding never bumps the outer width past ${contentWidth}. */
+                 padding never bumps the outer width past the paper width.
+                 The receipt now fills the full roll width and is kept off
+                 the edges only by the symmetric side padding below — this
+                 keeps every box truly centred on the paper. */
               .receipt-print-only * {
                 box-sizing: border-box !important;
               }
@@ -417,7 +419,7 @@ export default function Bill() {
                  logo so the print starts right at the top of the paper.
                  Add dynamic safe side padding to prevent cutoffs. */
               .receipt-print-only > div:first-child {
-                padding-top: 1mm !important;
+                padding-top: 0 !important;
                 padding-bottom: 1mm !important;
                 padding-left: ${sidePadding} !important;
                 padding-right: ${sidePadding} !important;
