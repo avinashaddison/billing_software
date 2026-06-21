@@ -438,6 +438,46 @@ export default function Bill() {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
               }
+
+              /* ── Paper-saving (compact print) ──
+                 Tighten the printed receipt so a single bill uses less
+                 thermal roll. The on-screen view is unchanged — these rules
+                 only take effect when printing. */
+
+              /* Shrink the logo — the biggest single paper user at the top. */
+              .receipt-logo { height: 56px !important; }
+
+              /* Collapse the gap between every receipt section. */
+              .receipt-print-only > div:first-child > * {
+                margin-top: 1mm !important;
+                margin-bottom: 0 !important;
+              }
+              .receipt-print-only > div:first-child > *:first-child {
+                margin-top: 0 !important;
+              }
+
+              /* Trim table row padding. */
+              .receipt-print-only td,
+              .receipt-print-only th {
+                padding-top: 0.6mm !important;
+                padding-bottom: 0.6mm !important;
+              }
+
+              /* Slimmer grand-total bar. */
+              .receipt-print-only .receipt-grand-total {
+                padding-top: 1.2mm !important;
+                padding-bottom: 1.2mm !important;
+              }
+
+              /* Drop blank padding rows + the 'Powered by' credit on paper. */
+              .receipt-pad-row,
+              .receipt-powered { display: none !important; }
+
+              /* Tighten the footer block. */
+              .receipt-footer {
+                margin-top: 1.5mm !important;
+                padding-top: 1mm !important;
+              }
             }
           `}</style>
         );
@@ -522,7 +562,7 @@ export default function Bill() {
               return (
                 <div className="text-center" style={{ padding: '0px 0' }}>
                   {store.logoUrl === "teddy" ? (
-                    <svg className="mx-auto mb-1" style={{ height: `${logoSize}px`, width: "auto", color: textClr }} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="receipt-logo mx-auto mb-1" style={{ height: `${logoSize}px`, width: "auto", color: textClr }} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="50" cy="50" r="30" />
                       <circle cx="23" cy="23" r="10" />
                       <circle cx="23" cy="23" r="5" fill="currentColor" />
@@ -536,7 +576,7 @@ export default function Bill() {
                     </svg>
                   ) : store.logoUrl ? (
                     <img src={store.logoUrl} alt={store.name}
-                         className="mx-auto object-contain mb-1"
+                         className="receipt-logo mx-auto object-contain mb-1"
                          style={{ height: `${logoSize}px`, maxWidth: "120px", printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
                   ) : (
                     <div className="text-[28px] mb-1">{store.logoEmoji || "🧸"}</div>
@@ -783,7 +823,7 @@ export default function Bill() {
                 })}
                 {/* Spacer rows for tiny bills */}
                 {items.length < 3 && Array.from({ length: 3 - items.length }).map((_, i) => (
-                  <tr key={`pad-${i}`}>
+                  <tr key={`pad-${i}`} className="receipt-pad-row">
                     <td className="px-1.5 py-1 border-r border-black/15">&nbsp;</td>
                     <td className="border-r border-black/15"/>
                     <td className="border-r border-black/15"/>
@@ -870,9 +910,9 @@ export default function Bill() {
             )}
 
             {/* ── FOOTER ── */}
-            <div className="text-center text-[10px] mt-3 pt-2 border-t border-dashed border-black/40">
+            <div className="receipt-footer text-center text-[10px] mt-3 pt-2 border-t border-dashed border-black/40">
               <div className="font-black tracking-[0.18em] mb-0.5">— THANK YOU · VISIT AGAIN —</div>
-              <div className="text-[9px] text-black/60">Powered by {store.appSubtitle}</div>
+              <div className="receipt-powered text-[9px] text-black/60">Powered by {store.appSubtitle}</div>
               <div className="font-mono text-[8px] text-black/40 mt-0.5">Ref: {bill.id.slice(0, 8).toUpperCase()}</div>
             </div>
           </div>
