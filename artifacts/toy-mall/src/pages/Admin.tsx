@@ -203,11 +203,24 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
   const refresh = async () => {
     setLoading(true);
     try {
-      const [t, s] = await Promise.all([
-        fetch(`${API}/platform/tenants`, { credentials: "include" }).then((r) => r.json()),
-        fetch(`${API}/platform/stats`,   { credentials: "include" }).then((r) => r.json()),
+      const [tRes, sRes] = await Promise.all([
+        fetch(`${API}/platform/tenants`, { credentials: "include" }),
+        fetch(`${API}/platform/stats`,   { credentials: "include" }),
       ]);
-      setTenants(t.tenants ?? []);
+      /* Session expired or revoked → bounce back to the login screen instead
+         of leaving the vendor staring at an empty dashboard with a vague error. */
+      if (tRes.status === 401 || sRes.status === 401) {
+        toast.error("Session expired — please sign in again");
+        onLogout();
+        return;
+      }
+      if (!tRes.ok || !sRes.ok) {
+        toast.error("Could not load tenants");
+        return;
+      }
+      const t = await tRes.json();
+      const s = await sRes.json();
+      setTenants(Array.isArray(t.tenants) ? t.tenants : []);
       setStats(s);
     } catch {
       toast.error("Could not load tenants");
@@ -263,7 +276,8 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
   const resetOwnerPwd = async (t: TenantRow) => {
     const newPwd = prompt(`New password for the owner of ${t.name} (8–128 chars):`);
     if (!newPwd) return;
-    if (newPwd.length < 8) { toast.error("Password too short"); return; }
+    if (newPwd.length < 8)   { toast.error("Password too short (min 8 characters)"); return; }
+    if (newPwd.length > 128) { toast.error("Password too long (max 128 characters)"); return; }
     const r = await fetch(`${API}/platform/tenants/${t.id}/owner-password`, {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },

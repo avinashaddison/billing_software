@@ -12,11 +12,10 @@
  *     (cookie alone is not trusted).
  */
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { eq, sql, isNull } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import {
   db,
-  pool,
   authUsersTable,
   tenantsTable,
   staffProfilesTable,
@@ -314,88 +313,99 @@ router.post("/platform/tenants", requirePlatformAdmin, async (req, res): Promise
       res.status(409).json({ error: "A tenant with that id already exists" });
       return;
     }
-    const [tenant] = await db
-      .insert(tenantsTable)
-      .values({ id, name, expiresAt })
-      .returning();
-
-    /* 1. Email-login row (used at /login). */
+    /* Pre-compute the slow bcrypt hashes OUTSIDE the transaction so the DB
+       transaction stays short (no connection is held open during hashing). */
     const hashedPwd = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const [owner] = await db
-      .insert(authUsersTable)
-      .values({
-        tenantId:     tenant.id,
-        email:        String(email).trim().toLowerCase(),
-        passwordHash: hashedPwd,
-        role:         "owner",
-      })
-      .returning();
-
-    /* 2. Staff profile row + default PIN. The /login flow shows the staff
-       list AFTER email-login, so without this row the owner can email-auth
-       but then hit "No staff accounts found". PIN is 8085 by default —
-       owner is told to change it from Staff Management. */
     const hashedPin = await bcrypt.hash(DEFAULT_OWNER_PIN, BCRYPT_ROUNDS);
-    const [staffOwner] = await db
-      .insert(staffProfilesTable)
-      .values({
-        tenantId: tenant.id,
-        name:     "Owner",
-        pin:      hashedPin,
-        role:     "owner",
-      })
-      .returning();
 
-    /* 3. Full write permissions on every resource. The Protected wrapper on
-       each page checks per-resource access; owners always get write so they
-       see every menu item out of the box. */
-    await db
-      .insert(staffPermissionsTable)
-      .values(OWNER_RESOURCES.map((resource) => ({
-        tenantId: tenant.id,
-        staffId:  staffOwner.id,
-        resource,
-        level:    "write",
-      })))
-      .onConflictDoNothing();
+    /* Provision the tenant ATOMICALLY: tenant row + owner email-login + staff
+       profile + permissions + store_settings all commit together or not at
+       all. Previously these were five independent writes, so a failure midway
+       could strand a half-created tenant (e.g. a login with no staff profile,
+       leaving the owner stuck at "No staff accounts found"). */
+    const { tenant, owner, staffOwner } = await db.transaction(async (tx) => {
+      const [tenant] = await tx
+        .insert(tenantsTable)
+        .values({ id, name, expiresAt })
+        .returning();
 
-    /* 4. store_settings row so /api/settings returns the new tenant's name,
-       not the legacy NULL-tenant Hira & Sons singleton. `id` is an INT PK
-       with default=1, so we must pick the next free id explicitly. Going
-       through `pool` directly avoids drizzle's QueryResult vs rows[] shape
-       trap with raw SQL. */
-    const maxRow = await pool.query<{ next_id: number }>(
-      "SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM store_settings",
-    );
-    const settingsId = Number(maxRow.rows[0]?.next_id) || 2;
-    /* Minimal seed — only the shop name is pre-filled (from the tenant's
-       display name). Everything else is blank so the client fills it in
-       from Settings on first login. */
-    await db
-      .insert(storeSettingsTable)
-      .values({
-        id:       settingsId,
-        tenantId: tenant.id,
-        data:     {
-          name:               tenant.name,
-          tagline:            "",
-          phone:              "",
-          email:              "",
-          address:            "",
-          gst:                "",
-          logoEmoji:          "🏪",
-          logoUrl:            "",
-          appSubtitle:        "",
-          footerNote:         "",
-          termsAndConditions: [],
-          upiId:              "",
-          dynamicQrMode:      false,
-          labelShowPrice:     true,
-          scannerThresholdMs: 100,
-          receiptPaperWidth:  "80mm",
-        },
-      })
-      .onConflictDoNothing();
+      /* 1. Email-login row (used at /login). */
+      const [owner] = await tx
+        .insert(authUsersTable)
+        .values({
+          tenantId:     tenant.id,
+          email:        String(email).trim().toLowerCase(),
+          passwordHash: hashedPwd,
+          role:         "owner",
+        })
+        .returning();
+
+      /* 2. Staff profile row + default PIN. The /login flow shows the staff
+         list AFTER email-login, so without this row the owner can email-auth
+         but then hit "No staff accounts found". PIN is 8085 by default —
+         owner is told to change it from Staff Management. */
+      const [staffOwner] = await tx
+        .insert(staffProfilesTable)
+        .values({
+          tenantId: tenant.id,
+          name:     "Owner",
+          pin:      hashedPin,
+          role:     "owner",
+        })
+        .returning();
+
+      /* 3. Full write permissions on every resource. The Protected wrapper on
+         each page checks per-resource access; owners always get write so they
+         see every menu item out of the box. */
+      await tx
+        .insert(staffPermissionsTable)
+        .values(OWNER_RESOURCES.map((resource) => ({
+          tenantId: tenant.id,
+          staffId:  staffOwner.id,
+          resource,
+          level:    "write",
+        })))
+        .onConflictDoNothing();
+
+      /* 4. store_settings row so /api/settings returns the new tenant's name,
+         not the legacy NULL-tenant Hira & Sons singleton. `id` is an INT PK
+         with default=1, so we pick the next free id explicitly — inside the
+         same transaction so it can't race a concurrent onboarding. */
+      const [maxRow] = await tx
+        .select({ nextId: sql<number>`COALESCE(MAX(${storeSettingsTable.id}), 0) + 1` })
+        .from(storeSettingsTable);
+      const settingsId = Number(maxRow?.nextId) || 2;
+      /* Minimal seed — only the shop name is pre-filled (from the tenant's
+         display name). Everything else is blank so the client fills it in
+         from Settings on first login. */
+      await tx
+        .insert(storeSettingsTable)
+        .values({
+          id:       settingsId,
+          tenantId: tenant.id,
+          data:     {
+            name:               tenant.name,
+            tagline:            "",
+            phone:              "",
+            email:              "",
+            address:            "",
+            gst:                "",
+            logoEmoji:          "🏪",
+            logoUrl:            "",
+            appSubtitle:        "",
+            footerNote:         "",
+            termsAndConditions: [],
+            upiId:              "",
+            dynamicQrMode:      false,
+            labelShowPrice:     true,
+            scannerThresholdMs: 100,
+            receiptPaperWidth:  "80mm",
+          },
+        })
+        .onConflictDoNothing();
+
+      return { tenant, owner, staffOwner };
+    });
 
     void recordAudit({
       action:       "tenant.create",
@@ -569,10 +579,14 @@ router.post("/platform/tenants/:id/owner-password", requirePlatformAdmin, async 
     res.status(400).json({ error: "Password must be 8–128 chars" }); return;
   }
   try {
+    /* Order by creation time so we deterministically target the SAME owner the
+       admin panel displays (the earliest-created one) when a tenant somehow
+       has more than one owner row. */
     const [owner] = await db
       .select({ id: authUsersTable.id, email: authUsersTable.email })
       .from(authUsersTable)
-      .where(sql`${authUsersTable.tenantId} = ${tenantId} AND ${authUsersTable.role} = 'owner'`);
+      .where(sql`${authUsersTable.tenantId} = ${tenantId} AND ${authUsersTable.role} = 'owner'`)
+      .orderBy(authUsersTable.createdAt);
     if (!owner) { res.status(404).json({ error: "Owner not found for this tenant" }); return; }
     const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
     await db
@@ -599,7 +613,10 @@ router.get("/platform/stats", requirePlatformAdmin, async (_req, res): Promise<v
     const [tenants]  = await db.select({ c: sql<number>`count(*)::int` }).from(tenantsTable);
     const [active]   = await db.select({ c: sql<number>`count(*)::int` }).from(tenantsTable).where(eq(tenantsTable.isActive, true));
     const [users]    = await db.select({ c: sql<number>`count(*)::int` }).from(authUsersTable);
-    const [legacy]   = await db.select({ c: sql<number>`count(*)::int` }).from(authUsersTable).where(isNull(authUsersTable.tenantId));
+    /* "Legacy NULL" = real tenant-less data left over from before multi-tenancy.
+       Exclude the vendor's own platform_admin accounts (also tenant_id NULL by
+       design) so they don't inflate this number. */
+    const [legacy]   = await db.select({ c: sql<number>`count(*)::int` }).from(authUsersTable).where(sql`${authUsersTable.tenantId} IS NULL AND ${authUsersTable.role} <> 'platform_admin'`);
     res.json({
       totalTenants:  tenants?.c ?? 0,
       activeTenants: active?.c ?? 0,
