@@ -45,6 +45,10 @@ export interface StoreSettings {
   headerLogoSize?: number;
   headerColorTheme?: "black" | "gold-navy";
   headerShowOrnaments?: boolean;
+  /** Receipt header alignment. "center" (default) stacks the logo above the
+   *  centered shop name. "left" puts the logo on the left with the shop name
+   *  and tagline beside it — a more compact header that uses less paper. */
+  headerAlign?: "center" | "left";
 }
 
 interface StoreSettingsStore extends StoreSettings {
@@ -96,6 +100,7 @@ const SETTINGS_DEFAULTS: StoreSettings = {
   headerLogoSize:     96,
   headerColorTheme:   "black",
   headerShowOrnaments: false,
+  headerAlign:        "center",
 };
 
 export const useStoreSettings = create<StoreSettingsStore>()(

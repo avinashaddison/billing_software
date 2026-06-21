@@ -529,6 +529,7 @@ export default function Bill() {
               const logoSize = store.headerLogoSize ?? 96;
               const colorTheme = store.headerColorTheme || "black";
               const showOrnaments = store.headerShowOrnaments ?? false;
+              const align = store.headerAlign || "center";
 
               // Color mapping
               const textClr = colorTheme === "gold-navy" ? "#0a1c36" : "#000000";
@@ -559,6 +560,78 @@ export default function Bill() {
                 );
               } else {
                 renderedName = mainNameMatch;
+              }
+
+              if (align === "left") {
+                return (
+                  <div className="flex items-center gap-3" style={{ padding: '2px 0' }}>
+                    <div className="shrink-0">
+                      {store.logoUrl === "teddy" ? (
+                        <svg className="receipt-logo" style={{ height: `${logoSize * 0.5}px`, width: "auto", color: textClr }} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="50" cy="50" r="30" />
+                          <circle cx="23" cy="23" r="10" />
+                          <circle cx="23" cy="23" r="5" fill="currentColor" />
+                          <circle cx="77" cy="23" r="10" />
+                          <circle cx="77" cy="23" r="5" fill="currentColor" />
+                          <circle cx="38" cy="45" r="3" fill="currentColor" />
+                          <circle cx="62" cy="45" r="3" fill="currentColor" />
+                          <ellipse cx="50" cy="58" rx="8" ry="6" strokeWidth="2" />
+                          <polygon points="50,54 46,58 54,58" fill="currentColor" />
+                          <path d="M50,60 Q47,64 44,62 M50,60 Q53,64 56,62" />
+                        </svg>
+                      ) : store.logoUrl ? (
+                        <img src={store.logoUrl} alt={store.name}
+                             className="receipt-logo object-contain"
+                             style={{ height: `${logoSize * 0.5}px`, maxWidth: "90px", printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
+                      ) : (
+                        <div className="text-[26px]">{store.logoEmoji || "🧸"}</div>
+                      )}
+                    </div>
+                    <div className="text-left min-w-0 flex-1">
+                      <div
+                        style={{
+                          fontFamily: brandFont,
+                          fontWeight: 900,
+                          fontSize: `${brandFontSize}px`,
+                          lineHeight: 1.0,
+                          letterSpacing: "0.02em",
+                          textTransform: "uppercase",
+                          color: textClr,
+                        }}
+                      >
+                        {renderedName}
+                      </div>
+                      {layout === "split" && (
+                        <div
+                          style={{
+                            fontFamily: subtitleFont,
+                            fontWeight: 900,
+                            fontSize: `${Math.round(subtitleFontSize * 0.62)}px`,
+                            lineHeight: 1.1,
+                            letterSpacing: "0.04em",
+                            textTransform: "uppercase",
+                            color: textClr,
+                          }}
+                        >
+                          {subName}
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          fontFamily: taglineFont,
+                          fontStyle: isTaglineSans ? "normal" : "italic",
+                          fontSize: `${taglineFontSize}px`,
+                          fontWeight: 600,
+                          color: textClr,
+                          letterSpacing: "0.04em",
+                          lineHeight: 1.15,
+                        }}
+                      >
+                        {store.tagline || "The Complete Gift Store"}
+                      </div>
+                    </div>
+                  </div>
+                );
               }
 
               return (
@@ -698,14 +771,14 @@ export default function Bill() {
               );
             })()}
 
-            <div className="text-center leading-snug mt-2 space-y-1"
+            <div className={`${(store.headerAlign || "center") === "left" ? "text-left" : "text-center"} leading-snug mt-2 space-y-1`}
                  style={{
                    fontFamily: addressPhoneFont,
                    fontSize: `${store.headerAddressPhoneFontSize ?? 12}px`,
                    color: store.headerColorTheme === "gold-navy" ? "#0a1c36" : "#000000"
                  }}>
               {store.address && (
-                <div className="flex items-center justify-center gap-1.5 px-2">
+                <div className={`flex items-center ${(store.headerAlign || "center") === "left" ? "justify-start" : "justify-center"} gap-1.5 px-2`}>
                   <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 24 24" style={{ color: store.headerColorTheme === "gold-navy" ? "#0a1c36" : "#000000" }}>
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                   </svg>
@@ -713,7 +786,7 @@ export default function Bill() {
                 </div>
               )}
               {store.phone && (
-                <div className="flex items-center justify-center gap-1.5">
+                <div className={`flex items-center ${(store.headerAlign || "center") === "left" ? "justify-start" : "justify-center"} gap-1.5`}>
                   <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24" style={{ color: store.headerColorTheme === "gold-navy" ? "#0a1c36" : "#000000" }}>
                     <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
                   </svg>
