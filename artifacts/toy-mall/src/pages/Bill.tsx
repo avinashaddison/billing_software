@@ -587,7 +587,7 @@ export default function Bill() {
                         <div className="text-[26px]">{store.logoEmoji || "🧸"}</div>
                       )}
                     </div>
-                    <div className="text-left min-w-0 flex-1">
+                    <div className="text-center min-w-0 flex-1">
                       <div
                         style={{
                           fontFamily: brandFont,
@@ -771,14 +771,14 @@ export default function Bill() {
               );
             })()}
 
-            <div className={`${(store.headerAlign || "center") === "left" ? "text-left" : "text-center"} leading-snug mt-2 space-y-1`}
+            <div className={`text-center leading-snug mt-2 space-y-1`}
                  style={{
                    fontFamily: addressPhoneFont,
                    fontSize: `${store.headerAddressPhoneFontSize ?? 12}px`,
                    color: store.headerColorTheme === "gold-navy" ? "#0a1c36" : "#000000"
                  }}>
               {store.address && (
-                <div className={`flex items-center ${(store.headerAlign || "center") === "left" ? "justify-start" : "justify-center"} gap-1.5 px-2`}>
+                <div className={`flex items-center justify-center gap-1.5 px-2`}>
                   <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 24 24" style={{ color: store.headerColorTheme === "gold-navy" ? "#0a1c36" : "#000000" }}>
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                   </svg>
@@ -786,7 +786,7 @@ export default function Bill() {
                 </div>
               )}
               {store.phone && (
-                <div className={`flex items-center ${(store.headerAlign || "center") === "left" ? "justify-start" : "justify-center"} gap-1.5`}>
+                <div className={`flex items-center justify-center gap-1.5`}>
                   <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24" style={{ color: store.headerColorTheme === "gold-navy" ? "#0a1c36" : "#000000" }}>
                     <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
                   </svg>
@@ -987,7 +987,7 @@ export default function Bill() {
             {/* ── FOOTER ── */}
             <div className="receipt-footer text-center text-[10px] mt-3 pt-2 border-t border-dashed border-black/40">
               <div className="font-black tracking-[0.18em] mb-0.5">— THANK YOU · VISIT AGAIN —</div>
-              <div className="receipt-powered text-[9px] text-black/60">Powered by {store.appSubtitle}</div>
+              <div className="receipt-powered text-[9px] text-black">Powered by <span className="font-bold">{store.appSubtitle}</span></div>
               <div className="font-mono text-[8px] text-black/40 mt-0.5">Ref: {bill.id.slice(0, 8).toUpperCase()}</div>
             </div>
           </div>

@@ -1474,7 +1474,7 @@ function ReceiptHeaderPreview({
               <div className="text-[22px]">{logoEmoji || "🧸"}</div>
             )}
           </div>
-          <div className="text-left min-w-0 flex-1">
+          <div className="text-center min-w-0 flex-1">
             <div style={{ fontFamily: brandFont, fontWeight: 900, fontSize: `${brandFontSize * 0.7}px`, lineHeight: 1.05, letterSpacing: "0.02em", textTransform: "uppercase", color: textClr }}>
               {renderedName}
             </div>

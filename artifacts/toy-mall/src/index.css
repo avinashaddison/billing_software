@@ -515,6 +515,7 @@
   /* App chrome — never useful on paper */
   aside,                 /* SideNav root element */
   nav[data-app-nav],     /* BottomNav (tagged in BottomNav.tsx) */
+  [data-sonner-toaster], /* sonner toast popups (e.g. "Bill raised" notice) */
   .no-print              /* opt-out hook for per-page print buttons */
   { display: none !important; }
 
