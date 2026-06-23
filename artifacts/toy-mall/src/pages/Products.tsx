@@ -14,6 +14,11 @@ import { useScanFlash } from "@/hooks/use-scan-flash";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
+/* Render at most this many rows at once. The full list is still fetched and
+   filtered client-side, but only one page is mounted to the DOM — this keeps
+   the page snappy on shops with hundreds/thousands of SKUs. */
+const PAGE_SIZE = 50;
+
 type ImportRow = Record<string, string>;
 
 function parseCsv(text: string): { headers: string[]; rows: ImportRow[] } {
@@ -735,6 +740,7 @@ export default function Products() {
   const [stockFilter, setStockFilter] = useState<"all" | "in" | "low" | "out">("all");
   const [addedDateFilter, setAddedDateFilter] = useState<string>("");
   const [showRecover, setShowRecover] = useState(false);
+  const [page, setPage]             = useState(1);
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
@@ -770,6 +776,7 @@ export default function Products() {
   const qc                          = useQueryClient();
   const [, navigate]                = useLocation();
   const searchInputRef              = useRef<HTMLInputElement>(null);
+  const listRef                     = useRef<HTMLDivElement>(null);
 
   /* Today's Deal toggle handler.
      - If product is currently active → instantly deactivate. The server
@@ -870,6 +877,23 @@ export default function Products() {
 
     return categoryOk && supplierOk && stockOk && dateOk;
   });
+
+  /* ── Pagination (client-side over the filtered list) ── */
+  const totalPages   = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
+  const currentPage  = Math.min(page, totalPages);
+  const pageStart    = (currentPage - 1) * PAGE_SIZE;
+  const pageProducts = products.slice(pageStart, pageStart + PAGE_SIZE);
+
+  /* Any filter/search change should jump back to the first page so the user
+     isn't stranded on a now-out-of-range page. */
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, categoryFilter, supplierFilter, stockFilter, addedDateFilter, filterLowStock]);
+
+  /* Jump back to the top of the list whenever the page changes. */
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0 });
+  }, [currentPage]);
 
   const handleDelete = async () => {
     if (!pendingDelete) return;
@@ -1094,7 +1118,7 @@ export default function Products() {
         <span className="w-10"></span>
       </div>
 
-      <div className="flex-1 md:divide-y divide-border overflow-y-auto">
+      <div ref={listRef} className="flex-1 md:divide-y divide-border overflow-y-auto">
         {isLoading ? (
           <div className="p-4 md:p-6 space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -1111,7 +1135,7 @@ export default function Products() {
           <>
             {/* Mobile: card list */}
             <div className="p-4 space-y-3 md:hidden">
-              {products?.map((product) => {
+              {pageProducts.map((product) => {
                 const sid = "supplierId" in product ? (product.supplierId as string | null | undefined) : null;
                 return (
                   <ProductMobileCard
@@ -1130,7 +1154,7 @@ export default function Products() {
 
             {/* Desktop: table rows */}
             <div className="hidden md:block">
-              {products?.map((product) => {
+              {pageProducts.map((product) => {
                 const sid = "supplierId" in product ? (product.supplierId as string | null | undefined) : null;
                 return (
                   <ProductDesktopRow
@@ -1146,6 +1170,35 @@ export default function Products() {
                 );
               })}
             </div>
+
+            {/* Pagination — only when the filtered list spills past one page */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-4 border-t bg-background/60 flex-wrap">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  Showing <span className="text-foreground font-bold">{pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, products.length)}</span> of{" "}
+                  <span className="text-foreground font-bold">{products.length}</span>
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                    className="h-9 px-3 rounded-lg border text-xs font-bold hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-xs font-bold text-muted-foreground px-2 tabular-nums">
+                    Page {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="h-9 px-3 rounded-lg border text-xs font-bold hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

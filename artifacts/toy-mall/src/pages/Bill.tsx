@@ -471,9 +471,12 @@ export default function Bill() {
                 padding-bottom: 1.2mm !important;
               }
 
-              /* Drop blank padding rows + the 'Powered by' credit on paper. */
-              .receipt-pad-row,
-              .receipt-powered { display: none !important; }
+              /* Drop blank padding rows on paper. */
+              .receipt-pad-row { display: none !important; }
+
+              /* Kill the screen-only card margin so the receipt starts right
+                 at the top of the paper (no wasted blank strip up top). */
+              .receipt-card { margin-top: 0 !important; margin-bottom: 0 !important; }
 
               /* Tighten the footer block. */
               .receipt-footer {
@@ -564,70 +567,82 @@ export default function Bill() {
 
               if (align === "left") {
                 return (
-                  <div className="flex items-center gap-3" style={{ padding: '2px 0' }}>
-                    <div className="shrink-0">
-                      {store.logoUrl === "teddy" ? (
-                        <svg className="receipt-logo" style={{ height: `${logoSize * 0.5}px`, width: "auto", color: textClr }} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="50" cy="50" r="30" />
-                          <circle cx="23" cy="23" r="10" />
-                          <circle cx="23" cy="23" r="5" fill="currentColor" />
-                          <circle cx="77" cy="23" r="10" />
-                          <circle cx="77" cy="23" r="5" fill="currentColor" />
-                          <circle cx="38" cy="45" r="3" fill="currentColor" />
-                          <circle cx="62" cy="45" r="3" fill="currentColor" />
-                          <ellipse cx="50" cy="58" rx="8" ry="6" strokeWidth="2" />
-                          <polygon points="50,54 46,58 54,58" fill="currentColor" />
-                          <path d="M50,60 Q47,64 44,62 M50,60 Q53,64 56,62" />
-                        </svg>
-                      ) : store.logoUrl ? (
-                        <img src={store.logoUrl} alt={store.name}
-                             className="receipt-logo object-contain"
-                             style={{ height: `${logoSize * 0.5}px`, maxWidth: "90px", printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
-                      ) : (
-                        <div className="text-[26px]">{store.logoEmoji || "🧸"}</div>
-                      )}
+                  <div style={{ padding: '2px 0' }}>
+                    {/* Brand name — big banner across the full width, one line */}
+                    <div
+                      className="text-center"
+                      style={{
+                        fontFamily: brandFont,
+                        fontWeight: 900,
+                        fontSize: `${Math.round(brandFontSize * 1.15)}px`,
+                        lineHeight: 1.05,
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                        color: textClr,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {renderedName}
                     </div>
-                    <div className="text-center min-w-0 flex-1">
-                      <div
-                        style={{
-                          fontFamily: brandFont,
-                          fontWeight: 900,
-                          fontSize: `${brandFontSize}px`,
-                          lineHeight: 1.0,
-                          letterSpacing: "0.02em",
-                          textTransform: "uppercase",
-                          color: textClr,
-                        }}
-                      >
-                        {renderedName}
+
+                    {/* Logo + sub-name (e.g. GIFT SHOP) centered just beneath the name */}
+                    <div className="flex items-center justify-center gap-3 -mt-1">
+                      <div className="shrink-0">
+                        {store.logoUrl === "teddy" ? (
+                          <svg className="receipt-logo" style={{ height: `${logoSize * 0.55}px`, width: "auto", color: textClr }} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="50" cy="50" r="30" />
+                            <circle cx="23" cy="23" r="10" />
+                            <circle cx="23" cy="23" r="5" fill="currentColor" />
+                            <circle cx="77" cy="23" r="10" />
+                            <circle cx="77" cy="23" r="5" fill="currentColor" />
+                            <circle cx="38" cy="45" r="3" fill="currentColor" />
+                            <circle cx="62" cy="45" r="3" fill="currentColor" />
+                            <ellipse cx="50" cy="58" rx="8" ry="6" strokeWidth="2" />
+                            <polygon points="50,54 46,58 54,58" fill="currentColor" />
+                            <path d="M50,60 Q47,64 44,62 M50,60 Q53,64 56,62" />
+                          </svg>
+                        ) : store.logoUrl ? (
+                          <img src={store.logoUrl} alt={store.name}
+                               className="receipt-logo object-contain"
+                               style={{ height: `${logoSize * 0.55}px`, maxWidth: "90px", printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as any} />
+                        ) : (
+                          <div className="text-[26px]">{store.logoEmoji || "🧸"}</div>
+                        )}
                       </div>
-                      {layout === "split" && (
+                      {/* Sub-name + slogan stacked beside the logo — keeps the
+                          slogan under GIFT SHOP and saves a full-width row. */}
+                      <div className="text-left">
+                        {layout === "split" && (
+                          <div
+                            style={{
+                              fontFamily: subtitleFont,
+                              fontWeight: 900,
+                              fontSize: `${Math.round(subtitleFontSize * 0.7)}px`,
+                              lineHeight: 1.1,
+                              letterSpacing: "0.28em",
+                              textIndent: "0.28em",
+                              textTransform: "uppercase",
+                              color: textClr,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {subName}
+                          </div>
+                        )}
                         <div
                           style={{
-                            fontFamily: subtitleFont,
-                            fontWeight: 900,
-                            fontSize: `${Math.round(subtitleFontSize * 0.62)}px`,
-                            lineHeight: 1.1,
-                            letterSpacing: "0.04em",
-                            textTransform: "uppercase",
+                            fontFamily: taglineFont,
+                            fontStyle: isTaglineSans ? "normal" : "italic",
+                            fontSize: `${Math.round(taglineFontSize * 0.9)}px`,
+                            fontWeight: 600,
                             color: textClr,
+                            letterSpacing: "0.03em",
+                            lineHeight: 1.15,
+                            whiteSpace: "nowrap",
                           }}
                         >
-                          {subName}
+                          {store.tagline || "The Complete Gift Store"}
                         </div>
-                      )}
-                      <div
-                        style={{
-                          fontFamily: taglineFont,
-                          fontStyle: isTaglineSans ? "normal" : "italic",
-                          fontSize: `${taglineFontSize}px`,
-                          fontWeight: 600,
-                          color: textClr,
-                          letterSpacing: "0.04em",
-                          lineHeight: 1.15,
-                        }}
-                      >
-                        {store.tagline || "The Complete Gift Store"}
                       </div>
                     </div>
                   </div>
