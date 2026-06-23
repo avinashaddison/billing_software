@@ -102,6 +102,8 @@ export default function CreateProduct() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (document.querySelector('[data-state="open"]')) return;
+      const el = document.activeElement;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
       setLocation("/products");
     };
     window.addEventListener("keydown", onKey);
@@ -136,10 +138,12 @@ export default function CreateProduct() {
   const [skuLoading, setSkuLoading]   = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
 
-  /* Open the Category picker automatically when the page loads so the user
-     can pick straight from the keyboard (the search box autofocuses). */
+  /* Focus the Category trigger on load so it can be opened straight from the
+     keyboard (press Enter or ↓) without reaching for the mouse. */
   useEffect(() => {
-    const t = setTimeout(() => setCategoryOpen(true), 120);
+    const t = setTimeout(() => {
+      (document.getElementById("category-trigger") as HTMLButtonElement | null)?.focus();
+    }, 150);
     return () => clearTimeout(t);
   }, []);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -303,6 +307,7 @@ export default function CreateProduct() {
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
+                                id="category-trigger"
                                 type="button"
                                 variant="outline"
                                 role="combobox"
