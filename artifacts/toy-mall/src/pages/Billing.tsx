@@ -285,7 +285,7 @@ export default function Billing() {
                     <div className="p-4 rounded-2xl border bg-card shadow-sm hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
                             isSup
                               ? "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400"
                               : "bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400"
@@ -311,8 +311,8 @@ export default function Billing() {
                           <div>
                             <p className="font-bold text-sm">
                               {isSup
-                                ? `Payment · ${(row.method ?? "cash").toUpperCase()}`
-                                : `Bill #${row.billNumber ?? row.shortId} · ${row.itemsCount} item${row.itemsCount !== 1 ? "s" : ""}`}
+                                ? `Bill to Supplier · ${(row.method ?? "cash").toUpperCase()}`
+                                : `Bill to Customer · #${row.billNumber ?? row.shortId} · ${row.itemsCount} item${row.itemsCount !== 1 ? "s" : ""}`}
                             </p>
                           </div>
                         </div>
@@ -358,13 +358,13 @@ export default function Billing() {
                               <p className="font-black text-sm text-foreground truncate">{row.name}</p>
                               <p className="font-mono text-[10px] text-muted-foreground">
                                 {isSup
-                                  ? `Payment · ${(row.method ?? "cash").toUpperCase()}`
-                                  : `Bill #${row.billNumber ?? row.shortId} · ${row.itemsCount} item${row.itemsCount !== 1 ? "s" : ""}`}
+                                  ? `Bill to Supplier · ${(row.method ?? "cash").toUpperCase()}`
+                                  : `Bill to Customer · #${row.billNumber ?? row.shortId} · ${row.itemsCount} item${row.itemsCount !== 1 ? "s" : ""}`}
                               </p>
                             </div>
                           </div>
                           <div className="w-28 text-center">
-                            <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${
                               isSup
                                 ? "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400"
                                 : "bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400"

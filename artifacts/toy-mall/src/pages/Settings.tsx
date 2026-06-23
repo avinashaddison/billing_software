@@ -1455,7 +1455,7 @@ function ReceiptHeaderPreview({
         </div>
         <div>
           {/* Brand name — big banner across the full width, one line */}
-          <div className="text-center" style={{ fontFamily: brandFont, fontWeight: 900, fontSize: `${Math.round(brandFontSize * 1.15)}px`, lineHeight: 1.05, letterSpacing: "0.04em", textTransform: "uppercase", color: textClr, whiteSpace: "nowrap" }}>
+          <div className="text-center" style={{ fontFamily: brandFont, fontWeight: 900, fontSize: `${brandFontSize}px`, lineHeight: 1.05, letterSpacing: "0.02em", textTransform: "uppercase", color: textClr, whiteSpace: "nowrap" }}>
             {renderedName}
           </div>
           {/* Logo + sub-name centered just beneath */}

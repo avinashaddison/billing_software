@@ -574,9 +574,9 @@ export default function Bill() {
                       style={{
                         fontFamily: brandFont,
                         fontWeight: 900,
-                        fontSize: `${Math.round(brandFontSize * 1.15)}px`,
+                        fontSize: `${brandFontSize}px`,
                         lineHeight: 1.05,
-                        letterSpacing: "0.04em",
+                        letterSpacing: "0.02em",
                         textTransform: "uppercase",
                         color: textClr,
                         whiteSpace: "nowrap",
