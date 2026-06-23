@@ -96,6 +96,18 @@ export default function CreateProduct() {
   const queryClient   = useQueryClient();
   const createProduct = useCreateProduct();
 
+  /* Press Esc to go back to the products list. If a dropdown/menu is open,
+     let it handle its own Escape first (don't navigate away). */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector('[data-state="open"]')) return;
+      setLocation("/products");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setLocation]);
+
   /* Load categories from the database only */
   const { data: dbCategories = [], isLoading: catsLoading } = useQuery<ApiCategory[]>({
     queryKey: ["categories"],

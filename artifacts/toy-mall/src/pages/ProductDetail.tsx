@@ -40,6 +40,20 @@ export default function ProductDetail() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { userId, role } = useAuth();
+
+  /* Press Esc to go back to the products list. Skip when a dropdown/menu is
+     open or a field is focused so it doesn't interrupt those. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector('[data-state="open"]')) return;
+      const el = document.activeElement;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      setLocation("/products");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setLocation]);
   const isOwner = role === "owner";
   const store = useStoreSettings();
   const { addItem, count } = useCart();
