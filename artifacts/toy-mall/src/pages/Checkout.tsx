@@ -4,7 +4,7 @@ import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
   Phone, User, Wallet, Banknote, Smartphone, Minus, Plus,
   Trash2, ScanLine, WifiOff, RefreshCw, QrCode, BadgeCheck, Tag,
-  HandCoins, PencilLine,
+  HandCoins, PencilLine, Truck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -52,6 +52,23 @@ async function postCheckout(payload: {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Checkout failed");
+  return data;
+}
+
+/** Record a payment made TO a supplier (money out). Used by the checkout's
+ *  Supplier mode — the grand total is logged in the supplier's payment
+ *  history instead of creating a customer sale. */
+async function postSupplierPayment(
+  supplierId: string,
+  payload: { amount: number; method: string; note?: string },
+) {
+  const res = await fetch(`${BASE_URL}/api/suppliers/${supplierId}/payments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to record supplier payment");
   return data;
 }
 
@@ -491,6 +508,19 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [successBillId, setSuccessBillId] = useState<string | null>(null);
 
+  /* Customer (default) vs Supplier mode. In Supplier mode the grand total is
+     recorded as a payment to the chosen supplier instead of a customer sale. */
+  const [partyType, setPartyType] = useState<"customer" | "supplier">("customer");
+  const [supplierId, setSupplierId] = useState("");
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/suppliers`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setSuppliers(Array.isArray(d) ? d.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })) : []))
+      .catch(() => {});
+  }, []);
+
   const [discountValue, setDiscountValue] = useState("");
   const [discountType, setDiscountType]   = useState<"percent" | "amount">("percent");
 
@@ -607,6 +637,33 @@ export default function Checkout() {
     });
 
   const handleCheckout = async () => {
+    /* ── Supplier mode: record a payment to the supplier (money out) ── */
+    if (partyType === "supplier") {
+      if (!supplierId) { toast.error("Select a supplier first"); playError(); return; }
+      if (finalTotal <= 0) { toast.error("Add items or an amount first"); playError(); return; }
+      if (!isOnline) { toast.error("Supplier payments need an internet connection"); return; }
+      setLoading(true);
+      try {
+        const method = paymentModeRef.current === "upi" ? "upi" : "cash";
+        await postSupplierPayment(supplierId, {
+          amount: finalTotal,
+          method,
+          note: count > 0 ? `${count} item${count !== 1 ? "s" : ""} via checkout` : undefined,
+        });
+        playCheckoutSuccess();
+        const supName = suppliers.find((s) => s.id === supplierId)?.name ?? "supplier";
+        toast.success(`₹${finalTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })} paid to ${supName}`);
+        clearCart();
+        setSupplierId("");
+      } catch (e) {
+        playError();
+        toast.error((e as Error).message || "Failed to record supplier payment");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const err = validatePhone(phone);
     if (err) { setPhoneError(err); return; }
     if (!items.length) return;
@@ -924,8 +981,8 @@ export default function Checkout() {
               )}
             </div>
 
-            {/* ── Dynamic UPI QR panel — auto-shows when UPI selected ── */}
-            {qrActive && (
+            {/* ── Dynamic UPI QR panel — auto-shows when UPI selected (customer sales only) ── */}
+            {qrActive && partyType === "customer" && (
               <div className="px-4 pt-4">
                 <div className="rounded-2xl border-2 border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 overflow-hidden">
                   <div className="px-4 py-3 border-b border-indigo-200 dark:border-indigo-800 flex items-center gap-2">
@@ -957,6 +1014,55 @@ export default function Checkout() {
               </div>
             )}
 
+            {/* Customer / Supplier toggle */}
+            <div className="px-4 pt-4">
+              <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-2xl">
+                {(["customer", "supplier"] as const).map((t) => {
+                  const active = partyType === t;
+                  const Icon = t === "customer" ? User : Truck;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setPartyType(t)}
+                      className={`h-11 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all ${
+                        active ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {t === "customer" ? "Customer" : "Supplier"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {partyType === "supplier" && (
+              <div className="px-4 pt-4 pb-4">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5" /> Select Supplier
+                  <span className="normal-case font-bold text-amber-600 dark:text-amber-400">(payment will be recorded to them)</span>
+                </p>
+                <select
+                  value={supplierId}
+                  onChange={(e) => setSupplierId(e.target.value)}
+                  className="w-full h-12 px-3 rounded-xl bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                >
+                  <option value="">— Choose a supplier —</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                {suppliers.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground mt-1.5">No suppliers yet — add one from the Suppliers page.</p>
+                )}
+                <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                  The grand total <b className="text-foreground">₹{finalTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</b> will be logged in this supplier's payment history. No stock is changed.
+                </p>
+              </div>
+            )}
+
+            {partyType === "customer" && (<>
             {/* Customer phone — first because typing it auto-fills the name */}
             <div className="px-4 pt-4">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -1026,15 +1132,18 @@ export default function Checkout() {
                 }`}
               />
             </div>
+            </>)}
           </div>
 
           {/* ── Sticky checkout button ── */}
           <div className="shrink-0 border-t px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3 bg-card">
             <button
               onClick={handleCheckout}
-              disabled={loading || (!!phone && !!validatePhone(phone))}
+              disabled={loading || (partyType === "supplier" ? !supplierId : (!!phone && !!validatePhone(phone)))}
               className={`w-full py-4 rounded-2xl font-black text-base text-white flex items-center justify-center gap-2.5 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 ${
-                paymentMode === "credit"
+                partyType === "supplier"
+                  ? "bg-amber-600 hover:bg-amber-500 shadow-amber-500/20"
+                  : paymentMode === "credit"
                   ? "bg-rose-600 hover:bg-rose-500 shadow-rose-500/20"
                   : qrActive
                     ? "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20"
@@ -1045,6 +1154,11 @@ export default function Checkout() {
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" /> Processing…
+                </>
+              ) : partyType === "supplier" ? (
+                <>
+                  <Truck className="w-5 h-5" />
+                  Record Payment · ₹{finalTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                 </>
               ) : paymentMode === "credit" ? (
                 <>

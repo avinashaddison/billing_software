@@ -45,6 +45,28 @@ router.get("/suppliers", async (req, res): Promise<void> => {
   res.json(rows);
 });
 
+/* All supplier payments for the tenant (newest first), joined with the
+ * supplier name. Powers the "Supplier" entries shown in the Billing list. */
+router.get("/supplier-payments", async (req, res): Promise<void> => {
+  const rows = await db
+    .select({
+      id:           supplierPaymentsTable.id,
+      supplierId:   supplierPaymentsTable.supplierId,
+      supplierName: suppliersTable.name,
+      amount:       supplierPaymentsTable.amount,
+      method:       supplierPaymentsTable.method,
+      note:         supplierPaymentsTable.note,
+      paidAt:       supplierPaymentsTable.paidAt,
+      createdAt:    supplierPaymentsTable.createdAt,
+    })
+    .from(supplierPaymentsTable)
+    .innerJoin(suppliersTable, eq(supplierPaymentsTable.supplierId, suppliersTable.id))
+    .where(tenantWhere(supplierPaymentsTable.tenantId, req.tenantId))
+    .orderBy(desc(supplierPaymentsTable.paidAt), desc(supplierPaymentsTable.createdAt))
+    .limit(100);
+  res.json(rows.map((r) => ({ ...r, amount: Number(r.amount) })));
+});
+
 router.post("/suppliers", async (req, res): Promise<void> => {
   const { name, contact, email, phone, address, notes } = req.body;
   if (!name || typeof name !== "string" || !name.trim()) {

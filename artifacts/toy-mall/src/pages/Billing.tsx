@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { format, isToday, isThisWeek } from "date-fns";
 import {
   ChevronRight, IndianRupee, ShoppingBag,
-  CalendarDays, TrendingUp, Search, X, FileText,
+  CalendarDays, TrendingUp, Search, X, FileText, User, Truck,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -15,46 +15,108 @@ interface Bill {
   totalAmount: number;
   itemsCount: number;
   createdAt: string;
+  customerName?: string | null;
+  customerPhone?: string | null;
+}
+interface SupplierPayment {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  amount: number;
+  method: string;
+  paidAt: string;
+  createdAt: string;
+}
+
+/* Unified row the list renders — a customer sale or a supplier payment. */
+interface Row {
+  key: string;
+  kind: "customer" | "supplier";
+  name: string;
+  amount: number;
+  date: string;
+  href: string;
+  billNumber?: number;
+  shortId?: string;
+  itemsCount?: number;
+  method?: string;
 }
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type Filter = "today" | "week" | "all";
+type DateFilter = "today" | "week" | "all";
+type Party = "all" | "customer" | "supplier";
 
 /* ── Component ───────────────────────────────────────────────────── */
 
 export default function Billing() {
-  const [bills, setBills]     = useState<Bill[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter]   = useState<Filter>("all");
-  const [search, setSearch]   = useState("");
+  const [bills, setBills]       = useState<Bill[]>([]);
+  const [payments, setPayments] = useState<SupplierPayment[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [party, setParty]       = useState<Party>("all");
+  const [search, setSearch]     = useState("");
 
   useEffect(() => {
-    fetch(`${BASE_URL}/api/bills`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((d) => setBills(Array.isArray(d) ? d : []))
+    Promise.all([
+      fetch(`${BASE_URL}/api/bills`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${BASE_URL}/api/supplier-payments`).then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([b, p]) => {
+        setBills(Array.isArray(b) ? b : []);
+        setPayments(Array.isArray(p) ? p : []);
+      })
+      .catch(() => { setBills([]); setPayments([]); })
       .finally(() => setLoading(false));
   }, []);
 
-  /* ── Derived stats ── */
+  /* ── Stats (customer sales = revenue only; supplier payments are money out) ── */
   const todayBills   = bills.filter((b) => isToday(new Date(b.createdAt)));
   const weekBills    = bills.filter((b) => isThisWeek(new Date(b.createdAt)));
-
   const todayRevenue = todayBills.reduce((s, b) => s + b.totalAmount, 0);
   const weekRevenue  = weekBills.reduce((s, b) => s + b.totalAmount, 0);
   const totalRevenue = bills.reduce((s, b) => s + b.totalAmount, 0);
 
+  /* ── Build the unified row list ── */
+  const customerRows: Row[] = bills.map((b) => ({
+    key: `b-${b.id}`,
+    kind: "customer",
+    name: b.customerName?.trim() || (b.customerPhone ? `+91 ${b.customerPhone}` : "Walk-in customer"),
+    amount: b.totalAmount,
+    date: b.createdAt,
+    href: `/bill/${b.id}`,
+    billNumber: b.billNumber,
+    shortId: b.id.slice(0, 8).toUpperCase(),
+    itemsCount: b.itemsCount,
+  }));
+  const supplierRows: Row[] = payments.map((p) => ({
+    key: `s-${p.id}`,
+    kind: "supplier",
+    name: p.supplierName,
+    amount: p.amount,
+    date: p.paidAt,
+    href: "/suppliers",
+    method: p.method,
+  }));
+
+  const allRows = [...customerRows, ...supplierRows].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
+
   /* ── Filter + search pipeline ── */
+  const partyFiltered = party === "all" ? allRows : allRows.filter((r) => r.kind === party);
   const timeFiltered =
-    filter === "today" ? todayBills :
-    filter === "week"  ? weekBills  : bills;
+    dateFilter === "today" ? partyFiltered.filter((r) => isToday(new Date(r.date)))
+    : dateFilter === "week" ? partyFiltered.filter((r) => isThisWeek(new Date(r.date)))
+    : partyFiltered;
 
   const q = search.trim().toLowerCase().replace(/^#/, "");
   const filtered = q
-    ? timeFiltered.filter((b) =>
-        (b.billNumber != null && String(b.billNumber).includes(q)) ||
-        b.id.toLowerCase().includes(q) ||
-        b.totalAmount.toFixed(2).includes(q)
+    ? timeFiltered.filter((r) =>
+        (r.billNumber != null && String(r.billNumber).includes(q)) ||
+        r.key.toLowerCase().includes(q) ||
+        r.name.toLowerCase().includes(q) ||
+        r.amount.toFixed(2).includes(q)
       )
     : timeFiltered;
 
@@ -69,7 +131,7 @@ export default function Billing() {
           <h1 className="text-2xl font-black">Billing</h1>
         </div>
         <p className="text-sm text-muted-foreground hidden md:block">
-          All checkout bills and revenue summary
+          Customer sales and supplier payments
         </p>
       </div>
 
@@ -124,14 +186,36 @@ export default function Billing() {
           })}
         </div>
 
-        {/* ── Filter pills ── */}
+        {/* ── Party type tabs (All / Customer / Supplier) ── */}
         <div className="flex gap-2 px-4 md:px-6 mb-3">
-          {(["all", "week", "today"] as Filter[]).map((f) => (
+          {([
+            { id: "all",      label: "All",      Icon: FileText },
+            { id: "customer", label: "Customer", Icon: User },
+            { id: "supplier", label: "Supplier", Icon: Truck },
+          ] as { id: Party; label: string; Icon: React.ElementType }[]).map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => setParty(id)}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-bold transition-all ${
+                party === id
+                  ? "bg-foreground text-background shadow-md"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Date filter pills ── */}
+        <div className="flex gap-2 px-4 md:px-6 mb-3">
+          {(["all", "week", "today"] as DateFilter[]).map((f) => (
             <button
               key={f}
-              onClick={() => setFilter(f)}
+              onClick={() => setDateFilter(f)}
               className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${
-                filter === f
+                dateFilter === f
                   ? "bg-primary text-primary-foreground shadow-md"
                   : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
@@ -149,7 +233,7 @@ export default function Billing() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by Bill No, Bill ID or amount…"
+              placeholder="Search by name, Bill No, ID or amount…"
               className="w-full h-10 pl-9 pr-10 rounded-xl border border-border bg-muted/50 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
             />
             {search && (
@@ -164,13 +248,13 @@ export default function Billing() {
           {search && (
             <p className="text-xs text-muted-foreground mt-1.5 px-1">
               {filtered.length === 0
-                ? "No bills match your search"
-                : `${filtered.length} bill${filtered.length !== 1 ? "s" : ""} found`}
+                ? "No entries match your search"
+                : `${filtered.length} entr${filtered.length !== 1 ? "ies" : "y"} found`}
             </p>
           )}
         </div>
 
-        {/* ── Bills list ── */}
+        {/* ── List ── */}
         {loading ? (
           <div className="px-4 md:px-6 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -184,104 +268,124 @@ export default function Billing() {
           <div className="text-center py-16 text-muted-foreground">
             <ShoppingBag className="w-16 h-16 mx-auto mb-4 opacity-20" />
             <p className="font-bold text-lg">
-              {search ? `No results for "${search.replace(/^#/, "#").toUpperCase()}"` : `No bills ${filter !== "all" ? `for ${filter === "today" ? "today" : "this week"}` : "yet"}`}
+              {search ? `No results for "${search}"` : "Nothing here yet"}
             </p>
             <p className="text-sm mt-1">
-              {search ? "Try a different bill number, ID or amount." : "Complete a checkout to generate a bill."}
+              {search ? "Try a different name, bill number or amount." : "Complete a checkout to generate an entry."}
             </p>
           </div>
         ) : (
           <>
             {/* Mobile cards */}
             <div className="md:hidden px-4 space-y-3">
-              {filtered.map((bill) => (
-                <Link key={bill.id} href={`/bill/${bill.id}`}>
-                  <div className="p-4 rounded-2xl border bg-card shadow-sm hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-foreground">
-                          Bill #{bill.billNumber ?? bill.id.slice(0, 6).toUpperCase()}
-                        </span>
-                        <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                          {bill.id.slice(0, 8).toUpperCase()}
-                        </span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {format(new Date(bill.createdAt), "d MMM, h:mm a")}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-950/50 flex items-center justify-center shrink-0">
-                          <FileText className="w-5 h-5 text-green-600 dark:text-green-400" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-sm">
-                            {bill.itemsCount} item{bill.itemsCount !== 1 ? "s" : ""} sold
-                          </p>
-                          <span className="text-[10px] bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-400 font-black px-2 py-0.5 rounded-full">
-                            PAID
+              {filtered.map((row) => {
+                const isSup = row.kind === "supplier";
+                return (
+                  <Link key={row.key} href={row.href}>
+                    <div className="p-4 rounded-2xl border bg-card shadow-sm hover:border-primary/40 active:scale-[0.99] transition-all cursor-pointer">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${
+                            isSup
+                              ? "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400"
+                              : "bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400"
+                          }`}>
+                            {isSup ? <Truck className="w-2.5 h-2.5" /> : <User className="w-2.5 h-2.5" />}
+                            {isSup ? "Supplier" : "Customer"}
                           </span>
+                          <span className="text-sm font-bold truncate">{row.name}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {format(new Date(row.date), "d MMM, h:mm a")}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                            isSup ? "bg-amber-100 dark:bg-amber-950/50" : "bg-green-100 dark:bg-green-950/50"
+                          }`}>
+                            {isSup
+                              ? <Truck className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                              : <FileText className="w-5 h-5 text-green-600 dark:text-green-400" />}
+                          </div>
+                          <div>
+                            <p className="font-bold text-sm">
+                              {isSup
+                                ? `Payment · ${(row.method ?? "cash").toUpperCase()}`
+                                : `Bill #${row.billNumber ?? row.shortId} · ${row.itemsCount} item${row.itemsCount !== 1 ? "s" : ""}`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <p className={`font-black text-xl ${isSup ? "text-amber-600 dark:text-amber-400" : "text-primary"}`}>
+                            {isSup ? "−" : ""}₹{row.amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                          </p>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <p className="font-black text-xl text-primary">
-                          ₹{bill.totalAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                        </p>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                      </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
 
             {/* Desktop table */}
             <div className="hidden md:block px-6">
               <div className="rounded-2xl border overflow-hidden">
                 <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/40">
-                  <span>Bill</span>
-                  <span className="w-28 text-center">Items</span>
-                  <span className="w-36 text-right">Total Amount</span>
-                  <span className="w-44 text-right">Date & Time</span>
+                  <span>Entry</span>
+                  <span className="w-28 text-center">Type</span>
+                  <span className="w-36 text-right">Amount</span>
+                  <span className="w-44 text-right">Date &amp; Time</span>
                   <span className="w-8"></span>
                 </div>
 
                 <div className="divide-y divide-border bg-card">
-                  {filtered.map((bill) => (
-                    <Link key={bill.id} href={`/bill/${bill.id}`}>
-                      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-4 hover:bg-muted/30 transition-colors items-center cursor-pointer group">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-950/50 flex items-center justify-center shrink-0">
-                            <FileText className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  {filtered.map((row) => {
+                    const isSup = row.kind === "supplier";
+                    return (
+                      <Link key={row.key} href={row.href}>
+                        <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-4 hover:bg-muted/30 transition-colors items-center cursor-pointer group">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                              isSup ? "bg-amber-100 dark:bg-amber-950/50" : "bg-green-100 dark:bg-green-950/50"
+                            }`}>
+                              {isSup
+                                ? <Truck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                                : <FileText className="w-4 h-4 text-green-600 dark:text-green-400" />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-black text-sm text-foreground truncate">{row.name}</p>
+                              <p className="font-mono text-[10px] text-muted-foreground">
+                                {isSup
+                                  ? `Payment · ${(row.method ?? "cash").toUpperCase()}`
+                                  : `Bill #${row.billNumber ?? row.shortId} · ${row.itemsCount} item${row.itemsCount !== 1 ? "s" : ""}`}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-black text-sm text-foreground">
-                              Bill #{bill.billNumber ?? bill.id.slice(0, 6).toUpperCase()}
-                            </p>
-                            <p className="font-mono text-[10px] text-muted-foreground">
-                              {bill.id.slice(0, 8).toUpperCase()}
-                            </p>
+                          <div className="w-28 text-center">
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${
+                              isSup
+                                ? "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400"
+                                : "bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400"
+                            }`}>
+                              {isSup ? <Truck className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                              {isSup ? "Supplier" : "Customer"}
+                            </span>
+                          </div>
+                          <div className={`w-36 text-right font-black text-lg ${isSup ? "text-amber-600 dark:text-amber-400" : "text-primary"}`}>
+                            {isSup ? "−" : ""}₹{row.amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                          </div>
+                          <div className="w-44 text-right text-sm text-muted-foreground font-medium">
+                            {format(new Date(row.date), "d MMM yyyy, h:mm a")}
+                          </div>
+                          <div className="w-8 flex justify-end">
+                            <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                           </div>
                         </div>
-                        <div className="w-28 text-center">
-                          <span className="inline-flex items-center gap-1 bg-muted text-muted-foreground text-xs font-bold px-2.5 py-1 rounded-full">
-                            <ShoppingBag className="w-3 h-3" />
-                            {bill.itemsCount} item{bill.itemsCount !== 1 ? "s" : ""}
-                          </span>
-                        </div>
-                        <div className="w-36 text-right font-black text-lg text-primary">
-                          ₹{bill.totalAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                        </div>
-                        <div className="w-44 text-right text-sm text-muted-foreground font-medium">
-                          {format(new Date(bill.createdAt), "d MMM yyyy, h:mm a")}
-                        </div>
-                        <div className="w-8 flex justify-end">
-                          <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             </div>
