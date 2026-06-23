@@ -8,6 +8,8 @@ import { useListProducts } from "@workspace/api-client-react";
 import { useStoreSettings } from "@/lib/store-info";
 import { MM_TO_PX, LABEL_PRESETS, loadLabelSize, saveLabelSize, isPresetSize as isPreset, type LabelSize } from "@/lib/label-size";
 
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
 export default function Labels() {
   const { data: productsData, isLoading: loading } = useListProducts();
   const products: Product[] = (productsData ?? []) as Product[];
@@ -24,6 +26,15 @@ export default function Labels() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [stockFilter, setStockFilter] = useState<"all" | "in" | "low" | "out">("all");
   const [addedDateFilter, setAddedDateFilter] = useState<string>("");
+  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/suppliers`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setSuppliers(Array.isArray(d) ? d.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })) : []))
+      .catch(() => {});
+  }, []);
 
   const [labelSize, setLabelSizeState]   = useState<LabelSize>(loadLabelSize);
   const [customW, setCustomW]            = useState(String(labelSize.w));
@@ -70,8 +81,12 @@ export default function Labels() {
     const matchesDate =
       !addedDateFilter ? true :
       createdAt ? new Date(createdAt).toISOString().slice(0, 10) === addedDateFilter : true;
+    const sid = (p as { supplierId?: string | null }).supplierId;
+    const matchesSupplier =
+      supplierFilter === "all" ? true :
+      supplierFilter === "__none__" ? !sid : sid === supplierFilter;
 
-    return matchesSearch && matchesCategory && matchesStock && matchesDate;
+    return matchesSearch && matchesCategory && matchesStock && matchesDate && matchesSupplier;
   });
 
   const getDefaultCopies = (id: string) => {
@@ -329,6 +344,18 @@ export default function Labels() {
               <option value="out">Out of Stock</option>
             </select>
 
+            <select
+              value={supplierFilter}
+              onChange={(e) => setSupplierFilter(e.target.value)}
+              className="h-9 rounded-lg border bg-background px-2.5 text-xs font-semibold"
+            >
+              <option value="all">All Suppliers</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+              <option value="__none__">No Supplier</option>
+            </select>
+
             <Input
               type="date"
               value={addedDateFilter}
@@ -339,7 +366,7 @@ export default function Labels() {
 
             <button
               type="button"
-              onClick={() => { setCategoryFilter("all"); setStockFilter("all"); setAddedDateFilter(""); }}
+              onClick={() => { setCategoryFilter("all"); setStockFilter("all"); setAddedDateFilter(""); setSupplierFilter("all"); }}
               className="h-9 px-3 rounded-lg border text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted"
             >
               Clear

@@ -268,6 +268,7 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
               const v = e.target.value === "" ? 0 : parseFloat(e.target.value);
               onLineDiscount(item.productId, dType, Number.isFinite(v) ? v : 0);
             }}
+            onWheel={(e) => e.currentTarget.blur()}
             className="w-full h-8 pl-2 pr-7 text-xs rounded-lg border bg-muted/40 focus:outline-none focus:ring-2 focus:ring-amber-400/40 font-bold tabular-nums"
           />
           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-black text-muted-foreground pointer-events-none">
@@ -373,6 +374,7 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
                 inputMode="decimal"
                 value={priceStr}
                 onChange={(e) => setPriceStr(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
                 placeholder="0.00"
                 className="w-full h-11 pl-8 pr-3 rounded-xl bg-muted border border-border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition-all"
                 onKeyDown={(e) => e.key === "Enter" && submit()}
@@ -401,6 +403,7 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
                   const v = parseInt(e.target.value, 10);
                   if (Number.isFinite(v) && v >= 1) setQty(v);
                 }}
+                onWheel={(e) => e.currentTarget.blur()}
                 className="flex-1 h-10 text-center font-black text-lg bg-card border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400/40 tabular-nums"
               />
               <button
@@ -898,6 +901,7 @@ export default function Checkout() {
                     step="1"
                     value={discountValue}
                     onChange={(e) => setDiscountValue(e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     placeholder={discountType === "percent" ? "e.g. 10" : "e.g. 50"}
                     className="flex-1 h-9 px-3 rounded-xl bg-muted border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
                   />

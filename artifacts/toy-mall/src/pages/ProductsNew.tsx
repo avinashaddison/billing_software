@@ -402,9 +402,28 @@ export default function CreateProduct() {
                     </p>
                     <Select
                       value={selectedSupplierId}
-                      onValueChange={(v) => setSelectedSupplierId(v === "__none__" ? "" : v)}
+                      onValueChange={(v) => {
+                        setSelectedSupplierId(v === "__none__" ? "" : v);
+                        // After picking a supplier, move focus down to the
+                        // Product Name field (Radix returns focus to the
+                        // trigger on select, so defer past that).
+                        if (v !== "__none__") {
+                          setTimeout(() => nameRef.current?.focus(), 60);
+                        }
+                      }}
                     >
-                      <SelectTrigger className="h-12 rounded-xl">
+                      <SelectTrigger
+                        className="h-12 rounded-xl"
+                        onKeyDownCapture={(e) => {
+                          // Once a supplier is chosen, Enter should advance to
+                          // Product Name instead of re-opening the dropdown.
+                          if (e.key === "Enter" && selectedSupplierId) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            nameRef.current?.focus();
+                          }
+                        }}
+                      >
                         <SelectValue placeholder={suppliersLoading ? "Loading suppliers…" : "Select a supplier…"} />
                       </SelectTrigger>
                       <SelectContent className="max-h-60">
