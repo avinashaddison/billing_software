@@ -519,7 +519,7 @@ export default function Bill() {
         <div className="receipt-print-only receipt-card mx-auto my-6 w-full max-w-sm bg-white shadow-2xl overflow-hidden text-black"
              style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
 
-          <div className="px-4 py-4 text-[12px] leading-snug">
+          <div className="px-4 pt-2 pb-4 text-[12px] leading-snug">
 
             {/* ── STORE HEADER ── */}
             {(() => {
@@ -567,7 +567,7 @@ export default function Bill() {
 
               if (align === "left") {
                 return (
-                  <div style={{ padding: '2px 0' }}>
+                  <div style={{ paddingBottom: '2px' }}>
                     {/* Brand name — big banner across the full width, one line */}
                     <div
                       className="text-center"
