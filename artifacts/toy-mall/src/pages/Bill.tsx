@@ -585,8 +585,8 @@ export default function Bill() {
                       {renderedName}
                     </div>
 
-                    {/* Logo + sub-name (e.g. GIFT SHOP) centered just beneath the name */}
-                    <div className="flex items-center justify-center gap-3 -mt-1">
+                    {/* Logo + sub-name (e.g. GIFT SHOP) + address, all beside the box */}
+                    <div className="flex items-start justify-center gap-3 -mt-1">
                       <div className="shrink-0">
                         {store.logoUrl === "teddy" ? (
                           <svg className="receipt-logo" style={{ height: `${logoSize * 0.55}px`, width: "auto", color: textClr }} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -643,6 +643,28 @@ export default function Bill() {
                         >
                           {store.tagline || "The Complete Gift Store"}
                         </div>
+                        {/* Address + phone start right here, beside the box */}
+                        {store.address && (
+                          <div className="flex items-start gap-1 mt-1" style={{ fontFamily: addressPhoneFont, fontSize: `${Math.round(addressPhoneFontSize * 0.82)}px`, color: textClr, lineHeight: 1.2 }}>
+                            <svg className="w-2.5 h-2.5 shrink-0 mt-px" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                            </svg>
+                            <span className="font-semibold">{store.address}</span>
+                          </div>
+                        )}
+                        {store.phone && (
+                          <div className="flex items-center gap-1 mt-0.5" style={{ fontFamily: addressPhoneFont, fontSize: `${Math.round(addressPhoneFontSize * 0.82)}px`, color: textClr, lineHeight: 1.2 }}>
+                            <svg className="w-2.5 h-2.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+                            </svg>
+                            <span className="font-bold">Phone : {store.phone}</span>
+                          </div>
+                        )}
+                        {store.email && (
+                          <div className="font-semibold mt-0.5" style={{ fontFamily: addressPhoneFont, fontSize: `${Math.round(addressPhoneFontSize * 0.82)}px`, color: textClr, lineHeight: 1.2 }}>
+                            E-Mail : {store.email}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -786,6 +808,7 @@ export default function Bill() {
               );
             })()}
 
+            {(store.headerAlign || "center") !== "left" && (
             <div className={`text-center leading-snug mt-2 space-y-1`}
                  style={{
                    fontFamily: addressPhoneFont,
@@ -810,6 +833,7 @@ export default function Bill() {
               )}
               {store.email && <div className="font-semibold">E-Mail : {store.email}</div>}
             </div>
+            )}
 
             <div className="text-center font-black text-[11px] tracking-[0.25em] mt-2.5 mb-1.5 border-y border-black py-0.5 uppercase">Invoice</div>
 
