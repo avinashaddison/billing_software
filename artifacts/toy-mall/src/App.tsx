@@ -21,6 +21,8 @@ import ProductDetail  from "@/pages/ProductDetail";
 import BulkSalePrice  from "@/pages/BulkSalePrice";
 import Scan           from "@/pages/Scan";
 import Logs           from "@/pages/Logs";
+import StockAlert     from "@/pages/StockAlert";
+import Analytics      from "@/pages/Analytics";
 import Profile        from "@/pages/Profile";
 import Bill           from "@/pages/Bill";
 import Billing        from "@/pages/Billing";
@@ -193,6 +195,8 @@ function Router() {
             <Route path="/product"      component={() => <Protected resource="products"><ProductDetail /></Protected>} />
             <Route path="/scan"         component={() => <Protected resource="scan"><Scan /></Protected>} />
             <Route path="/logs"         component={() => <Protected resource="logs"><Logs /></Protected>} />
+            <Route path="/stock-alert"  component={() => <Protected resource="stockAlert"><StockAlert /></Protected>} />
+            <Route path="/analytics"    component={() => <Protected resource="analytics"><Analytics /></Protected>} />
             <Route path="/profile"      component={Profile} />
             <Route path="/billing"      component={() => <Protected resource="billing"><Billing /></Protected>} />
             <Route path="/bill/:id"     component={() => <Protected resource="billing"><Bill /></Protected>} />

@@ -46,6 +46,63 @@ router.get("/reports/revenue", async (req, res): Promise<void> => {
   res.json(result);
 });
 
+/**
+ * GET /api/reports/sku-performance?days=30
+ * Aggregated per-SKU sales over the last N days (default 30, max 365):
+ * units sold, revenue, bills, and — when a purchase price is set — profit
+ * and margin. Ordered by revenue, capped at the top 100 SKUs.
+ *
+ * Manual (custom-name) line items have no productId, so the inner join on
+ * products naturally drops them — only real catalogue SKUs are counted.
+ */
+router.get("/reports/sku-performance", async (req, res): Promise<void> => {
+  const days = Math.min(parseInt(String(req.query.days ?? 30), 10) || 30, 365);
+
+  const rows = await db
+    .select({
+      productId:     saleItemsTable.productId,
+      productName:   productsTable.name,
+      productSku:    productsTable.sku,
+      category:      productsTable.category,
+      purchasePrice: productsTable.purchasePrice,
+      totalQty:      sql<number>`SUM(${saleItemsTable.quantity})::int`.as("total_qty"),
+      totalRevenue:  sql<string>`SUM(${saleItemsTable.subtotal})`.as("total_revenue"),
+      billCount:     sql<number>`COUNT(DISTINCT ${saleItemsTable.saleId})::int`.as("bill_count"),
+    })
+    .from(saleItemsTable)
+    .innerJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
+    .innerJoin(billsTable,    sql`${saleItemsTable.saleId}    = ${billsTable.id}`)
+    .where(and(
+      gte(billsTable.createdAt, sql`NOW() - make_interval(days => ${days})`),
+      tenantWhere(billsTable.tenantId, req.tenantId),
+    ))
+    .groupBy(
+      saleItemsTable.productId, productsTable.name, productsTable.sku,
+      productsTable.category, productsTable.purchasePrice,
+    )
+    .orderBy(desc(sql`SUM(${saleItemsTable.subtotal})`))
+    .limit(100);
+
+  res.json(rows.map((p) => {
+    const qty     = Number(p.totalQty);
+    const revenue = Number(p.totalRevenue);
+    const cost    = p.purchasePrice != null ? Number(p.purchasePrice) * qty : null;
+    const profit  = cost != null ? revenue - cost : null;
+    const margin  = profit != null && revenue > 0 ? (profit / revenue) * 100 : null;
+    return {
+      productId:    p.productId,
+      productName:  p.productName,
+      productSku:   p.productSku,
+      category:     p.category,
+      totalQty:     qty,
+      totalRevenue: revenue,
+      billCount:    Number(p.billCount),
+      profit,
+      margin,
+    };
+  }));
+});
+
 /* ── Helpers ─────────────────────────────────────────────────────── */
 type SalesTotals = {
   totalAmount: number;

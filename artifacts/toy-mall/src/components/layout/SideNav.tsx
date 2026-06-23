@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, PencilLine } from "lucide-react";
+import { Home, Package, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, PencilLine, AlertTriangle, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -55,7 +55,9 @@ export function SideNav() {
   ].filter((item) => !item.resource || visible(item.resource));
 
   const extraItems = [
-    { name: "Today's Deals", href: "/deals",      icon: Sparkles,  resource: "deals"     },
+    { name: "Today's Deals", href: "/deals",       icon: Sparkles,      resource: "deals"      },
+    { name: "Stock Alert",   href: "/stock-alert", icon: AlertTriangle, resource: "stockAlert" },
+    { name: "Analytics",     href: "/analytics",   icon: BarChart3,     resource: "analytics"  },
     { name: "Reports",       href: "/report",     icon: FileText,  resource: "reports"   },
     { name: "Customers",     href: "/customers",  icon: Users,     resource: "customers" },
     { name: "Categories",    href: "/categories", icon: Layers,    resource: "categories"},

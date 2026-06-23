@@ -341,6 +341,8 @@ function ReceivablesCard() {
 
 /* ── Quick-tile ──────────────────────────────────────────────────── */
 const quickTiles = [
+  { href: "/stock-alert", icon: AlertTriangle, label: "Stock Alert", desc: "Low stock & movement", iconBg: "bg-amber-500",   gradient: "from-amber-500/8"  },
+  { href: "/analytics",   icon: TrendingUp,    label: "Analytics",   desc: "Trends & SKU stats",   iconBg: "bg-indigo-500",  gradient: "from-indigo-500/8" },
   { href: "/report",    icon: FileText, label: "Reports",   desc: "EOD & trends",     iconBg: "bg-blue-500",    gradient: "from-blue-500/8"   },
   { href: "/customers", icon: Users,    label: "Customers", desc: "Purchase history", iconBg: "bg-purple-500",  gradient: "from-purple-500/8" },
   { href: "/labels",    icon: Tag,      label: "Labels",    desc: "Barcode shelf labels",    iconBg: "bg-amber-500",   gradient: "from-amber-500/8"  },
