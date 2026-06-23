@@ -135,6 +135,13 @@ export default function CreateProduct() {
   const [autoSku, setAutoSku]         = useState<string>("");
   const [skuLoading, setSkuLoading]   = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+
+  /* Open the Category picker automatically when the page loads so the user
+     can pick straight from the keyboard (the search box autofocuses). */
+  useEffect(() => {
+    const t = setTimeout(() => setCategoryOpen(true), 120);
+    return () => clearTimeout(t);
+  }, []);
   const nameRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<FormValues>({
