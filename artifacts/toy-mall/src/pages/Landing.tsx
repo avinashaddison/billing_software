@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { useSeo, SITE } from "@/lib/seo";
 import {
   ScanLine, Receipt, QrCode, Boxes, BarChart3, Sparkles,
   Check, X, ArrowRight, Star, Shield, MessageCircle,
@@ -14,27 +15,41 @@ const WHATSAPP_NUMBER = "919999999999";
 const TRIAL_URL       = "/login";
 
 /* ═══════════════════════════════════════════════════════════════
-   AddisonX — Indian-show landing.
+   Addison Bill — Indian-show landing.
    Bold copy, marigold garland, mandala motifs, gold-foil headings,
    wedding-invitation pricing card, Bollywood-poster shadows.
 ═══════════════════════════════════════════════════════════════ */
 export default function Landing() {
+  useSeo({
+    path: "/",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: FAQS.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    },
+  });
   return (
     <div className="min-h-screen text-slate-900 lp-cream overflow-x-hidden selection:bg-[#FF6B35] selection:text-white">
       <Garland />
       <OfferStrip />
       <Nav />
-      <Hero />
-      <LiveCounter />
-      <LogoMarquee />
-      <Features />
-      <HowItWorks />
-      <Industries />
-      <Comparison />
-      <Pricing />
-      <Testimonial />
-      <FAQ />
-      <FinalCTA />
+      <main>
+        <Hero />
+        <LiveCounter />
+        <LogoMarquee />
+        <Features />
+        <HowItWorks />
+        <Industries />
+        <Comparison />
+        <Pricing />
+        <Testimonial />
+        <FAQ />
+        <FinalCTA />
+      </main>
       <Footer />
       <StickyCTA />
     </div>
@@ -92,18 +107,9 @@ function Nav() {
 
   return (
     <nav className={`sticky top-0 z-50 transition-all duration-300 ${scrolled ? "bg-[#FFFBF5]/90 backdrop-blur-xl border-b-2 border-[#FFC8A0]/60 shadow-sm" : "bg-transparent"}`}>
-      <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
-        <a href="#top" className="flex items-center gap-2.5 group">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#F59E0B] via-[#FF6B35] to-[#B83A0A] flex items-center justify-center text-white font-black shadow-lg shadow-[#B83A0A]/30 ring-2 ring-white">
-              <span className="text-xl">⚡</span>
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#138808] ring-2 ring-white" />
-          </div>
-          <div className="leading-tight">
-            <div className="font-black text-base text-slate-900">AddisonX</div>
-            <div className="text-[9px] font-black tracking-[0.2em] uppercase text-[#B83A0A] -mt-0.5">Dukaan ka Software</div>
-          </div>
+      <div className="max-w-7xl mx-auto px-4 md:px-8 h-20 flex items-center justify-between">
+        <a href="#top" className="flex items-center group">
+          <img src="/logo2.png" alt="AddisonBill — Dukaan ka Software" className="h-14 md:h-16 w-auto transition-transform group-hover:scale-[1.03]" />
         </a>
 
         <div className="hidden md:flex items-center gap-1">
@@ -116,10 +122,12 @@ function Nav() {
         </div>
 
         <div className="hidden md:flex items-center gap-2">
-          <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener"
-             className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[12px] font-bold text-[#0F7C57] hover:bg-[#138808]/10 transition-all">
-            <MessageCircle className="w-3.5 h-3.5" />
-            +91 99999 99999
+          <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=AddisonBill%20demo%20chahiye`} target="_blank" rel="noopener"
+             className="group/wa flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-black text-white bg-gradient-to-r from-[#25D366] to-[#128C7E] ring-2 ring-[#25D366]/30 shadow-md shadow-[#128C7E]/30 hover:shadow-lg hover:shadow-[#128C7E]/40 hover:-translate-y-0.5 transition-all">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 transition-transform group-hover/wa:scale-110" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.967-.94 1.165-.173.197-.347.222-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.611-.916-2.206-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
+            Contact for Demo
           </a>
           <Link href={TRIAL_URL}
              className="group px-5 py-2.5 rounded-full text-[13px] font-black text-white bg-gradient-to-r from-[#FF6B35] to-[#B83A0A] hover:shadow-lg hover:shadow-[#B83A0A]/40 hover:-translate-y-0.5 transition-all ring-2 ring-[#F59E0B]/40">
@@ -207,6 +215,7 @@ function Hero() {
 
           {/* Multi-color headline */}
           <h1 className="font-black tracking-tight leading-[0.9]">
+            <span className="sr-only">Addison Bill — GST billing and inventory software for Indian shopkeepers. </span>
             <span className="block text-5xl md:text-6xl lg:text-7xl text-slate-900">
               Dukaan{" "}
               <span className="bg-gradient-to-br from-[#FF6B35] via-[#E94F18] to-[#B83A0A] bg-clip-text text-transparent">
@@ -239,7 +248,7 @@ function Hero() {
               {/* Pulse aura */}
               <span aria-hidden className="absolute inset-0 rounded-full lp-animate-pulse-soft pointer-events-none" />
             </Link>
-            <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=AddisonX%20demo%20chahiye`} target="_blank" rel="noopener"
+            <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=Addison%20Bill%20demo%20chahiye`} target="_blank" rel="noopener"
                className="inline-flex items-center gap-2 px-5 py-4 rounded-full font-black text-[#0F7C57] bg-white border-2 border-[#138808]/40 hover:bg-[#138808]/5 hover:border-[#138808]/60 transition-all">
               <MessageCircle className="w-5 h-5" />
               <span>WhatsApp Demo</span>
@@ -716,7 +725,7 @@ function Features() {
   ];
 
   return (
-    <section id="features" className="py-20 md:py-28 relative">
+    <section id="features" className="py-20 md:py-28 relative scroll-mt-24">
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         <div className="text-center mb-14">
           <div className="inline-flex items-center gap-2 mb-3">
@@ -760,7 +769,7 @@ function HowItWorks() {
     { n: 3, Icon: Sparkles, title: "App handle karegi", sub: "Baaki sab chhodo",  desc: "Stock update, daily report, GST — sab automatic." },
   ];
   return (
-    <section id="how" className="py-20 md:py-28 bg-gradient-to-b from-white/60 to-transparent">
+    <section id="how" className="py-20 md:py-28 bg-gradient-to-b from-white/60 to-transparent scroll-mt-24">
       <div className="max-w-6xl mx-auto px-4 md:px-8">
         <div className="text-center mb-14">
           <div className="inline-flex items-center gap-2 mb-3">
@@ -818,7 +827,7 @@ function Industries() {
     { Icon: Pill,        name: "Pharmacy / Medical",      hindi: "Medical" },
   ];
   return (
-    <section className="py-20 md:py-28">
+    <section id="industries" className="py-20 md:py-28 scroll-mt-24">
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 mb-3">
@@ -869,7 +878,7 @@ function Comparison() {
     { feat: "GST / Accounting exports",            a: true, t: true as const },
   ];
   return (
-    <section id="compare" className="py-20 md:py-28 bg-gradient-to-b from-[#FFE4D1]/30 to-transparent">
+    <section id="compare" className="py-20 md:py-28 bg-gradient-to-b from-[#FFE4D1]/30 to-transparent scroll-mt-24">
       <div className="max-w-5xl mx-auto px-4 md:px-8">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 mb-3">
@@ -879,7 +888,7 @@ function Comparison() {
           </div>
           <h2 className="text-3xl md:text-6xl font-black leading-[1.05] text-slate-900">
             <span className="text-slate-400 line-through decoration-2 decoration-rose-300">Tally accountants ke liye hai.</span><br />
-            <span className="lp-gold-foil">AddisonX</span> dukaandaaron ke liye.
+            <span className="lp-gold-foil">Addison Bill</span> dukaandaaron ke liye.
           </h2>
         </div>
 
@@ -890,7 +899,7 @@ function Comparison() {
               <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-[#F59E0B] text-white text-[9px] rounded-full font-black lp-animate-badge-bounce whitespace-nowrap ring-2 ring-white">
                 <Crown className="inline w-3 h-3 mr-1 -mt-0.5" /> RECOMMENDED
               </span>
-              AddisonX
+              Addison Bill
             </div>
             <div className="p-4 md:p-5 text-center bg-slate-100 text-slate-500">Tally / Vyapar</div>
           </div>
@@ -927,7 +936,7 @@ function Comparison() {
         </div>
 
         <p className="text-center text-xs text-slate-500 mt-4">
-          *Tally and Vyapar are great tools — for accountants. AddisonX is built shoulder-to-shoulder with shopkeepers.
+          *Tally and Vyapar are great tools — for accountants. Addison Bill is built shoulder-to-shoulder with shopkeepers.
         </p>
       </div>
     </section>
@@ -937,7 +946,7 @@ function Comparison() {
 /* ─── 11. PRICING (Wedding-invite card) ────────────────────── */
 function Pricing() {
   return (
-    <section id="pricing" className="py-20 md:py-28 relative overflow-hidden">
+    <section id="pricing" className="py-20 md:py-28 relative overflow-hidden scroll-mt-24">
       <div className="absolute inset-0 -z-10 pointer-events-none">
         <div className="absolute top-1/2 -left-20 w-80 h-80 rounded-full bg-[#FFA86B]/30 blur-3xl lp-animate-float-orb" />
         <div className="absolute top-1/2 -right-20 w-80 h-80 rounded-full bg-[#F59E0B]/25 blur-3xl lp-animate-float-orb" style={{ animationDelay: "-9s" }} />
@@ -1069,13 +1078,13 @@ function Testimonial() {
         </div>
         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70 mb-4">— What shopkeepers say —</p>
         <blockquote className="text-3xl md:text-5xl font-black leading-tight">
-          "Hamara cashier saalon se Tally par tha. 2 din mein AddisonX seekh gaya. <span className="lp-gold-foil inline-block">Ab wapas nahi jaayega.</span>"
+          "Hamara cashier saalon se Tally par tha. 2 din mein Addison Bill seekh gaya. <span className="lp-gold-foil inline-block">Ab wapas nahi jaayega.</span>"
         </blockquote>
         <div className="mt-10 inline-flex items-center gap-3 px-5 py-3 rounded-2xl bg-white/15 backdrop-blur border border-white/20">
           <div className="w-12 h-12 rounded-full bg-[#F59E0B] flex items-center justify-center font-black text-white text-lg ring-2 ring-white">SK</div>
           <div className="text-left">
             <p className="font-black text-base">Sharma Kirana Store</p>
-            <p className="text-xs opacity-80">Indore · 4 months on AddisonX</p>
+            <p className="text-xs opacity-80">Indore · 4 months on Addison Bill</p>
           </div>
         </div>
       </div>
@@ -1084,10 +1093,9 @@ function Testimonial() {
 }
 
 /* ─── 13. FAQ ──────────────────────────────────────────────── */
-function FAQ() {
-  const faqs = [
+export const FAQS = [
     { q: "Kya mujhe install karna padega?",
-      a: "Nahi. AddisonX cloud par chalta hai — Chrome, Edge, Safari, ya mobile par browser kholo, login karo, bas." },
+      a: "Nahi. Addison Bill cloud par chalta hai — Chrome, Edge, Safari, ya mobile par browser kholo, login karo, bas." },
     { q: "Kaun sa hardware chahiye?",
       a: "Minimum: ek Android phone ya laptop. Recommended: 80mm thermal printer (agar bill print karna hai), USB barcode scanner." },
     { q: "Internet nahi ho toh?",
@@ -1098,10 +1106,13 @@ function FAQ() {
       a: "Haan. Free onboarding call (Hindi/English) — aapka GSTIN, HSN codes, opening stock — sab hum setup kar denge." },
     { q: "Cancel karna ho toh?",
       a: "Ek click. Pro-rata refund. Koi 'cancellation fee' nahi. Aapka data bhi CSV mein export karke de denge." },
-  ];
+];
+
+function FAQ() {
+  const faqs = FAQS;
   const [open, setOpen] = useState<number | null>(0);
   return (
-    <section id="faq" className="py-20 md:py-28">
+    <section id="faq" className="py-20 md:py-28 scroll-mt-24">
       <div className="max-w-3xl mx-auto px-4 md:px-8">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 mb-3">
@@ -1265,16 +1276,9 @@ function Footer() {
 
           {/* Brand col */}
           <div>
-            <a href="#top" className="flex items-center gap-2.5 mb-5 group">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#F59E0B] via-[#FF6B35] to-[#B83A0A] flex items-center justify-center text-white font-black ring-2 ring-white/10 group-hover:scale-105 transition-transform shadow-lg shadow-[#B83A0A]/30">
-                  <span className="text-xl">⚡</span>
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#138808] ring-2 ring-slate-900" />
-              </div>
-              <div>
-                <div className="font-black text-xl">AddisonX</div>
-                <div className="text-[10px] font-black tracking-[0.2em] text-[#FFA86B] -mt-0.5">Dukaan ka Software</div>
+            <a href="#top" className="inline-flex mb-5 group">
+              <div className="rounded-2xl bg-[#FFFBF5] px-4 py-2.5 ring-1 ring-white/10 shadow-lg shadow-black/30 group-hover:scale-[1.02] transition-transform">
+                <img src="/logo2.png" alt="Addison Bill — Dukaan ka Software" className="h-10 w-auto" />
               </div>
             </a>
             <p className="text-sm text-white/65 leading-relaxed max-w-xs mb-5">
@@ -1301,25 +1305,50 @@ function Footer() {
 
           {/* Link columns */}
           {[
-            { title: "Product",    items: ["Features", "Pricing", "Demo", "Sign In", "Status"] },
-            { title: "Industries", items: ["Kirana", "Gift Shop", "Pharmacy", "Mobile", "Fashion"] },
-            { title: "Company",    items: ["About us", "Blog", "Terms", "Privacy", "Refund"] },
-          ].map((col, i) => (
-            <div key={i}>
+            { title: "Product", links: [
+              { label: "Features", href: "#features", kind: "anchor" },
+              { label: "Pricing",  href: "#pricing",  kind: "anchor" },
+              { label: "vs Tally", href: "#compare",  kind: "anchor" },
+              { label: "FAQ",      href: "#faq",      kind: "anchor" },
+              { label: "Sign In",  href: TRIAL_URL,   kind: "route" },
+            ]},
+            { title: "Industries", links: [
+              { label: "Kirana",    href: "#industries", kind: "anchor" },
+              { label: "Gift Shop", href: "#industries", kind: "anchor" },
+              { label: "Pharmacy",  href: "#industries", kind: "anchor" },
+              { label: "Mobile",    href: "#industries", kind: "anchor" },
+              { label: "Fashion",   href: "#industries", kind: "anchor" },
+            ]},
+            { title: "Company", links: [
+              { label: "About us", href: "#compare", kind: "anchor" },
+              { label: "Contact",  href: `https://wa.me/${WHATSAPP_NUMBER}?text=Addison%20Bill%20demo%20chahiye`, kind: "external" },
+              { label: "Terms",    href: "/terms",   kind: "route" },
+              { label: "Privacy",  href: "/privacy", kind: "route" },
+              { label: "Refund",   href: "/refund",  kind: "route" },
+            ]},
+          ].map((col) => (
+            <nav key={col.title} aria-label={col.title}>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-4 flex items-center gap-1.5">
                 <span className="w-4 h-px bg-[#FFA86B]" />
                 {col.title}
               </p>
               <ul className="space-y-2.5">
-                {col.items.map((it, j) => (
-                  <li key={j}>
-                    <a href="#" className="text-sm text-white/70 hover:text-[#FFA86B] hover:translate-x-1 inline-block transition-all">
-                      {it}
-                    </a>
-                  </li>
-                ))}
+                {col.links.map((l) => {
+                  const cls = "text-sm text-white/70 hover:text-[#FFA86B] hover:translate-x-1 inline-block transition-all";
+                  return (
+                    <li key={l.label}>
+                      {l.kind === "route" ? (
+                        <Link href={l.href} className={cls}>{l.label}</Link>
+                      ) : l.kind === "external" ? (
+                        <a href={l.href} target="_blank" rel="noopener" className={cls}>{l.label}</a>
+                      ) : (
+                        <a href={l.href} className={cls}>{l.label}</a>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
-            </div>
+            </nav>
           ))}
         </div>
 
@@ -1374,7 +1403,7 @@ function Footer() {
         {/* ─ 6. Bottom row ─ */}
         <div className="mt-10 pt-6 border-t border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-xs">
           <p className="text-white/40">
-            © {new Date().getFullYear()} AddisonX Media · Built with <span className="text-[#FF6B35]">♥</span> in <span className="text-[#FFA86B] font-bold">Bharat 🇮🇳</span>
+            © {new Date().getFullYear()} Addison Bill Media · Built with <span className="text-[#FF6B35]">♥</span> in <span className="text-[#FFA86B] font-bold">Bharat 🇮🇳</span>
           </p>
           <div className="flex items-center gap-2 text-white/40">
             <span className="font-bold uppercase tracking-wider text-[10px]">We accept</span>
@@ -1388,7 +1417,7 @@ function Footer() {
         {/* ─ 7. Giant brand word (tasteful footer flourish) ─ */}
         <div aria-hidden className="mt-10 select-none pointer-events-none overflow-hidden">
           <div className="text-center font-black tracking-tight leading-none text-[8rem] md:text-[14rem] lg:text-[18rem] lp-text-stroke opacity-30">
-            AddisonX
+            Addison Bill
           </div>
         </div>
       </div>

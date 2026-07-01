@@ -29,7 +29,7 @@ export interface SidebarTheme {
   blob2: string;
   /** Sparkle accent color in the top-right corner */
   sparkle: string;
-  /** Gradient classes for the "AddisonX Media" subtitle text-clip */
+  /** Gradient classes for the "Addison Bill Media" subtitle text-clip */
   accentText: string;
   /** Outer-glow gradient for the logo tile */
   glow: string;

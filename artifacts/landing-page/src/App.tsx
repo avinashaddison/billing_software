@@ -44,7 +44,7 @@ function Nav() {
             <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-volt-400 ring-2 ring-ink-950" />
           </div>
           <div className="leading-tight">
-            <div className="font-black text-base text-white">AddisonX</div>
+            <div className="font-black text-base text-white">Addison Bill</div>
             <div className="text-[9px] font-black tracking-[0.2em] uppercase text-saffron-400 -mt-0.5">Billing OS</div>
           </div>
         </a>
@@ -155,7 +155,7 @@ function Hero() {
             <span>Start 14-day Free Trial</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </a>
-          <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=AddisonX%20demo%20चाहिए`} target="_blank" rel="noopener"
+          <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=Addison%20Bill%20demo%20चाहिए`} target="_blank" rel="noopener"
              className="inline-flex items-center gap-2 px-5 py-4 rounded-full font-bold text-white glass glass-hover transition-all">
             <MessageCircle className="w-5 h-5 text-volt-400" />
             Book WhatsApp Demo
@@ -228,7 +228,7 @@ function DashboardMockup({ tracked }: { tracked: number }) {
           {/* Camera dot on top bezel */}
           <div className="absolute top-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-slate-400/80" />
-            <div className="text-[8px] font-bold tracking-[0.2em] text-slate-400 uppercase">AddisonX</div>
+            <div className="text-[8px] font-bold tracking-[0.2em] text-slate-400 uppercase">Addison Bill</div>
           </div>
 
           {/* Screen */}
@@ -664,7 +664,7 @@ function Comparison() {
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-saffron-400 mb-4">vs Tally / Vyapar</p>
           <h2 className="text-3xl md:text-5xl lg:text-6xl font-black leading-[1.05]">
             <span className="text-white/30">Tally is for accountants.</span><br />
-            <span className="gradient-saffron">AddisonX is for you.</span>
+            <span className="gradient-saffron">Addison Bill is for you.</span>
           </h2>
         </div>
 
@@ -676,7 +676,7 @@ function Comparison() {
               <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-volt-400 text-ink-950 text-[9px] rounded-full font-black animate-badge-bounce whitespace-nowrap">
                 ✦ RECOMMENDED
               </span>
-              AddisonX
+              Addison Bill
             </div>
             <div className="p-4 md:p-5 text-center text-white/40">Tally / Vyapar</div>
           </div>
@@ -851,7 +851,7 @@ function Testimonial() {
             {[1,2,3,4,5].map(i => <Star key={i} className="w-5 h-5 fill-saffron-400 text-saffron-400" />)}
           </div>
           <blockquote className="text-2xl md:text-4xl font-black leading-tight relative" style={{ fontFamily: "var(--font-hindi)" }}>
-            "हमारा cashier सालों से Tally पर था. <span className="gradient-saffron">2 दिन में AddisonX सीख गया.</span> अब वापस नहीं जाएगा."
+            "हमारा cashier सालों से Tally पर था. <span className="gradient-saffron">2 दिन में Addison Bill सीख गया.</span> अब वापस नहीं जाएगा."
           </blockquote>
           <div className="mt-8 inline-flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-saffron-400 to-saffron-600 flex items-center justify-center font-black text-ink-950">
@@ -859,7 +859,7 @@ function Testimonial() {
             </div>
             <div className="text-left">
               <p className="font-black text-sm">Sharma Kirana Store</p>
-              <p className="text-xs text-white/50">Indore · 4 months on AddisonX</p>
+              <p className="text-xs text-white/50">Indore · 4 months on Addison Bill</p>
             </div>
           </div>
         </div>
@@ -876,7 +876,7 @@ function FAQ() {
     {
       q: "Do I have to install anything?",
       qh: "क्या install करना पड़ेगा?",
-      a: "Nothing. AddisonX runs in your browser — Chrome, Edge, Safari, or mobile. Open the link, log in, start billing. कुछ install नहीं करना।",
+      a: "Nothing. Addison Bill runs in your browser — Chrome, Edge, Safari, or mobile. Open the link, log in, start billing. कुछ install नहीं करना।",
     },
     {
       q: "What hardware do I need?",
@@ -1014,7 +1014,7 @@ function Footer() {
                 <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-volt-400 ring-2 ring-ink-950" />
               </div>
               <div>
-                <div className="font-black text-lg text-white">AddisonX</div>
+                <div className="font-black text-lg text-white">Addison Bill</div>
                 <div className="text-[10px] font-black tracking-[0.2em] text-saffron-400 -mt-0.5">BILLING OS</div>
               </div>
             </div>
@@ -1042,7 +1042,7 @@ function Footer() {
         </div>
 
         <div className="mt-12 pt-6 border-t border-white/5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-xs text-white/30">
-          <p>© {new Date().getFullYear()} AddisonX Media. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Addison Bill Media. All rights reserved.</p>
           <div className="flex items-center gap-4">
             <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="hover:text-saffron-400 font-bold">+91 99999 99999</a>
             <span className="text-white/15">·</span>

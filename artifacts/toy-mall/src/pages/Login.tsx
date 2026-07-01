@@ -249,7 +249,7 @@ export default function Login() {
           </div>
         </div>
         <h1 className="mt-5 text-3xl md:text-4xl font-black tracking-tight text-slate-900">
-          {emailUser ? store.name : "AddisonX Software"}
+          {emailUser ? store.name : "Addison Bill Software"}
         </h1>
         <p className="text-[12px] font-black uppercase tracking-[0.18em] text-rose-600 mt-1">
           {emailUser ? (store.appSubtitle || "Billing & Inventory") : "दुकान का सॉफ्टवेयर"}
@@ -333,7 +333,7 @@ export default function Login() {
           </button>
 
           {/* WhatsApp helper */}
-          <a href="https://wa.me/?text=Hi%20AddisonX%2C%20login%20issue%20hai"
+          <a href="https://wa.me/?text=Hi%20Addison%20Bill%2C%20login%20issue%20hai"
             target="_blank" rel="noreferrer"
             className="block text-center pt-1 text-[12px] font-bold text-emerald-700 hover:text-emerald-800 transition-colors">
             <MessageCircle className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
@@ -487,7 +487,7 @@ export default function Login() {
           <Flame className="w-3 h-3 text-rose-600" />
           <span className="text-[11px] font-bold text-slate-700">Made in Bharat · with</span>
           <span className="text-[11px] font-black bg-gradient-to-r from-rose-600 via-orange-600 to-amber-500 bg-clip-text text-transparent">
-            AddisonX Media
+            Addison Bill Media
           </span>
         </div>
       </div>

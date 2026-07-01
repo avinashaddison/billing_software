@@ -117,7 +117,7 @@ function LoginScreen({ onAuthed }: { onAuthed: (m: PlatformMe) => void }) {
           <ShieldCheck className="w-9 h-9 text-white drop-shadow-sm" strokeWidth={2.2} />
         </div>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
-          AddisonX Admin
+          Addison Bill Admin
         </h1>
         <p className="text-[15px] text-slate-500 dark:text-zinc-400 mt-1">
           Manage all client tenants
@@ -184,7 +184,7 @@ function LoginScreen({ onAuthed }: { onAuthed: (m: PlatformMe) => void }) {
         <div className="flex items-center gap-1.5">
           <span className="text-[13px]">⚡</span>
           <span className="text-[13px] font-medium bg-gradient-to-r from-violet-500 via-blue-500 to-cyan-400 bg-clip-text text-transparent">
-            AddisonX Media
+            Addison Bill Media
           </span>
         </div>
       </div>
@@ -327,7 +327,7 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
               <ShieldCheck className="w-5 h-5" strokeWidth={2.5} />
             </div>
             <div>
-              <h1 className="text-lg font-black tracking-tight">AddisonX Admin</h1>
+              <h1 className="text-lg font-black tracking-tight">Addison Bill Admin</h1>
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{me.email}</p>
             </div>
           </div>

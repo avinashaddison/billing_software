@@ -1,0 +1,31 @@
+# Addison Bill — robots.txt
+User-agent: *
+Allow: /$
+Allow: /terms
+Allow: /privacy
+Allow: /refund
+
+# Private application area — keep out of the index
+Disallow: /login
+Disallow: /dashboard
+Disallow: /products
+Disallow: /product
+Disallow: /scan
+Disallow: /checkout
+Disallow: /billing
+Disallow: /bill/
+Disallow: /suppliers
+Disallow: /customers
+Disallow: /report
+Disallow: /analytics
+Disallow: /logs
+Disallow: /labels
+Disallow: /categories
+Disallow: /deals
+Disallow: /staff
+Disallow: /stock-alert
+Disallow: /settings
+Disallow: /profile
+Disallow: /admin
+
+Sitemap: https://addisonbill.com/sitemap.xml

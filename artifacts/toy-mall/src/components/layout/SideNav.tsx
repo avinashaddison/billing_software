@@ -124,7 +124,7 @@ export function SideNav() {
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300" />
               </span>
               <p className={`text-[9px] font-black tracking-[0.18em] uppercase truncate bg-gradient-to-r ${theme.accentText} bg-clip-text text-transparent`}>
-                AddisonX Media
+                Addison Bill Media
               </p>
             </div>
           </div>
@@ -329,7 +329,7 @@ export function SideNav() {
         <div className="mt-1 px-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-500/10 via-blue-500/10 to-cyan-500/10 border border-violet-500/20">
           <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-0.5">Developed by</p>
           <p className="text-[11px] font-black bg-gradient-to-r from-violet-500 via-blue-500 to-cyan-400 bg-clip-text text-transparent leading-tight">
-            AddisonX Media
+            Addison Bill Media
           </p>
         </div>
       </div>

@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 import { SnowOverlay } from "@/components/effects/SnowOverlay";
 import { CartProvider } from "@/contexts/cart-context";
 import { useEffect }           from "react";
@@ -38,6 +37,7 @@ import Checkout        from "@/pages/Checkout";
 import SettingsPage    from "@/pages/Settings";
 import AdminPage       from "@/pages/Admin";
 import Landing         from "@/pages/Landing";
+import Legal           from "@/pages/Legal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -180,6 +180,11 @@ function Router() {
   /* Login screen — public, no AppLayout. */
   if (location === "/login") return <Login />;
 
+  /* Public legal pages — required for payment-provider onboarding. */
+  if (location === "/terms")   return <Legal doc="terms" />;
+  if (location === "/privacy") return <Legal doc="privacy" />;
+  if (location === "/refund")  return <Legal doc="refund" />;
+
   /* Everything below requires auth. */
   if (!isLoggedIn) return <Redirect to="/login" />;
 
@@ -229,7 +234,6 @@ function App() {
               <SessionSync />
               <SnowOverlay />
               <Router />
-              <PwaInstallPrompt />
             </RealtimeProvider>
           </WouterRouter>
         </CartProvider>
