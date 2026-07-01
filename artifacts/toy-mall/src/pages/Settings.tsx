@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette, Sparkles } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette, Sparkles, Monitor, LogOut, ShieldAlert } from "lucide-react";
+import { useLocation } from "wouter";
 import { useStoreSettings, usePerStaffScannerPrefs, type StoreSettings } from "@/lib/store-info";
 
 /* `bulbLaariEnabled` is owned by the Customization section and toggled in
@@ -77,7 +78,7 @@ const SCANNER_PRESETS = [
 
 export default function SettingsPage() {
   const store = useStoreSettings();
-  const { staffId, staffName } = useAuth();
+  const { staffId, staffName, role } = useAuth();
   const scannerPrefs = usePerStaffScannerPrefs();
   const myPref = staffId ? scannerPrefs.getPref(staffId) : null;
 
@@ -979,6 +980,9 @@ export default function SettingsPage() {
           </div>
         </Section>
 
+        {/* ── Devices & Sessions (owner-only) ── */}
+        {role === "owner" && <DevicesSection />}
+
         {isDirty && (
           <div className="fixed bottom-24 md:bottom-6 left-4 right-4 md:left-auto md:right-8 md:w-72 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-lg z-20">
             <p className="text-xs font-bold text-amber-700 dark:text-amber-400">You have unsaved changes</p>
@@ -1291,6 +1295,135 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
+/* ── Devices & Sessions ──
+ * Owner-only manager listing every device signed into the shop, with the
+ * ability to log any one out or all at once. Backed by /api/auth/sessions. */
+interface DeviceSession {
+  id: string;
+  kind: "pin" | "email";
+  who: string;
+  device: string;
+  ip: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  isCurrent: boolean;
+}
+
+function relTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hr${hr !== 1 ? "s" : ""} ago`;
+  const day = Math.floor(hr / 24);
+  return `${day} day${day !== 1 ? "s" : ""} ago`;
+}
+
+function DevicesSection() {
+  const { logout } = useAuth();
+  const [, setLocation] = useLocation();
+  const [sessions, setSessions] = useState<DeviceSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [revokingAll, setRevokingAll] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    fetch(`${API}/auth/sessions`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setSessions(Array.isArray(d) ? d : []))
+      .catch(() => setSessions([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const logoutOne = async (id: string, isCurrent: boolean) => {
+    setBusyId(id);
+    try {
+      const r = await fetch(`${API}/auth/sessions/${id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error();
+      if (isCurrent) { logout(); setLocation("/login"); return; }
+      toast.success("Device logged out");
+      load();
+    } catch {
+      toast.error("Failed to log out device");
+      setBusyId(null);
+    }
+  };
+
+  const logoutAll = async () => {
+    if (!confirm("Log out ALL devices, including this one? Everyone will have to sign in again.")) return;
+    setRevokingAll(true);
+    try {
+      const r = await fetch(`${API}/auth/sessions/revoke-all`, { method: "POST" });
+      if (!r.ok) throw new Error();
+      logout();
+      setLocation("/login");
+    } catch {
+      toast.error("Failed to log out devices");
+      setRevokingAll(false);
+    }
+  };
+
+  return (
+    <Section icon={Monitor} title="Devices & Sessions" color="text-slate-600 bg-slate-100 dark:bg-slate-800/40">
+      <p className="text-[11px] text-muted-foreground -mt-1">
+        Every device currently signed into your shop. Log out any you don't recognise.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+      ) : sessions.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-4">No active devices.</p>
+      ) : (
+        <div className="space-y-2">
+          {sessions.map((s) => (
+            <div key={s.id} className="flex items-center gap-3 p-3 rounded-xl border bg-muted/20">
+              <div className="w-9 h-9 rounded-lg bg-background border flex items-center justify-center shrink-0">
+                <Monitor className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-bold truncate">{s.device}</p>
+                  {s.isCurrent && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-600 dark:text-green-400 text-[10px] font-black">
+                      This device
+                    </span>
+                  )}
+                  <span className="px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-bold text-muted-foreground uppercase">
+                    {s.kind === "pin" ? "PIN" : "Email"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {s.who}{s.ip ? ` · ${s.ip}` : ""} · active {relTime(s.lastSeenAt)}
+                </p>
+              </div>
+              <button
+                onClick={() => logoutOne(s.id, s.isCurrent)}
+                disabled={busyId === s.id}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-muted hover:bg-red-100 dark:hover:bg-red-900/30 text-xs font-bold text-red-600 dark:text-red-400 transition-colors disabled:opacity-50 shrink-0"
+              >
+                {busyId === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                Log out
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={logoutAll}
+        disabled={revokingAll || sessions.length === 0}
+        className="w-full h-11 rounded-xl bg-red-500 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-600 active:scale-[0.98] transition-all disabled:opacity-50"
+      >
+        {revokingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
+        Log out all devices
+      </button>
+    </Section>
+  );
+}
+
 /**
  * Live miniature of the SideNav logo card — re-uses the same theme tokens
  * so what the owner sees in Settings is exactly what they'll get.
@@ -1339,7 +1472,7 @@ function SidebarHeaderPreview({
             <div className="flex items-center gap-1.5 mt-1">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
               <p className={`text-[9px] font-black tracking-[0.18em] uppercase truncate bg-gradient-to-r ${t.accentText} bg-clip-text text-transparent`}>
-                AddisonX Media
+                Addison Bill Media
               </p>
             </div>
           </div>

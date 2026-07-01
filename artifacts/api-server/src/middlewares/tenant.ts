@@ -32,6 +32,10 @@ declare global {
       staffId?: string;
       userId?: string;
       authKind?: "pin" | "email";
+      /** auth_sessions.id carried by the cookie's `sid` claim. Undefined for
+       *  legacy cookies minted before device tracking (lazy-upgraded on the
+       *  next request by requireAuth). */
+      sessionId?: string;
       /** Platform-admin auth_users.id when the platform_session cookie is
        *  present and valid. Independent of tenant_session above. */
       platformUserId?: string;
@@ -75,15 +79,18 @@ interface CookiePayload {
   u: string | null;
   /** Session kind discriminator. */
   k: AuthKind | null;
+  /** auth_sessions.id (device row). Absent on legacy pre-device cookies. */
+  sid?: string | null;
   /** Issued-at (ms). */
   iat: number;
 }
 
 export interface DecodedSession {
-  tenantId: string | null;
-  staffId:  string | null;
-  userId:   string | null;
-  kind:     AuthKind | null;
+  tenantId:  string | null;
+  staffId:   string | null;
+  userId:    string | null;
+  kind:      AuthKind | null;
+  sessionId: string | null;
 }
 
 /**
@@ -98,12 +105,14 @@ export function signTenantCookie(args: {
   staffId?:  string | null;
   userId?:   string | null;
   kind:      AuthKind | null;
+  sessionId?: string | null;
 }): string {
   const payload: CookiePayload = {
     t: args.tenantId,
     s: args.staffId ?? null,
     u: args.userId ?? null,
     k: args.kind,
+    sid: args.sessionId ?? null,
     iat: Date.now(),
   };
   const b64 = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -134,10 +143,11 @@ export function verifyTenantCookie(raw: string | undefined): DecodedSession | nu
       : (typeof obj.s === "string" ? "pin" : null);
 
     return {
-      tenantId: typeof obj.t === "string" ? obj.t : null,
-      staffId:  typeof obj.s === "string" ? obj.s : null,
-      userId:   typeof obj.u === "string" ? obj.u : null,
+      tenantId:  typeof obj.t === "string" ? obj.t : null,
+      staffId:   typeof obj.s === "string" ? obj.s : null,
+      userId:    typeof obj.u === "string" ? obj.u : null,
       kind,
+      sessionId: typeof obj.sid === "string" ? obj.sid : null,
     };
   } catch {
     return null;
@@ -151,9 +161,10 @@ export function tenantContext(req: Request, _res: Response, next: NextFunction):
   /* Tenant session — drives /login + everything in the tenant SPA. */
   const decoded = verifyTenantCookie(cookies[TENANT_COOKIE_NAME]);
   req.tenantId = decoded?.tenantId ?? null;
-  if (decoded?.staffId) req.staffId = decoded.staffId;
-  if (decoded?.userId)  req.userId  = decoded.userId;
-  if (decoded?.kind)    req.authKind = decoded.kind;
+  if (decoded?.staffId)   req.staffId   = decoded.staffId;
+  if (decoded?.userId)    req.userId    = decoded.userId;
+  if (decoded?.kind)      req.authKind  = decoded.kind;
+  if (decoded?.sessionId) req.sessionId = decoded.sessionId;
 
   /* Platform session — independent cookie so the vendor can be signed into
      /admin while ALSO logged into a tenant via /login on the same browser.

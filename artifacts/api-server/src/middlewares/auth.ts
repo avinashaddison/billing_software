@@ -13,8 +13,11 @@
  * staff within the caller's tenant — including the legacy null-tenant owner.
  */
 import type { Request, Response, NextFunction } from "express";
-import { eq } from "drizzle-orm";
-import { db, authUsersTable, staffProfilesTable } from "@workspace/db";
+import { eq, and, sql } from "drizzle-orm";
+import { db, authUsersTable, staffProfilesTable, authSessionsTable } from "@workspace/db";
+import { clientMeta, createSession } from "../lib/sessions";
+import { logger } from "../lib/logger";
+import { TENANT_COOKIE_NAME, signTenantCookie, tenantCookieOptions } from "./tenant";
 
 /**
  * Endpoints reachable WITHOUT a session. Kept identical to the tenant-active
@@ -39,6 +42,89 @@ export const PUBLIC_PATHS: ReadonlySet<string> = new Set([
  * Everything else gets a 401 so anonymous callers can't reach tenant data
  * or mutate state by hitting the API directly.
  */
+/**
+ * Device-session gate, run once the caller's account is confirmed active.
+ *
+ * Returns `true` if the request should proceed, `false` if it already sent a
+ * 401 (the session was revoked). Three paths:
+ *
+ *  - cookie carries a `sid` → verify the auth_sessions row exists and is not
+ *    revoked. Missing/revoked → fail CLOSED (401 + clear cookie) so a
+ *    remotely-logged-out device stops working on its next request.
+ *  - cookie has no `sid` (minted before device tracking) → lazily register a
+ *    device and re-issue the cookie with the new `sid` (silent upgrade — the
+ *    user is never logged out).
+ *  - the session SELECT itself throws (Neon blip) → fail OPEN (proceed). A
+ *    transient DB error must not mass-logout the whole tenant. This is
+ *    deliberately different from the account-active check below, which 500s.
+ */
+async function validateOrUpgradeSession(
+  req: Request,
+  res: Response,
+  subjectKind: "pin" | "email",
+  subjectId: string,
+): Promise<boolean> {
+  if (req.sessionId) {
+    let row: { revokedAt: Date | null } | undefined;
+    try {
+      [row] = await db
+        .select({ revokedAt: authSessionsTable.revokedAt })
+        .from(authSessionsTable)
+        .where(and(
+          eq(authSessionsTable.id, req.sessionId),
+          eq(authSessionsTable.subjectKind, subjectKind),
+          eq(authSessionsTable.subjectId, subjectId),
+        ));
+    } catch (err) {
+      logger.warn({ err }, "session status check failed — allowing (fail-open)");
+      return true;
+    }
+    if (!row || row.revokedAt) {
+      res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
+      res.status(401).json({ error: "Session revoked" });
+      return false;
+    }
+    /* Throttled, fire-and-forget last-seen bump: at most one write per minute
+       per session, and a failed write never blocks or fails the request. */
+    db.update(authSessionsTable)
+      .set({ lastSeenAt: sql`now()` })
+      .where(and(
+        eq(authSessionsTable.id, req.sessionId),
+        sql`${authSessionsTable.lastSeenAt} < now() - interval '60 seconds'`,
+      ))
+      .then(() => undefined, () => undefined);
+    return true;
+  }
+
+  /* Legacy cookie (no sid) → register a device row and re-issue the cookie
+     carrying the new sid. Best-effort: never block auth if the write fails. */
+  try {
+    const { userAgent, ip } = clientMeta(req);
+    const sid = await createSession({
+      tenantId: req.tenantId,
+      subjectKind,
+      subjectId,
+      userAgent,
+      ip,
+    });
+    req.sessionId = sid;
+    res.cookie(
+      TENANT_COOKIE_NAME,
+      signTenantCookie({
+        tenantId:  req.tenantId,
+        staffId:   subjectKind === "pin"   ? subjectId : null,
+        userId:    subjectKind === "email" ? subjectId : null,
+        kind:      subjectKind,
+        sessionId: sid,
+      }),
+      tenantCookieOptions(),
+    );
+  } catch (err) {
+    logger.warn({ err }, "session lazy-upgrade failed — allowing without sid");
+  }
+  return true;
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (PUBLIC_PATHS.has(req.path)) { next(); return; }
   if (!req.staffId && !req.userId) {
@@ -57,6 +143,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         .from(authUsersTable)
         .where(eq(authUsersTable.id, req.userId));
       if (!u || !u.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
+      if (!(await validateOrUpgradeSession(req, res, "email", req.userId))) return;
       next();
       return;
     }
@@ -66,6 +153,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         .from(staffProfilesTable)
         .where(eq(staffProfilesTable.id, req.staffId));
       if (!s || !s.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
+      if (!(await validateOrUpgradeSession(req, res, "pin", req.staffId))) return;
       next();
       return;
     }

@@ -21,11 +21,12 @@
  * `tenant_id = req.tenantId`.
  */
 import { Router, type IRouter } from "express";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, desc, isNull, inArray, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, authUsersTable } from "@workspace/db";
+import { db, authUsersTable, authSessionsTable, staffProfilesTable } from "@workspace/db";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { requireAdmin } from "../middlewares/auth";
+import { clientMeta, createSession } from "../lib/sessions";
 import {
   TENANT_COOKIE_NAME,
   signTenantCookie,
@@ -131,12 +132,24 @@ router.post("/auth/login-email", async (req, res): Promise<void> => {
       .where(eq(authUsersTable.id, user.id))
       .then(() => undefined, () => undefined);
 
+    /* Register this device so it appears in the Devices & Sessions manager
+       and can be revoked remotely. The row id becomes the cookie's sid. */
+    const { userAgent, ip } = clientMeta(req);
+    const sessionId = await createSession({
+      tenantId:    user.tenantId ?? null,
+      subjectKind: "email",
+      subjectId:   user.id,
+      userAgent,
+      ip,
+    });
+
     res.cookie(
       TENANT_COOKIE_NAME,
       signTenantCookie({
-        tenantId: user.tenantId ?? null,
-        userId:   user.id,
-        kind:     "email",
+        tenantId:  user.tenantId ?? null,
+        userId:    user.id,
+        kind:      "email",
+        sessionId,
       }),
       tenantCookieOptions(),
     );
@@ -314,6 +327,116 @@ router.post("/auth/users/:id/enable", requireAdmin, async (req, res): Promise<vo
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     res.json(safeUser(user));
   } catch { res.status(500).json({ error: "Failed to enable user" }); }
+});
+
+/* ════════════════ Devices & Sessions (owner-only) ════════════════
+ *
+ * Lets the owner see every device logged into the shop and log any of them
+ * out (or all at once). "Logged out" = the session's revoked_at is stamped;
+ * requireAuth then 401s that device on its next request.
+ */
+
+/** Derive a short human label ("Chrome on Windows") from a User-Agent. Best
+ *  effort — falls back to "Unknown device". No external dependency. */
+function deviceLabelFromUA(ua: string | null): string {
+  if (!ua) return "Unknown device";
+  const s = ua.toLowerCase();
+
+  let os = "";
+  if (s.includes("windows"))                      os = "Windows";
+  else if (s.includes("iphone") || s.includes("ipad")) os = s.includes("ipad") ? "iPad" : "iPhone";
+  else if (s.includes("android"))                 os = "Android";
+  else if (s.includes("mac os") || s.includes("macintosh")) os = "macOS";
+  else if (s.includes("linux"))                   os = "Linux";
+
+  let browser = "";
+  if (s.includes("edg/") || s.includes("edga") || s.includes("edgios")) browser = "Edge";
+  else if (s.includes("opr/") || s.includes("opera"))                    browser = "Opera";
+  else if (s.includes("chrome") || s.includes("crios"))                  browser = "Chrome";
+  else if (s.includes("firefox") || s.includes("fxios"))                 browser = "Firefox";
+  else if (s.includes("safari"))                                         browser = "Safari";
+
+  if (browser && os) return `${browser} on ${os}`;
+  if (browser)       return browser;
+  if (os)            return os;
+  return "Unknown device";
+}
+
+/* ── GET /api/auth/sessions — list the tenant's active devices ────── */
+router.get("/auth/sessions", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const sessions = await db
+      .select()
+      .from(authSessionsTable)
+      .where(and(
+        tenantWhere(authSessionsTable.tenantId, req.tenantId),
+        isNull(authSessionsTable.revokedAt),
+      ))
+      .orderBy(desc(authSessionsTable.lastSeenAt));
+
+    /* Resolve a display name per session, branching on subject kind. */
+    const pinIds   = sessions.filter((s) => s.subjectKind === "pin").map((s) => s.subjectId);
+    const emailIds = sessions.filter((s) => s.subjectKind === "email").map((s) => s.subjectId);
+
+    const staffRows = pinIds.length
+      ? await db.select({ id: staffProfilesTable.id, name: staffProfilesTable.name })
+          .from(staffProfilesTable).where(inArray(staffProfilesTable.id, pinIds))
+      : [];
+    const userRows = emailIds.length
+      ? await db.select({ id: authUsersTable.id, email: authUsersTable.email })
+          .from(authUsersTable).where(inArray(authUsersTable.id, emailIds))
+      : [];
+    const nameByStaff = new Map(staffRows.map((r) => [r.id, r.name]));
+    const emailByUser = new Map(userRows.map((r) => [r.id, r.email]));
+
+    res.json(sessions.map((s) => ({
+      id:         s.id,
+      kind:       s.subjectKind,
+      who:        s.subjectKind === "pin"
+        ? (nameByStaff.get(s.subjectId) ?? "Staff")
+        : (emailByUser.get(s.subjectId) ?? "User"),
+      device:     deviceLabelFromUA(s.userAgent),
+      ip:         s.ip,
+      createdAt:  s.createdAt,
+      lastSeenAt: s.lastSeenAt,
+      isCurrent:  s.id === req.sessionId,
+    })));
+  } catch { res.status(500).json({ error: "Failed to list sessions" }); }
+});
+
+/* ── DELETE /api/auth/sessions/:id — log out one device ───────────── */
+router.delete("/auth/sessions/:id", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const [row] = await db
+      .update(authSessionsTable)
+      .set({ revokedAt: sql`now()` })
+      .where(and(
+        eq(authSessionsTable.id, String(req.params.id)),
+        tenantWhereWrite(authSessionsTable.tenantId, req.tenantId),
+        isNull(authSessionsTable.revokedAt),
+      ))
+      .returning({ id: authSessionsTable.id });
+    if (!row) { res.status(404).json({ error: "Session not found" }); return; }
+    res.json({ ok: true, id: row.id });
+  } catch { res.status(500).json({ error: "Failed to revoke session" }); }
+});
+
+/* ── POST /api/auth/sessions/revoke-all — log out EVERY device ──────
+ * Includes the caller's own device; the cookie is cleared here and the
+ * next request 401s, so the owner is signed out too. */
+router.post("/auth/sessions/revoke-all", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const revoked = await db
+      .update(authSessionsTable)
+      .set({ revokedAt: sql`now()` })
+      .where(and(
+        tenantWhereWrite(authSessionsTable.tenantId, req.tenantId),
+        isNull(authSessionsTable.revokedAt),
+      ))
+      .returning({ id: authSessionsTable.id });
+    res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
+    res.json({ ok: true, count: revoked.length });
+  } catch { res.status(500).json({ error: "Failed to revoke sessions" }); }
 });
 
 export default router;

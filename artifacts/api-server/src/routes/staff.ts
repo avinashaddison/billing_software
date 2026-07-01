@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc, and, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, staffProfilesTable, staffPermissionsTable, authUsersTable, tenantsTable } from "@workspace/db";
+import { db, staffProfilesTable, staffPermissionsTable, authUsersTable, tenantsTable, authSessionsTable } from "@workspace/db";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { requireAdmin } from "../middlewares/auth";
+import { clientMeta, createSession } from "../lib/sessions";
 import {
   TENANT_COOKIE_NAME,
   signTenantCookie,
@@ -132,15 +133,27 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     const permissions: Record<string, string> = {};
     for (const p of perms) permissions[p.resource] = p.level;
 
+    /* Register this device so it appears in the Devices & Sessions manager
+       and can be revoked remotely. The row id becomes the cookie's sid. */
+    const { userAgent, ip } = clientMeta(req);
+    const sessionId = await createSession({
+      tenantId:    member.tenantId ?? null,
+      subjectKind: "pin",
+      subjectId:   member.id,
+      userAgent,
+      ip,
+    });
+
     /* ── Issue signed tenant_session cookie ──
        member.tenantId is null for legacy Hira & Sons staff → cookie
        carries null and downstream queries match the IS-NULL branch. */
     res.cookie(
       TENANT_COOKIE_NAME,
       signTenantCookie({
-        tenantId: member.tenantId ?? null,
-        staffId:  member.id,
-        kind:     "pin",
+        tenantId:  member.tenantId ?? null,
+        staffId:   member.id,
+        kind:      "pin",
+        sessionId,
       }),
       tenantCookieOptions(),
     );
@@ -156,7 +169,20 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 });
 
 /* ── POST /api/auth/logout ──────────────────────────────────────── */
-router.post("/auth/logout", (_req, res): void => {
+router.post("/auth/logout", async (req, res): Promise<void> => {
+  /* Revoke this device's session so it drops off the Devices list. The cookie
+     is signed, so req.sessionId is trustworthy; scope the revoke to the
+     session id (a forged/foreign id simply matches no active row). */
+  if (req.sessionId) {
+    await db
+      .update(authSessionsTable)
+      .set({ revokedAt: sql`now()` })
+      .where(and(
+        eq(authSessionsTable.id, req.sessionId),
+        sql`${authSessionsTable.revokedAt} is null`,
+      ))
+      .catch(() => undefined);
+  }
   res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
   res.json({ ok: true });
 });

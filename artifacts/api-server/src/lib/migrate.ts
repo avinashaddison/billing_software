@@ -59,6 +59,7 @@ const MIGRATION_FILES = [
   "0010_per_tenant_unique.sql",
   "0011_perf_indexes.sql",
   "0012_bill_payments.sql",
+  "0013_auth_sessions.sql",
 ];
 
 function findMigration(name: string): string | null {
