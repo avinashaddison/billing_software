@@ -200,13 +200,20 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
       .orderBy(desc(sql`SUM(${saleItemsTable.quantity})`))
       .limit(10),
 
+    /* Profit base. LEFT JOIN (not INNER) so MANUAL / non-inventory lines
+       (productId IS NULL) are kept: they have no purchase cost, so their full
+       subtotal is counted as profit (a gift-wrap, service charge, etc.). A
+       line is "covered" — and thus part of the profit base — when it is either
+       a manual line OR a catalogue item that has a purchase price set.
+       Catalogue items with an UNSET purchase price stay excluded so we never
+       overstate margin on items whose real cost we don't know. */
     db.select({
-        totalCost:      sql<string>`COALESCE(SUM(${productsTable.purchasePrice} * ${saleItemsTable.quantity}), 0)`.as("total_cost"),
-        coveredItems:   sql<number>`COUNT(DISTINCT CASE WHEN ${productsTable.purchasePrice} IS NOT NULL THEN ${saleItemsTable.productId} END)::int`.as("covered_items"),
-        coveredRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${productsTable.purchasePrice} IS NOT NULL THEN ${saleItemsTable.subtotal} ELSE 0 END), 0)`.as("covered_revenue"),
+        totalCost:      sql<string>`COALESCE(SUM(CASE WHEN ${productsTable.purchasePrice} IS NOT NULL THEN ${productsTable.purchasePrice} * ${saleItemsTable.quantity} ELSE 0 END), 0)`.as("total_cost"),
+        coveredItems:   sql<number>`COUNT(*) FILTER (WHERE ${saleItemsTable.productId} IS NULL OR ${productsTable.purchasePrice} IS NOT NULL)::int`.as("covered_items"),
+        coveredRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${saleItemsTable.productId} IS NULL OR ${productsTable.purchasePrice} IS NOT NULL THEN ${saleItemsTable.subtotal} ELSE 0 END), 0)`.as("covered_revenue"),
       })
       .from(saleItemsTable)
-      .innerJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
+      .leftJoin(productsTable,  sql`${saleItemsTable.productId} = ${productsTable.id}`)
       .innerJoin(billsTable,    sql`${saleItemsTable.saleId}    = ${billsTable.id}`)
       .where(and(
         sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`,
@@ -289,10 +296,12 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
   ]);
 
   const totalCost      = Number(profitSummary?.totalCost ?? 0);
-  /* Profit is computed ONLY over items whose purchase (cost) price is set, so
-   * we compare like-with-like revenue. Mixing full revenue with partial cost
-   * (the old behaviour) overstated profit. profitCoverage tells the UI how many
-   * items are included so it can label the figure ("based on N priced items"). */
+  /* Profit is computed over the "covered" revenue base: manual/non-inventory
+   * lines (zero cost → full margin) plus catalogue items whose purchase price
+   * is set. Catalogue items with an UNSET cost are excluded so we compare
+   * like-with-like revenue and never overstate margin on unknown-cost items.
+   * profitCoverage tells the UI how many lines are included so it can label
+   * the figure ("based on N priced items"). */
   const coveredRevenue = Number(profitSummary?.coveredRevenue ?? 0);
   const grossProfit    = coveredRevenue - totalCost;
   const margin         = coveredRevenue > 0 ? (grossProfit / coveredRevenue) * 100 : 0;
