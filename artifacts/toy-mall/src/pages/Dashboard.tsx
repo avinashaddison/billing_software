@@ -207,15 +207,17 @@ const accentMap: Record<Accent, {
 };
 
 function StatCard({
-  title, value, subtitle, icon: Icon, loading, accent = "blue", testid,
+  title, value, subtitle, icon: Icon, loading, accent = "blue", testid, href,
 }: {
   title: string; value?: string | number; subtitle?: string;
   icon: React.ElementType; loading?: boolean;
   accent?: Accent; testid?: string;
+  /** When set, the whole card becomes a link to this route. */
+  href?: string;
 }) {
   const a = accentMap[accent];
-  return (
-    <div className={`relative bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${a.glow}`} data-testid={testid}>
+  const body = (
+    <>
       <div className={`absolute inset-0 bg-gradient-to-br ${a.gradient} pointer-events-none`} />
       <div className="relative p-4">
         <div className="flex items-start justify-between mb-3">
@@ -233,6 +235,22 @@ function StatCard({
           <p className="text-[10px] mt-2 font-semibold text-muted-foreground">{subtitle}</p>
         )}
       </div>
+    </>
+  );
+
+  const baseClass = `relative bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${a.glow}`;
+
+  if (href) {
+    return (
+      <Link href={href} data-testid={testid}
+        className={`${baseClass} block cursor-pointer active:scale-[0.98] transition-all`}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <div className={baseClass} data-testid={testid}>
+      {body}
     </div>
   );
 }
@@ -384,11 +402,13 @@ export default function Dashboard() {
         <StatCard title="Today IN" icon={ArrowDownToLine} accent="green"
           value={activity?.inQuantity}
           subtitle={`${activity?.inCount ?? 0} transactions`}
-          loading={loadingActivity} testid="stat-today-in" />
+          loading={loadingActivity} testid="stat-today-in"
+          href="/products?added=today" />
         <StatCard title="Today OUT" icon={ArrowUpToLine} accent="red"
           value={activity?.outQuantity}
           subtitle={`${activity?.outCount ?? 0} transactions`}
-          loading={loadingActivity} testid="stat-today-out" />
+          loading={loadingActivity} testid="stat-today-out"
+          href="/report" />
       </div>
 
       {/* ── Revenue + Receivables (money in / money owed) ── */}

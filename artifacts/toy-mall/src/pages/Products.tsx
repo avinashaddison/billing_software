@@ -728,6 +728,9 @@ export default function Products() {
   const searchStr                   = useSearch();
   const urlParams                   = new URLSearchParams(searchStr);
   const filterLowStock              = urlParams.get("filter") === "lowstock";
+  /* Dashboard's "Today IN" card links here with ?added=today so the list
+     opens pre-filtered to items added today. A raw date is passed through. */
+  const addedParam                  = urlParams.get("added");
   const [search, setSearch]         = useState("");
   const [showImport, setShowImport] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; sku: string } | null>(null);
@@ -738,7 +741,9 @@ export default function Products() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [stockFilter, setStockFilter] = useState<"all" | "in" | "low" | "out">("all");
-  const [addedDateFilter, setAddedDateFilter] = useState<string>("");
+  const [addedDateFilter, setAddedDateFilter] = useState<string>(
+    addedParam === "today" ? new Date().toLocaleDateString("en-CA") : (addedParam ?? ""),
+  );
   const [showRecover, setShowRecover] = useState(false);
   const [page, setPage]             = useState(1);
 
