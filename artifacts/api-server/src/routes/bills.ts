@@ -3,6 +3,7 @@ import { eq, desc, and, sql, inArray, gte } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable, billPaymentsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { requireWrite } from "../middlewares/auth";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 
 const router: IRouter = Router();
@@ -138,7 +139,7 @@ function isValidCheckoutBody(body: unknown): body is {
   });
 }
 
-router.post("/bills/checkout", async (req, res): Promise<void> => {
+router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<void> => {
   if (!isValidCheckoutBody(req.body)) {
     res.status(400).json({
       error: "Invalid checkout payload. Requires items[], paymentMode (cash|upi), and optional 10-digit customerPhone.",
@@ -167,6 +168,8 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
         discountType?:    "percent" | "amount";
         discountValue?:   number;
         subtotal:         number;
+        /** Cost snapshot at sale time — powers stable historical profit. */
+        purchasePrice?:   number;
         /** Stock fields populated only for catalogue lines (used by low-stock
          *  Telegram alert). Manual lines set these to safe placeholders so the
          *  alert filter naturally excludes them. */
@@ -246,6 +249,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           discountType:     item.discountType,
           discountValue:    item.discountValue,
           subtotal:         item.price * item.quantity,
+          purchasePrice:    product.purchasePrice != null ? Number(product.purchasePrice) : undefined,
           newStock:         decremented.stock,
           threshold:        product.lowStockThreshold,
         });
@@ -281,6 +285,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
           customerPhone: customerPhone || null,
           discount:      discount && discount > 0 ? String(discount) : null,
           discountType:  discount && discount > 0 && discountType ? discountType : null,
+          discountAmount: discountAmount > 0 ? discountAmount.toFixed(2) : null,
         })
         .returning();
 
@@ -299,6 +304,7 @@ router.post("/bills/checkout", async (req, res): Promise<void> => {
             discountType:     i.discountType ?? null,
             discountValue:    i.discountValue != null ? String(i.discountValue) : null,
             subtotal:         String(i.subtotal),
+            purchasePrice:    i.purchasePrice != null ? String(i.purchasePrice) : null,
           }))
         )
         .returning();

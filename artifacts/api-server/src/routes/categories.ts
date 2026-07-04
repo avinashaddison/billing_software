@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, asc, sql, and } from "drizzle-orm";
 import { db, categoriesTable, productsTable } from "@workspace/db";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { requireWrite } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -30,7 +31,7 @@ router.get("/categories", async (req, res): Promise<void> => {
 });
 
 /* ── POST /api/categories ── create ─────────────────────────────── */
-router.post("/categories", async (req, res): Promise<void> => {
+router.post("/categories", requireWrite("categories"), async (req, res): Promise<void> => {
   const { name, emoji, skuCode } = req.body ?? {};
   if (!name || typeof name !== "string" || name.trim().length < 2) {
     res.status(400).json({ error: "Name must be at least 2 characters" });
@@ -58,7 +59,7 @@ router.post("/categories", async (req, res): Promise<void> => {
 });
 
 /* ── PUT /api/categories/:id ── update ──────────────────────────── */
-router.put("/categories/:id", async (req, res): Promise<void> => {
+router.put("/categories/:id", requireWrite("categories"), async (req, res): Promise<void> => {
   const { name, emoji, skuCode } = req.body ?? {};
   const updates: Record<string, string> = {};
   if (name !== undefined) {
@@ -76,7 +77,7 @@ router.put("/categories/:id", async (req, res): Promise<void> => {
       .update(categoriesTable)
       .set(updates)
       .where(and(
-        eq(categoriesTable.id, req.params.id),
+        eq(categoriesTable.id, String(req.params.id)),
         tenantWhereWrite(categoriesTable.tenantId, req.tenantId),
       ))
       .returning();
@@ -92,12 +93,12 @@ router.put("/categories/:id", async (req, res): Promise<void> => {
 });
 
 /* ── DELETE /api/categories/:id ── delete ───────────────────────── */
-router.delete("/categories/:id", async (req, res): Promise<void> => {
+router.delete("/categories/:id", requireWrite("categories"), async (req, res): Promise<void> => {
   try {
     const [row] = await db
       .delete(categoriesTable)
       .where(and(
-        eq(categoriesTable.id, req.params.id),
+        eq(categoriesTable.id, String(req.params.id)),
         tenantWhereWrite(categoriesTable.tenantId, req.tenantId),
       ))
       .returning();

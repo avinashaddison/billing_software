@@ -12,4 +12,5 @@ export const StockLogType = {
   IN: "IN",
   OUT: "OUT",
   ADJUSTMENT: "ADJUSTMENT",
+  RETURN: "RETURN",
 } as const;

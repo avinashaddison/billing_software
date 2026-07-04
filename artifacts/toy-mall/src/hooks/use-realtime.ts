@@ -20,6 +20,13 @@ export type SseEventType =
   | "low_stock_alert"
   | "cart_updated";
 
+/** Notify plain-fetch pages (Billing, Customers) that server data changed.
+ *  Those pages don't use React Query, so cache invalidation can't reach them;
+ *  they listen for these window events and re-fetch. */
+function notify(name: "addison:bills-changed" | "addison:suppliers-changed") {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(name));
+}
+
 /** Invalidate all dashboard-related queries */
 function invalidateDashboard(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
@@ -97,11 +104,24 @@ export function useRealtime() {
         // Bill deducts stock from multiple products — invalidate all product queries
         invalidateAllProducts(qc);
         invalidateDashboard(qc);
+        notify("addison:bills-changed");
         toast.success(
           `🧾 Bill raised — ₹${d.totalAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })} · ${d.itemsCount} item${d.itemsCount !== 1 ? "s" : ""} · ${d.paymentMode.toUpperCase()}`,
           { duration: 4000 }
         );
       });
+
+      /* ── payment recorded / return processed (both fire bill_payment) ── */
+      es.addEventListener("bill_payment", () => {
+        invalidateDashboard(qc);
+        invalidateAllProducts(qc);   // returns restock, so product stock changed too
+        notify("addison:bills-changed");
+      });
+
+      /* ── supplier created / paid ── */
+      es.addEventListener("supplier_created",       () => notify("addison:suppliers-changed"));
+      es.addEventListener("supplier_payment_added", () => notify("addison:suppliers-changed"));
+      es.addEventListener("supplier_payment_deleted", () => notify("addison:suppliers-changed"));
 
       /* ── new product added ── */
       es.addEventListener("product_created", (e) => {

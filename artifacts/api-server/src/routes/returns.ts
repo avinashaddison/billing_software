@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { db, returnsTable, productsTable, billsTable, saleItemsTable } from "@workspace/db";
+import { db, returnsTable, productsTable, billsTable, saleItemsTable, stockLogsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { logger } from "../lib/logger";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
@@ -114,6 +114,18 @@ router.post("/returns", async (req, res): Promise<void> => {
         quantity: number; newStock: number; tenantId: string | null;
       }> = [];
 
+      /* Serialize concurrent returns against the SAME bill by taking a row
+         lock up front. Without this, two simultaneous returns could each read
+         the same prior-returned total, both pass the eligibility check, and
+         over-return / double-refund the same units. FOR UPDATE makes the
+         second transaction wait until the first commits, so it then sees the
+         updated prior-returned count. */
+      await tx
+        .select({ id: billsTable.id })
+        .from(billsTable)
+        .where(eq(billsTable.id, billId))
+        .for("update");
+
       for (const [pid, qty] of requestedByProduct) {
         const [product] = await tx
           .select()
@@ -128,15 +140,23 @@ router.post("/returns", async (req, res): Promise<void> => {
           );
         }
 
-        /* How many of this product were actually sold on this bill … */
+        /* How many of this product were sold on this bill, and the TOTAL
+           line amount paid for them (sum of sale_items.subtotal — this already
+           reflects per-line discounts). Summing across every matching line
+           also means a product billed on two lines at different prices is
+           handled correctly, instead of picking one arbitrary price. */
         const [soldRow] = await tx
-          .select({ sold: sql<string>`coalesce(sum(${saleItemsTable.quantity}), 0)` })
+          .select({
+            sold:  sql<string>`coalesce(sum(${saleItemsTable.quantity}), 0)`,
+            gross: sql<string>`coalesce(sum(${saleItemsTable.subtotal}), 0)`,
+          })
           .from(saleItemsTable)
           .where(and(
             eq(saleItemsTable.saleId, billId),
             eq(saleItemsTable.productId, pid),
           ));
-        const sold = Number(soldRow?.sold ?? 0);
+        const sold  = Number(soldRow?.sold ?? 0);
+        const gross = Number(soldRow?.gross ?? 0);
 
         /* … and how many were already returned on PRIOR return transactions. */
         const [priorRow] = await tx
@@ -159,27 +179,25 @@ router.post("/returns", async (req, res): Promise<void> => {
           );
         }
 
-        /* Refund at the HISTORICAL price the customer actually paid (from
-           sale_items), not the current product.price. Falls back to
-           product.price only if the sale_items row is missing. */
-        const [saleItem] = await tx
-          .select({ price: saleItemsTable.price })
-          .from(saleItemsTable)
-          .where(and(
-            eq(saleItemsTable.saleId, billId),
-            eq(saleItemsTable.productId, pid),
-          ))
-          .limit(1);
+        /* Refund the NET amount the customer actually paid for these units.
+           `gross` is the pre-bill-discount line total; scale it by the bill's
+           net ratio so any ORDER-LEVEL discount (bills.discountAmount) is
+           passed through to the refund. Without this, returning units from a
+           discounted bill would refund MORE than the customer paid.
 
-        const unitPrice = saleItem ? Number(saleItem.price) : Number(product.price);
-        if (!saleItem) {
-          logger.warn(
-            { billId, productId: pid },
-            "Return: no sale_items row found for this bill+product, falling back to current product.price for refund",
-          );
-        }
+             billSubtotal = totalAmount + discountAmount   (checkout invariant)
+             netRatio     = totalAmount / billSubtotal      (≤ 1)
+             netPerUnit   = gross / sold * netRatio
+             refund       = netPerUnit * qty                (rounded to paise)
 
-        const refundAmount = unitPrice * qty;
+           discountAmount was backfilled for all historical bills by migration
+           0014, so old bills refund correctly too. No discount → ratio 1. */
+        const billTotal    = Number(bill.totalAmount);
+        const billDiscount = Number(bill.discountAmount ?? 0);
+        const billSubtotal = billTotal + billDiscount;
+        const netRatio     = billSubtotal > 0 ? billTotal / billSubtotal : 1;
+        const netPerUnit   = sold > 0 ? (gross / sold) * netRatio : Number(product.price);
+        const refundAmount = Math.round(netPerUnit * qty * 100) / 100;
         totalRefund += refundAmount;
 
         const [ret] = await tx
@@ -201,6 +219,17 @@ router.post("/returns", async (req, res): Promise<void> => {
           .set({ stock: sql`${productsTable.stock} + ${qty}` })
           .where(eq(productsTable.id, pid))
           .returning({ stock: productsTable.stock });
+
+        /* Keep the stock-movement history complete: without this row the
+           Logs page and stock reports can't explain the restock. RETURN (not
+           IN) so supplier purchase reports don't count it as a purchase. */
+        await tx.insert(stockLogsTable).values({
+          tenantId:  product.tenantId,
+          productId: pid,
+          type:      "RETURN",
+          quantity:  qty,
+          userId:    req.staffId ?? null,
+        });
 
         stockEvents.push({
           productId:   pid,

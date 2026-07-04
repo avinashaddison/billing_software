@@ -43,6 +43,13 @@ export const saleItemsTable = pgTable(
     /** Raw value the cashier typed (e.g. 10 for "10%" or 50 for "₹50"). */
     discountValue:   numeric("discount_value", { precision: 15, scale: 2 }),
     subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),
+    /**
+     * Cost-price snapshot at sale time (products.purchase_price when the
+     * bill was raised). Profit reports use this so later cost edits don't
+     * rewrite history. NULL on manual lines and on rows sold before the
+     * column existed — reports fall back to the product's current cost.
+     */
+    purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

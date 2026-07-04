@@ -104,6 +104,7 @@ export const StockLogType = {
   IN: "IN",
   OUT: "OUT",
   ADJUSTMENT: "ADJUSTMENT",
+  RETURN: "RETURN",
 } as const;
 
 export interface StockLog {
@@ -335,6 +336,7 @@ export const ListStockLogsType = {
   IN: "IN",
   OUT: "OUT",
   ADJUSTMENT: "ADJUSTMENT",
+  RETURN: "RETURN",
 } as const;
 
 export type ListSalesParams = {

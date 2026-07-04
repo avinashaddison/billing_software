@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 export type LineDiscountType = "percent" | "amount";
 
@@ -115,6 +116,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveToStorage(items);
   }, [items]);
+
+  /* ── Clear the in-memory cart on logout ────────────────────────────
+     CartProvider wraps the whole app (it doesn't unmount on logout), so
+     without this the previous user's cart would still be in memory when a
+     different shop signs in on the same device. logout() also clears the
+     localStorage copy; this covers the live state. */
+  const isLoggedIn = useAuth((s) => s.isLoggedIn);
+  const prevLoggedIn = useRef(isLoggedIn);
+  useEffect(() => {
+    if (prevLoggedIn.current && !isLoggedIn) setItems([]);
+    prevLoggedIn.current = isLoggedIn;
+  }, [isLoggedIn]);
 
   /* ── On mount: load any in-progress cart from the server ───────────
      This lets a PC open the Ongoing Checkout page and see what mobile

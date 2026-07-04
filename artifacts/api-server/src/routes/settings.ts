@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { sql, isNull, eq, and } from "drizzle-orm";
 import { db, storeSettingsTable } from "@workspace/db";
+import { requireWrite } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -41,7 +42,7 @@ router.get("/settings", async (req, res): Promise<void> => {
   res.json({ data: row.data, updatedAt: row.updatedAt });
 });
 
-router.put("/settings", async (req, res): Promise<void> => {
+router.put("/settings", requireWrite("settings"), async (req, res): Promise<void> => {
   const data = req.body;
   if (!data || typeof data !== "object") {
     res.status(400).json({ error: "Body must be a JSON object" });

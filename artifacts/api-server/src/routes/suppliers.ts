@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { db, suppliersTable, supplierPaymentsTable } from "@workspace/db";
+import { db, suppliersTable, supplierPaymentsTable, productsTable, stockLogsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
-import { requireAdmin } from "../middlewares/auth";
+import { requireAdmin, requireWrite } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -67,7 +67,7 @@ router.get("/supplier-payments", async (req, res): Promise<void> => {
   res.json(rows.map((r) => ({ ...r, amount: Number(r.amount) })));
 });
 
-router.post("/suppliers", async (req, res): Promise<void> => {
+router.post("/suppliers", requireWrite("suppliers"), async (req, res): Promise<void> => {
   const { name, contact, email, phone, address, notes } = req.body;
   if (!name || typeof name !== "string" || !name.trim()) {
     res.status(400).json({ error: "name is required" });
@@ -94,8 +94,8 @@ router.get("/suppliers/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.patch("/suppliers/:id", async (req, res): Promise<void> => {
-  const { id } = req.params;
+router.patch("/suppliers/:id", requireWrite("suppliers"), async (req, res): Promise<void> => {
+  const id = String(req.params.id);
   const { name, contact, email, phone, address, notes } = req.body;
   const updates: Record<string, unknown> = {};
   if (name != null) updates.name = name;
@@ -116,8 +116,8 @@ router.patch("/suppliers/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.delete("/suppliers/:id", async (req, res): Promise<void> => {
-  const { id } = req.params;
+router.delete("/suppliers/:id", requireWrite("suppliers"), async (req, res): Promise<void> => {
+  const id = String(req.params.id);
   const [row] = await db
     .delete(suppliersTable)
     .where(and(
@@ -127,6 +127,102 @@ router.delete("/suppliers/:id", async (req, res): Promise<void> => {
     .returning();
   if (!row) { res.status(404).json({ error: "Supplier not found" }); return; }
   res.sendStatus(204);
+});
+
+/* ───── Supplier purchase report ─────
+ * For every product currently linked to the supplier: units purchased (IN)
+ * and sold (OUT) within a calendar-day range, current stock, and purchase
+ * value. Supplier attribution is the product's CURRENT supplierId — stock
+ * logs don't record a supplier, so history follows the product's link.
+ * Days are Asia/Kolkata calendar days, matching the reports endpoints. */
+router.get("/suppliers/:id/report", async (req, res): Promise<void> => {
+  const { id } = req.params;
+  const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const todayIndia = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const from = isDay(req.query.from) ? req.query.from : todayIndia;
+  const to   = isDay(req.query.to)   ? req.query.to   : from;
+  if (from > to) {
+    res.status(400).json({ error: "'from' must not be after 'to'" });
+    return;
+  }
+
+  const [supplier] = await db
+    .select()
+    .from(suppliersTable)
+    .where(and(
+      eq(suppliersTable.id, id),
+      tenantWhere(suppliersTable.tenantId, req.tenantId),
+    ));
+  if (!supplier) { res.status(404).json({ error: "Supplier not found" }); return; }
+
+  const inRange = sql`DATE(${stockLogsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') BETWEEN ${from} AND ${to}`;
+
+  const [products, [payments]] = await Promise.all([
+    db
+      .select({
+        id:            productsTable.id,
+        name:          productsTable.name,
+        sku:           productsTable.sku,
+        stock:         productsTable.stock,
+        purchasePrice: productsTable.purchasePrice,
+        purchasedQty:  sql<number>`COALESCE(SUM(CASE WHEN ${stockLogsTable.type} = 'IN'  THEN ${stockLogsTable.quantity} END), 0)::int`.as("purchased_qty"),
+        soldQty:       sql<number>`COALESCE(SUM(CASE WHEN ${stockLogsTable.type} = 'OUT' THEN ${stockLogsTable.quantity} END), 0)::int`.as("sold_qty"),
+        /* Last stock-IN ever (not range-limited — the join above is), falling
+           back to the product's creation date for rows whose opening stock was
+           typed in at product entry and never logged as an IN. */
+        entryDate:     sql<string>`COALESCE((SELECT MAX(sl.created_at) FROM stock_logs sl WHERE sl.product_id = ${productsTable.id} AND sl.type = 'IN'), ${productsTable.createdAt})`.as("entry_date"),
+      })
+      .from(productsTable)
+      .leftJoin(stockLogsTable, and(
+        eq(stockLogsTable.productId, productsTable.id),
+        tenantWhere(stockLogsTable.tenantId, req.tenantId),
+        inRange,
+      ))
+      .where(and(
+        eq(productsTable.supplierId, id),
+        tenantWhere(productsTable.tenantId, req.tenantId),
+      ))
+      .groupBy(productsTable.id)
+      .orderBy(
+        desc(sql`COALESCE(SUM(CASE WHEN ${stockLogsTable.type} = 'IN' THEN ${stockLogsTable.quantity} END), 0)`),
+        productsTable.name,
+      ),
+    db
+      .select({
+        paidInRange:  sql<string>`COALESCE(SUM(${supplierPaymentsTable.amount}), 0)`,
+        paymentCount: sql<number>`COUNT(*)::int`,
+      })
+      .from(supplierPaymentsTable)
+      .where(and(
+        eq(supplierPaymentsTable.supplierId, id),
+        tenantWhere(supplierPaymentsTable.tenantId, req.tenantId),
+        sql`DATE(${supplierPaymentsTable.paidAt} AT TIME ZONE 'Asia/Kolkata') BETWEEN ${from} AND ${to}`,
+      )),
+  ]);
+
+  const rows = products.map((p) => {
+    const purchasePrice = p.purchasePrice != null ? Number(p.purchasePrice) : null;
+    return {
+      ...p,
+      purchasePrice,
+      purchaseValue: purchasePrice != null ? p.purchasedQty * purchasePrice : null,
+    };
+  });
+
+  res.json({
+    supplier: { id: supplier.id, name: supplier.name, phone: supplier.phone, address: supplier.address },
+    from,
+    to,
+    products: rows,
+    totals: {
+      purchasedQty:  rows.reduce((s, p) => s + p.purchasedQty, 0),
+      soldQty:       rows.reduce((s, p) => s + p.soldQty, 0),
+      currentStock:  rows.reduce((s, p) => s + p.stock, 0),
+      purchaseValue: rows.reduce((s, p) => s + (p.purchaseValue ?? 0), 0),
+      paidInRange:   Number(payments?.paidInRange ?? 0),
+      paymentCount:  payments?.paymentCount ?? 0,
+    },
+  });
 });
 
 /* ───── Supplier payment history ─────

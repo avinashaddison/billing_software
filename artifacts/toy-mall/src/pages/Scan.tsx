@@ -661,6 +661,10 @@ export default function Scan() {
   const [mode, setMode]               = useState<PageMode>("billing");
   const [manualSku, setManualSku]     = useState("");
   const [checking, setChecking]       = useState(false);
+  /* Synchronous double-submit guard — `checking` state re-renders a frame late
+     and the offline path doesn't set it, so a fast double-tap could otherwise
+     create two bills / two queued bills. */
+  const submittingRef                 = useRef(false);
   const [lookupSku, setLookupSku]     = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(true);
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
@@ -803,6 +807,8 @@ export default function Scan() {
 
   const handleConfirmCheckout = async (paymentMode: PaymentMode, customerPhone: string, customerName: string) => {
     if (!items.length) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     /* ── Offline: queue the bill locally, sync later ── */
     if (!isOnline) {
@@ -817,6 +823,9 @@ export default function Scan() {
       playCheckoutSuccess();
       clearCart();
       setShowModal(false);
+      /* Cart clears asynchronously — brief cooldown so a rapid second tap
+         can't re-queue the same stale cart. */
+      setTimeout(() => { submittingRef.current = false; }, 800);
       return;
     }
 
@@ -833,6 +842,7 @@ export default function Scan() {
       toast.error(err.message || "Checkout failed");
     } finally {
       setChecking(false);
+      submittingRef.current = false;
     }
   };
 

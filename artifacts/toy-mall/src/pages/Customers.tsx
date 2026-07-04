@@ -643,6 +643,15 @@ export default function Customers() {
 
   useEffect(() => { fetchCustomers(period); }, [period, fetchCustomers]);
 
+  /* Live refresh: a new bill, a payment, or a return changes outstanding
+     balances. use-realtime bridges those SSE events to this window event so
+     the customer list (and its receivables) don't go stale. */
+  useEffect(() => {
+    const onChange = () => fetchCustomers(period);
+    window.addEventListener("addison:bills-changed", onChange);
+    return () => window.removeEventListener("addison:bills-changed", onChange);
+  }, [period, fetchCustomers]);
+
   const openCustomer = useCallback(async (phone: string) => {
     setDetailLoading(true);
     try {

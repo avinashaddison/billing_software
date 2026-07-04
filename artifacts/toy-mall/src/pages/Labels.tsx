@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Tag, Printer, Loader2, Search, Check, Package, Eye, Plus, Minus, Info, DollarSign, Ruler, X, ZoomIn, Filter } from "lucide-react";
+import { Tag, Printer, Loader2, Search, Check, Package, Eye, Plus, Minus, Info, DollarSign, Ruler, X, ZoomIn, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LabelCard, type LabelProduct as Product } from "@/components/ui/LabelCard";
 import { getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
@@ -27,6 +27,7 @@ export default function Labels() {
   const [stockFilter, setStockFilter] = useState<"all" | "in" | "low" | "out">("all");
   const [addedDateFilter, setAddedDateFilter] = useState<string>("");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
@@ -88,6 +89,23 @@ export default function Labels() {
 
     return matchesSearch && matchesCategory && matchesStock && matchesDate && matchesSupplier;
   });
+
+  /* ── Pagination (50 per page) ── */
+  const PAGE_SIZE  = 50;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Any filter change jumps back to page 1 so results are never hidden
+  // on a now-out-of-range page.
+  useEffect(() => {
+    setPage(1);
+  }, [search, categoryFilter, stockFilter, addedDateFilter, supplierFilter]);
+
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0 });
+  }, [safePage]);
 
   const getDefaultCopies = (id: string) => {
     const p = products.find((x) => x.id === id);
@@ -415,7 +433,7 @@ export default function Labels() {
         )}
 
         {/* ── Product list ── */}
-        <div className="flex-1 overflow-y-auto pb-24 md:pb-6">
+        <div ref={listRef} className="flex-1 overflow-y-auto pb-24 md:pb-6">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -427,7 +445,7 @@ export default function Labels() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {filtered.map((p) => {
+              {paged.map((p) => {
                 const isSelected = selected.has(p.id);
                 const hex = getCategoryHex(p.category);
                 const emoji = getCategoryEmoji(p.category);
@@ -491,6 +509,36 @@ export default function Labels() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* ── Pagination ── */}
+          {!loading && filtered.length > 0 && (
+            <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-4 border-t">
+              <p className="text-xs font-bold text-muted-foreground">
+                {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} products
+              </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(safePage - 1)}
+                    disabled={safePage <= 1}
+                    className="flex items-center gap-1 px-3 h-8 rounded-full bg-muted text-xs font-bold hover:bg-muted/70 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" /> Prev
+                  </button>
+                  <span className="text-xs font-black tabular-nums px-1">
+                    {safePage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage(safePage + 1)}
+                    disabled={safePage >= totalPages}
+                    className="flex items-center gap-1 px-3 h-8 rounded-full bg-muted text-xs font-bold hover:bg-muted/70 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                  >
+                    Next <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

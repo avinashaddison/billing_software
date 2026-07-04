@@ -316,6 +316,12 @@ export default function Suppliers() {
                             {payCount > 0 ? <>₹{inr(totalPaid)} paid</> : <>Payments</>}
                             <ChevronDown className={`w-3 h-3 transition-transform ${isPayOpen ? "rotate-180" : ""}`} />
                           </button>
+                          <Link
+                            href={`/suppliers/report?supplier=${s.id}`}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-all"
+                          >
+                            <FileText className="w-3 h-3" /> Report
+                          </Link>
                         </div>
                         <div className="pl-10 space-y-0.5">
                           {s.contact  && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><FileText className="w-3 h-3" /> {s.contact}</p>}

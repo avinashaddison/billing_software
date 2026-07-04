@@ -509,6 +509,11 @@ export default function Checkout() {
    * because this is an auxiliary convenience, not core checkout flow. */
   const [lookingUp, setLookingUp] = useState(false);
   const [loading, setLoading] = useState(false);
+  /* Synchronous in-flight guard. `loading` state alone can't prevent a fast
+     double-tap (React commits it a frame later), and the offline path never
+     sets loading at all — so a double submit could create two bills / two
+     queued bills. This ref flips instantly and is checked at handler entry. */
+  const submittingRef = useRef(false);
   const [successBillId, setSuccessBillId] = useState<string | null>(null);
 
   /* Customer (default) vs Supplier mode. In Supplier mode the grand total is
@@ -645,6 +650,8 @@ export default function Checkout() {
       if (!supplierId) { toast.error("Select a supplier first"); playError(); return; }
       if (finalTotal <= 0) { toast.error("Add items or an amount first"); playError(); return; }
       if (!isOnline) { toast.error("Supplier payments need an internet connection"); return; }
+      if (submittingRef.current) return;
+      submittingRef.current = true;
       setLoading(true);
       try {
         const method = paymentModeRef.current === "upi" ? "upi" : "cash";
@@ -663,6 +670,7 @@ export default function Checkout() {
         toast.error((e as Error).message || "Failed to record supplier payment");
       } finally {
         setLoading(false);
+        submittingRef.current = false;
       }
       return;
     }
@@ -680,6 +688,10 @@ export default function Checkout() {
       return;
     }
 
+    /* Committed to submitting — block re-entry from a double-tap. */
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     if (!isOnline) {
       enqueue({
         items: buildCheckoutItems(),
@@ -693,6 +705,10 @@ export default function Checkout() {
       });
       playCheckoutSuccess();
       clearCart();
+      /* Short cooldown before re-arming: the cart is cleared asynchronously,
+         so a rapid second tap could otherwise re-queue the same (stale) cart
+         before the button's disabled state re-renders. */
+      setTimeout(() => { submittingRef.current = false; }, 800);
       return;
     }
 
@@ -714,6 +730,7 @@ export default function Checkout() {
       toast.error((err as Error).message || "Checkout failed");
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 

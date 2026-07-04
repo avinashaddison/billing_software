@@ -14,7 +14,7 @@
  */
 import type { Request, Response, NextFunction } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, authUsersTable, staffProfilesTable, authSessionsTable } from "@workspace/db";
+import { db, authUsersTable, staffProfilesTable, authSessionsTable, staffPermissionsTable } from "@workspace/db";
 import { clientMeta, createSession } from "../lib/sessions";
 import { logger } from "../lib/logger";
 import { TENANT_COOKIE_NAME, signTenantCookie, tenantCookieOptions } from "./tenant";
@@ -202,4 +202,55 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
   } catch {
     res.status(500).json({ error: "Authorization check failed" });
   }
+}
+
+/* ───── per-resource WRITE gate ─────
+ *
+ * Enforces the SAME permission model the SPA uses, but on the server, so a
+ * restricted staff account can't bypass the UI and mutate data by calling the
+ * API directly. Grants write when:
+ *   - email user with role owner/admin (admins have full access; email
+ *     manager/cashier accounts have no per-resource map and the SPA already
+ *     shows them nothing, so they get no write), OR
+ *   - PIN staff with role 'owner', OR
+ *   - PIN staff whose staff_permissions[resource] === 'write'.
+ * Everyone else gets 403. Apply as route middleware:
+ *   router.post("/products", requireWrite("products"), handler)
+ */
+export function requireWrite(resource: string) {
+  return async function (req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (req.authKind === "email" && req.userId) {
+        const [me] = await db
+          .select({ role: authUsersTable.role, isActive: authUsersTable.isActive })
+          .from(authUsersTable)
+          .where(eq(authUsersTable.id, req.userId));
+        if (!me || !me.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
+        if (me.role === "owner" || me.role === "admin") { next(); return; }
+        res.status(403).json({ error: `No permission to modify ${resource}` });
+        return;
+      }
+      if (req.staffId) {
+        const [me] = await db
+          .select({ role: staffProfilesTable.role, isActive: staffProfilesTable.isActive })
+          .from(staffProfilesTable)
+          .where(eq(staffProfilesTable.id, req.staffId));
+        if (!me || !me.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
+        if (me.role === "owner") { next(); return; }
+        const [perm] = await db
+          .select({ level: staffPermissionsTable.level })
+          .from(staffPermissionsTable)
+          .where(and(
+            eq(staffPermissionsTable.staffId, req.staffId),
+            eq(staffPermissionsTable.resource, resource),
+          ));
+        if (perm?.level === "write") { next(); return; }
+        res.status(403).json({ error: `No permission to modify ${resource}` });
+        return;
+      }
+      res.status(401).json({ error: "Not authenticated" });
+    } catch {
+      res.status(500).json({ error: "Authorization check failed" });
+    }
+  };
 }

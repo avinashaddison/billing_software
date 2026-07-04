@@ -1,8 +1,33 @@
 import { schedule } from "node-cron";
-import { sql, desc } from "drizzle-orm";
-import { db, billsTable, saleItemsTable, productsTable } from "@workspace/db";
+import { sql, desc, and, or, lt, isNotNull } from "drizzle-orm";
+import { db, billsTable, saleItemsTable, productsTable, authSessionsTable } from "@workspace/db";
 import { sendDailySalesSummary } from "./telegram";
 import { logger } from "./logger";
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Prune the auth_sessions table so it doesn't grow unbounded (every login and
+ * every legacy-cookie upgrade inserts a row, and every request reads it).
+ * Deletes:
+ *   - sessions revoked more than 30 days ago (the device is long gone), and
+ *   - sessions not seen in 400 days (past the 365-day cookie lifetime, so the
+ *     cookie is already dead — deleting the row can't log anyone out early).
+ * Active, in-use sessions are never touched.
+ */
+export async function cleanupStaleSessions(): Promise<void> {
+  const revokedCutoff = new Date(Date.now() - 30 * DAY_MS);
+  const staleCutoff   = new Date(Date.now() - 400 * DAY_MS);
+  try {
+    await db.delete(authSessionsTable).where(or(
+      and(isNotNull(authSessionsTable.revokedAt), lt(authSessionsTable.revokedAt, revokedCutoff)),
+      lt(authSessionsTable.lastSeenAt, staleCutoff),
+    ));
+    logger.info("auth_sessions cleanup complete");
+  } catch (err) {
+    logger.error({ err }, "auth_sessions cleanup failed");
+  }
+}
 
 async function fetchDailySummary(dateStr: string) {
   const [salesSummary] = await db
@@ -63,6 +88,13 @@ export function startDailyReportScheduler(): void {
   schedule(cronExpr, () => {
     runDailyReport().catch((err) =>
       logger.error({ err }, "Failed to send daily sales summary")
+    );
+  }, { timezone: "Asia/Kolkata" });
+
+  /* Nightly session-table cleanup at 03:15 IST (low-traffic window). */
+  schedule("15 3 * * *", () => {
+    cleanupStaleSessions().catch((err) =>
+      logger.error({ err }, "Failed to clean up auth_sessions")
     );
   }, { timezone: "Asia/Kolkata" });
 }

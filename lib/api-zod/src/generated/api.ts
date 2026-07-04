@@ -217,7 +217,7 @@ export const UpdateStockResponse = zod.object({
     productId: zod.string(),
     productName: zod.string(),
     productSku: zod.string(),
-    type: zod.enum(["IN", "OUT", "ADJUSTMENT"]),
+    type: zod.enum(["IN", "OUT", "ADJUSTMENT", "RETURN"]),
     quantity: zod.number(),
     userId: zod.string().nullish(),
     createdAt: zod.string(),
@@ -257,7 +257,7 @@ export const listStockLogsQueryOffsetDefault = 0;
 export const ListStockLogsQueryParams = zod.object({
   productId: zod.coerce.string().optional().describe("Filter by product ID"),
   type: zod
-    .enum(["IN", "OUT", "ADJUSTMENT"])
+    .enum(["IN", "OUT", "ADJUSTMENT", "RETURN"])
     .optional()
     .describe("Filter by log type"),
   today: zod.coerce
@@ -279,7 +279,7 @@ export const ListStockLogsResponseItem = zod.object({
   productId: zod.string(),
   productName: zod.string(),
   productSku: zod.string(),
-  type: zod.enum(["IN", "OUT", "ADJUSTMENT"]),
+  type: zod.enum(["IN", "OUT", "ADJUSTMENT", "RETURN"]),
   quantity: zod.number(),
   userId: zod.string().nullish(),
   createdAt: zod.string(),

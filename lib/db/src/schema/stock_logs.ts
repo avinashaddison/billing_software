@@ -12,7 +12,9 @@ export const stockLogsTable = pgTable(
     productId: uuid("product_id")
       .notNull()
       .references(() => productsTable.id),
-    type: text("type", { enum: ["IN", "OUT", "ADJUSTMENT"] }).notNull(),
+    /** RETURN = customer return restock — kept distinct from IN so supplier
+     *  purchase reports don't count returned goods as purchases. */
+    type: text("type", { enum: ["IN", "OUT", "ADJUSTMENT", "RETURN"] }).notNull(),
     quantity: integer("quantity").notNull(),
     userId: text("user_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

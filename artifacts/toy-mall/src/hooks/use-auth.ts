@@ -67,8 +67,16 @@ export const useAuth = create<AuthState>()(
         });
         /* Drop the persisted store-settings cache so the next sign-in (possibly
            a different tenant on the same browser) hydrates from scratch
-           instead of flashing the previous tenant's name/logo/etc. */
-        try { localStorage.removeItem("toy-mall-store-settings-v1"); } catch { /* ignore */ }
+           instead of flashing the previous tenant's name/logo/etc.
+           Also drop the cart and the offline-bill queue: these are NOT
+           tenant-scoped keys, so on a shared device they would otherwise leak
+           one shop's cart into the next shop's session (and the offline queue
+           could sync bills under the wrong account). */
+        try {
+          localStorage.removeItem("toy-mall-store-settings-v1");
+          localStorage.removeItem("toy-mall-cart");
+          localStorage.removeItem("hira-sons-offline-queue-v1");
+        } catch { /* ignore */ }
       },
     }),
     { name: "toy-mall-auth-v2" }

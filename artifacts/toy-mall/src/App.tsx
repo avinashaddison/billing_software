@@ -27,6 +27,7 @@ import Profile        from "@/pages/Profile";
 import Bill           from "@/pages/Bill";
 import Billing        from "@/pages/Billing";
 import Suppliers      from "@/pages/Suppliers";
+import SupplierReport from "@/pages/SupplierReport";
 import Customers      from "@/pages/Customers";
 import Report         from "@/pages/Report";
 import Labels         from "@/pages/Labels";
@@ -208,6 +209,7 @@ function Router() {
             <Route path="/billing"      component={() => <Protected resource="billing"><Billing /></Protected>} />
             <Route path="/bill/:id"     component={() => <Protected resource="billing"><Bill /></Protected>} />
             <Route path="/suppliers"    component={() => <Protected resource="suppliers"><Suppliers /></Protected>} />
+            <Route path="/suppliers/report" component={() => <Protected resource="suppliers"><SupplierReport /></Protected>} />
             <Route path="/customers"    component={() => <Protected resource="customers"><Customers /></Protected>} />
             <Route path="/report"       component={() => <Protected resource="reports"><Report /></Protected>} />
             <Route path="/labels"       component={() => <Protected resource="labels"><Labels /></Protected>} />

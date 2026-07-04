@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "../lib/logger";
+import { requireAdmin } from "../middlewares/auth";
 
 const router: IRouter = Router();
 const exec = promisify(execFile);
@@ -86,8 +87,10 @@ async function checkForUpdates(): Promise<CheckResult> {
   }
 }
 
-/* ───── GET /api/updates/check ───── */
-router.get("/updates/check", async (req, res): Promise<void> => {
+/* ───── GET /api/updates/check ─────
+ * Admin-only: this spawns `git fetch`, and /install below runs a full
+ * pull+install+schema-push+build. A non-owner must never reach either. */
+router.get("/updates/check", requireAdmin, async (req, res): Promise<void> => {
   const force = req.query.force === "1";
   if (!force && cached && Date.now() - cachedAt < CACHE_MS) {
     res.json(cached); return;
@@ -129,7 +132,7 @@ async function runStep(stage: InstallStage, cmd: string, args: string[]): Promis
 }
 
 /* ───── POST /api/updates/install — run update.bat steps in sequence ───── */
-router.post("/updates/install", async (_req, res): Promise<void> => {
+router.post("/updates/install", requireAdmin, async (_req, res): Promise<void> => {
   if (installState.stage !== "idle" && installState.stage !== "done" && installState.stage !== "failed") {
     res.status(409).json({ error: "An update is already running", state: installState });
     return;

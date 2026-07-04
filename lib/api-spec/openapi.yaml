@@ -265,7 +265,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [IN, OUT, ADJUSTMENT]
+            enum: [IN, OUT, ADJUSTMENT, RETURN]
           description: Filter by log type
         - name: today
           in: query
@@ -669,7 +669,7 @@ components:
           type: string
         type:
           type: string
-          enum: [IN, OUT, ADJUSTMENT]
+          enum: [IN, OUT, ADJUSTMENT, RETURN]
         quantity:
           type: integer
         userId:

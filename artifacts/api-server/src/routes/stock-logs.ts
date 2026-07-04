@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { db, stockLogsTable, productsTable } from "@workspace/db";
 import { ListStockLogsQueryParams } from "@workspace/api-zod";
 import { tenantWhere } from "../lib/tenant";
+import { istToday } from "../lib/ist";
 
 const router: IRouter = Router();
 
@@ -19,9 +20,8 @@ router.get("/stock-logs", async (req, res): Promise<void> => {
   if (productId) conditions.push(eq(stockLogsTable.productId, productId));
   if (type) conditions.push(eq(stockLogsTable.type, type));
   if (today) {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    conditions.push(gte(stockLogsTable.createdAt, todayStart));
+    // IST business day, matching the dashboard counters and reports.
+    conditions.push(sql`DATE(${stockLogsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${istToday()}`);
   }
 
   const rows = await db

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { format, isToday, isThisWeek } from "date-fns";
 import {
@@ -57,8 +57,8 @@ export default function Billing() {
   const [party, setParty]       = useState<Party>("all");
   const [search, setSearch]     = useState("");
 
-  useEffect(() => {
-    Promise.all([
+  const load = useCallback(() => {
+    return Promise.all([
       fetch(`${BASE_URL}/api/bills`).then((r) => (r.ok ? r.json() : [])),
       fetch(`${BASE_URL}/api/supplier-payments`).then((r) => (r.ok ? r.json() : [])),
     ])
@@ -69,6 +69,21 @@ export default function Billing() {
       .catch(() => { setBills([]); setPayments([]); })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  /* Live refresh: a sale, payment, return, or supplier payment elsewhere in
+     the app broadcasts an SSE event that use-realtime bridges to these window
+     events. Without this the history would stay stale until a manual reload. */
+  useEffect(() => {
+    const onChange = () => { void load(); };
+    window.addEventListener("addison:bills-changed", onChange);
+    window.addEventListener("addison:suppliers-changed", onChange);
+    return () => {
+      window.removeEventListener("addison:bills-changed", onChange);
+      window.removeEventListener("addison:suppliers-changed", onChange);
+    };
+  }, [load]);
 
   /* ── Stats (customer sales = revenue only; supplier payments are money out) ── */
   const todayBills   = bills.filter((b) => isToday(new Date(b.createdAt)));

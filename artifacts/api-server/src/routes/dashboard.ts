@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { lte, sql, gte, and, desc, eq, gt } from "drizzle-orm";
 import { db, productsTable, stockLogsTable, billsTable, returnsTable } from "@workspace/db";
 import { tenantWhere } from "../lib/tenant";
+import { istToday } from "../lib/ist";
 
 const router: IRouter = Router();
 
@@ -16,8 +17,7 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     .from(productsTable)
     .where(tenantWhere(productsTable.tenantId, req.tenantId));
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const today = istToday();
 
   const [todayActivity] = await db
     .select({
@@ -26,7 +26,7 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     })
     .from(stockLogsTable)
     .where(and(
-      gte(stockLogsTable.createdAt, todayStart),
+      sql`DATE(${stockLogsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${today}`,
       tenantWhere(stockLogsTable.tenantId, req.tenantId),
     ));
 
@@ -54,8 +54,7 @@ router.get("/dashboard/low-stock", async (req, res): Promise<void> => {
 });
 
 router.get("/dashboard/today-activity", async (req, res): Promise<void> => {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const today = istToday();
 
   const [activity] = await db
     .select({
@@ -66,7 +65,7 @@ router.get("/dashboard/today-activity", async (req, res): Promise<void> => {
     })
     .from(stockLogsTable)
     .where(and(
-      gte(stockLogsTable.createdAt, todayStart),
+      sql`DATE(${stockLogsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${today}`,
       tenantWhere(stockLogsTable.tenantId, req.tenantId),
     ));
 

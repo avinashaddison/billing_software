@@ -410,7 +410,8 @@ function OverviewTab({
     <>
       {/* Hero KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="Revenue"     accent="green"  icon={IndianRupee} value={fmt(eod.totalAmount)}  delta={deltaRev}   deltaLbl="vs yest" />
+        <Kpi label="Revenue"     accent="green"  icon={IndianRupee} value={fmt(eod.totalAmount)}  delta={deltaRev}   deltaLbl="vs yest"
+          hint={eod.returnsTotal > 0 ? `net ${fmt(eod.totalAmount - eod.returnsTotal)} after returns` : undefined} />
         <Kpi label="Profit"      accent="teal"   icon={TrendingUp}  value={fmt(eod.grossProfit)}  hint={eod.profitCoverage > 0 ? `${eod.margin.toFixed(0)}% margin` : "set cost prices for margin"} />
         <Kpi label="Bills"       accent="blue"   icon={FileText}    value={fmt2(eod.billCount)}   delta={deltaBills} deltaLbl="vs yest" />
         <Kpi label="Customers"   accent="purple" icon={Users}       value={fmt2(eod.uniqueCustomers)} hint={`${fmt2(eod.itemsSold)} items sold`} />

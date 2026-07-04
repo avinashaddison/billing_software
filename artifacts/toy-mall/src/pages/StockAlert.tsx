@@ -27,7 +27,7 @@ interface Product {
   lowStockThreshold: number;
   imageUrl:          string | null;
 }
-type MovementType = "IN" | "OUT" | "ADJUSTMENT";
+type MovementType = "IN" | "OUT" | "ADJUSTMENT" | "RETURN";
 interface StockLog {
   id:          string;
   productId:   string;
@@ -332,10 +332,10 @@ export default function StockAlert() {
                             <p className={`font-black text-sm tabular-nums ${
                               isIn ? "text-emerald-600 dark:text-emerald-400" : isOut ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"
                             }`}>
-                              {isIn ? "+" : isOut ? "−" : "±"}{l.quantity}
+                              {isIn || l.type === "RETURN" ? "+" : isOut ? "−" : "±"}{l.quantity}
                             </p>
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              {l.type === "ADJUSTMENT" ? "Adjust" : l.type === "IN" ? "Stock In" : "Sold"}
+                              {l.type === "ADJUSTMENT" ? "Adjust" : l.type === "IN" ? "Stock In" : l.type === "RETURN" ? "Return" : "Sold"}
                             </p>
                           </div>
                         </div>

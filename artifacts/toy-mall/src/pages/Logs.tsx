@@ -3,7 +3,7 @@ import { useListStockLogs, getListStockLogsQueryKey } from "@workspace/api-clien
 import { format } from "date-fns";
 import {
   Clock, ArrowDownToLine, ArrowUpToLine, Settings2,
-  Receipt, ShoppingBag, ChevronRight,
+  Receipt, ShoppingBag, ChevronRight, Undo2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -153,25 +153,28 @@ export default function Logs() {
 
   const getLogIcon = (logType: string) => {
     switch (logType) {
-      case "IN":  return <ArrowDownToLine className="w-4 h-4 text-green-600 dark:text-green-400" />;
-      case "OUT": return <ArrowUpToLine className="w-4 h-4 text-red-600 dark:text-red-400" />;
-      default:    return <Settings2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
+      case "IN":     return <ArrowDownToLine className="w-4 h-4 text-green-600 dark:text-green-400" />;
+      case "OUT":    return <ArrowUpToLine className="w-4 h-4 text-red-600 dark:text-red-400" />;
+      case "RETURN": return <Undo2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
+      default:       return <Settings2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
     }
   };
 
   const getBadgeClass = (logType: string) => {
     switch (logType) {
-      case "IN":  return "text-green-700 bg-green-100 border-green-200 dark:text-green-400 dark:bg-green-900/30 dark:border-green-800";
-      case "OUT": return "text-red-700 bg-red-100 border-red-200 dark:text-red-400 dark:bg-red-900/30 dark:border-red-800";
-      default:    return "text-blue-700 bg-blue-100 border-blue-200 dark:text-blue-400 dark:bg-blue-900/30 dark:border-blue-800";
+      case "IN":     return "text-green-700 bg-green-100 border-green-200 dark:text-green-400 dark:bg-green-900/30 dark:border-green-800";
+      case "OUT":    return "text-red-700 bg-red-100 border-red-200 dark:text-red-400 dark:bg-red-900/30 dark:border-red-800";
+      case "RETURN": return "text-amber-700 bg-amber-100 border-amber-200 dark:text-amber-400 dark:bg-amber-900/30 dark:border-amber-800";
+      default:       return "text-blue-700 bg-blue-100 border-blue-200 dark:text-blue-400 dark:bg-blue-900/30 dark:border-blue-800";
     }
   };
 
   const getQtyColor = (logType: string) => {
     switch (logType) {
-      case "IN":  return "text-green-600 dark:text-green-400";
-      case "OUT": return "text-red-600 dark:text-red-400";
-      default:    return "text-blue-600 dark:text-blue-400";
+      case "IN":     return "text-green-600 dark:text-green-400";
+      case "OUT":    return "text-red-600 dark:text-red-400";
+      case "RETURN": return "text-amber-600 dark:text-amber-400";
+      default:       return "text-blue-600 dark:text-blue-400";
     }
   };
 
@@ -196,6 +199,7 @@ export default function Logs() {
                 <SelectItem value="ALL">All Activity</SelectItem>
                 <SelectItem value="IN">Stock IN</SelectItem>
                 <SelectItem value="OUT">Stock OUT</SelectItem>
+                <SelectItem value="RETURN">Returns</SelectItem>
                 <SelectItem value="ADJUSTMENT">Adjustments</SelectItem>
               </SelectContent>
             </Select>
@@ -286,7 +290,7 @@ export default function Logs() {
                           <p className="text-xs font-mono text-muted-foreground mt-0.5">{log.productSku}</p>
                         </div>
                         <div className={`flex items-center gap-1 font-black text-lg ${getQtyColor(log.type)}`}>
-                          {log.type === "IN" ? "+" : log.type === "OUT" ? "-" : ""}{log.quantity}
+                          {log.type === "IN" || log.type === "RETURN" ? "+" : log.type === "OUT" ? "-" : ""}{log.quantity}
                         </div>
                       </div>
                     </div>
@@ -312,7 +316,7 @@ export default function Logs() {
                         </Badge>
                       </div>
                       <div className={`w-24 text-right font-black text-lg ${getQtyColor(log.type)}`}>
-                        {log.type === "IN" ? "+" : log.type === "OUT" ? "-" : ""}{log.quantity}
+                        {log.type === "IN" || log.type === "RETURN" ? "+" : log.type === "OUT" ? "-" : ""}{log.quantity}
                       </div>
                       <div className="w-36 text-right text-sm text-muted-foreground font-medium">
                         {format(new Date(log.createdAt), "MMM d, h:mm a")}

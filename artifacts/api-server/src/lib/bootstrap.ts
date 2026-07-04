@@ -34,9 +34,13 @@ export async function bootstrapDefaultOwner(): Promise<void> {
       isActive: true,
     });
 
+    /* Do NOT log the actual PIN — logs may be shipped/retained, and the
+       default is a well-known constant from public source. The operator can
+       find the default in the deploy docs; the important signal here is that a
+       default account now exists and must be secured. */
     logger.warn(
-      { name: DEFAULT_OWNER_NAME, pin: DEFAULT_OWNER_PIN },
-      "Bootstrap: created default Owner. CHANGE THE PIN IMMEDIATELY in Staff Management.",
+      { name: DEFAULT_OWNER_NAME },
+      "Bootstrap: created default Owner with the documented default PIN. CHANGE THE PIN IMMEDIATELY in Staff Management.",
     );
   } catch (err) {
     // Never fail startup because of bootstrap — the DB might be unreachable

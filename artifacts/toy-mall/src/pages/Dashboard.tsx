@@ -398,6 +398,7 @@ export default function Dashboard() {
           value={summary?.totalProducts} loading={loadingSummary} testid="stat-total-products" />
         <StatCard title="Stock Value" icon={IndianRupee} accent="teal"
           value={summary ? `₹${Number(summary.totalStockValue).toLocaleString("en-IN", { maximumFractionDigits: 0 })}` : undefined}
+          subtitle="at selling price"
           loading={loadingSummary} testid="stat-stock-value" />
         <StatCard title="Today IN" icon={ArrowDownToLine} accent="green"
           value={activity?.inQuantity}

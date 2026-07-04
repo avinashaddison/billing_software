@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "wouter";
 import { ArrowLeft, ScanLine, Printer, RotateCcw, X, Minus, Plus, Check, Loader2, Share2 } from "lucide-react";
 import { toast } from "sonner";
@@ -94,6 +94,7 @@ function ReturnModal({ billId, items, onClose }: { billId: string; items: BillIt
     Object.fromEntries(returnableItems.map((i) => [i.id, i.quantity]))
   );
   const [processing, setProcessing] = useState(false);
+  const processingRef               = useRef(false);
   const [reason, setReason]         = useState("Customer return");
 
   const toggle = (id: string) =>
@@ -101,6 +102,10 @@ function ReturnModal({ billId, items, onClose }: { billId: string; items: BillIt
 
   const handleReturn = async () => {
     if (selected.size === 0) { toast.error("Select at least one item to return"); return; }
+    // Synchronous re-entry guard: `processing` state re-renders a frame late,
+    // so a fast double-tap could otherwise POST two returns for the same items.
+    if (processingRef.current) return;
+    processingRef.current = true;
     setProcessing(true);
     try {
       /* Build items using productId (not the sale-item id) */
@@ -121,7 +126,7 @@ function ReturnModal({ billId, items, onClose }: { billId: string; items: BillIt
       toast.success(`Return processed — ${refundStr}stock restocked`);
       onClose(true);
     } catch (e: any) { toast.error(e.message || "Return failed"); }
-    finally { setProcessing(false); }
+    finally { setProcessing(false); processingRef.current = false; }
   };
 
   return (
@@ -515,6 +520,15 @@ export default function Bill() {
           const totalSavings   = saleSavings + manualDiscount;
           const totalQty       = items.reduce((s, i) => s + i.quantity, 0);
           const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          /* GST breakdown. The rate is treated as INCLUSIVE — the grand total
+             already contains it — so we back it out of bill.totalAmount and
+             split evenly into CGST + SGST (intra-state). Shown only when the
+             shop has configured a non-zero rate. */
+          const gstRate  = Number(store.gstRatePercent ?? 0);
+          const showGst  = gstRate > 0;
+          const gstTaxable = showGst ? bill.totalAmount / (1 + gstRate / 100) : 0;
+          const gstAmount  = showGst ? bill.totalAmount - gstTaxable : 0;
+          const gstHalf    = gstRate / 2;
           return (
         <div className="receipt-print-only receipt-card mx-auto my-6 w-full max-w-sm bg-white shadow-2xl overflow-hidden text-black"
              style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
@@ -1002,6 +1016,25 @@ export default function Bill() {
                   <span>NET TOTAL</span>
                   <span className="text-right tabular-nums">₹{fmt(bill.totalAmount)}</span>
                 </div>
+
+                {/* ── GST breakdown (inclusive) ── */}
+                {showGst && (
+                  <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 leading-tight text-[10px] border-t border-dashed border-black/40 mt-1.5 pt-1.5">
+                    {store.gst && (
+                      <>
+                        <span className="text-black/70">GSTIN</span>
+                        <span className="text-right tabular-nums font-mono">{store.gst}</span>
+                      </>
+                    )}
+                    <span className="text-black/70">Taxable Value</span>
+                    <span className="text-right tabular-nums">₹{fmt(gstTaxable)}</span>
+                    <span className="text-black/70">CGST @ {gstHalf}%</span>
+                    <span className="text-right tabular-nums">₹{fmt(gstAmount / 2)}</span>
+                    <span className="text-black/70">SGST @ {gstHalf}%</span>
+                    <span className="text-right tabular-nums">₹{fmt(gstAmount / 2)}</span>
+                    <span className="col-span-2 text-[8.5px] italic text-black/60">(GST inclusive · total already contains ₹{fmt(gstAmount)} tax)</span>
+                  </div>
+                )}
               </div>
             </div>
 

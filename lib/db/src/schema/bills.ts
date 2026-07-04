@@ -22,8 +22,12 @@ export const billsTable = pgTable(
     /** Derived from amountPaid vs totalAmount but stored so the receivables
      *  query can hit a partial index instead of computing on every row. */
     paymentStatus: varchar("payment_status", { length: 10 }).notNull().default("paid"),
+    /** Raw value the cashier typed (e.g. 10 for "10%" or 50 for "₹50"). */
     discount:      numeric("discount", { precision: 10, scale: 2 }),
     discountType:  text("discount_type"),
+    /** The actual rupee discount applied (clamped, percent resolved against
+     *  the pre-discount subtotal). Reports MUST use this, not `discount`. */
+    discountAmount: numeric("discount_amount", { precision: 15, scale: 2 }),
     createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

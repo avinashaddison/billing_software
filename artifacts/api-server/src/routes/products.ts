@@ -1,8 +1,10 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, and, lte, gte, inArray, sql, desc, isNull } from "drizzle-orm";
-import { db, productsTable, stockLogsTable, salesTable, saleItemsTable } from "@workspace/db";
+import { db, productsTable, stockLogsTable, salesTable, saleItemsTable, returnsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { requireWrite } from "../middlewares/auth";
+import { logger } from "../lib/logger";
 import {
   ListProductsQueryParams,
   CreateProductBody,
@@ -79,7 +81,7 @@ router.get("/products", async (req, res): Promise<void> => {
   res.json(products.map(mapProduct));
 });
 
-router.post("/products", async (req, res): Promise<void> => {
+router.post("/products", requireWrite("products"), async (req, res): Promise<void> => {
   const parsed = CreateProductBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -87,6 +89,31 @@ router.post("/products", async (req, res): Promise<void> => {
   }
 
   const { name, sku, barcode, category, price, salePrice, salePriceUntil, purchasePrice, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
+
+  /* Reject negative money/stock — the generated validators don't bound these,
+     so without the guard a negative price or opening stock would persist and
+     poison stock-value and profit reports. */
+  const MAX_MONEY = 100_000_000;
+  if (price < 0 || price > MAX_MONEY) {
+    res.status(400).json({ error: "price must be a non-negative, realistic amount" });
+    return;
+  }
+  if (salePrice != null && salePrice < 0) {
+    res.status(400).json({ error: "salePrice must be non-negative" });
+    return;
+  }
+  if (purchasePrice != null && (purchasePrice < 0 || purchasePrice > MAX_MONEY)) {
+    res.status(400).json({ error: "purchasePrice must be a non-negative, realistic amount" });
+    return;
+  }
+  if (stock != null && (!Number.isInteger(stock) || stock < 0)) {
+    res.status(400).json({ error: "stock must be a non-negative whole number" });
+    return;
+  }
+  if (lowStockThreshold != null && (!Number.isInteger(lowStockThreshold) || lowStockThreshold < 0)) {
+    res.status(400).json({ error: "lowStockThreshold must be a non-negative whole number" });
+    return;
+  }
 
   if (salePrice != null && salePrice >= price) {
     res.status(400).json({ error: "salePrice must be less than the regular price" });
@@ -235,7 +262,7 @@ router.get("/products/:id", async (req, res): Promise<void> => {
   res.json(mapProduct(product));
 });
 
-router.patch("/products/:id", async (req, res): Promise<void> => {
+router.patch("/products/:id", requireWrite("products"), async (req, res): Promise<void> => {
   const params = UpdateProductParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -249,6 +276,27 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   }
 
   const d = parsed.data;
+
+  /* Reject negative money/stock on update (generated validator doesn't bound
+     these). Mirrors the create-route guard so a PATCH can't sneak in a value
+     that a POST would reject. */
+  const MAX_MONEY = 100_000_000;
+  if (d.price != null && (d.price < 0 || d.price > MAX_MONEY)) {
+    res.status(400).json({ error: "price must be a non-negative, realistic amount" });
+    return;
+  }
+  if (d.purchasePrice != null && (Number(d.purchasePrice) < 0 || Number(d.purchasePrice) > MAX_MONEY)) {
+    res.status(400).json({ error: "purchasePrice must be a non-negative, realistic amount" });
+    return;
+  }
+  if (d.stock != null && (!Number.isInteger(d.stock) || d.stock < 0)) {
+    res.status(400).json({ error: "stock must be a non-negative whole number" });
+    return;
+  }
+  if (d.lowStockThreshold != null && (!Number.isInteger(d.lowStockThreshold) || d.lowStockThreshold < 0)) {
+    res.status(400).json({ error: "lowStockThreshold must be a non-negative whole number" });
+    return;
+  }
 
   /* Fetch existing product upfront — needed for salePrice validation and 404 detection */
   const [existing] = await db
@@ -344,7 +392,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   res.json(mapProduct(product));
 });
 
-router.delete("/products/:id", async (req, res): Promise<void> => {
+router.delete("/products/:id", requireWrite("products"), async (req, res): Promise<void> => {
   const params = DeleteProductParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -353,43 +401,73 @@ router.delete("/products/:id", async (req, res): Promise<void> => {
 
   const { id } = params.data;
 
-  const [product] = await db.transaction(async (tx) => {
-    /* Confirm the product belongs to the caller's tenant before we delete
-       it (and its stock-log history). */
-    const [owned] = await tx
-      .select({ id: productsTable.id })
-      .from(productsTable)
-      .where(and(
-        eq(productsTable.id, id),
-        tenantWhereWrite(productsTable.tenantId, req.tenantId),
-      ));
-    if (!owned) return [undefined];
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      /* Confirm the product belongs to the caller's tenant before we delete
+         it (and its stock-log history). */
+      const [owned] = await tx
+        .select({ id: productsTable.id })
+        .from(productsTable)
+        .where(and(
+          eq(productsTable.id, id),
+          tenantWhereWrite(productsTable.tenantId, req.tenantId),
+        ));
+      if (!owned) return { status: "not_found" as const };
 
-    /* 1. Remove stock-movement logs (history has no value without the product) */
-    await tx.delete(stockLogsTable).where(eq(stockLogsTable.productId, id));
+      /* Guard: `sales` (quick-OUT) and `returns` reference this product with
+         NOT NULL foreign keys. A hard delete would either hit a raw FK-violation
+         500, or — if we cascaded — permanently erase financial history. Neither
+         is acceptable, so block the delete with a clear message instead. Bill
+         line items (`sale_items`) are handled below by nulling the reference,
+         which preserves the printed bill. */
+      const [salesRef] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(salesTable)
+        .where(eq(salesTable.productId, id));
+      const [returnsRef] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(returnsTable)
+        .where(eq(returnsTable.productId, id));
+      if ((salesRef?.n ?? 0) > 0 || (returnsRef?.n ?? 0) > 0) {
+        return { status: "has_history" as const };
+      }
 
-    /* 2. Nullify the product reference in sale items so bill history is preserved */
-    await tx
-      .update(saleItemsTable)
-      .set({ productId: null })
-      .where(eq(saleItemsTable.productId, id));
+      /* 1. Remove stock-movement logs (history has no value without the product) */
+      await tx.delete(stockLogsTable).where(eq(stockLogsTable.productId, id));
 
-    /* 3. Delete the product itself */
-    return tx
-      .delete(productsTable)
-      .where(eq(productsTable.id, id))
-      .returning();
-  });
+      /* 2. Nullify the product reference in sale items so bill history is preserved */
+      await tx
+        .update(saleItemsTable)
+        .set({ productId: null })
+        .where(eq(saleItemsTable.productId, id));
 
-  if (!product) {
-    res.status(404).json({ error: "Product not found" });
-    return;
+      /* 3. Delete the product itself */
+      const [deleted] = await tx
+        .delete(productsTable)
+        .where(eq(productsTable.id, id))
+        .returning();
+      return { status: "ok" as const, product: deleted };
+    });
+
+    if (outcome.status === "not_found") {
+      res.status(404).json({ error: "Product not found" });
+      return;
+    }
+    if (outcome.status === "has_history") {
+      res.status(409).json({
+        error: "This product has sales or return history and can't be deleted. Set its stock to 0 to retire it instead.",
+      });
+      return;
+    }
+
+    res.sendStatus(204);
+  } catch (err) {
+    logger.error({ err, productId: id }, "Product delete failed");
+    res.status(500).json({ error: "Failed to delete product" });
   }
-
-  res.sendStatus(204);
 });
 
-router.post("/products/:id/stock", async (req, res): Promise<void> => {
+router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promise<void> => {
   const params = UpdateStockParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -403,6 +481,26 @@ router.post("/products/:id/stock", async (req, res): Promise<void> => {
   }
 
   const { type, quantity, userId } = parsed.data;
+
+  /* Harden the quantity: the generated zod validator is only `z.number()`
+     (no int / sign / range bound), so without this a crafted request could
+     send a negative OUT (which would INCREASE stock and write negative-
+     revenue sale rows), a fractional value (500 at the integer column), or an
+     absurd magnitude. IN/OUT need a positive count; ADJUSTMENT sets an
+     absolute level so 0 is allowed but negatives never are. */
+  const MAX_QTY = 10_000_000;
+  if (!Number.isInteger(quantity)) {
+    res.status(400).json({ error: "quantity must be a whole number" });
+    return;
+  }
+  if (quantity < 0 || quantity > MAX_QTY) {
+    res.status(400).json({ error: `quantity must be between 0 and ${MAX_QTY}` });
+    return;
+  }
+  if ((type === "IN" || type === "OUT") && quantity < 1) {
+    res.status(400).json({ error: "quantity must be at least 1 for IN/OUT" });
+    return;
+  }
 
   /* All reads + writes run inside one transaction so the stock change, the
      stock-log row and any sale row commit (or roll back) together. OUT uses
@@ -559,7 +657,7 @@ router.get("/products/:id/qr", async (req, res): Promise<void> => {
  * Body: { productIds: string[]; supplierId: string | null }
  * Sets supplier_id on every listed product (null clears it).
  */
-router.post("/products/bulk-assign-supplier", async (req, res): Promise<void> => {
+router.post("/products/bulk-assign-supplier", requireWrite("products"), async (req, res): Promise<void> => {
   const productIds = Array.isArray(req.body?.productIds) ? req.body.productIds : null;
   const supplierId = req.body?.supplierId ?? null;
 
@@ -595,7 +693,7 @@ router.post("/products/bulk-assign-supplier", async (req, res): Promise<void> =>
  * Matches by SKU (within the caller's tenant) — updates existing products.
  * If SKU is unknown but name + category + price are provided → creates a new product.
  */
-router.post("/products/bulk-import", async (req, res): Promise<void> => {
+router.post("/products/bulk-import", requireWrite("products"), async (req, res): Promise<void> => {
   const { items } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
     res.status(400).json({ error: "items array is required" });
@@ -780,7 +878,7 @@ router.get("/products/sale-price-recovery/preview", async (req, res): Promise<vo
   res.json({ count: candidates.length, candidates });
 });
 
-router.post("/products/sale-price-recovery/apply", async (req, res): Promise<void> => {
+router.post("/products/sale-price-recovery/apply", requireWrite("products"), async (req, res): Promise<void> => {
   const candidates = await buildSalePriceRecoveryCandidates(req.tenantId);
 
   let restored = 0;

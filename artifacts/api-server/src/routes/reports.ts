@@ -1,9 +1,16 @@
 import { Router, type IRouter } from "express";
-import { desc, gte, sql, and, eq } from "drizzle-orm";
+import { desc, sql, and, eq } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable, billPaymentsTable } from "@workspace/db";
 import { tenantWhere } from "../lib/tenant";
+import { istToday, istShiftDay } from "../lib/ist";
 
 const router: IRouter = Router();
+
+/** timestamptz of IST midnight for a YYYY-MM-DD day — index-friendly lower
+ *  bound that covers the WHOLE first calendar day of a report window (a
+ *  rolling `NOW() - interval` cutoff silently drops the early hours of the
+ *  window's oldest day). */
+const istDayStart = (day: string) => sql`${day}::timestamp AT TIME ZONE 'Asia/Kolkata'`;
 
 /**
  * GET /api/reports/revenue?days=7
@@ -11,6 +18,7 @@ const router: IRouter = Router();
  */
 router.get("/reports/revenue", async (req, res): Promise<void> => {
   const days = Math.min(parseInt(String(req.query.days ?? 7), 10) || 7, 90);
+  const fromDay = istShiftDay(istToday(), -(days - 1));
 
   const rows = await db
     .select({
@@ -21,7 +29,7 @@ router.get("/reports/revenue", async (req, res): Promise<void> => {
     })
     .from(billsTable)
     .where(and(
-      gte(billsTable.createdAt, sql`NOW() - make_interval(days => ${days})`),
+      sql`${billsTable.createdAt} >= ${istDayStart(fromDay)}`,
       tenantWhere(billsTable.tenantId, req.tenantId),
     ))
     .groupBy(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`)
@@ -57,6 +65,13 @@ router.get("/reports/revenue", async (req, res): Promise<void> => {
  */
 router.get("/reports/sku-performance", async (req, res): Promise<void> => {
   const days = Math.min(parseInt(String(req.query.days ?? 30), 10) || 30, 365);
+  const fromDay = istShiftDay(istToday(), -(days - 1));
+
+  /* Cost = the sale-time snapshot on the line item, falling back to the
+     product's current purchase price for rows sold before snapshots existed.
+     Profit is only reported when EVERY unit has a known cost, so a partially
+     priced SKU never shows an overstated margin. */
+  const lineCost = sql`COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice})`;
 
   const rows = await db
     .select({
@@ -64,21 +79,22 @@ router.get("/reports/sku-performance", async (req, res): Promise<void> => {
       productName:   productsTable.name,
       productSku:    productsTable.sku,
       category:      productsTable.category,
-      purchasePrice: productsTable.purchasePrice,
       totalQty:      sql<number>`SUM(${saleItemsTable.quantity})::int`.as("total_qty"),
       totalRevenue:  sql<string>`SUM(${saleItemsTable.subtotal})`.as("total_revenue"),
       billCount:     sql<number>`COUNT(DISTINCT ${saleItemsTable.saleId})::int`.as("bill_count"),
+      totalCost:     sql<string>`COALESCE(SUM(${lineCost} * ${saleItemsTable.quantity}), 0)`.as("total_cost"),
+      costedQty:     sql<number>`COALESCE(SUM(${saleItemsTable.quantity}) FILTER (WHERE ${lineCost} IS NOT NULL), 0)::int`.as("costed_qty"),
     })
     .from(saleItemsTable)
     .innerJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
     .innerJoin(billsTable,    sql`${saleItemsTable.saleId}    = ${billsTable.id}`)
     .where(and(
-      gte(billsTable.createdAt, sql`NOW() - make_interval(days => ${days})`),
+      sql`${billsTable.createdAt} >= ${istDayStart(fromDay)}`,
       tenantWhere(billsTable.tenantId, req.tenantId),
     ))
     .groupBy(
       saleItemsTable.productId, productsTable.name, productsTable.sku,
-      productsTable.category, productsTable.purchasePrice,
+      productsTable.category,
     )
     .orderBy(desc(sql`SUM(${saleItemsTable.subtotal})`))
     .limit(100);
@@ -86,7 +102,7 @@ router.get("/reports/sku-performance", async (req, res): Promise<void> => {
   res.json(rows.map((p) => {
     const qty     = Number(p.totalQty);
     const revenue = Number(p.totalRevenue);
-    const cost    = p.purchasePrice != null ? Number(p.purchasePrice) * qty : null;
+    const cost    = p.costedQty === qty ? Number(p.totalCost) : null;
     const profit  = cost != null ? revenue - cost : null;
     const margin  = profit != null && revenue > 0 ? (profit / revenue) * 100 : null;
     return {
@@ -127,9 +143,11 @@ async function dailyTotals(targetDate: string, tenantId: string | null): Promise
       cashSales:   sql<string>`COALESCE(SUM(CASE WHEN ${billsTable.paymentMode} = 'cash'   THEN ${billsTable.totalAmount} ELSE 0 END), 0)`.as("cash"),
       upiSales:    sql<string>`COALESCE(SUM(CASE WHEN ${billsTable.paymentMode} = 'upi'    THEN ${billsTable.totalAmount} ELSE 0 END), 0)`.as("upi"),
       creditSales: sql<string>`COALESCE(SUM(CASE WHEN ${billsTable.paymentMode} = 'credit' THEN ${billsTable.totalAmount} ELSE 0 END), 0)`.as("credit"),
-      discount:    sql<string>`COALESCE(SUM(CASE WHEN ${billsTable.discount} IS NOT NULL AND ${billsTable.discountType} = 'amount'  THEN ${billsTable.discount}
-                                                  WHEN ${billsTable.discount} IS NOT NULL AND ${billsTable.discountType} = 'percent' THEN ${billsTable.totalAmount} * ${billsTable.discount} / 100
-                                                  ELSE 0 END), 0)`.as("discount"),
+      /* discount_amount is the computed rupee discount stored at checkout
+         (and backfilled by migration 0014). The raw `discount` column holds
+         whatever the cashier typed (a percent or an unclamped amount) and
+         must never be summed directly. */
+      discount:    sql<string>`COALESCE(SUM(COALESCE(${billsTable.discountAmount}, 0)), 0)`.as("discount"),
       uniqueCustomers: sql<number>`COUNT(DISTINCT ${billsTable.customerPhone})::int`.as("unique_customers"),
     })
     .from(billsTable)
@@ -185,9 +203,10 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
         productId:     saleItemsTable.productId,
         productName:   productsTable.name,
         productSku:    productsTable.sku,
-        purchasePrice: productsTable.purchasePrice,
         totalQty:      sql<number>`SUM(${saleItemsTable.quantity})::int`.as("total_qty"),
         totalRevenue:  sql<string>`SUM(${saleItemsTable.subtotal})`.as("total_revenue"),
+        totalCost:     sql<string>`COALESCE(SUM(COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) * ${saleItemsTable.quantity}), 0)`.as("total_cost"),
+        costedQty:     sql<number>`COALESCE(SUM(${saleItemsTable.quantity}) FILTER (WHERE COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) IS NOT NULL), 0)::int`.as("costed_qty"),
       })
       .from(saleItemsTable)
       .innerJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
@@ -196,7 +215,7 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
         sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`,
         tenantWhere(billsTable.tenantId, tenantId),
       ))
-      .groupBy(saleItemsTable.productId, productsTable.name, productsTable.sku, productsTable.purchasePrice)
+      .groupBy(saleItemsTable.productId, productsTable.name, productsTable.sku)
       .orderBy(desc(sql`SUM(${saleItemsTable.quantity})`))
       .limit(10),
 
@@ -204,13 +223,14 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
        (productId IS NULL) are kept: they have no purchase cost, so their full
        subtotal is counted as profit (a gift-wrap, service charge, etc.). A
        line is "covered" — and thus part of the profit base — when it is either
-       a manual line OR a catalogue item that has a purchase price set.
-       Catalogue items with an UNSET purchase price stay excluded so we never
-       overstate margin on items whose real cost we don't know. */
+       a manual line OR a catalogue item whose cost is known: the sale-time
+       snapshot (sale_items.purchase_price) when present, else the product's
+       current purchase price. Catalogue items with no known cost stay
+       excluded so we never overstate margin. */
     db.select({
-        totalCost:      sql<string>`COALESCE(SUM(CASE WHEN ${productsTable.purchasePrice} IS NOT NULL THEN ${productsTable.purchasePrice} * ${saleItemsTable.quantity} ELSE 0 END), 0)`.as("total_cost"),
-        coveredItems:   sql<number>`COUNT(*) FILTER (WHERE ${saleItemsTable.productId} IS NULL OR ${productsTable.purchasePrice} IS NOT NULL)::int`.as("covered_items"),
-        coveredRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${saleItemsTable.productId} IS NULL OR ${productsTable.purchasePrice} IS NOT NULL THEN ${saleItemsTable.subtotal} ELSE 0 END), 0)`.as("covered_revenue"),
+        totalCost:      sql<string>`COALESCE(SUM(CASE WHEN COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) IS NOT NULL THEN COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) * ${saleItemsTable.quantity} ELSE 0 END), 0)`.as("total_cost"),
+        coveredItems:   sql<number>`COUNT(*) FILTER (WHERE ${saleItemsTable.productId} IS NULL OR COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) IS NOT NULL)::int`.as("covered_items"),
+        coveredRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${saleItemsTable.productId} IS NULL OR COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) IS NOT NULL THEN ${saleItemsTable.subtotal} ELSE 0 END), 0)`.as("covered_revenue"),
       })
       .from(saleItemsTable)
       .leftJoin(productsTable,  sql`${saleItemsTable.productId} = ${productsTable.id}`)
@@ -368,7 +388,7 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
     topProducts: topProducts.map((p) => {
       const qty     = Number(p.totalQty);
       const revenue = Number(p.totalRevenue);
-      const cost    = p.purchasePrice != null ? Number(p.purchasePrice) * qty : null;
+      const cost    = p.costedQty === qty ? Number(p.totalCost) : null;
       const profit  = cost != null ? revenue - cost : null;
       const margin  = profit != null && revenue > 0 ? (profit / revenue) * 100 : null;
       return {
