@@ -267,6 +267,11 @@ paths:
             type: string
             enum: [IN, OUT, ADJUSTMENT]
           description: Filter by log type
+        - name: today
+          in: query
+          schema:
+            type: boolean
+          description: Only return logs created today (server time)
         - name: limit
           in: query
           schema:

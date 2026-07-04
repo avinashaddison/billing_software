@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, gte } from "drizzle-orm";
 import { db, stockLogsTable, productsTable } from "@workspace/db";
 import { ListStockLogsQueryParams } from "@workspace/api-zod";
 import { tenantWhere } from "../lib/tenant";
@@ -13,11 +13,16 @@ router.get("/stock-logs", async (req, res): Promise<void> => {
     return;
   }
 
-  const { productId, type, limit = 50, offset = 0 } = parsed.data;
+  const { productId, type, today, limit = 50, offset = 0 } = parsed.data;
 
   const conditions = [tenantWhere(stockLogsTable.tenantId, req.tenantId)];
   if (productId) conditions.push(eq(stockLogsTable.productId, productId));
   if (type) conditions.push(eq(stockLogsTable.type, type));
+  if (today) {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    conditions.push(gte(stockLogsTable.createdAt, todayStart));
+  }
 
   const rows = await db
     .select({

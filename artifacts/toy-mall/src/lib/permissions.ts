@@ -66,6 +66,7 @@ export const PATH_RESOURCE: Record<string, ResourceKey> = {
   "/billing":    "billing",
   "/bill":       "billing",
   "/logs":       "logs",
+  "/today-out":  "logs",
   "/stock-alert": "stockAlert",
   "/report":     "reports",
   "/analytics":  "analytics",

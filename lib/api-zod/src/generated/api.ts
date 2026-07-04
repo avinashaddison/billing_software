@@ -260,6 +260,10 @@ export const ListStockLogsQueryParams = zod.object({
     .enum(["IN", "OUT", "ADJUSTMENT"])
     .optional()
     .describe("Filter by log type"),
+  today: zod.coerce
+    .boolean()
+    .optional()
+    .describe("Only return logs created today (server time)"),
   limit: zod.coerce
     .number()
     .default(listStockLogsQueryLimitDefault)

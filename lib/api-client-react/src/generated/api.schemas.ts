@@ -315,6 +315,10 @@ export type ListStockLogsParams = {
    */
   type?: ListStockLogsType;
   /**
+   * Only return logs created today (server time)
+   */
+  today?: boolean;
+  /**
    * Number of logs to return
    */
   limit?: number;

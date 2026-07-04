@@ -408,7 +408,7 @@ export default function Dashboard() {
           value={activity?.outQuantity}
           subtitle={`${activity?.outCount ?? 0} transactions`}
           loading={loadingActivity} testid="stat-today-out"
-          href="/report" />
+          href="/today-out" />
       </div>
 
       {/* ── Revenue + Receivables (money in / money owed) ── */}
