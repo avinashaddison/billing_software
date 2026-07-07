@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://addisonbill.com/</loc>
+    <loc>https://addisonbill.in/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://addisonbill.com/terms</loc>
+    <loc>https://addisonbill.in/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://addisonbill.com/privacy</loc>
+    <loc>https://addisonbill.in/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://addisonbill.com/refund</loc>
+    <loc>https://addisonbill.in/refund</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

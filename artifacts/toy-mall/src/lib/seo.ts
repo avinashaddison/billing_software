@@ -5,13 +5,13 @@ import { useEffect } from "react";
 
    ⚠️  Update SITE.url to your real production domain. It is used for
    canonical URLs, Open Graph / Twitter image URLs, sitemap, and
-   structured data. Search-replace "https://addisonbill.com" across
+   structured data. Search-replace "https://addisonbill.in" across
    the repo (index.html, robots.txt, sitemap.xml) if it differs.
 ═══════════════════════════════════════════════════════════════ */
 
 export const SITE = {
   name: "Addison Bill",
-  url: "https://addisonbill.com",
+  url: "https://addisonbill.in",
   twitter: "@addisonbill",
   locale: "en_IN",
   defaultTitle: "Addison Bill — India's Simplest Billing & Inventory Software",

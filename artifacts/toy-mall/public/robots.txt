@@ -28,4 +28,4 @@ Disallow: /settings
 Disallow: /profile
 Disallow: /admin
 
-Sitemap: https://addisonbill.com/sitemap.xml
+Sitemap: https://addisonbill.in/sitemap.xml
