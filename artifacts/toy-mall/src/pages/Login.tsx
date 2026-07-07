@@ -333,7 +333,7 @@ export default function Login() {
           </button>
 
           {/* WhatsApp helper */}
-          <a href="https://wa.me/?text=Hi%20Addison%20Bill%2C%20login%20issue%20hai"
+          <a href="https://wa.me/919142647797?text=Hi%20Addison%20Bill%2C%20login%20issue%20hai"
             target="_blank" rel="noreferrer"
             className="block text-center pt-1 text-[12px] font-bold text-emerald-700 hover:text-emerald-800 transition-colors">
             <MessageCircle className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />

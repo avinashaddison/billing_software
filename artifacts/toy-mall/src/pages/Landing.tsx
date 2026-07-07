@@ -77,10 +77,10 @@ function OfferStrip() {
   return (
     <div className="bg-gradient-to-r from-[#B83A0A] via-[#E94F18] to-[#B83A0A] text-white text-center py-2 px-4 text-[12px] md:text-[13px] font-bold mt-7 relative z-30">
       <span className="inline-flex items-center gap-2">
-        <span className="text-base lp-flame inline-block">🪔</span>
-        <span>LAUNCH OFFER · pehle 100 dukaandaars ke liye — </span>
-        <span className="bg-[#F59E0B] text-[#0B0B11] px-2 py-0.5 rounded-full font-black uppercase tracking-wider">3 din FREE trial</span>
-        <span className="text-base lp-flame inline-block">🪔</span>
+        <span className="text-base lp-flame inline-block">🎀</span>
+        <span>RAKSHA BANDHAN DHAMAKA · pehle 100 dukaandaars ke liye — </span>
+        <span className="bg-[#F59E0B] text-[#0B0B11] px-2 py-0.5 rounded-full font-black uppercase tracking-wider">50% DISCOUNT</span>
+        <span className="text-base lp-flame inline-block">🎀</span>
       </span>
     </div>
   );
@@ -1404,7 +1404,7 @@ function Footer() {
             </div>
             <div>
               <div className="text-[10px] font-black uppercase tracking-wider text-white/40">HQ</div>
-              <div className="font-black text-white text-sm">Mumbai · Ranchi</div>
+              <div className="font-black text-white text-sm">Ranchi</div>
             </div>
           </div>
         </div>
