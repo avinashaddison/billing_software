@@ -73,6 +73,17 @@ onlyBuiltDependencies:
   - msw
   - unrs-resolver
 
+# pnpm 11 replaced `onlyBuiltDependencies` (above, used by pnpm 10) with this
+# `allowBuilds` map. Both are kept so build scripts are approved on pnpm 10
+# (local dev + Render) and pnpm 11 (Hostinger deploy) alike. Without this,
+# pnpm 11 aborts the install with ERR_PNPM_IGNORED_BUILDS on esbuild's
+# postinstall, which the API bundler needs.
+allowBuilds:
+  '@swc/core': true
+  esbuild: true
+  msw: true
+  unrs-resolver: true
+
 overrides:
   # replit uses linux-x64 only, we can exclude all other platforms
   "esbuild>@esbuild/darwin-arm64": "-"
