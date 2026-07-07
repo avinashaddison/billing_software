@@ -1044,6 +1044,9 @@ function Pricing() {
               <p className="text-center text-sm opacity-90 mt-1.5">
                 = <strong>{inr(perMonth)}/month</strong> · {inr(perDay)}/day · ek chai se kam
               </p>
+              <p className="text-center text-[11px] font-black uppercase tracking-wider mt-2 text-[#FFE4D1]">
+                🔥 Sirf pehle 100 dukaandaar ke liye
+              </p>
 
               <div className="my-7 flex items-center gap-3">
                 <div className="flex-1 h-px bg-white/30" />
