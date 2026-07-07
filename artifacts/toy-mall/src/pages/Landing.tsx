@@ -1404,7 +1404,7 @@ function Footer() {
             </div>
             <div>
               <div className="text-[10px] font-black uppercase tracking-wider text-white/40">HQ</div>
-              <div className="font-black text-white text-sm">Mumbai · Ranchi</div>
+              <div className="font-black text-white text-sm">Ranchi</div>
             </div>
           </div>
         </div>
