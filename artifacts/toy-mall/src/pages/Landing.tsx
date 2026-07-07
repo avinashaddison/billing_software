@@ -11,7 +11,7 @@ import {
   MapPin, Globe, Award,
 } from "lucide-react";
 
-const WHATSAPP_NUMBER = "919999999999";
+const WHATSAPP_NUMBER = "919142647797";
 const TRIAL_URL       = "/login";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -266,7 +266,7 @@ function Hero() {
             </div>
             <span className="text-slate-300 hidden sm:inline">·</span>
             <div className="flex items-center gap-1.5 text-slate-600">
-              <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>14 din Free</span>
+              <Check className="w-4 h-4 text-[#138808]" strokeWidth={3} /> <span>3 din Free</span>
             </div>
             <span className="text-slate-300 hidden sm:inline">·</span>
             <div className="flex items-center gap-1.5 text-slate-600">
@@ -523,7 +523,7 @@ function LaptopMockup() {
                 <div className="w-2.5 h-2.5 rounded-full bg-[#4ADE5F]/70" />
               </div>
               <div className="ml-3 flex-1 flex items-center gap-1.5 px-3 py-1 rounded-md bg-white/5 text-[9px] text-white/40" style={{ fontFamily: "var(--font-mono)" }}>
-                <Lock className="w-2.5 h-2.5" /> billing.addisonxmedia.com
+                <Lock className="w-2.5 h-2.5" /> addisonbill.in
               </div>
               <div className="text-[9px] text-white/30">9:41</div>
             </div>
@@ -945,6 +945,27 @@ function Comparison() {
 
 /* ─── 11. PRICING (Wedding-invite card) ────────────────────── */
 function Pricing() {
+  /* Price is vendor-controlled from /admin (platform_settings) and served by
+     the public /api/public/pricing endpoint. Defaults keep the card populated
+     on first paint and if the API is ever unreachable. ₹/month and ₹/day are
+     DERIVED from the deal price so they can never disagree with it. */
+  const [pricing, setPricing] = useState({ dealPrice: 4999, originalPrice: 9999 });
+  useEffect(() => {
+    const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+    fetch(`${base}/api/public/pricing`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const deal = Number(d?.dealPrice);
+        const orig = Number(d?.originalPrice);
+        if (Number.isFinite(deal) && Number.isFinite(orig)) {
+          setPricing({ dealPrice: deal, originalPrice: orig });
+        }
+      })
+      .catch(() => {});
+  }, []);
+  const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  const perMonth = Math.round(pricing.dealPrice / 12);
+  const perDay   = Math.round(pricing.dealPrice / 365);
   return (
     <section id="pricing" className="py-20 md:py-28 relative overflow-hidden scroll-mt-24">
       <div className="absolute inset-0 -z-10 pointer-events-none">
@@ -973,7 +994,7 @@ function Pricing() {
           <div className="relative p-7 md:p-8 rounded-3xl bg-white border-2 border-[#FFC8A0]/40">
             <div className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 mb-4">Free Trial</div>
             <h3 className="text-2xl font-black text-slate-900">Pehle try karo, baad mein decide</h3>
-            <div className="text-6xl md:text-7xl font-black tabular-nums mt-5 text-slate-900">14 <span className="text-2xl text-slate-500">din</span></div>
+            <div className="text-6xl md:text-7xl font-black tabular-nums mt-5 text-slate-900">3 <span className="text-2xl text-slate-500">din</span></div>
             <p className="text-sm text-slate-500 mt-1">Koi credit card nahi</p>
 
             <ul className="mt-7 space-y-2.5 text-sm">
@@ -1017,11 +1038,11 @@ function Pricing() {
               <p className="text-center text-sm opacity-80 mt-1">90%+ shopkeepers choose this</p>
 
               <div className="text-center mt-6 flex items-baseline gap-3 justify-center">
-                <span className="text-xl line-through opacity-50 tabular-nums">₹14,999</span>
-                <span className="text-7xl md:text-8xl font-black tabular-nums lp-counter-glow">₹9,999</span>
+                <span className="text-xl line-through opacity-50 tabular-nums">{inr(pricing.originalPrice)}</span>
+                <span className="text-7xl md:text-8xl font-black tabular-nums lp-counter-glow">{inr(pricing.dealPrice)}</span>
               </div>
               <p className="text-center text-sm opacity-90 mt-1.5">
-                = <strong>₹833/month</strong> · ₹27/day · ek chai se kam
+                = <strong>{inr(perMonth)}/month</strong> · {inr(perDay)}/day · ek chai se kam
               </p>
 
               <div className="my-7 flex items-center gap-3">
@@ -1052,7 +1073,7 @@ function Pricing() {
               </Link>
 
               <p className="text-[11px] text-center opacity-80 mt-3">
-                ✓ 14 din free trial &nbsp;·&nbsp; ✓ Pro-rata refund &nbsp;·&nbsp; ✓ Kabhi bhi cancel
+                ✓ 3 din free trial &nbsp;·&nbsp; ✓ Pro-rata refund &nbsp;·&nbsp; ✓ Kabhi bhi cancel
               </p>
             </div>
           </div>
@@ -1169,14 +1190,14 @@ function FinalCTA() {
 
           <div className="relative text-white">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#F59E0B] text-white mb-6 lp-animate-badge-bounce ring-2 ring-white/30">
-              🪔 14 din free trial — koi credit card nahi · 🪔
+              🪔 3 din free trial — koi credit card nahi · 🪔
             </div>
             <h2 className="text-5xl md:text-8xl font-black leading-[0.9]">
               Dukaan badhao.<br />
               <span className="lp-gold-foil inline-block">Hum sab handle karenge.</span>
             </h2>
             <p className="mt-6 text-base md:text-lg opacity-90 max-w-xl mx-auto">
-              14 din free. Koi credit card nahi. WhatsApp par 24×7 support.
+              3 din free. Koi credit card nahi. WhatsApp par 24×7 support.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
@@ -1361,17 +1382,17 @@ function Footer() {
             </div>
             <div>
               <div className="text-[10px] font-black uppercase tracking-wider text-white/40">WhatsApp</div>
-              <div className="font-black text-white">+91 99999 99999</div>
+              <div className="font-black text-white">+91 91426 47797</div>
             </div>
           </a>
-          <a href="mailto:hello@addisonxmedia.com"
+          <a href="mailto:contact@addisonbill.in"
              className="group flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/[0.04] border border-white/10 hover:bg-[#FF6B35]/15 hover:border-[#FF6B35]/40 transition-all">
             <div className="w-10 h-10 rounded-xl bg-[#FF6B35] text-white flex items-center justify-center">
               <Mail className="w-5 h-5" />
             </div>
             <div className="min-w-0">
               <div className="text-[10px] font-black uppercase tracking-wider text-white/40">Email</div>
-              <div className="font-black text-white text-sm truncate">hello@addisonxmedia.com</div>
+              <div className="font-black text-white text-sm truncate">contact@addisonbill.in</div>
             </div>
           </a>
           <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/[0.04] border border-white/10">

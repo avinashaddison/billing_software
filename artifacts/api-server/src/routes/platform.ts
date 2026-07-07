@@ -21,6 +21,7 @@ import {
   staffProfilesTable,
   staffPermissionsTable,
   storeSettingsTable,
+  platformSettingsTable,
   productsTable,
   salesTable,
   auditEventsTable,
@@ -55,6 +56,7 @@ const SLUG_RE  = /^[a-z][a-z0-9-]{1,38}[a-z0-9]$/;
 /* Allowed shorthand durations for the /admin "Access" picker. The presets
    keep the admin UX one-tap; anything else uses an explicit ISO date. */
 const PRESET_DURATIONS: Record<string, number> = {
+  "3d":     3  * 86_400_000,
   "7d":     7  * 86_400_000,
   "30d":    30 * 86_400_000,
   "90d":    90 * 86_400_000,
@@ -76,7 +78,7 @@ function resolveExpiry(raw: unknown): Date | null {
     const d = new Date(raw);
     if (!Number.isNaN(d.getTime())) return d;
   }
-  throw new Error("Invalid expiresAt — use 'lifetime', a preset (7d/30d/90d/180d/365d), or an ISO date");
+  throw new Error("Invalid expiresAt — use 'lifetime', a preset (3d/7d/30d/90d/180d/365d), or an ISO date");
 }
 
 function isValidEmail(e: unknown): e is string {
@@ -555,7 +557,7 @@ router.post("/platform/tenants/:id/extend", requirePlatformAdmin, async (req, re
   }
 
   if (typeof duration !== "string" || !(duration in PRESET_DURATIONS)) {
-    res.status(400).json({ error: "duration must be 'lifetime' or one of 7d/30d/90d/180d/365d" });
+    res.status(400).json({ error: "duration must be 'lifetime' or one of 3d/7d/30d/90d/180d/365d" });
     return;
   }
 
@@ -717,6 +719,98 @@ router.get("/platform/audit", requirePlatformAdmin, async (req, res): Promise<vo
     res.json({ events });
   } catch {
     res.status(500).json({ error: "Failed to load audit log" });
+  }
+});
+
+/* ───── Platform-wide settings (global, NOT per-tenant) ─────────────
+ *
+ * A single-row `platform_settings` store (id = 1) holds vendor-level config.
+ * Today that's just the public subscription pricing shown on the marketing
+ * landing page: the deal price and the struck-through "original" price. The
+ * per-month / per-day figures the landing page shows are DERIVED from the deal
+ * price (÷ 12, ÷ 365) on the client — never stored — so they can't drift.
+ */
+const PLATFORM_SETTINGS_ID = 1;
+const DEFAULT_PRICING = { dealPrice: 4999, originalPrice: 9999 } as const;
+
+/** Read the singleton settings blob. Returns {} on any miss/error so callers
+ *  fall back to defaults rather than failing. */
+async function readPlatformSettings(): Promise<Record<string, unknown>> {
+  try {
+    const [row] = await db
+      .select({ data: platformSettingsTable.data })
+      .from(platformSettingsTable)
+      .where(eq(platformSettingsTable.id, PLATFORM_SETTINGS_ID));
+    return (row?.data as Record<string, unknown>) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** Coerce stored settings into a valid pricing pair, defaulting any
+ *  missing/invalid field. */
+function pricingFromSettings(data: Record<string, unknown>): { dealPrice: number; originalPrice: number } {
+  const num = (v: unknown, fallback: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : fallback;
+  };
+  return {
+    dealPrice:     num(data.dealPrice,     DEFAULT_PRICING.dealPrice),
+    originalPrice: num(data.originalPrice, DEFAULT_PRICING.originalPrice),
+  };
+}
+
+/* ───── GET /api/public/pricing — PUBLIC subscription pricing ─────────
+ *
+ * No auth: the marketing landing page fetches this before any session exists.
+ * Reachable because platformRouter mounts BEFORE the tenant/auth gates, so this
+ * handler responds and short-circuits before either gate runs. Returns the two
+ * rupee amounts; the client derives ₹/month and ₹/day from the deal price.
+ */
+router.get("/public/pricing", async (_req, res): Promise<void> => {
+  const data = await readPlatformSettings();
+  res.json(pricingFromSettings(data));
+});
+
+/* ───── GET /api/platform/settings — vendor view of global settings ─── */
+router.get("/platform/settings", requirePlatformAdmin, async (_req, res): Promise<void> => {
+  const data = await readPlatformSettings();
+  res.json({ pricing: pricingFromSettings(data) });
+});
+
+/* ───── PATCH /api/platform/settings — update subscription pricing ────
+ *
+ * Body: { dealPrice: number, originalPrice: number } — whole rupees.
+ */
+router.patch("/platform/settings", requirePlatformAdmin, async (req, res): Promise<void> => {
+  const isRupee = (v: unknown): v is number =>
+    typeof v === "number" && Number.isFinite(v) && Number.isInteger(v) && v >= 0 && v <= 100_000_000;
+  const dealPrice     = req.body?.dealPrice;
+  const originalPrice = req.body?.originalPrice;
+  if (!isRupee(dealPrice) || !isRupee(originalPrice)) {
+    res.status(400).json({ error: "dealPrice and originalPrice must be whole rupee amounts (0–100000000)" });
+    return;
+  }
+  try {
+    const existing = await readPlatformSettings();
+    const nextData = { ...existing, dealPrice, originalPrice };
+    await db
+      .insert(platformSettingsTable)
+      .values({ id: PLATFORM_SETTINGS_ID, data: nextData })
+      .onConflictDoUpdate({
+        target: platformSettingsTable.id,
+        set:    { data: nextData, updatedAt: new Date() },
+      });
+    void recordAudit({
+      action:     "platform.pricing_update",
+      actorId:    req.platformActor!.id,
+      actorEmail: req.platformActor!.email,
+      ip:         req.ip,
+      metadata:   { dealPrice, originalPrice },
+    });
+    res.json({ pricing: { dealPrice, originalPrice } });
+  } catch {
+    res.status(500).json({ error: "Failed to save pricing" });
   }
 });
 

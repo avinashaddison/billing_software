@@ -3,6 +3,7 @@ import {
   ShieldCheck, LogOut, RefreshCw, Plus, Search, Building2, Users, Package,
   Receipt, Loader2, AlertTriangle, Mail, Lock, KeyRound, Power, PowerOff,
   CheckCircle2, CalendarClock, Infinity, Pencil, Copy, ScrollText, X, Clock,
+  IndianRupee,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,6 +27,7 @@ interface TenantRow {
 
 /** Access duration choices used in both the create dialog and Extend menu. */
 const ACCESS_PRESETS = [
+  { key: "3d",       label: "3 days"     },
   { key: "7d",       label: "7 days"     },
   { key: "30d",      label: "1 month"    },
   { key: "90d",      label: "3 months"   },
@@ -354,6 +356,9 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
           <StatCard label="Legacy NULL"    value={stats?.legacyUsers ?? 0}   gradient="from-amber-500 to-orange-500" icon={AlertTriangle} />
         </div>
 
+        {/* Global subscription pricing (drives the public landing page) */}
+        <PricingCard />
+
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
@@ -517,6 +522,112 @@ function StatCard({ label, value, gradient, icon: Icon }: {
   );
 }
 
+/* ───────── Subscription Pricing card (global — drives the landing page) ───── */
+function PricingCard() {
+  const [dealPrice, setDealPrice]         = useState<number | "">("");
+  const [originalPrice, setOriginalPrice] = useState<number | "">("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`${API}/platform/settings`, { credentials: "include" });
+        if (!r.ok) { if (alive) toast.error("Could not load pricing"); return; }
+        const d = await r.json();
+        if (!alive) return;
+        setDealPrice(Number(d?.pricing?.dealPrice ?? 4999));
+        setOriginalPrice(Number(d?.pricing?.originalPrice ?? 9999));
+      } catch { if (alive) toast.error("Could not load pricing"); }
+      finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  const deal = typeof dealPrice === "number" ? dealPrice : 0;
+  const perMonth = Math.round(deal / 12);
+  const perDay   = Math.round(deal / 365);
+
+  const save = async () => {
+    if (typeof dealPrice !== "number" || typeof originalPrice !== "number") {
+      toast.error("Enter both prices"); return;
+    }
+    if (!Number.isInteger(dealPrice) || !Number.isInteger(originalPrice) || dealPrice < 0 || originalPrice < 0) {
+      toast.error("Prices must be whole rupee amounts"); return;
+    }
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/platform/settings`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dealPrice, originalPrice }),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        toast.error(data.error || "Could not save pricing"); return;
+      }
+      toast.success("Landing-page price updated");
+    } catch { toast.error("Server unreachable"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="rounded-2xl border bg-card p-4 md:p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-lg shrink-0">
+          <IndianRupee className="w-4 h-4" strokeWidth={2.5} />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-sm font-black">Subscription Pricing</h2>
+          <p className="text-[11px] text-muted-foreground">Shown on the public landing page. ₹/month &amp; ₹/day auto-calculate from the deal price.</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <>
+          <div className="grid md:grid-cols-[1fr_1fr_auto] gap-3 md:items-end">
+            <label className="block space-y-1.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Deal price (₹ / year)</span>
+              <input
+                type="number" min={0} step={1} value={dealPrice}
+                onChange={(e) => setDealPrice(e.target.value === "" ? "" : Math.trunc(Number(e.target.value)))}
+                className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Original — struck-through (₹)</span>
+              <input
+                type="number" min={0} step={1} value={originalPrice}
+                onChange={(e) => setOriginalPrice(e.target.value === "" ? "" : Math.trunc(Number(e.target.value)))}
+                className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </label>
+            <button
+              onClick={save} disabled={saving}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-sm shadow-lg shadow-emerald-500/30 disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+
+          <div className="mt-4 rounded-xl bg-muted/40 border px-4 py-3">
+            <span className="block text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1.5">Landing-page preview</span>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-sm line-through text-muted-foreground tabular-nums">{inr(typeof originalPrice === "number" ? originalPrice : 0)}</span>
+              <span className="text-2xl font-black tabular-nums">{inr(deal)}</span>
+              <span className="text-xs text-muted-foreground">= <strong className="text-foreground">{inr(perMonth)}/month</strong> · {inr(perDay)}/day</span>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ───────── Create Tenant Dialog ───────── */
 function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [id, setId] = useState("");
@@ -527,9 +638,9 @@ function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCre
   /* On success we flip to a credentials hand-off screen instead of closing
      immediately, so the vendor can copy the login the client will need. */
   const [created, setCreated] = useState<{ name: string; email: string; password: string; pin: string | null } | null>(null);
-  /* Access duration — drives `expiresAt` on the server. Default to 1 year
-     since that's the most common paid SaaS subscription length. */
-  const [access, setAccess] = useState<AccessKey>("365d");
+  /* Access duration — drives `expiresAt` on the server. Defaults to the 3-day
+     free trial; bump to a paid duration (e.g. 1 year) once the client pays. */
+  const [access, setAccess] = useState<AccessKey>("3d");
   /* Track whether the user has manually edited the tenant id. Until they do,
      we keep regenerating it from the shop name on every keystroke. The moment
      they touch the id field we stop syncing so we don't clobber their edit. */

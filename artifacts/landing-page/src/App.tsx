@@ -9,8 +9,8 @@ import {
   Activity, Box, Bot, Banknote, Hash,
 } from "lucide-react";
 
-const WHATSAPP_NUMBER = "919999999999";
-const TRIAL_URL       = "https://billing.addisonxmedia.com";
+const WHATSAPP_NUMBER = "919142647797";
+const TRIAL_URL       = "https://addisonbill.in";
 
 /* ═══════════════════════════════════════════════════════════════
    NAV
@@ -152,7 +152,7 @@ function Hero() {
           <a href={TRIAL_URL} target="_blank" rel="noopener"
              className="group relative inline-flex items-center gap-2 px-6 py-4 rounded-full font-black text-ink-950 bg-white hover:bg-volt-300 transition-colors text-base animate-glow-pulse">
             <Sparkles className="w-5 h-5" />
-            <span>Start 14-day Free Trial</span>
+            <span>Start 3-day Free Trial</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </a>
           <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=Addison%20Bill%20demo%20चाहिए`} target="_blank" rel="noopener"
@@ -242,7 +242,7 @@ function DashboardMockup({ tracked }: { tracked: number }) {
               </div>
               <div className="mx-auto px-3 py-1 rounded-full bg-white border border-slate-200 text-[10px] font-mono text-slate-500 flex items-center gap-1.5">
                 <Lock className="w-3 h-3 text-emerald-500" />
-                billing.addisonxmedia.com
+                addisonbill.in
               </div>
               <div className="w-12" />
             </div>
@@ -826,7 +826,7 @@ function Pricing() {
               </a>
 
               <p className="text-[11px] text-center opacity-80 mt-3.5">
-                ✓ 14-day free trial first · ✓ Pro-rata refund · ✓ Cancel anytime
+                ✓ 3-day free trial first · ✓ Pro-rata refund · ✓ Cancel anytime
               </p>
             </div>
           </div>
@@ -959,7 +959,7 @@ function FinalCTA() {
           <div className="relative text-white">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-ink-950 text-volt-300 mb-6 animate-badge-bounce">
               <Sparkles className="w-3.5 h-3.5" />
-              14-day free trial · no credit card
+              3-day free trial · no credit card
             </div>
             <h2 className="text-5xl md:text-7xl lg:text-8xl font-black leading-[0.95]">
               Run your shop.<br />
@@ -1044,9 +1044,9 @@ function Footer() {
         <div className="mt-12 pt-6 border-t border-white/5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-xs text-white/30">
           <p>© {new Date().getFullYear()} Addison Bill Media. All rights reserved.</p>
           <div className="flex items-center gap-4">
-            <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="hover:text-saffron-400 font-bold">+91 99999 99999</a>
+            <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="hover:text-saffron-400 font-bold">+91 91426 47797</a>
             <span className="text-white/15">·</span>
-            <a href="mailto:hello@addisonxmedia.com" className="hover:text-saffron-400 font-bold">hello@addisonxmedia.com</a>
+            <a href="mailto:contact@addisonbill.in" className="hover:text-saffron-400 font-bold">contact@addisonbill.in</a>
           </div>
         </div>
       </div>
@@ -1071,7 +1071,7 @@ function StickyCTA() {
       <a href={TRIAL_URL} target="_blank" rel="noopener"
          className="flex items-center justify-center gap-2 w-full px-5 py-4 rounded-full font-black text-ink-950 bg-white shadow-2xl">
         <Sparkles className="w-5 h-5" />
-        Start 14-day Free Trial
+        Start 3-day Free Trial
         <ArrowRight className="w-5 h-5" />
       </a>
     </div>
