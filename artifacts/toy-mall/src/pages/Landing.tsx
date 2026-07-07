@@ -1122,8 +1122,8 @@ export const FAQS = [
       a: "Nahi. Addison Bill cloud par chalta hai — Chrome, Edge, Safari, ya mobile par browser kholo, login karo, bas." },
     { q: "Kaun sa hardware chahiye?",
       a: "Minimum: ek Android phone ya laptop. Recommended: 80mm thermal printer (agar bill print karna hai), USB barcode scanner." },
-    { q: "Internet nahi ho toh?",
-      a: "Offline mode kaam karta hai — bills queue mein jaayenge, internet aate hi auto-sync. Aapka din rukta nahi." },
+    { q: "Internet zaroori hai?",
+      a: "Haan — Addison Bill cloud par chalta hai, isliye aapka data har device par turant sync aur auto-backup rehta hai, kabhi kho nahi sakta. Ek normal mobile data ya WiFi connection kaafi hai." },
     { q: "Mera data safe hai?",
       a: "Bank-grade encryption, daily backups, Indian servers. Koi access nahi karta aapka data — hum bhi nahi." },
     { q: "GST ke setup mein help milegi?",
@@ -1280,7 +1280,7 @@ function Footer() {
             { Icon: Lock,       label: "Bank-grade",      sub: "encryption",       color: "text-[#FFA86B]" },
             { Icon: Shield,     label: "GST Certified",   sub: "audit-ready",      color: "text-[#B5FF6A]" },
             { Icon: Headphones, label: "Live Support",    sub: "12-min avg reply", color: "text-amber-300" },
-            { Icon: Wifi,       label: "Works Offline",   sub: "auto-sync",        color: "text-violet-300" },
+            { Icon: Wifi,       label: "Realtime Sync",   sub: "cloud backup",     color: "text-violet-300" },
             { Icon: Award,      label: "100+ shops",      sub: "4.9 stars",        color: "text-rose-300" },
           ].map((b, i) => (
             <div key={i} className="px-3 py-3 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3">

@@ -463,15 +463,15 @@ function Features() {
             desc="One tap to put a product on sale. Instant."
           />
 
-          {/* Offline / cloud / WhatsApp */}
+          {/* Realtime cloud sync */}
           <FeatureCard
             className="col-span-12 md:col-span-4 lg:col-span-4"
             Icon={Wifi}
             iconColor="text-volt-400"
             iconBg="bg-volt-500/10"
-            title="Works offline"
-            hindi="Internet गया? चलता रहेगा।"
-            desc="Bills queue locally, auto-sync when internet returns."
+            title="Realtime cloud sync"
+            hindi="हर device पर तुरंत sync"
+            desc="Every bill syncs to the cloud instantly — auto-backup, open from any device."
           />
 
           <FeatureCard
@@ -884,9 +884,9 @@ function FAQ() {
       a: "Minimum: an Android phone or any laptop. Recommended: 80mm thermal printer + USB barcode scanner. हम बता देंगे क्या खरीदना है — total under ₹6,000.",
     },
     {
-      q: "What if internet goes down?",
-      qh: "Internet नहीं हो तो?",
-      a: "Offline mode kicks in automatically — bills queue locally and auto-sync the moment internet returns. Your shop never stops.",
+      q: "Do I need internet?",
+      qh: "Internet ज़रूरी है?",
+      a: "Yes — Addison Bill runs in the cloud, so your data syncs across devices and auto-backs up, never lost. A normal mobile-data or WiFi connection is all you need.",
     },
     {
       q: "Is my data safe?",
