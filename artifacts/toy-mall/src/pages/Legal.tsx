@@ -9,8 +9,8 @@ import { useSeo, SITE } from "@/lib/seo";
 ═══════════════════════════════════════════════════════════════ */
 
 const COMPANY   = "Addison Bill Media";
-const SUPPORT   = "hello@addisonxmedia.com";
-const WHATSAPP  = "919999999999";
+const SUPPORT   = "contact@addisonbill.in";
+const WHATSAPP  = "919142647797";
 const LAST_UPDATED = "28 June 2026";
 
 type Section = { h: string; body: string[] };
