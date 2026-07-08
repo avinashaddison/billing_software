@@ -50,6 +50,39 @@ async function sendMessage(text: string): Promise<void> {
   await Promise.all(chatIds.map((id) => sendToOne(token, id, text)));
 }
 
+/**
+ * Send a file (e.g. a gzipped DB backup) as a Telegram document to every
+ * configured chat — or an explicit override list (BACKUP_TELEGRAM_CHAT_ID).
+ * Uses multipart/form-data via the global FormData/Blob (Node 18+). Silently
+ * no-ops when unconfigured. Telegram's bot document limit is ~50 MB.
+ */
+export async function sendDocument(
+  filename: string,
+  content: Buffer,
+  caption: string,
+  chatIdsOverride?: string[],
+): Promise<void> {
+  const token   = process.env.TELEGRAM_BOT_TOKEN;
+  const chatIds = chatIdsOverride && chatIdsOverride.length > 0 ? chatIdsOverride : getChatIds();
+  if (!token || chatIds.length === 0) return;
+  for (const chatId of chatIds) {
+    try {
+      const form = new FormData();
+      form.append("chat_id", chatId);
+      form.append("caption", caption.slice(0, 1024));
+      form.append("parse_mode", "HTML");
+      form.append("document", new Blob([new Uint8Array(content)]), filename);
+      const res = await fetch(`${API_BASE}/bot${token}/sendDocument`, { method: "POST", body: form });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        logger.warn({ status: res.status, chatId, body }, "Telegram sendDocument failed");
+      }
+    } catch (err) {
+      logger.warn({ err, chatId }, "Telegram sendDocument error");
+    }
+  }
+}
+
 export interface SaleAlertItem {
   productName: string;
   quantity:    number;

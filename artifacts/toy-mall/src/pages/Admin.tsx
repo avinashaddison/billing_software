@@ -3,7 +3,7 @@ import {
   ShieldCheck, LogOut, RefreshCw, Plus, Search, Building2, Users, Package,
   Receipt, Loader2, AlertTriangle, Mail, Lock, KeyRound, Power, PowerOff,
   CheckCircle2, CalendarClock, Infinity, Pencil, Copy, ScrollText, X, Clock,
-  IndianRupee,
+  IndianRupee, DatabaseBackup,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -206,6 +206,7 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
   const [editing, setEditing] = useState<TenantRow | null>(null);
   const [viewingUsers, setViewingUsers] = useState<TenantRow | null>(null);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -239,6 +240,22 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
   const logout = async () => {
     await fetch(`${API}/platform/logout`, { method: "POST", credentials: "include" }).catch(() => {});
     onLogout();
+  };
+
+  /* Trigger an immediate DB backup → Telegram (same routine as the nightly job). */
+  const backupNow = async () => {
+    setBackingUp(true);
+    const t = toast.loading("Backing up database…");
+    try {
+      const r = await fetch(`${API}/platform/backup`, { method: "POST", credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        toast.success(`Backup sent to Telegram — ${d.tables ?? "?"} tables, ${Number(d.totalRows ?? 0).toLocaleString("en-IN")} rows`, { id: t });
+      } else {
+        toast.error(d.error || "Backup failed", { id: t });
+      }
+    } catch { toast.error("Server unreachable", { id: t }); }
+    finally { setBackingUp(false); }
   };
 
   const filtered = useMemo(() => {
@@ -334,6 +351,9 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={backupNow} disabled={backingUp} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted disabled:opacity-50" title="Send a full database backup to Telegram now">
+              <DatabaseBackup className={`w-3.5 h-3.5 ${backingUp ? "animate-pulse" : ""}`} /> <span className="hidden sm:inline">{backingUp ? "Backing up…" : "Backup"}</span>
+            </button>
             <button onClick={() => setAuditOpen(true)} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted" title="Audit log">
               <ScrollText className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Audit Log</span>
             </button>
