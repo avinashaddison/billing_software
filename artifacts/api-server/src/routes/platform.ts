@@ -28,6 +28,7 @@ import {
 } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { recordAudit } from "../lib/audit";
+import { runDatabaseBackup } from "../lib/backup";
 import {
   PLATFORM_COOKIE_NAME,
   signTenantCookie,
@@ -811,6 +812,29 @@ router.patch("/platform/settings", requirePlatformAdmin, async (req, res): Promi
     res.json({ pricing: { dealPrice, originalPrice } });
   } catch {
     res.status(500).json({ error: "Failed to save pricing" });
+  }
+});
+
+/* ───── POST /api/platform/backup — on-demand DB backup to Telegram ───
+ *
+ * Runs the same routine as the nightly scheduled job, immediately, so the
+ * vendor can verify backups work (and grab an ad-hoc copy) without waiting for
+ * 02:30 IST. Awaits the send so the response reflects success/failure.
+ */
+router.post("/platform/backup", requirePlatformAdmin, async (req, res): Promise<void> => {
+  try {
+    const summary = await runDatabaseBackup();
+    void recordAudit({
+      action:     "platform.backup",
+      actorId:    req.platformActor!.id,
+      actorEmail: req.platformActor!.email,
+      ip:         req.ip,
+      metadata:   { tables: summary.tables, totalRows: summary.totalRows, sizeBytes: summary.sizeBytes },
+    });
+    res.json({ ok: true, ...summary });
+  } catch (err: any) {
+    logger.error({ err }, "manual database backup failed");
+    res.status(500).json({ error: err?.message || "Backup failed — check server logs" });
   }
 });
 

@@ -2,6 +2,7 @@ import { schedule } from "node-cron";
 import { sql, desc, and, or, lt, isNotNull } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, authSessionsTable } from "@workspace/db";
 import { sendDailySalesSummary } from "./telegram";
+import { runDatabaseBackup } from "./backup";
 import { logger } from "./logger";
 
 const DAY_MS = 86_400_000;
@@ -95,6 +96,17 @@ export function startDailyReportScheduler(): void {
   schedule("15 3 * * *", () => {
     cleanupStaleSessions().catch((err) =>
       logger.error({ err }, "Failed to clean up auth_sessions")
+    );
+  }, { timezone: "Asia/Kolkata" });
+
+  /* Nightly full-database backup → Telegram at 02:30 IST (BACKUP_HOUR overrides
+     the hour). Runs before the cleanup so a backup captures the pre-prune state. */
+  const backupHour = parseInt(process.env.BACKUP_HOUR ?? "2", 10);
+  const clampedBackupHour = Math.max(0, Math.min(23, isNaN(backupHour) ? 2 : backupHour));
+  logger.info({ backupHour: clampedBackupHour, timezone: "Asia/Kolkata" }, "Scheduling nightly DB backup to Telegram");
+  schedule(`30 ${clampedBackupHour} * * *`, () => {
+    runDatabaseBackup().catch((err) =>
+      logger.error({ err }, "Nightly database backup failed")
     );
   }, { timezone: "Asia/Kolkata" });
 }
