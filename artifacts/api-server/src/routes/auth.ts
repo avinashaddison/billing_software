@@ -21,10 +21,11 @@
  * `tenant_id = req.tenantId`.
  */
 import { Router, type IRouter } from "express";
-import { eq, and, asc, desc, isNull, inArray, sql } from "drizzle-orm";
+import { eq, ne, and, asc, desc, isNull, inArray, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, authUsersTable, authSessionsTable, staffProfilesTable } from "@workspace/db";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { recordAudit } from "../lib/audit";
 import { requireAdmin } from "../middlewares/auth";
 import { clientMeta, createSession } from "../lib/sessions";
 import {
@@ -295,6 +296,83 @@ router.post("/auth/users/:id/password", requireAdmin, async (req, res): Promise<
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     res.json({ ok: true, id: user.id });
   } catch { res.status(500).json({ error: "Failed to reset password" }); }
+});
+
+/* ── POST /api/auth/change-password — self-service for the owner ──
+ *
+ * Lets the shop owner rotate their own email-login password from Settings,
+ * without going through the platform admin. Works from BOTH session kinds:
+ *  - email session → the caller's own auth_users row
+ *  - PIN owner session → the tenant's email account(s); the current
+ *    password identifies which row (normally there is exactly one).
+ * The current password is always verified, so a borrowed unlocked device
+ * can't silently take over the account. */
+router.post("/auth/change-password", requireAdmin, async (req, res): Promise<void> => {
+  const currentPassword = req.body?.currentPassword;
+  const newPassword     = req.body?.newPassword;
+  if (typeof currentPassword !== "string" || currentPassword.length === 0) {
+    res.status(400).json({ error: "Current password required" }); return;
+  }
+  if (!isValidPassword(newPassword)) {
+    res.status(400).json({ error: `New password must be ${MIN_PASSWORD_LEN}–${MAX_PASSWORD_LEN} chars` });
+    return;
+  }
+  try {
+    const candidates = req.authKind === "email" && req.userId
+      ? await db.select().from(authUsersTable)
+          .where(eq(authUsersTable.id, req.userId))
+      : await db.select().from(authUsersTable)
+          .where(and(
+            tenantWhere(authUsersTable.tenantId, req.tenantId),
+            eq(authUsersTable.isActive, true),
+          ));
+
+    let user: (typeof candidates)[number] | undefined;
+    for (const c of candidates) {
+      const matched = await bcrypt.compare(currentPassword, c.passwordHash);
+      if (matched && !user) user = c;
+    }
+    if (candidates.length === 0) {
+      await bcrypt.compare(currentPassword, "$2b$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv");
+    }
+    if (!user) {
+      res.status(401).json({ error: "Current password is incorrect" });
+      return;
+    }
+
+    const hashed = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await db.update(authUsersTable)
+      .set({
+        passwordHash: hashed,
+        passwordResetToken:   null,
+        passwordResetExpires: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(authUsersTable.id, user.id));
+
+    /* Every OTHER device holding an email session for this account must sign
+       in again with the new password. Best-effort: a failed revoke must not
+       fail the password change that already happened. */
+    db.update(authSessionsTable)
+      .set({ revokedAt: sql`now()` })
+      .where(and(
+        eq(authSessionsTable.subjectKind, "email"),
+        eq(authSessionsTable.subjectId, user.id),
+        isNull(authSessionsTable.revokedAt),
+        ...(req.sessionId ? [ne(authSessionsTable.id, req.sessionId)] : []),
+      ))
+      .then(() => undefined, () => undefined);
+
+    void recordAudit({
+      action:       "auth.password_changed",
+      actorId:      user.id,
+      actorEmail:   user.email,
+      targetTenant: user.tenantId ?? null,
+      ip:           req.ip,
+    });
+
+    res.json({ ok: true, email: user.email });
+  } catch { res.status(500).json({ error: "Failed to change password" }); }
 });
 
 /* ── POST /api/auth/users/:id/disable ───────────────────────────── */

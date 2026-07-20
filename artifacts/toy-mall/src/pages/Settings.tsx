@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette, Sparkles, Monitor, LogOut, ShieldAlert } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette, Sparkles, Monitor, LogOut, ShieldAlert, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useLocation } from "wouter";
 import { useStoreSettings, usePerStaffScannerPrefs, type StoreSettings } from "@/lib/store-info";
 
@@ -980,6 +980,9 @@ export default function SettingsPage() {
           </div>
         </Section>
 
+        {/* ── Login Password (owner-only) ── */}
+        {role === "owner" && <ChangePasswordSection />}
+
         {/* ── Devices & Sessions (owner-only) ── */}
         {role === "owner" && <DevicesSection />}
 
@@ -1292,6 +1295,118 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {children}
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
+  );
+}
+
+/* ── Login Password ──
+ * Owner-only self-service rotation of the shop's email-login password
+ * (the password used at the first login step). Backed by
+ * /api/auth/change-password, which verifies the current password server-side. */
+function ChangePasswordSection() {
+  const [current, setCurrent]       = useState("");
+  const [next, setNext]             = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [show, setShow]             = useState(false);
+  const [busy, setBusy]             = useState(false);
+
+  const mismatch  = confirmPwd.length > 0 && next !== confirmPwd;
+  const tooShort  = next.length > 0 && next.length < 8;
+  const canSubmit = current.length > 0 && next.length >= 8 && next === confirmPwd && !busy;
+
+  const inputCls =
+    "w-full px-3 py-2.5 pr-10 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono";
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/auth/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) {
+        toast.error(d?.error || "Failed to change password");
+        return;
+      }
+      toast.success(`Password updated for ${d?.email ?? "your account"}. Other devices must sign in again.`);
+      setCurrent(""); setNext(""); setConfirmPwd("");
+    } catch {
+      toast.error("Could not reach server");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section icon={KeyRound} title="Login Password" color="text-orange-600 bg-orange-50 dark:bg-orange-950/30">
+      <p className="text-[11px] text-muted-foreground -mt-1">
+        Change the email password used at the first login step. Other devices signed in with
+        the old password will be logged out.
+      </p>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Current Password">
+          <div className="relative">
+            <input
+              type={show ? "text" : "password"}
+              autoComplete="current-password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+              placeholder="Your current password"
+              className={inputCls}
+            />
+            <button
+              type="button"
+              onClick={() => setShow((s) => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={show ? "Hide passwords" : "Show passwords"}
+            >
+              {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </Field>
+        <Field label="New Password" hint="At least 8 characters">
+          <input
+            type={show ? "text" : "password"}
+            autoComplete="new-password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            placeholder="New password (min 8 chars)"
+            className={inputCls}
+          />
+          {tooShort && (
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+              Password must be at least 8 characters.
+            </p>
+          )}
+        </Field>
+        <Field label="Confirm New Password">
+          <input
+            type={show ? "text" : "password"}
+            autoComplete="new-password"
+            value={confirmPwd}
+            onChange={(e) => setConfirmPwd(e.target.value)}
+            placeholder="Type the new password again"
+            className={inputCls}
+          />
+          {mismatch && (
+            <p className="text-[11px] text-red-600 dark:text-red-400 font-medium mt-1">
+              Passwords don't match.
+            </p>
+          )}
+        </Field>
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="w-full h-11 rounded-xl bg-orange-500 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-orange-600 active:scale-[0.98] transition-all disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+          {busy ? "Updating…" : "Update Password"}
+        </button>
+      </form>
+    </Section>
   );
 }
 
