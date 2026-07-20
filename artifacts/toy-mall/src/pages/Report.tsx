@@ -7,8 +7,9 @@ import {
   FileText, Printer, ChevronLeft, ChevronRight, TrendingUp, TrendingDown,
   IndianRupee, ShoppingBag, Package, Banknote, Smartphone, Loader2,
   HandCoins, Users, Tag, Undo2, Download, Clock, Trophy, Sparkles,
-  Activity,
+  Activity, FileSpreadsheet,
 } from "lucide-react";
+import ProfitTab from "./report/ProfitTab";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -45,7 +46,7 @@ interface EodReport {
   topCustomers:   TopCustomer[];
 }
 
-type Tab = "overview" | "sales" | "receivables" | "inventory" | "customers";
+type Tab = "overview" | "sales" | "profit" | "receivables" | "inventory" | "customers";
 
 /* ── Utilities ──────────────────────────────────────────────────── */
 function todayIndia() {
@@ -292,8 +293,9 @@ export default function Report() {
           </button>
         </div>
 
-        {/* Period selector */}
-        <div className="flex items-center gap-2 pb-3 flex-wrap no-print">
+        {/* Period selector — hidden on the Profit tab, which has its own
+            from/to range controls */}
+        <div className={`flex items-center gap-2 pb-3 flex-wrap no-print ${tab === "profit" ? "hidden" : ""}`}>
           <div className="flex gap-1 p-1 bg-muted rounded-xl">
             <button onClick={() => setDate(todayIndia())}
               className={`px-3 h-8 rounded-lg text-xs font-bold transition-all ${isToday ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
@@ -327,6 +329,7 @@ export default function Report() {
           {([
             { id: "overview",    label: "Overview",    Icon: Sparkles },
             { id: "sales",       label: "Sales",       Icon: TrendingUp },
+            { id: "profit",      label: "Profit",      Icon: FileSpreadsheet },
             { id: "receivables", label: "Receivables", Icon: HandCoins },
             { id: "inventory",   label: "Inventory",   Icon: Package },
             { id: "customers",   label: "Customers",   Icon: Users },
@@ -349,7 +352,11 @@ export default function Report() {
 
       {/* ── Body ── */}
       <div className="flex-1 overflow-y-auto pb-24 md:pb-6 p-4 md:p-6 space-y-5 print:p-2">
-        {loading && (
+        {/* Profit tab is self-contained: its own date range, fetch and
+            loading state — independent of the single-day EOD payload. */}
+        {tab === "profit" && <ProfitTab />}
+
+        {loading && tab !== "profit" && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>

@@ -410,4 +410,172 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
   });
 });
 
+/**
+ * GET /api/reports/profit?from=YYYY-MM-DD&to=YYYY-MM-DD
+ *
+ * Full profit & investment statement over an arbitrary date range (IST
+ * calendar days, both ends inclusive). Powers the Excel-style Profit tab.
+ *
+ * Per-item rows: every catalogue SKU sold in the range (qty, revenue,
+ * cost-of-goods = investment, profit, margin) plus manual/non-inventory
+ * lines grouped by their custom name (zero cost → full margin, matching the
+ * EOD report's treatment). Catalogue items with NO known purchase price are
+ * flagged (`costKnown: false`) and excluded from the profit totals so the
+ * margin is never overstated.
+ *
+ * Also returns the period's stock purchases (stock IN) valued at the
+ * product's CURRENT purchase price — stock_logs stores no price snapshot,
+ * so it's an estimate, labelled as such in the UI.
+ */
+router.get("/reports/profit", async (req, res): Promise<void> => {
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const today = istToday();
+  let from = String(req.query.from ?? "");
+  let to   = String(req.query.to   ?? "");
+  if (!DATE_RE.test(to))   to   = today;
+  if (!DATE_RE.test(from)) from = istShiftDay(to, -29);
+  if (from > to) [from, to] = [to, from];
+  /* Hard cap the window so a typo'd year can't scan the whole table. */
+  if (istShiftDay(from, 366) < to) from = istShiftDay(to, -366);
+
+  const tenantId = req.tenantId;
+  const lo = istDayStart(from);
+  const hi = istDayStart(istShiftDay(to, 1)); // exclusive upper bound
+  const billRange = and(
+    sql`${billsTable.createdAt} >= ${lo}`,
+    sql`${billsTable.createdAt} < ${hi}`,
+    tenantWhere(billsTable.tenantId, tenantId),
+  );
+
+  const lineCost = sql`COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice})`;
+
+  const [skuRows, manualRows, billTotals, purchases] = await Promise.all([
+    /* Catalogue items sold in the range, one row per SKU. */
+    db.select({
+        productId:    saleItemsTable.productId,
+        productName:  productsTable.name,
+        productSku:   productsTable.sku,
+        category:     productsTable.category,
+        totalQty:     sql<number>`SUM(${saleItemsTable.quantity})::int`.as("total_qty"),
+        totalRevenue: sql<string>`SUM(${saleItemsTable.subtotal})`.as("total_revenue"),
+        billCount:    sql<number>`COUNT(DISTINCT ${saleItemsTable.saleId})::int`.as("bill_count"),
+        totalCost:    sql<string>`COALESCE(SUM(${lineCost} * ${saleItemsTable.quantity}), 0)`.as("total_cost"),
+        costedQty:    sql<number>`COALESCE(SUM(${saleItemsTable.quantity}) FILTER (WHERE ${lineCost} IS NOT NULL), 0)::int`.as("costed_qty"),
+      })
+      .from(saleItemsTable)
+      .innerJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
+      .innerJoin(billsTable,    sql`${saleItemsTable.saleId}    = ${billsTable.id}`)
+      .where(billRange)
+      .groupBy(saleItemsTable.productId, productsTable.name, productsTable.sku, productsTable.category)
+      .orderBy(desc(sql`SUM(${saleItemsTable.subtotal})`)),
+
+    /* Manual / non-inventory lines, grouped by the typed name. */
+    db.select({
+        customName:   sql<string>`COALESCE(${saleItemsTable.customName}, 'Manual item')`.as("custom_name"),
+        totalQty:     sql<number>`SUM(${saleItemsTable.quantity})::int`.as("total_qty"),
+        totalRevenue: sql<string>`SUM(${saleItemsTable.subtotal})`.as("total_revenue"),
+        billCount:    sql<number>`COUNT(DISTINCT ${saleItemsTable.saleId})::int`.as("bill_count"),
+      })
+      .from(saleItemsTable)
+      .innerJoin(billsTable, sql`${saleItemsTable.saleId} = ${billsTable.id}`)
+      .where(and(sql`${saleItemsTable.productId} IS NULL`, billRange))
+      .groupBy(sql`COALESCE(${saleItemsTable.customName}, 'Manual item')`)
+      .orderBy(desc(sql`SUM(${saleItemsTable.subtotal})`)),
+
+    /* Range-wide bill headline numbers. */
+    db.select({
+        billCount:   sql<number>`COUNT(*)::int`.as("bill_count"),
+        totalAmount: sql<string>`COALESCE(SUM(${billsTable.totalAmount}), 0)`.as("total_amount"),
+      })
+      .from(billsTable)
+      .where(billRange)
+      .then((rows) => rows[0] ?? { billCount: 0, totalAmount: "0" }),
+
+    /* Stock purchased (IN) during the range, valued at current cost. */
+    db.select({
+        units:    sql<number>`COALESCE(SUM(${stockLogsTable.quantity}), 0)::int`.as("units"),
+        txCount:  sql<number>`COUNT(*)::int`.as("tx_count"),
+        estValue: sql<string>`COALESCE(SUM(${stockLogsTable.quantity} * COALESCE(${productsTable.purchasePrice}, 0)), 0)`.as("est_value"),
+      })
+      .from(stockLogsTable)
+      .innerJoin(productsTable, sql`${stockLogsTable.productId} = ${productsTable.id}`)
+      .where(and(
+        sql`${stockLogsTable.type} = 'IN'`,
+        sql`${stockLogsTable.createdAt} >= ${lo}`,
+        sql`${stockLogsTable.createdAt} < ${hi}`,
+        tenantWhere(stockLogsTable.tenantId, tenantId),
+      ))
+      .then((rows) => rows[0] ?? { units: 0, txCount: 0, estValue: "0" }),
+  ]);
+
+  const rows = [
+    ...skuRows.map((p) => {
+      const qty       = Number(p.totalQty);
+      const revenue   = Number(p.totalRevenue);
+      const costKnown = p.costedQty === qty;
+      const cost      = costKnown ? Number(p.totalCost) : null;
+      const profit    = cost != null ? revenue - cost : null;
+      return {
+        kind:      "sku" as const,
+        name:      p.productName,
+        sku:       p.productSku,
+        category:  p.category,
+        qty,
+        revenue,
+        cost,
+        profit,
+        margin:    profit != null && revenue > 0 ? (profit / revenue) * 100 : null,
+        billCount: Number(p.billCount),
+        costKnown,
+      };
+    }),
+    ...manualRows.map((m) => {
+      const revenue = Number(m.totalRevenue);
+      return {
+        kind:      "manual" as const,
+        name:      m.customName,
+        sku:       null,
+        category:  null,
+        qty:       Number(m.totalQty),
+        revenue,
+        cost:      0,
+        profit:    revenue,
+        margin:    revenue > 0 ? 100 : null,
+        billCount: Number(m.billCount),
+        costKnown: true,
+      };
+    }),
+  ].sort((a, b) => b.revenue - a.revenue);
+
+  /* Totals over rows with a KNOWN cost (same "covered" base as EOD). */
+  let coveredRevenue = 0, totalCost = 0, uncostedRevenue = 0, totalQty = 0;
+  for (const r of rows) {
+    totalQty += r.qty;
+    if (r.costKnown && r.cost != null) { coveredRevenue += r.revenue; totalCost += r.cost; }
+    else uncostedRevenue += r.revenue;
+  }
+  const totalProfit = coveredRevenue - totalCost;
+
+  res.json({
+    from,
+    to,
+    rows,
+    totals: {
+      revenue:         Number(billTotals.totalAmount),
+      itemRevenue:     coveredRevenue + uncostedRevenue,
+      investment:      totalCost,
+      profit:          totalProfit,
+      margin:          coveredRevenue > 0 ? (totalProfit / coveredRevenue) * 100 : 0,
+      qty:             totalQty,
+      billCount:       Number(billTotals.billCount),
+      uncostedRevenue,
+    },
+    purchases: {
+      units:    Number(purchases.units),
+      txCount:  Number(purchases.txCount),
+      estValue: Number(purchases.estValue),
+    },
+  });
+});
+
 export default router;
