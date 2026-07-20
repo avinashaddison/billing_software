@@ -829,7 +829,7 @@ router.post("/platform/backup", requirePlatformAdmin, async (req, res): Promise<
       actorId:    req.platformActor!.id,
       actorEmail: req.platformActor!.email,
       ip:         req.ip,
-      metadata:   { tables: summary.tables, totalRows: summary.totalRows, sizeBytes: summary.sizeBytes },
+      metadata:   { tables: summary.tables, totalRows: summary.totalRows, sizeBytes: summary.sizeBytes, r2: summary.destinations.r2, telegram: summary.destinations.telegram },
     });
     res.json({ ok: true, ...summary });
   } catch (err: any) {
