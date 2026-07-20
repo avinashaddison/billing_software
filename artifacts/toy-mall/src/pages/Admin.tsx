@@ -3,7 +3,8 @@ import {
   ShieldCheck, LogOut, RefreshCw, Plus, Search, Building2, Users, Package,
   Receipt, Loader2, AlertTriangle, Mail, Lock, KeyRound, Power, PowerOff,
   CheckCircle2, CalendarClock, Infinity, Pencil, Copy, ScrollText, X, Clock,
-  IndianRupee, DatabaseBackup,
+  IndianRupee, DatabaseBackup, Download, Eye, Cloud, Send, ArchiveRestore,
+  LayoutDashboard, Menu, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -53,6 +54,22 @@ interface Stats {
   legacyUsers:   number;
 }
 
+/** Stable, colourful avatar gradient per tenant — hashed from the id so a
+ *  tenant keeps its colour across reloads. */
+const AVATAR_GRADS = [
+  "from-violet-500 to-fuchsia-500",
+  "from-sky-500 to-cyan-400",
+  "from-emerald-500 to-teal-400",
+  "from-amber-500 to-orange-500",
+  "from-rose-500 to-pink-500",
+  "from-indigo-500 to-blue-500",
+] as const;
+function avatarGrad(id: string): string {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return AVATAR_GRADS[h % AVATAR_GRADS.length];
+}
+
 export default function AdminPage() {
   const [me, setMe]       = useState<PlatformMe | null>(null);
   const [checking, setChecking] = useState(true);
@@ -65,16 +82,21 @@ export default function AdminPage() {
       .finally(() => setChecking(false));
   }, []);
 
-  if (checking) {
-    return (
-      <div className="min-h-[100dvh] flex items-center justify-center">
-        <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (!me) return <LoginScreen onAuthed={setMe} />;
-  return <Dashboard me={me} onLogout={() => setMe(null)} />;
+  /* The admin panel is always-dark by design: the `dark` wrapper flips every
+     token (bg-card, bg-background, …) so dialogs and cards inherit the theme. */
+  return (
+    <div className="dark">
+      {checking ? (
+        <div className="min-h-[100dvh] flex items-center justify-center bg-[#05070f]">
+          <Loader2 className="w-7 h-7 animate-spin text-slate-500" />
+        </div>
+      ) : !me ? (
+        <LoginScreen onAuthed={setMe} />
+      ) : (
+        <Dashboard me={me} onLogout={() => setMe(null)} />
+      )}
+    </div>
+  );
 }
 
 /* ───────── Login ───────── */
@@ -340,48 +362,256 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
     }
   };
 
-  return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-white to-violet-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-violet-950/20">
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white shadow-lg shadow-violet-500/30">
-              <ShieldCheck className="w-5 h-5" strokeWidth={2.5} />
-            </div>
-            <div>
-              <h1 className="text-lg font-black tracking-tight">Addison Bill Admin</h1>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{me.email}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={backupNow} disabled={backingUp} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted disabled:opacity-50" title="Save a full database backup to Cloudflare R2 / Telegram now">
-              <DatabaseBackup className={`w-3.5 h-3.5 ${backingUp ? "animate-pulse" : ""}`} /> <span className="hidden sm:inline">{backingUp ? "Backing up…" : "Backup"}</span>
-            </button>
-            <button onClick={() => setAuditOpen(true)} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted" title="Audit log">
-              <ScrollText className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Audit Log</span>
-            </button>
-            <button onClick={refresh} className="p-2 rounded-xl bg-card border hover:bg-muted transition-colors" title="Refresh">
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </button>
-            <button onClick={logout} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted">
-              <LogOut className="w-3.5 h-3.5" /> Sign out
-            </button>
-          </div>
+  /* ── Sidebar shell ── */
+  type Section = "dashboard" | "tenants" | "pricing" | "backups";
+  const [section, setSection] = useState<Section>("dashboard");
+  const [navOpen, setNavOpen] = useState(false);
+
+  const NAV: { key: Section; label: string; icon: React.ElementType; hint: string }[] = [
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, hint: "Overview & quick actions" },
+    { key: "tenants",   label: "Tenants",   icon: Building2,       hint: "Manage client shops" },
+    { key: "pricing",   label: "Pricing",   icon: IndianRupee,     hint: "Landing-page price" },
+    { key: "backups",   label: "Backups",   icon: DatabaseBackup,  hint: "R2, schedule & restore" },
+  ];
+  const SECTION_META: Record<Section, { title: string; sub: string }> = {
+    dashboard: { title: "Dashboard", sub: "Everything at a glance" },
+    tenants:   { title: "Tenants",   sub: `${tenants.length} client shop${tenants.length !== 1 ? "s" : ""} on the platform` },
+    pricing:   { title: "Subscription Pricing", sub: "Drives the public landing page" },
+    backups:   { title: "Database Backups", sub: "Cloudflare R2 · Telegram · restore" },
+  };
+
+  const goto = (s: Section) => { setSection(s); setNavOpen(false); };
+
+  /* Tenants that need attention: expired or expiring within 7 days. */
+  const attention = useMemo(() => {
+    const now = Date.now();
+    return tenants
+      .filter((t) => t.expiresAt && (new Date(t.expiresAt).getTime() - now) < 7 * 86_400_000)
+      .sort((a, b) => new Date(a.expiresAt!).getTime() - new Date(b.expiresAt!).getTime())
+      .slice(0, 6);
+  }, [tenants]);
+
+  const SidebarBody = (
+    <>
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-5 pt-6 pb-5">
+        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white shadow-lg shadow-violet-500/40 shrink-0">
+          <ShieldCheck className="w-5 h-5" strokeWidth={2.5} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-black tracking-tight text-white leading-tight">Addison Bill</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-300/80">Admin Panel</p>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 space-y-5">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Total Tenants"  value={stats?.totalTenants ?? 0}  gradient="from-violet-500 to-fuchsia-500" icon={Building2} />
-          <StatCard label="Active Tenants" value={stats?.activeTenants ?? 0} gradient="from-emerald-500 to-teal-500" icon={CheckCircle2} />
-          <StatCard label="Auth Users"     value={stats?.totalUsers ?? 0}    gradient="from-blue-500 to-cyan-500" icon={Users} />
-          <StatCard label="Legacy NULL"    value={stats?.legacyUsers ?? 0}   gradient="from-amber-500 to-orange-500" icon={AlertTriangle} />
+      {/* Nav */}
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+        {NAV.map(({ key, label, icon: Icon, hint }) => {
+          const active = section === key;
+          return (
+            <button
+              key={key}
+              onClick={() => goto(key)}
+              className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 ${
+                active
+                  ? "bg-white/10 text-white ring-1 ring-white/10 shadow-[0_0_24px_-6px_rgba(168,85,247,0.55)]"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-full bg-gradient-to-b from-violet-400 to-fuchsia-500 transition-all duration-300 ${active ? "h-6 opacity-100" : "h-0 opacity-0"}`} />
+              <Icon className={`w-4 h-4 shrink-0 transition-transform duration-200 ${active ? "scale-110" : "group-hover:scale-110"}`} />
+              <span className="flex-1 min-w-0">
+                <span className="block text-[13px] font-bold leading-tight">{label}</span>
+                <span className={`block text-[10px] leading-tight transition-colors ${active ? "text-violet-200/70" : "text-slate-500 group-hover:text-slate-400"}`}>{hint}</span>
+              </span>
+              {key === "tenants" && tenants.length > 0 && (
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black tabular-nums ${active ? "bg-white/15 text-white" : "bg-white/5 text-slate-400"}`}>
+                  {tenants.length}
+                </span>
+              )}
+              {attention.length > 0 && key === "dashboard" && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              )}
+            </button>
+          );
+        })}
+
+        <div className="pt-2 mt-2 border-t border-white/10">
+          <button
+            onClick={() => { setAuditOpen(true); setNavOpen(false); }}
+            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-200"
+          >
+            <ScrollText className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110" />
+            <span className="flex-1 text-[13px] font-bold">Audit Log</span>
+            <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+          </button>
+        </div>
+      </nav>
+
+      {/* User / sign out */}
+      <div className="px-3 pb-5 pt-3 border-t border-white/10 space-y-1">
+        <div className="flex items-center gap-2.5 px-3 py-2">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-white/20 flex items-center justify-center text-[11px] font-black text-white shrink-0 uppercase">
+            {me.email.slice(0, 1)}
+          </div>
+          <p className="text-[11px] font-mono text-slate-400 truncate" title={me.email}>{me.email}</p>
+        </div>
+        <button
+          onClick={logout}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-slate-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 text-[13px] font-bold"
+        >
+          <LogOut className="w-4 h-4" /> Sign out
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-[100dvh] flex bg-[#05070f] text-slate-100 relative isolate">
+
+      {/* ── Ambient aurora backdrop ── */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="adm-orb absolute -top-48 -left-32 w-[560px] h-[560px] rounded-full bg-violet-600/25 blur-[120px]" />
+        <div className="adm-orb absolute top-1/3 -right-44 w-[520px] h-[520px] rounded-full bg-fuchsia-600/15 blur-[120px]" style={{ animationDelay: "-8s" }} />
+        <div className="adm-orb absolute -bottom-56 left-1/4 w-[620px] h-[620px] rounded-full bg-sky-600/15 blur-[130px]" style={{ animationDelay: "-14s" }} />
+        <div className="absolute inset-0 opacity-70"
+          style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#05070f]" />
+      </div>
+
+      {/* ── Sidebar (desktop) ── */}
+      <aside className="hidden lg:flex flex-col w-64 shrink-0 sticky top-0 h-[100dvh] bg-white/[0.02] backdrop-blur-2xl border-r border-white/[0.06] relative overflow-hidden">
+        <div aria-hidden className="adm-glow-pulse pointer-events-none absolute -top-24 -left-24 w-64 h-64 rounded-full bg-violet-600/20 blur-3xl" />
+        <div className="relative flex flex-col h-full">{SidebarBody}</div>
+      </aside>
+
+      {/* ── Sidebar (mobile drawer) ── */}
+      {navOpen && (
+        <div className="lg:hidden fixed inset-0 z-40">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setNavOpen(false)} />
+          <aside className="absolute left-0 top-0 h-full w-72 bg-[#0a0d1a]/95 backdrop-blur-2xl border-r border-white/10 flex flex-col animate-in slide-in-from-left duration-300">
+            {SidebarBody}
+          </aside>
+        </div>
+      )}
+
+      {/* ── Main ── */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Topbar */}
+        <div className="sticky top-0 z-20 bg-[#05070f]/50 backdrop-blur-xl border-b border-white/[0.06]">
+          <div className="px-4 md:px-8 py-3.5 flex items-center gap-3">
+            <button onClick={() => setNavOpen(true)} className="lg:hidden p-2 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] transition-colors">
+              <Menu className="w-4 h-4" />
+            </button>
+            <div className="flex-1 min-w-0" key={section}>
+              <h1 className="text-lg font-black tracking-tight leading-tight bg-gradient-to-r from-white via-white to-slate-400 bg-clip-text text-transparent animate-in fade-in slide-in-from-bottom-1 duration-300">
+                {SECTION_META[section].title}
+              </h1>
+              <p className="text-[11px] text-slate-500 animate-in fade-in duration-500">{SECTION_META[section].sub}</p>
+            </div>
+            <button onClick={refresh} className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] transition-all active:scale-90" title="Refresh">
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <button
+              onClick={() => setCreating(true)}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30 flex items-center gap-1.5 hover:shadow-violet-500/50 hover:-translate-y-px active:scale-95 transition-all"
+            >
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Tenant</span>
+            </button>
+          </div>
         </div>
 
-        {/* Global subscription pricing (drives the public landing page) */}
-        <PricingCard />
+        {/* Section content */}
+        <div key={section} className="flex-1 px-4 md:px-8 py-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300 max-w-6xl w-full">
 
+          {/* ═══ DASHBOARD ═══ */}
+          {section === "dashboard" && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: "Total Tenants",  value: stats?.totalTenants ?? 0,  gradient: "from-violet-500 to-fuchsia-500", icon: Building2 },
+                  { label: "Active Tenants", value: stats?.activeTenants ?? 0, gradient: "from-emerald-500 to-teal-500",   icon: CheckCircle2 },
+                  { label: "Auth Users",     value: stats?.totalUsers ?? 0,    gradient: "from-blue-500 to-cyan-500",      icon: Users },
+                  { label: "Legacy NULL",    value: stats?.legacyUsers ?? 0,   gradient: "from-amber-500 to-orange-500",   icon: AlertTriangle },
+                ].map((s, i) => (
+                  <div key={s.label} className="animate-in fade-in zoom-in-95 duration-300" style={{ animationDelay: `${i * 70}ms`, animationFillMode: "backwards" }}>
+                    <StatCard label={s.label} value={s.value} gradient={s.gradient} icon={s.icon} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Needs attention */}
+              {attention.length > 0 && (
+                <div className="rounded-2xl border border-amber-400/25 bg-amber-500/[0.06] backdrop-blur-xl p-4 md:p-5 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: "200ms", animationFillMode: "backwards" }}>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/40">
+                      <Clock className="w-4 h-4" strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-black text-amber-100">Needs Attention</h2>
+                      <p className="text-[11px] text-amber-200/50">Expired or expiring within 7 days</p>
+                    </div>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {attention.map((t) => {
+                      const lbl = expiryLabel(t.expiresAt);
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => { setSortBy("expiry"); setSearch(""); goto("tenants"); }}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.04] ring-1 ring-white/[0.07] hover:ring-amber-400/40 hover:bg-white/[0.07] hover:-translate-y-px transition-all text-left group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white shrink-0">
+                            <Building2 className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-black truncate">{t.name}</p>
+                            <p className={`text-[10px] font-bold ${lbl.tone === "bad" ? "text-rose-500" : "text-amber-600 dark:text-amber-400"}`}>{lbl.text}</p>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick actions */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  { label: "New Tenant", desc: "Onboard a client", icon: Plus, cls: "from-violet-500 to-fuchsia-600", onClick: () => setCreating(true) },
+                  { label: backingUp ? "Backing up…" : "Backup Now", desc: "R2 + Telegram", icon: DatabaseBackup, cls: "from-sky-500 to-indigo-600", onClick: backupNow },
+                  { label: "Manage Backups", desc: "Preview & restore", icon: ArchiveRestore, cls: "from-emerald-500 to-teal-600", onClick: () => goto("backups") },
+                  { label: "Audit Log", desc: "Every admin action", icon: ScrollText, cls: "from-slate-500 to-slate-700", onClick: () => setAuditOpen(true) },
+                ].map((a, i) => (
+                  <button
+                    key={a.label}
+                    onClick={a.onClick}
+                    disabled={a.label.startsWith("Backing")}
+                    className="adm-card relative overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.08] backdrop-blur-xl p-4 text-left hover:ring-violet-400/40 hover:shadow-[0_10px_44px_-14px_rgba(139,92,246,0.5)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 animate-in fade-in zoom-in-95 disabled:opacity-60"
+                    style={{ animationDelay: `${250 + i * 60}ms`, animationFillMode: "backwards" }}
+                  >
+                    <span className="adm-shimmer" aria-hidden />
+                    <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${a.cls} flex items-center justify-center text-white shadow-lg mb-3`}>
+                      <a.icon className={`w-4 h-4 ${a.label.startsWith("Backing") ? "animate-pulse" : ""}`} strokeWidth={2.5} />
+                    </div>
+                    <p className="text-sm font-black leading-tight">{a.label}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{a.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ═══ PRICING ═══ */}
+          {section === "pricing" && <PricingCard />}
+
+          {/* ═══ BACKUPS ═══ */}
+          {section === "backups" && <BackupsCard />}
+
+          {/* ═══ TENANTS ═══ */}
+          {section === "tenants" && (
+            <>
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
@@ -390,14 +620,14 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, id, or owner email…"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-400/40 transition-all"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
             title="Filter by status"
-            className="px-3 py-2.5 rounded-xl border bg-card text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="px-3 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-sm font-medium text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/40 [&>option]:bg-slate-900"
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>
@@ -408,34 +638,29 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
             title="Sort tenants"
-            className="px-3 py-2.5 rounded-xl border bg-card text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="px-3 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-sm font-medium text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/40 [&>option]:bg-slate-900"
           >
             <option value="newest">Newest first</option>
             <option value="name">Name A–Z</option>
             <option value="expiry">Expiry soonest</option>
           </select>
-          <button
-            onClick={() => setCreating(true)}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30 flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" /> New Tenant
-          </button>
         </div>
 
         {/* Tenants table */}
         {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-slate-500" /></div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">
+          <div className="rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.08] backdrop-blur-xl p-12 text-center text-slate-500">
             {tenants.length === 0 ? "No tenants yet — click 'New Tenant' to onboard your first client." : "No tenants match this search."}
           </div>
         ) : (
-          <div className="rounded-2xl border bg-card overflow-hidden divide-y">
-            {filtered.map((t) => (
-              <div key={t.id} className="p-4 hover:bg-muted/30 transition-colors">
+          <div className="rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.08] backdrop-blur-xl overflow-hidden divide-y divide-white/[0.06]">
+            {filtered.map((t, ti) => (
+              <div key={t.id} className="p-4 hover:bg-white/[0.04] transition-colors animate-in fade-in slide-in-from-bottom-1 duration-300"
+                style={{ animationDelay: `${Math.min(ti * 45, 450)}ms`, animationFillMode: "backwards" }}>
                 <div className="flex items-start gap-3 flex-wrap">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 bg-gradient-to-br ${t.isActive ? "from-violet-500 to-fuchsia-500" : "from-slate-400 to-slate-600"}`}>
-                    <Building2 className="w-5 h-5" />
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 bg-gradient-to-br shadow-lg ${t.isActive ? avatarGrad(t.id) : "from-slate-500 to-slate-700"}`}>
+                    <span className="text-sm font-black uppercase">{t.name.slice(0, 1)}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -520,6 +745,9 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
             ))}
           </div>
         )}
+            </>
+          )}
+        </div>
       </div>
 
       {creating && <CreateTenantDialog onClose={() => setCreating(false)} onCreated={() => { setCreating(false); void refresh(); }} />}
@@ -530,17 +758,37 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
   );
 }
 
+/** Ease-out count-up so stat numbers roll in instead of popping. */
+function useCountUp(target: number, ms = 900): number {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / ms);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setVal(Math.round(target * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return val;
+}
+
 function StatCard({ label, value, gradient, icon: Icon }: {
   label: string; value: number; gradient: string; icon: React.ElementType;
 }) {
+  const n = useCountUp(value);
   return (
-    <div className="rounded-2xl border bg-card p-4 relative overflow-hidden">
-      <div aria-hidden className={`absolute -top-8 -right-8 w-20 h-20 rounded-full bg-gradient-to-br ${gradient} opacity-10 blur-xl`} />
+    <div className="adm-card relative overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.08] backdrop-blur-xl p-4 hover:ring-white/20 hover:-translate-y-0.5 hover:shadow-[0_10px_44px_-14px_rgba(139,92,246,0.45)] transition-all duration-300">
+      <span className="adm-shimmer" aria-hidden />
+      <div aria-hidden className={`absolute -top-10 -right-10 w-28 h-28 rounded-full bg-gradient-to-br ${gradient} opacity-25 blur-2xl`} />
       <div className={`relative inline-flex w-9 h-9 rounded-xl bg-gradient-to-br ${gradient} items-center justify-center text-white shadow-lg`}>
         <Icon className="w-4 h-4" strokeWidth={2.5} />
       </div>
-      <p className="mt-3 text-3xl font-black tabular-nums">{value}</p>
-      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">{label}</p>
+      <p className="relative mt-3 text-3xl font-black tabular-nums bg-gradient-to-br from-white via-white to-slate-500 bg-clip-text text-transparent">{n}</p>
+      <p className="relative text-[10px] font-bold uppercase tracking-widest text-slate-500 mt-0.5">{label}</p>
     </div>
   );
 }
@@ -646,6 +894,370 @@ function PricingCard() {
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/* ───────── Database Backups card ─────────
+ * Configure the nightly backup hour (applied live — no restart), run one now,
+ * and browse the backups stored in Cloudflare R2: preview what's inside
+ * (tables + row counts) or download the .json.gz. */
+interface BackupFile { key: string; filename: string; sizeBytes: number; lastModified: string | null }
+interface BackupsInfo {
+  r2Configured: boolean;
+  telegramConfigured: boolean;
+  backupHour: number;
+  files: BackupFile[];
+  listError?: string;
+}
+interface BackupPreview {
+  key: string;
+  sizeBytes: number;
+  meta: { generatedAt?: string; date?: string; tables?: number; totalRows?: number };
+  tables: { name: string; rows: number }[];
+}
+
+const fmtHour = (h: number) => {
+  const ampm = h < 12 ? "AM" : "PM";
+  const disp = h % 12 === 0 ? 12 : h % 12;
+  return `${String(disp).padStart(2, "0")}:30 ${ampm}`;
+};
+const fmtMb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+const fmtWhen = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : "—";
+
+function BackupsCard() {
+  const [info, setInfo]           = useState<BackupsInfo | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [hour, setHour]           = useState(2);
+  const [savingHour, setSavingHour] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [preview, setPreview]     = useState<BackupPreview | null>(null);
+  const [previewing, setPreviewing] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<BackupFile | null>(null);
+  const [restoreConfirm, setRestoreConfirm] = useState("");
+  const [restoring, setRestoring] = useState(false);
+
+  const load = async () => {
+    try {
+      const r = await fetch(`${API}/platform/backups`, { credentials: "include" });
+      if (!r.ok) { toast.error("Could not load backups"); return; }
+      const d: BackupsInfo = await r.json();
+      setInfo(d);
+      setHour(d.backupHour);
+      if (d.listError) toast.error(d.listError);
+    } catch { toast.error("Server unreachable"); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, []);
+
+  const saveHour = async () => {
+    setSavingHour(true);
+    try {
+      const r = await fetch(`${API}/platform/backup-settings`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hour }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(d.error || "Could not save backup time"); return; }
+      toast.success(`Nightly backup rescheduled to ${fmtHour(hour)} IST — active immediately`);
+      setInfo((i) => (i ? { ...i, backupHour: hour } : i));
+    } catch { toast.error("Server unreachable"); }
+    finally { setSavingHour(false); }
+  };
+
+  const backupNow = async () => {
+    setBackingUp(true);
+    const t = toast.loading("Backing up database…");
+    try {
+      const r = await fetch(`${API}/platform/backup`, { method: "POST", credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        const dests = [d.destinations?.r2 ? "Cloudflare R2" : null, d.destinations?.telegram ? "Telegram" : null]
+          .filter(Boolean).join(" + ") || "?";
+        toast.success(`Backup saved to ${dests} — ${d.tables ?? "?"} tables, ${Number(d.totalRows ?? 0).toLocaleString("en-IN")} rows`, { id: t });
+        await load();
+      } else {
+        toast.error(d.error || "Backup failed", { id: t });
+      }
+    } catch { toast.error("Server unreachable", { id: t }); }
+    finally { setBackingUp(false); }
+  };
+
+  const openPreview = async (f: BackupFile) => {
+    setPreviewing(f.key);
+    try {
+      const r = await fetch(`${API}/platform/backups/preview?key=${encodeURIComponent(f.key)}`, { credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(d.error || "Preview failed"); return; }
+      setPreview(d as BackupPreview);
+    } catch { toast.error("Server unreachable"); }
+    finally { setPreviewing(null); }
+  };
+
+  const doRestore = async () => {
+    if (!restoreTarget || restoreConfirm !== "RESTORE" || restoring) return;
+    setRestoring(true);
+    const t = toast.loading("Restoring database — do not close this tab…");
+    try {
+      const r = await fetch(`${API}/platform/backups/restore`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: restoreTarget.key, confirm: restoreConfirm }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(d.error || "Restore failed — database unchanged", { id: t }); return; }
+      toast.success(
+        `Restored ${d.tables} tables (${Number(d.rowsRestored ?? 0).toLocaleString("en-IN")} rows). ` +
+        `A safety backup of the previous data was saved first.`,
+        { id: t, duration: 8000 },
+      );
+      setRestoreTarget(null);
+      setRestoreConfirm("");
+      await load();
+    } catch { toast.error("Server unreachable", { id: t }); }
+    finally { setRestoring(false); }
+  };
+
+  const download = async (f: BackupFile) => {
+    setDownloading(f.key);
+    try {
+      const r = await fetch(`${API}/platform/backups/download?key=${encodeURIComponent(f.key)}`, { credentials: "include" });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        toast.error(d.error || "Download failed"); return;
+      }
+      const blob = await r.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = f.filename; a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error("Server unreachable"); }
+    finally { setDownloading(null); }
+  };
+
+  return (
+    <div className="rounded-2xl border bg-card p-4 md:p-5">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center text-white shadow-lg shrink-0">
+          <DatabaseBackup className="w-4 h-4" strokeWidth={2.5} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-black">Database Backups</h2>
+          <p className="text-[11px] text-muted-foreground">Nightly automatic backup + on-demand. Stored in Cloudflare R2, copied to Telegram.</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black ${info?.r2Configured ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground"}`}>
+            <Cloud className="w-3 h-3" /> R2 {info?.r2Configured ? "✓" : "not set"}
+          </span>
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black ${info?.telegramConfigured ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground"}`}>
+            <Send className="w-3 h-3" /> Telegram {info?.telegramConfigured ? "✓" : "not set"}
+          </span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <>
+          {/* Schedule + backup-now row */}
+          <div className="grid md:grid-cols-[auto_auto_1fr] gap-3 md:items-end">
+            <label className="block space-y-1.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Nightly backup time (IST)
+              </span>
+              <select
+                value={hour}
+                onChange={(e) => setHour(Number(e.target.value))}
+                className="w-44 px-3 py-2.5 rounded-xl border bg-muted/30 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{fmtHour(h)}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              onClick={saveHour}
+              disabled={savingHour || hour === info?.backupHour}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white font-black text-sm shadow-lg shadow-sky-500/30 disabled:opacity-50"
+            >
+              {savingHour ? "Saving…" : hour === info?.backupHour ? "Scheduled ✓" : "Save Time"}
+            </button>
+            <div className="flex md:justify-end">
+              <button
+                onClick={backupNow}
+                disabled={backingUp}
+                className="px-5 py-2.5 rounded-xl border font-black text-sm flex items-center gap-2 hover:bg-muted disabled:opacity-50"
+              >
+                <DatabaseBackup className={`w-4 h-4 ${backingUp ? "animate-pulse" : ""}`} />
+                {backingUp ? "Backing up…" : "Backup Now"}
+              </button>
+            </div>
+          </div>
+
+          {/* Stored backups (R2) */}
+          <div className="mt-4">
+            <span className="block text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">
+              Stored backups {info?.r2Configured ? `(Cloudflare R2 — newest ${info.files.length})` : ""}
+            </span>
+            {!info?.r2Configured ? (
+              <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-xs font-medium text-amber-500">
+                Cloudflare R2 is not configured — add the R2_* env vars to store, preview and download backups here.
+                Backups currently go to Telegram only.
+              </div>
+            ) : info.files.length === 0 ? (
+              <div className="rounded-xl border bg-muted/30 px-4 py-3 text-xs font-medium text-muted-foreground">
+                No backups in R2 yet — press <b>Backup Now</b> to create the first one.
+              </div>
+            ) : (
+              <div className="rounded-xl border overflow-hidden">
+                <div className="max-h-64 overflow-y-auto divide-y divide-border/60">
+                  {info.files.map((f) => (
+                    <div key={f.key} className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-muted/40">
+                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <DatabaseBackup className="w-3.5 h-3.5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold font-mono truncate">{f.filename}</p>
+                        <p className="text-[11px] text-muted-foreground">{fmtWhen(f.lastModified)} · {fmtMb(f.sizeBytes)}</p>
+                      </div>
+                      <button
+                        onClick={() => openPreview(f)}
+                        disabled={previewing === f.key}
+                        className="px-2.5 py-1.5 rounded-lg border text-[11px] font-bold flex items-center gap-1 hover:bg-muted disabled:opacity-50 shrink-0"
+                      >
+                        {previewing === f.key ? <Loader2 className="w-3 h-3 animate-spin" /> : <Eye className="w-3 h-3" />}
+                        Preview
+                      </button>
+                      <button
+                        onClick={() => download(f)}
+                        disabled={downloading === f.key}
+                        className="px-2.5 py-1.5 rounded-lg border text-[11px] font-bold flex items-center gap-1 hover:bg-muted disabled:opacity-50 shrink-0"
+                      >
+                        {downloading === f.key ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                        Download
+                      </button>
+                      <button
+                        onClick={() => { setRestoreTarget(f); setRestoreConfirm(""); }}
+                        className="px-2.5 py-1.5 rounded-lg border border-red-500/40 text-[11px] font-bold flex items-center gap-1 text-red-500 hover:bg-red-500/10 shrink-0"
+                      >
+                        <ArchiveRestore className="w-3 h-3" />
+                        Restore
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Restore confirmation dialog ── */}
+      {restoreTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+             onClick={(e) => { if (e.target === e.currentTarget && !restoring) { setRestoreTarget(null); setRestoreConfirm(""); } }}>
+          <div className="w-full max-w-md bg-card border border-red-500/40 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-red-500/30 bg-red-500/10 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-red-500 flex items-center justify-center text-white shrink-0">
+                <ArchiveRestore className="w-4 h-4" strokeWidth={2.5} />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-black text-red-500">Restore Database</h3>
+                <p className="text-[11px] font-mono text-muted-foreground truncate">{restoreTarget.filename}</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 space-y-1.5 text-xs text-red-500 font-medium">
+                <p className="font-black">⚠ This replaces ALL current data — for EVERY tenant.</p>
+                <p>Every bill, product, staff account and setting created after
+                   {" "}{fmtWhen(restoreTarget.lastModified)} will be gone.</p>
+                <p>A safety backup of today's data is taken automatically first, and the
+                   restore is all-or-nothing — if anything fails, nothing changes.</p>
+                <p>Devices logged in after this backup was taken may need to sign in again.</p>
+              </div>
+              <label className="block space-y-1.5">
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Type <span className="text-red-500">RESTORE</span> to confirm
+                </span>
+                <input
+                  value={restoreConfirm}
+                  onChange={(e) => setRestoreConfirm(e.target.value.toUpperCase())}
+                  placeholder="RESTORE"
+                  disabled={restoring}
+                  className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm font-mono font-black tracking-widest focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                />
+              </label>
+            </div>
+            <div className="px-5 pb-5 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => { setRestoreTarget(null); setRestoreConfirm(""); }}
+                disabled={restoring}
+                className="py-2.5 rounded-xl border font-bold text-sm hover:bg-muted disabled:opacity-40">
+                Cancel
+              </button>
+              <button
+                onClick={doRestore}
+                disabled={restoreConfirm !== "RESTORE" || restoring}
+                className="py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                {restoring ? <><Loader2 className="w-4 h-4 animate-spin" /> Restoring…</> : <><ArchiveRestore className="w-4 h-4" /> Restore</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Preview dialog ── */}
+      {preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+             onClick={(e) => { if (e.target === e.currentTarget) setPreview(null); }}>
+          <div className="w-full max-w-md bg-card border rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b flex items-center justify-between">
+              <div className="min-w-0">
+                <h3 className="text-sm font-black flex items-center gap-2"><Eye className="w-4 h-4" /> Backup Preview</h3>
+                <p className="text-[11px] font-mono text-muted-foreground truncate mt-0.5">{preview.key.replace(/^backups\//, "")}</p>
+              </div>
+              <button onClick={() => setPreview(null)} className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: "Tables",   value: String(preview.meta.tables ?? preview.tables.length) },
+                  { label: "Total rows", value: Number(preview.meta.totalRows ?? preview.tables.reduce((s, t) => s + t.rows, 0)).toLocaleString("en-IN") },
+                  { label: "Size (gzip)", value: fmtMb(preview.sizeBytes) },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-xl border bg-muted/30 px-3 py-2 text-center">
+                    <p className="text-sm font-black tabular-nums">{s.value}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+              {preview.meta.generatedAt && (
+                <p className="text-[11px] text-muted-foreground">
+                  Generated {fmtWhen(String(preview.meta.generatedAt))} IST
+                </p>
+              )}
+              <div className="rounded-xl border overflow-hidden">
+                <div className="grid grid-cols-[1fr_auto] px-3 py-2 bg-muted/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  <span>Table</span><span>Rows</span>
+                </div>
+                <div className="divide-y divide-border/50">
+                  {preview.tables.map((t) => (
+                    <div key={t.name} className="grid grid-cols-[1fr_auto] px-3 py-1.5 text-xs">
+                      <span className="font-mono truncate">{t.name}</span>
+                      <span className="font-black tabular-nums">{t.rows.toLocaleString("en-IN")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

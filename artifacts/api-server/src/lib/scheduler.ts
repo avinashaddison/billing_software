@@ -1,6 +1,6 @@
-import { schedule } from "node-cron";
-import { sql, desc, and, or, lt, isNotNull } from "drizzle-orm";
-import { db, billsTable, saleItemsTable, productsTable, authSessionsTable } from "@workspace/db";
+import { schedule, type ScheduledTask } from "node-cron";
+import { eq, sql, desc, and, or, lt, isNotNull } from "drizzle-orm";
+import { db, billsTable, saleItemsTable, productsTable, authSessionsTable, platformSettingsTable } from "@workspace/db";
 import { sendDailySalesSummary } from "./telegram";
 import { runDatabaseBackup } from "./backup";
 import { logger } from "./logger";
@@ -99,12 +99,49 @@ export function startDailyReportScheduler(): void {
     );
   }, { timezone: "Asia/Kolkata" });
 
-  /* Nightly full-database backup → Telegram at 02:30 IST (BACKUP_HOUR overrides
-     the hour). Runs before the cleanup so a backup captures the pre-prune state. */
-  const backupHour = parseInt(process.env.BACKUP_HOUR ?? "2", 10);
-  const clampedBackupHour = Math.max(0, Math.min(23, isNaN(backupHour) ? 2 : backupHour));
-  logger.info({ backupHour: clampedBackupHour, timezone: "Asia/Kolkata" }, "Scheduling nightly DB backup (R2 / Telegram)");
-  schedule(`30 ${clampedBackupHour} * * *`, () => {
+  /* Nightly full-database backup → R2/Telegram at HH:30 IST. The hour is
+     admin-configurable (platform_settings.backupHour, editable live from the
+     admin panel); BACKUP_HOUR env is the fallback for fresh installs. Runs
+     before the cleanup so a backup captures the pre-prune state. */
+  void readPersistedBackupHour().then((hour) => applyBackupSchedule(hour));
+}
+
+/* ═════════ Configurable backup schedule ═════════ */
+
+let backupTask: ScheduledTask | null = null;
+let currentBackupHour = clampHour(parseInt(process.env.BACKUP_HOUR ?? "2", 10));
+
+function clampHour(h: number): number {
+  return Math.max(0, Math.min(23, Number.isFinite(h) ? Math.trunc(h) : 2));
+}
+
+/** The persisted admin choice, falling back to BACKUP_HOUR env, then 2 AM. */
+async function readPersistedBackupHour(): Promise<number> {
+  try {
+    const [row] = await db
+      .select({ data: platformSettingsTable.data })
+      .from(platformSettingsTable)
+      .where(eq(platformSettingsTable.id, 1));
+    const stored = (row?.data as { backupHour?: unknown } | null)?.backupHour;
+    if (stored !== undefined && stored !== null && Number.isFinite(Number(stored))) {
+      return clampHour(Number(stored));
+    }
+  } catch { /* fall through to env default */ }
+  return clampHour(parseInt(process.env.BACKUP_HOUR ?? "2", 10));
+}
+
+export function getBackupHour(): number {
+  return currentBackupHour;
+}
+
+/** (Re)schedule the nightly backup at HH:30 IST — replaces any existing job,
+ *  so the admin panel can change the time without a server restart. */
+export function applyBackupSchedule(hour: number): void {
+  const h = clampHour(hour);
+  backupTask?.stop();
+  currentBackupHour = h;
+  logger.info({ backupHour: h, timezone: "Asia/Kolkata" }, "Scheduling nightly DB backup (R2 / Telegram)");
+  backupTask = schedule(`30 ${h} * * *`, () => {
     runDatabaseBackup().catch((err) =>
       logger.error({ err }, "Nightly database backup failed")
     );

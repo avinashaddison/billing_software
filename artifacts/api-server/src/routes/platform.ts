@@ -26,9 +26,14 @@ import {
   salesTable,
   auditEventsTable,
 } from "@workspace/db";
+import zlib from "node:zlib";
 import { logger } from "../lib/logger";
 import { recordAudit } from "../lib/audit";
 import { runDatabaseBackup } from "../lib/backup";
+import { isConfigured as telegramConfigured } from "../lib/telegram";
+import { isR2Configured, listR2Backups, downloadR2Backup, isBackupKey } from "../lib/r2";
+import { getBackupHour, applyBackupSchedule } from "../lib/scheduler";
+import { restoreDatabaseBackup } from "../lib/restore";
 import {
   PLATFORM_COOKIE_NAME,
   signTenantCookie,
@@ -835,6 +840,134 @@ router.post("/platform/backup", requirePlatformAdmin, async (req, res): Promise<
   } catch (err: any) {
     logger.error({ err }, "manual database backup failed");
     res.status(500).json({ error: err?.message || "Backup failed — check server logs" });
+  }
+});
+
+/* ───── GET /api/platform/backups — backup config + stored R2 files ───── */
+router.get("/platform/backups", requirePlatformAdmin, async (_req, res): Promise<void> => {
+  const base = {
+    r2Configured:       isR2Configured(),
+    telegramConfigured: telegramConfigured(),
+    backupHour:         getBackupHour(),
+  };
+  if (!base.r2Configured) { res.json({ ...base, files: [] }); return; }
+  try {
+    res.json({ ...base, files: await listR2Backups() });
+  } catch (err) {
+    logger.error({ err }, "failed to list R2 backups");
+    res.json({ ...base, files: [], listError: "Could not reach Cloudflare R2 — check the R2_* credentials" });
+  }
+});
+
+/* ───── PUT /api/platform/backup-settings — set the nightly hour ─────
+ * Persists to platform_settings.backupHour AND reschedules the running
+ * cron job immediately — no server restart needed. Minute is fixed :30. */
+router.put("/platform/backup-settings", requirePlatformAdmin, async (req, res): Promise<void> => {
+  const hour = req.body?.hour;
+  if (typeof hour !== "number" || !Number.isInteger(hour) || hour < 0 || hour > 23) {
+    res.status(400).json({ error: "hour must be an integer 0–23 (IST)" });
+    return;
+  }
+  try {
+    const existing = await readPlatformSettings();
+    const nextData = { ...existing, backupHour: hour };
+    await db
+      .insert(platformSettingsTable)
+      .values({ id: PLATFORM_SETTINGS_ID, data: nextData })
+      .onConflictDoUpdate({
+        target: platformSettingsTable.id,
+        set:    { data: nextData, updatedAt: new Date() },
+      });
+    applyBackupSchedule(hour);
+    void recordAudit({
+      action:     "platform.backup_schedule_update",
+      actorId:    req.platformActor!.id,
+      actorEmail: req.platformActor!.email,
+      ip:         req.ip,
+      metadata:   { backupHour: hour },
+    });
+    res.json({ ok: true, backupHour: hour });
+  } catch {
+    res.status(500).json({ error: "Failed to save backup time" });
+  }
+});
+
+/* ───── GET /api/platform/backups/preview?key= — what's inside a backup ─────
+ * Downloads the snapshot from R2, gunzips it and returns ONLY the metadata +
+ * per-table row counts — never the row data itself (it holds password hashes
+ * and every tenant's records; the full file is available via /download). */
+router.get("/platform/backups/preview", requirePlatformAdmin, async (req, res): Promise<void> => {
+  const key = String(req.query.key ?? "");
+  if (!isBackupKey(key)) { res.status(400).json({ error: "Invalid backup key" }); return; }
+  if (!isR2Configured())  { res.status(400).json({ error: "Cloudflare R2 is not configured" }); return; }
+  try {
+    const gz      = await downloadR2Backup(key);
+    const payload = JSON.parse(zlib.gunzipSync(gz).toString("utf8")) as {
+      meta?: Record<string, unknown>;
+      data?: Record<string, unknown[]>;
+    };
+    const tables = Object.entries(payload.data ?? {})
+      .map(([name, rows]) => ({ name, rows: Array.isArray(rows) ? rows.length : 0 }))
+      .sort((a, b) => b.rows - a.rows);
+    res.json({
+      key,
+      sizeBytes: gz.length,
+      meta:      payload.meta ?? {},
+      tables,
+    });
+  } catch (err) {
+    logger.error({ err, key }, "backup preview failed");
+    res.status(500).json({ error: "Could not read that backup file" });
+  }
+});
+
+/* ───── POST /api/platform/backups/restore — replace the DB with a snapshot ─
+ * The nuclear option, so belt and braces: the client must echo confirm:
+ * "RESTORE", a safety backup of the CURRENT data is taken first (abort if it
+ * fails), and the whole restore runs in one transaction — any failure rolls
+ * back to the pre-restore state. Affects EVERY tenant. */
+router.post("/platform/backups/restore", requirePlatformAdmin, async (req, res): Promise<void> => {
+  const key     = String(req.body?.key ?? "");
+  const confirm = String(req.body?.confirm ?? "");
+  if (!isBackupKey(key)) { res.status(400).json({ error: "Invalid backup key" }); return; }
+  if (confirm !== "RESTORE") { res.status(400).json({ error: 'Confirmation missing — type RESTORE to proceed' }); return; }
+  if (!isR2Configured())  { res.status(400).json({ error: "Cloudflare R2 is not configured" }); return; }
+  try {
+    const summary = await restoreDatabaseBackup(key);
+    void recordAudit({
+      action:     "platform.backup_restore",
+      actorId:    req.platformActor!.id,
+      actorEmail: req.platformActor!.email,
+      ip:         req.ip,
+      metadata:   { key, tables: summary.tables, rowsRestored: summary.rowsRestored, safetyBackup: summary.safetyBackup },
+    });
+    res.json({ ok: true, ...summary });
+  } catch (err: any) {
+    logger.error({ err, key }, "database restore failed");
+    res.status(500).json({ error: err?.message || "Restore failed — the database was left unchanged" });
+  }
+});
+
+/* ───── GET /api/platform/backups/download?key= — fetch the .json.gz ───── */
+router.get("/platform/backups/download", requirePlatformAdmin, async (req, res): Promise<void> => {
+  const key = String(req.query.key ?? "");
+  if (!isBackupKey(key)) { res.status(400).json({ error: "Invalid backup key" }); return; }
+  if (!isR2Configured())  { res.status(400).json({ error: "Cloudflare R2 is not configured" }); return; }
+  try {
+    const gz = await downloadR2Backup(key);
+    void recordAudit({
+      action:     "platform.backup_download",
+      actorId:    req.platformActor!.id,
+      actorEmail: req.platformActor!.email,
+      ip:         req.ip,
+      metadata:   { key, sizeBytes: gz.length },
+    });
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader("Content-Disposition", `attachment; filename="${key.slice("backups/".length)}"`);
+    res.send(gz);
+  } catch (err) {
+    logger.error({ err, key }, "backup download failed");
+    res.status(500).json({ error: "Could not download that backup file" });
   }
 });
 
