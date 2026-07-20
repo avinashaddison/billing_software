@@ -33,6 +33,7 @@ import { runDatabaseBackup } from "../lib/backup";
 import { isConfigured as telegramConfigured } from "../lib/telegram";
 import { isR2Configured, listR2Backups, downloadR2Backup, isBackupKey } from "../lib/r2";
 import { getBackupHour, applyBackupSchedule } from "../lib/scheduler";
+import { restoreDatabaseBackup } from "../lib/restore";
 import {
   PLATFORM_COOKIE_NAME,
   signTenantCookie,
@@ -917,6 +918,33 @@ router.get("/platform/backups/preview", requirePlatformAdmin, async (req, res): 
   } catch (err) {
     logger.error({ err, key }, "backup preview failed");
     res.status(500).json({ error: "Could not read that backup file" });
+  }
+});
+
+/* ───── POST /api/platform/backups/restore — replace the DB with a snapshot ─
+ * The nuclear option, so belt and braces: the client must echo confirm:
+ * "RESTORE", a safety backup of the CURRENT data is taken first (abort if it
+ * fails), and the whole restore runs in one transaction — any failure rolls
+ * back to the pre-restore state. Affects EVERY tenant. */
+router.post("/platform/backups/restore", requirePlatformAdmin, async (req, res): Promise<void> => {
+  const key     = String(req.body?.key ?? "");
+  const confirm = String(req.body?.confirm ?? "");
+  if (!isBackupKey(key)) { res.status(400).json({ error: "Invalid backup key" }); return; }
+  if (confirm !== "RESTORE") { res.status(400).json({ error: 'Confirmation missing — type RESTORE to proceed' }); return; }
+  if (!isR2Configured())  { res.status(400).json({ error: "Cloudflare R2 is not configured" }); return; }
+  try {
+    const summary = await restoreDatabaseBackup(key);
+    void recordAudit({
+      action:     "platform.backup_restore",
+      actorId:    req.platformActor!.id,
+      actorEmail: req.platformActor!.email,
+      ip:         req.ip,
+      metadata:   { key, tables: summary.tables, rowsRestored: summary.rowsRestored, safetyBackup: summary.safetyBackup },
+    });
+    res.json({ ok: true, ...summary });
+  } catch (err: any) {
+    logger.error({ err, key }, "database restore failed");
+    res.status(500).json({ error: err?.message || "Restore failed — the database was left unchanged" });
   }
 });
 

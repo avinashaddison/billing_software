@@ -3,7 +3,7 @@ import {
   ShieldCheck, LogOut, RefreshCw, Plus, Search, Building2, Users, Package,
   Receipt, Loader2, AlertTriangle, Mail, Lock, KeyRound, Power, PowerOff,
   CheckCircle2, CalendarClock, Infinity, Pencil, Copy, ScrollText, X, Clock,
-  IndianRupee, DatabaseBackup, Download, Eye, Cloud, Send,
+  IndianRupee, DatabaseBackup, Download, Eye, Cloud, Send, ArchiveRestore,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -691,6 +691,9 @@ function BackupsCard() {
   const [preview, setPreview]     = useState<BackupPreview | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<BackupFile | null>(null);
+  const [restoreConfirm, setRestoreConfirm] = useState("");
+  const [restoring, setRestoring] = useState(false);
 
   const load = async () => {
     try {
@@ -748,6 +751,30 @@ function BackupsCard() {
       setPreview(d as BackupPreview);
     } catch { toast.error("Server unreachable"); }
     finally { setPreviewing(null); }
+  };
+
+  const doRestore = async () => {
+    if (!restoreTarget || restoreConfirm !== "RESTORE" || restoring) return;
+    setRestoring(true);
+    const t = toast.loading("Restoring database — do not close this tab…");
+    try {
+      const r = await fetch(`${API}/platform/backups/restore`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: restoreTarget.key, confirm: restoreConfirm }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(d.error || "Restore failed — database unchanged", { id: t }); return; }
+      toast.success(
+        `Restored ${d.tables} tables (${Number(d.rowsRestored ?? 0).toLocaleString("en-IN")} rows). ` +
+        `A safety backup of the previous data was saved first.`,
+        { id: t, duration: 8000 },
+      );
+      setRestoreTarget(null);
+      setRestoreConfirm("");
+      await load();
+    } catch { toast.error("Server unreachable", { id: t }); }
+    finally { setRestoring(false); }
   };
 
   const download = async (f: BackupFile) => {
@@ -868,6 +895,13 @@ function BackupsCard() {
                         {downloading === f.key ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
                         Download
                       </button>
+                      <button
+                        onClick={() => { setRestoreTarget(f); setRestoreConfirm(""); }}
+                        className="px-2.5 py-1.5 rounded-lg border border-red-500/40 text-[11px] font-bold flex items-center gap-1 text-red-500 hover:bg-red-500/10 shrink-0"
+                      >
+                        <ArchiveRestore className="w-3 h-3" />
+                        Restore
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -875,6 +909,60 @@ function BackupsCard() {
             )}
           </div>
         </>
+      )}
+
+      {/* ── Restore confirmation dialog ── */}
+      {restoreTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+             onClick={(e) => { if (e.target === e.currentTarget && !restoring) { setRestoreTarget(null); setRestoreConfirm(""); } }}>
+          <div className="w-full max-w-md bg-card border border-red-500/40 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-red-500/30 bg-red-500/10 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-red-500 flex items-center justify-center text-white shrink-0">
+                <ArchiveRestore className="w-4 h-4" strokeWidth={2.5} />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-black text-red-500">Restore Database</h3>
+                <p className="text-[11px] font-mono text-muted-foreground truncate">{restoreTarget.filename}</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 space-y-1.5 text-xs text-red-500 font-medium">
+                <p className="font-black">⚠ This replaces ALL current data — for EVERY tenant.</p>
+                <p>Every bill, product, staff account and setting created after
+                   {" "}{fmtWhen(restoreTarget.lastModified)} will be gone.</p>
+                <p>A safety backup of today's data is taken automatically first, and the
+                   restore is all-or-nothing — if anything fails, nothing changes.</p>
+                <p>Devices logged in after this backup was taken may need to sign in again.</p>
+              </div>
+              <label className="block space-y-1.5">
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Type <span className="text-red-500">RESTORE</span> to confirm
+                </span>
+                <input
+                  value={restoreConfirm}
+                  onChange={(e) => setRestoreConfirm(e.target.value.toUpperCase())}
+                  placeholder="RESTORE"
+                  disabled={restoring}
+                  className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm font-mono font-black tracking-widest focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                />
+              </label>
+            </div>
+            <div className="px-5 pb-5 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => { setRestoreTarget(null); setRestoreConfirm(""); }}
+                disabled={restoring}
+                className="py-2.5 rounded-xl border font-bold text-sm hover:bg-muted disabled:opacity-40">
+                Cancel
+              </button>
+              <button
+                onClick={doRestore}
+                disabled={restoreConfirm !== "RESTORE" || restoring}
+                className="py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                {restoring ? <><Loader2 className="w-4 h-4 animate-spin" /> Restoring…</> : <><ArchiveRestore className="w-4 h-4" /> Restore</>}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Preview dialog ── */}
