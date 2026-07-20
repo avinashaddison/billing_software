@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette, Sparkles, Monitor, LogOut, ShieldAlert, KeyRound, Eye, EyeOff } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette, Sparkles, Monitor, LogOut, ShieldAlert, KeyRound, Eye, EyeOff, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useStoreSettings, usePerStaffScannerPrefs, type StoreSettings } from "@/lib/store-info";
 
@@ -117,31 +117,6 @@ export default function SettingsPage() {
     headerAlign:        store.headerAlign ?? "center",
   });
   const [saved, setSaved] = useState(false);
-  const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
-  const [tgTesting, setTgTesting] = useState(false);
-
-  const [tgRecipients, setTgRecipients] = useState(0);
-
-  useEffect(() => {
-    fetch(`${API}/telegram/status`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { setTgConfigured(d?.configured ?? false); setTgRecipients(d?.recipients ?? 0); })
-      .catch(() => setTgConfigured(false));
-  }, []);
-
-  const handleTestTelegram = async () => {
-    setTgTesting(true);
-    try {
-      const r = await fetch(`${API}/telegram/test`, { method: "POST" });
-      const d = await r.json().catch(() => null);
-      if (r.ok) toast.success("Test alert sent! Check your Telegram.");
-      else toast.error(d?.error || "Failed to send test alert");
-    } catch {
-      toast.error("Could not reach server");
-    } finally {
-      setTgTesting(false);
-    }
-  };
 
   const set = (key: keyof FormSettings, val: any) =>
     setForm((f) => ({ ...f, [key]: val }));
@@ -929,56 +904,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* ── Telegram Notifications ── */}
-        <Section icon={Bell} title="Sale Notifications" color="text-sky-600 bg-sky-50 dark:bg-sky-950/30">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
-              <div className="flex items-center gap-2.5">
-                {tgConfigured === null ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                ) : tgConfigured ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-amber-500" />
-                )}
-                <div>
-                  <p className="text-xs font-bold">
-                    {tgConfigured === null ? "Checking…" : tgConfigured ? "Telegram Connected" : "Telegram Not Configured"}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {tgConfigured
-                      ? `${tgRecipients} recipient${tgRecipients !== 1 ? "s" : ""} — alerts fire on every new sale`
-                      : "Add secrets to enable alerts"}
-                  </p>
-                </div>
-              </div>
-              {tgConfigured && (
-                <button onClick={handleTestTelegram} disabled={tgTesting}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition-colors disabled:opacity-60">
-                  {tgTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                  {tgTesting ? "Sending…" : "Test Alert"}
-                </button>
-              )}
-            </div>
-
-            <div className="rounded-xl border bg-muted/10 p-3 space-y-2 text-[11px] text-muted-foreground">
-              <p className="font-bold text-xs text-foreground">Setup Instructions</p>
-              <ol className="space-y-1.5 list-decimal list-inside leading-relaxed">
-                <li>Open Telegram and search for <span className="font-mono bg-muted px-1 rounded">@BotFather</span></li>
-                <li>Send <span className="font-mono bg-muted px-1 rounded">/newbot</span> and follow the prompts to get a <b>Bot Token</b></li>
-                <li>Start a chat with your new bot, then visit:<br />
-                  <span className="font-mono bg-muted px-1 rounded break-all">api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span><br />
-                  to find your <b>Chat ID</b></li>
-                <li>Add <span className="font-mono bg-muted px-1 rounded">TELEGRAM_BOT_TOKEN</span> and <span className="font-mono bg-muted px-1 rounded">TELEGRAM_CHAT_ID</span> as secrets in Replit, then restart the app</li>
-              </ol>
-              <div className="mt-3 pt-3 border-t space-y-1">
-                <p className="font-bold text-xs text-foreground">Add Multiple Recipients</p>
-                <p>To send alerts to more than one person, edit the <span className="font-mono bg-muted px-1 rounded">TELEGRAM_CHAT_ID</span> secret and separate each Chat ID with a comma:</p>
-                <p className="font-mono bg-muted px-2 py-1 rounded break-all">123456789,987654321,555000111</p>
-                <p>Each person must first send a message to your bot so Telegram allows it to reach them.</p>
-              </div>
-            </div>
-          </div>
-        </Section>
+        <TelegramSection isOwner={role === "owner"} />
 
         {/* ── Login Password (owner-only) ── */}
         {role === "owner" && <ChangePasswordSection />}
@@ -1295,6 +1221,222 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {children}
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
+  );
+}
+
+/* ── Sale Notifications (Telegram) ──
+ * Status card for everyone; owners additionally get a form to register their
+ * OWN bot token + chat id(s) (PUT /api/telegram/settings) so this shop's sale
+ * and low-stock alerts go to their private Telegram instead of the shared
+ * default channel. */
+interface TgSettings {
+  supported:      boolean;
+  hasOwn:         boolean;
+  enabled:        boolean;
+  botTokenMasked: string | null;
+  chatIds:        string;
+  globalFallback: boolean;
+}
+
+function TelegramSection({ isOwner }: { isOwner: boolean }) {
+  const [status, setStatus]     = useState<{ configured: boolean; recipients: number; source: "tenant" | "global" | null } | null>(null);
+  const [settings, setSettings] = useState<TgSettings | null>(null);
+  const [botToken, setBotToken] = useState("");
+  const [chatIds, setChatIds]   = useState("");
+  const [testing, setTesting]   = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const loadStatus = () =>
+    fetch(`${API}/telegram/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setStatus(d ? { configured: !!d.configured, recipients: d.recipients ?? 0, source: d.source ?? null } : { configured: false, recipients: 0, source: null }))
+      .catch(() => setStatus({ configured: false, recipients: 0, source: null }));
+
+  const loadSettings = () =>
+    fetch(`${API}/telegram/settings`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        setSettings(d);
+        setChatIds(d.chatIds ?? "");
+      })
+      .catch(() => { /* form stays hidden */ });
+
+  useEffect(() => {
+    loadStatus();
+    if (isOwner) loadSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOwner]);
+
+  const handleTest = async () => {
+    setTesting(true);
+    try {
+      const r = await fetch(`${API}/telegram/test`, { method: "POST" });
+      const d = await r.json().catch(() => null);
+      if (r.ok) toast.success("Test alert sent! Check your Telegram.");
+      else toast.error(d?.error || "Failed to send test alert");
+    } catch {
+      toast.error("Could not reach server");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    if (!chatIds.trim()) { toast.error("Enter at least one Chat ID"); return; }
+    if (!botToken.trim() && !settings?.hasOwn) { toast.error("Enter your Bot Token"); return; }
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/telegram/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ botToken: botToken.trim(), chatIds: chatIds.trim() }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) { toast.error(d?.error || "Failed to save"); return; }
+      toast.success("Your Telegram bot is saved! Send a test alert to confirm.");
+      setBotToken("");
+      await Promise.all([loadStatus(), loadSettings()]);
+    } catch {
+      toast.error("Could not reach server");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!confirm("Remove your bot? Alerts go back to the default channel (if any).")) return;
+    setRemoving(true);
+    try {
+      const r = await fetch(`${API}/telegram/settings`, { method: "DELETE" });
+      if (!r.ok) throw new Error();
+      toast.success("Removed — using the default channel again.");
+      setBotToken(""); setChatIds("");
+      await Promise.all([loadStatus(), loadSettings()]);
+    } catch {
+      toast.error("Failed to remove");
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const inputCls =
+    "w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 font-mono";
+
+  const statusLabel = status === null
+    ? "Checking…"
+    : !status.configured
+    ? "Telegram Not Configured"
+    : status.source === "tenant"
+    ? "Your Own Bot Connected"
+    : "Telegram Connected (shared channel)";
+
+  const statusHint = status === null
+    ? ""
+    : !status.configured
+    ? "Add your bot below to enable alerts"
+    : status.source === "tenant"
+    ? `${status.recipients} recipient${status.recipients !== 1 ? "s" : ""} — sale alerts go to YOUR Telegram`
+    : `${status.recipients} recipient${status.recipients !== 1 ? "s" : ""} on the shared default channel`;
+
+  return (
+    <Section icon={Bell} title="Sale Notifications" color="text-sky-600 bg-sky-50 dark:bg-sky-950/30">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+          <div className="flex items-center gap-2.5">
+            {status === null ? (
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            ) : status.configured ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-amber-500" />
+            )}
+            <div>
+              <p className="text-xs font-bold">{statusLabel}</p>
+              <p className="text-[11px] text-muted-foreground">{statusHint}</p>
+            </div>
+          </div>
+          {status?.configured && (
+            <button onClick={handleTest} disabled={testing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition-colors disabled:opacity-60">
+              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              {testing ? "Sending…" : "Test Alert"}
+            </button>
+          )}
+        </div>
+
+        {isOwner && settings?.supported && (
+          <form onSubmit={handleSave} className="rounded-xl border bg-muted/10 p-3 space-y-3">
+            <p className="font-bold text-xs text-foreground">
+              {settings.hasOwn ? "Your Bot" : "Connect Your Own Bot"}
+            </p>
+            <p className="text-[11px] text-muted-foreground -mt-1.5">
+              Sale &amp; low-stock alerts for <b>your shop only</b> will go to your own Telegram — separate from every other shop.
+            </p>
+            <Field label="Bot Token" hint={settings.hasOwn ? "Leave empty to keep your saved token." : "From @BotFather, looks like 123456789:AAH4bx…"}>
+              <input
+                type="text"
+                value={botToken}
+                onChange={(e) => setBotToken(e.target.value)}
+                placeholder={settings.botTokenMasked ?? "123456789:AAH4bx…"}
+                autoComplete="off"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Chat ID(s)" hint="Your Telegram Chat ID. Separate multiple recipients with commas: 123456789,987654321">
+              <input
+                type="text"
+                value={chatIds}
+                onChange={(e) => setChatIds(e.target.value)}
+                placeholder="123456789"
+                autoComplete="off"
+                className={inputCls}
+              />
+            </Field>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 h-10 rounded-xl bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-sky-600 active:scale-[0.98] transition-all disabled:opacity-50">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                {saving ? "Saving…" : settings.hasOwn ? "Update Bot" : "Save Bot"}
+              </button>
+              {settings.hasOwn && (
+                <button
+                  type="button"
+                  onClick={handleRemove}
+                  disabled={removing}
+                  className="h-10 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50">
+                  {removing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  Remove
+                </button>
+              )}
+            </div>
+          </form>
+        )}
+
+        <div className="rounded-xl border bg-muted/10 p-3 space-y-2 text-[11px] text-muted-foreground">
+          <p className="font-bold text-xs text-foreground">Setup Instructions</p>
+          <ol className="space-y-1.5 list-decimal list-inside leading-relaxed">
+            <li>Open Telegram and search for <span className="font-mono bg-muted px-1 rounded">@BotFather</span></li>
+            <li>Send <span className="font-mono bg-muted px-1 rounded">/newbot</span> and follow the prompts to get a <b>Bot Token</b></li>
+            <li>Start a chat with your new bot (press <b>Start</b>), then visit:<br />
+              <span className="font-mono bg-muted px-1 rounded break-all">api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span><br />
+              to find your <b>Chat ID</b></li>
+            <li>Paste the <b>Bot Token</b> and <b>Chat ID</b> above and press <b>Save Bot</b>, then send a Test Alert</li>
+          </ol>
+          <div className="mt-3 pt-3 border-t space-y-1">
+            <p className="font-bold text-xs text-foreground">Add Multiple Recipients</p>
+            <p>To send alerts to more than one person, separate each Chat ID with a comma:</p>
+            <p className="font-mono bg-muted px-2 py-1 rounded break-all">123456789,987654321,555000111</p>
+            <p>Each person must first send a message to your bot so Telegram allows it to reach them.</p>
+          </div>
+        </div>
+      </div>
+    </Section>
   );
 }
 

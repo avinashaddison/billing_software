@@ -15,3 +15,4 @@ export * from "./categories";
 export * from "./staff";
 export * from "./store_settings";
 export * from "./platform_settings";
+export * from "./tenant_telegram";

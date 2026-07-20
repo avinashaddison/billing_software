@@ -339,14 +339,16 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
       createdAt:   result.bill.createdAt,
     }, tenantId);
 
-    // Fire-and-forget Telegram sale alert (never blocks the response)
-    sendSaleAlert(result.bill, result.items);
+    // Fire-and-forget Telegram sale alert (never blocks the response).
+    // Tenant-scoped: goes to the shop's own bot if configured, else the
+    // global env channel.
+    sendSaleAlert(tenantId, result.bill, result.items);
 
     // Fire low-stock Telegram alerts for any product that hit or crossed its threshold
     const lowStockItems: LowStockAlertItem[] = result.items
       .filter((i) => i.newStock <= i.threshold)
       .map((i) => ({ productName: i.productName, stock: i.newStock, threshold: i.threshold }));
-    sendLowStockAlert(lowStockItems);
+    sendLowStockAlert(tenantId, lowStockItems);
 
     res.status(201).json(result);
   } catch (err: any) {
