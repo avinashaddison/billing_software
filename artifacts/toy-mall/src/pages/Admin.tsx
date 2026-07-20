@@ -242,7 +242,8 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
     onLogout();
   };
 
-  /* Trigger an immediate DB backup → Telegram (same routine as the nightly job). */
+  /* Trigger an immediate DB backup → Cloudflare R2 + Telegram (same routine
+     as the nightly job). */
   const backupNow = async () => {
     setBackingUp(true);
     const t = toast.loading("Backing up database…");
@@ -250,7 +251,9 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
       const r = await fetch(`${API}/platform/backup`, { method: "POST", credentials: "include" });
       const d = await r.json().catch(() => ({}));
       if (r.ok) {
-        toast.success(`Backup sent to Telegram — ${d.tables ?? "?"} tables, ${Number(d.totalRows ?? 0).toLocaleString("en-IN")} rows`, { id: t });
+        const dests = [d.destinations?.r2 ? "Cloudflare R2" : null, d.destinations?.telegram ? "Telegram" : null]
+          .filter(Boolean).join(" + ") || "?";
+        toast.success(`Backup saved to ${dests} — ${d.tables ?? "?"} tables, ${Number(d.totalRows ?? 0).toLocaleString("en-IN")} rows`, { id: t });
       } else {
         toast.error(d.error || "Backup failed", { id: t });
       }
@@ -351,7 +354,7 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={backupNow} disabled={backingUp} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted disabled:opacity-50" title="Send a full database backup to Telegram now">
+            <button onClick={backupNow} disabled={backingUp} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted disabled:opacity-50" title="Save a full database backup to Cloudflare R2 / Telegram now">
               <DatabaseBackup className={`w-3.5 h-3.5 ${backingUp ? "animate-pulse" : ""}`} /> <span className="hidden sm:inline">{backingUp ? "Backing up…" : "Backup"}</span>
             </button>
             <button onClick={() => setAuditOpen(true)} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted" title="Audit log">

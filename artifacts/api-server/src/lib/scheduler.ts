@@ -103,7 +103,7 @@ export function startDailyReportScheduler(): void {
      the hour). Runs before the cleanup so a backup captures the pre-prune state. */
   const backupHour = parseInt(process.env.BACKUP_HOUR ?? "2", 10);
   const clampedBackupHour = Math.max(0, Math.min(23, isNaN(backupHour) ? 2 : backupHour));
-  logger.info({ backupHour: clampedBackupHour, timezone: "Asia/Kolkata" }, "Scheduling nightly DB backup to Telegram");
+  logger.info({ backupHour: clampedBackupHour, timezone: "Asia/Kolkata" }, "Scheduling nightly DB backup (R2 / Telegram)");
   schedule(`30 ${clampedBackupHour} * * *`, () => {
     runDatabaseBackup().catch((err) =>
       logger.error({ err }, "Nightly database backup failed")
