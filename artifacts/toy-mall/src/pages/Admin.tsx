@@ -3,7 +3,7 @@ import {
   ShieldCheck, LogOut, RefreshCw, Plus, Search, Building2, Users, Package,
   Receipt, Loader2, AlertTriangle, Mail, Lock, KeyRound, Power, PowerOff,
   CheckCircle2, CalendarClock, Infinity, Pencil, Copy, ScrollText, X, Clock,
-  IndianRupee, DatabaseBackup,
+  IndianRupee, DatabaseBackup, Download, Eye, Cloud, Send,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -382,6 +382,9 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
         {/* Global subscription pricing (drives the public landing page) */}
         <PricingCard />
 
+        {/* Backup schedule + stored R2 backups with preview/download */}
+        <BackupsCard />
+
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
@@ -646,6 +649,282 @@ function PricingCard() {
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/* ───────── Database Backups card ─────────
+ * Configure the nightly backup hour (applied live — no restart), run one now,
+ * and browse the backups stored in Cloudflare R2: preview what's inside
+ * (tables + row counts) or download the .json.gz. */
+interface BackupFile { key: string; filename: string; sizeBytes: number; lastModified: string | null }
+interface BackupsInfo {
+  r2Configured: boolean;
+  telegramConfigured: boolean;
+  backupHour: number;
+  files: BackupFile[];
+  listError?: string;
+}
+interface BackupPreview {
+  key: string;
+  sizeBytes: number;
+  meta: { generatedAt?: string; date?: string; tables?: number; totalRows?: number };
+  tables: { name: string; rows: number }[];
+}
+
+const fmtHour = (h: number) => {
+  const ampm = h < 12 ? "AM" : "PM";
+  const disp = h % 12 === 0 ? 12 : h % 12;
+  return `${String(disp).padStart(2, "0")}:30 ${ampm}`;
+};
+const fmtMb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+const fmtWhen = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : "—";
+
+function BackupsCard() {
+  const [info, setInfo]           = useState<BackupsInfo | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [hour, setHour]           = useState(2);
+  const [savingHour, setSavingHour] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [preview, setPreview]     = useState<BackupPreview | null>(null);
+  const [previewing, setPreviewing] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const load = async () => {
+    try {
+      const r = await fetch(`${API}/platform/backups`, { credentials: "include" });
+      if (!r.ok) { toast.error("Could not load backups"); return; }
+      const d: BackupsInfo = await r.json();
+      setInfo(d);
+      setHour(d.backupHour);
+      if (d.listError) toast.error(d.listError);
+    } catch { toast.error("Server unreachable"); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, []);
+
+  const saveHour = async () => {
+    setSavingHour(true);
+    try {
+      const r = await fetch(`${API}/platform/backup-settings`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hour }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(d.error || "Could not save backup time"); return; }
+      toast.success(`Nightly backup rescheduled to ${fmtHour(hour)} IST — active immediately`);
+      setInfo((i) => (i ? { ...i, backupHour: hour } : i));
+    } catch { toast.error("Server unreachable"); }
+    finally { setSavingHour(false); }
+  };
+
+  const backupNow = async () => {
+    setBackingUp(true);
+    const t = toast.loading("Backing up database…");
+    try {
+      const r = await fetch(`${API}/platform/backup`, { method: "POST", credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        const dests = [d.destinations?.r2 ? "Cloudflare R2" : null, d.destinations?.telegram ? "Telegram" : null]
+          .filter(Boolean).join(" + ") || "?";
+        toast.success(`Backup saved to ${dests} — ${d.tables ?? "?"} tables, ${Number(d.totalRows ?? 0).toLocaleString("en-IN")} rows`, { id: t });
+        await load();
+      } else {
+        toast.error(d.error || "Backup failed", { id: t });
+      }
+    } catch { toast.error("Server unreachable", { id: t }); }
+    finally { setBackingUp(false); }
+  };
+
+  const openPreview = async (f: BackupFile) => {
+    setPreviewing(f.key);
+    try {
+      const r = await fetch(`${API}/platform/backups/preview?key=${encodeURIComponent(f.key)}`, { credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(d.error || "Preview failed"); return; }
+      setPreview(d as BackupPreview);
+    } catch { toast.error("Server unreachable"); }
+    finally { setPreviewing(null); }
+  };
+
+  const download = async (f: BackupFile) => {
+    setDownloading(f.key);
+    try {
+      const r = await fetch(`${API}/platform/backups/download?key=${encodeURIComponent(f.key)}`, { credentials: "include" });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        toast.error(d.error || "Download failed"); return;
+      }
+      const blob = await r.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = f.filename; a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error("Server unreachable"); }
+    finally { setDownloading(null); }
+  };
+
+  return (
+    <div className="rounded-2xl border bg-card p-4 md:p-5">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center text-white shadow-lg shrink-0">
+          <DatabaseBackup className="w-4 h-4" strokeWidth={2.5} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-black">Database Backups</h2>
+          <p className="text-[11px] text-muted-foreground">Nightly automatic backup + on-demand. Stored in Cloudflare R2, copied to Telegram.</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black ${info?.r2Configured ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground"}`}>
+            <Cloud className="w-3 h-3" /> R2 {info?.r2Configured ? "✓" : "not set"}
+          </span>
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black ${info?.telegramConfigured ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground"}`}>
+            <Send className="w-3 h-3" /> Telegram {info?.telegramConfigured ? "✓" : "not set"}
+          </span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <>
+          {/* Schedule + backup-now row */}
+          <div className="grid md:grid-cols-[auto_auto_1fr] gap-3 md:items-end">
+            <label className="block space-y-1.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Nightly backup time (IST)
+              </span>
+              <select
+                value={hour}
+                onChange={(e) => setHour(Number(e.target.value))}
+                className="w-44 px-3 py-2.5 rounded-xl border bg-muted/30 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{fmtHour(h)}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              onClick={saveHour}
+              disabled={savingHour || hour === info?.backupHour}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white font-black text-sm shadow-lg shadow-sky-500/30 disabled:opacity-50"
+            >
+              {savingHour ? "Saving…" : hour === info?.backupHour ? "Scheduled ✓" : "Save Time"}
+            </button>
+            <div className="flex md:justify-end">
+              <button
+                onClick={backupNow}
+                disabled={backingUp}
+                className="px-5 py-2.5 rounded-xl border font-black text-sm flex items-center gap-2 hover:bg-muted disabled:opacity-50"
+              >
+                <DatabaseBackup className={`w-4 h-4 ${backingUp ? "animate-pulse" : ""}`} />
+                {backingUp ? "Backing up…" : "Backup Now"}
+              </button>
+            </div>
+          </div>
+
+          {/* Stored backups (R2) */}
+          <div className="mt-4">
+            <span className="block text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">
+              Stored backups {info?.r2Configured ? `(Cloudflare R2 — newest ${info.files.length})` : ""}
+            </span>
+            {!info?.r2Configured ? (
+              <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-xs font-medium text-amber-500">
+                Cloudflare R2 is not configured — add the R2_* env vars to store, preview and download backups here.
+                Backups currently go to Telegram only.
+              </div>
+            ) : info.files.length === 0 ? (
+              <div className="rounded-xl border bg-muted/30 px-4 py-3 text-xs font-medium text-muted-foreground">
+                No backups in R2 yet — press <b>Backup Now</b> to create the first one.
+              </div>
+            ) : (
+              <div className="rounded-xl border overflow-hidden">
+                <div className="max-h-64 overflow-y-auto divide-y divide-border/60">
+                  {info.files.map((f) => (
+                    <div key={f.key} className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-muted/40">
+                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <DatabaseBackup className="w-3.5 h-3.5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold font-mono truncate">{f.filename}</p>
+                        <p className="text-[11px] text-muted-foreground">{fmtWhen(f.lastModified)} · {fmtMb(f.sizeBytes)}</p>
+                      </div>
+                      <button
+                        onClick={() => openPreview(f)}
+                        disabled={previewing === f.key}
+                        className="px-2.5 py-1.5 rounded-lg border text-[11px] font-bold flex items-center gap-1 hover:bg-muted disabled:opacity-50 shrink-0"
+                      >
+                        {previewing === f.key ? <Loader2 className="w-3 h-3 animate-spin" /> : <Eye className="w-3 h-3" />}
+                        Preview
+                      </button>
+                      <button
+                        onClick={() => download(f)}
+                        disabled={downloading === f.key}
+                        className="px-2.5 py-1.5 rounded-lg border text-[11px] font-bold flex items-center gap-1 hover:bg-muted disabled:opacity-50 shrink-0"
+                      >
+                        {downloading === f.key ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                        Download
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Preview dialog ── */}
+      {preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+             onClick={(e) => { if (e.target === e.currentTarget) setPreview(null); }}>
+          <div className="w-full max-w-md bg-card border rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b flex items-center justify-between">
+              <div className="min-w-0">
+                <h3 className="text-sm font-black flex items-center gap-2"><Eye className="w-4 h-4" /> Backup Preview</h3>
+                <p className="text-[11px] font-mono text-muted-foreground truncate mt-0.5">{preview.key.replace(/^backups\//, "")}</p>
+              </div>
+              <button onClick={() => setPreview(null)} className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: "Tables",   value: String(preview.meta.tables ?? preview.tables.length) },
+                  { label: "Total rows", value: Number(preview.meta.totalRows ?? preview.tables.reduce((s, t) => s + t.rows, 0)).toLocaleString("en-IN") },
+                  { label: "Size (gzip)", value: fmtMb(preview.sizeBytes) },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-xl border bg-muted/30 px-3 py-2 text-center">
+                    <p className="text-sm font-black tabular-nums">{s.value}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+              {preview.meta.generatedAt && (
+                <p className="text-[11px] text-muted-foreground">
+                  Generated {fmtWhen(String(preview.meta.generatedAt))} IST
+                </p>
+              )}
+              <div className="rounded-xl border overflow-hidden">
+                <div className="grid grid-cols-[1fr_auto] px-3 py-2 bg-muted/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  <span>Table</span><span>Rows</span>
+                </div>
+                <div className="divide-y divide-border/50">
+                  {preview.tables.map((t) => (
+                    <div key={t.name} className="grid grid-cols-[1fr_auto] px-3 py-1.5 text-xs">
+                      <span className="font-mono truncate">{t.name}</span>
+                      <span className="font-black tabular-nums">{t.rows.toLocaleString("en-IN")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

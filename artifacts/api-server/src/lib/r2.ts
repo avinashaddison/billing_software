@@ -12,6 +12,7 @@
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
@@ -53,6 +54,47 @@ export async function uploadBackupToR2(filename: string, content: Buffer): Promi
     ContentType: "application/gzip",
   }));
   return key;
+}
+
+export interface R2BackupObject {
+  key:          string;
+  filename:     string;
+  sizeBytes:    number;
+  lastModified: string | null;
+}
+
+/** List stored backups, newest first. */
+export async function listR2Backups(): Promise<R2BackupObject[]> {
+  const listed = await client().send(new ListObjectsV2Command({
+    Bucket: env("R2_BUCKET"),
+    Prefix: PREFIX,
+  }));
+  return (listed.Contents ?? [])
+    .filter((o) => o.Key)
+    .sort((a, b) => (b.LastModified?.getTime() ?? 0) - (a.LastModified?.getTime() ?? 0))
+    .map((o) => ({
+      key:          o.Key!,
+      filename:     o.Key!.slice(PREFIX.length),
+      sizeBytes:    o.Size ?? 0,
+      lastModified: o.LastModified?.toISOString() ?? null,
+    }));
+}
+
+/** True when `key` addresses an object inside the backups prefix — the only
+ *  namespace the admin endpoints are allowed to touch. */
+export function isBackupKey(key: string): boolean {
+  return /^backups\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(key);
+}
+
+/** Fetch one backup object into memory. Shop-scale files (a few MB gzipped). */
+export async function downloadR2Backup(key: string): Promise<Buffer> {
+  const res = await client().send(new GetObjectCommand({
+    Bucket: env("R2_BUCKET"),
+    Key:    key,
+  }));
+  if (!res.Body) throw new Error("Empty object body");
+  const bytes = await res.Body.transformToByteArray();
+  return Buffer.from(bytes);
 }
 
 /**
