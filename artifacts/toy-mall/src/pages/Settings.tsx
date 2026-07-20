@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette, Sparkles, Monitor, LogOut, ShieldAlert } from "lucide-react";
+import { Settings2, Save, RotateCcw, Store, Phone, Receipt, Smile, Bell, CheckCircle2, AlertCircle, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Tag, ScanLine, CheckCircle, ChevronDown, ChevronUp, Download, XCircle, Cpu, Star, ImagePlus, Palette, Sparkles, Monitor, LogOut, ShieldAlert, KeyRound, Eye, EyeOff, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useStoreSettings, usePerStaffScannerPrefs, type StoreSettings } from "@/lib/store-info";
 
@@ -117,31 +117,6 @@ export default function SettingsPage() {
     headerAlign:        store.headerAlign ?? "center",
   });
   const [saved, setSaved] = useState(false);
-  const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
-  const [tgTesting, setTgTesting] = useState(false);
-
-  const [tgRecipients, setTgRecipients] = useState(0);
-
-  useEffect(() => {
-    fetch(`${API}/telegram/status`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { setTgConfigured(d?.configured ?? false); setTgRecipients(d?.recipients ?? 0); })
-      .catch(() => setTgConfigured(false));
-  }, []);
-
-  const handleTestTelegram = async () => {
-    setTgTesting(true);
-    try {
-      const r = await fetch(`${API}/telegram/test`, { method: "POST" });
-      const d = await r.json().catch(() => null);
-      if (r.ok) toast.success("Test alert sent! Check your Telegram.");
-      else toast.error(d?.error || "Failed to send test alert");
-    } catch {
-      toast.error("Could not reach server");
-    } finally {
-      setTgTesting(false);
-    }
-  };
 
   const set = (key: keyof FormSettings, val: any) =>
     setForm((f) => ({ ...f, [key]: val }));
@@ -929,56 +904,10 @@ export default function SettingsPage() {
         </Section>
 
         {/* ── Telegram Notifications ── */}
-        <Section icon={Bell} title="Sale Notifications" color="text-sky-600 bg-sky-50 dark:bg-sky-950/30">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
-              <div className="flex items-center gap-2.5">
-                {tgConfigured === null ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                ) : tgConfigured ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-amber-500" />
-                )}
-                <div>
-                  <p className="text-xs font-bold">
-                    {tgConfigured === null ? "Checking…" : tgConfigured ? "Telegram Connected" : "Telegram Not Configured"}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {tgConfigured
-                      ? `${tgRecipients} recipient${tgRecipients !== 1 ? "s" : ""} — alerts fire on every new sale`
-                      : "Add secrets to enable alerts"}
-                  </p>
-                </div>
-              </div>
-              {tgConfigured && (
-                <button onClick={handleTestTelegram} disabled={tgTesting}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition-colors disabled:opacity-60">
-                  {tgTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                  {tgTesting ? "Sending…" : "Test Alert"}
-                </button>
-              )}
-            </div>
+        <TelegramSection isOwner={role === "owner"} />
 
-            <div className="rounded-xl border bg-muted/10 p-3 space-y-2 text-[11px] text-muted-foreground">
-              <p className="font-bold text-xs text-foreground">Setup Instructions</p>
-              <ol className="space-y-1.5 list-decimal list-inside leading-relaxed">
-                <li>Open Telegram and search for <span className="font-mono bg-muted px-1 rounded">@BotFather</span></li>
-                <li>Send <span className="font-mono bg-muted px-1 rounded">/newbot</span> and follow the prompts to get a <b>Bot Token</b></li>
-                <li>Start a chat with your new bot, then visit:<br />
-                  <span className="font-mono bg-muted px-1 rounded break-all">api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span><br />
-                  to find your <b>Chat ID</b></li>
-                <li>Add <span className="font-mono bg-muted px-1 rounded">TELEGRAM_BOT_TOKEN</span> and <span className="font-mono bg-muted px-1 rounded">TELEGRAM_CHAT_ID</span> as secrets in Replit, then restart the app</li>
-              </ol>
-              <div className="mt-3 pt-3 border-t space-y-1">
-                <p className="font-bold text-xs text-foreground">Add Multiple Recipients</p>
-                <p>To send alerts to more than one person, edit the <span className="font-mono bg-muted px-1 rounded">TELEGRAM_CHAT_ID</span> secret and separate each Chat ID with a comma:</p>
-                <p className="font-mono bg-muted px-2 py-1 rounded break-all">123456789,987654321,555000111</p>
-                <p>Each person must first send a message to your bot so Telegram allows it to reach them.</p>
-              </div>
-            </div>
-          </div>
-        </Section>
+        {/* ── Login Password (owner-only) ── */}
+        {role === "owner" && <ChangePasswordSection />}
 
         {/* ── Devices & Sessions (owner-only) ── */}
         {role === "owner" && <DevicesSection />}
@@ -1292,6 +1221,334 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {children}
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
+  );
+}
+
+/* ── Sale Notifications (Telegram) ──
+ * Status card for everyone; owners additionally get a form to register their
+ * OWN bot token + chat id(s) (PUT /api/telegram/settings) so this shop's sale
+ * and low-stock alerts go to their private Telegram instead of the shared
+ * default channel. */
+interface TgSettings {
+  supported:      boolean;
+  hasOwn:         boolean;
+  enabled:        boolean;
+  botTokenMasked: string | null;
+  chatIds:        string;
+  globalFallback: boolean;
+}
+
+function TelegramSection({ isOwner }: { isOwner: boolean }) {
+  const [status, setStatus]     = useState<{ configured: boolean; recipients: number; source: "tenant" | "global" | null } | null>(null);
+  const [settings, setSettings] = useState<TgSettings | null>(null);
+  const [botToken, setBotToken] = useState("");
+  const [chatIds, setChatIds]   = useState("");
+  const [testing, setTesting]   = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const loadStatus = () =>
+    fetch(`${API}/telegram/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setStatus(d ? { configured: !!d.configured, recipients: d.recipients ?? 0, source: d.source ?? null } : { configured: false, recipients: 0, source: null }))
+      .catch(() => setStatus({ configured: false, recipients: 0, source: null }));
+
+  const loadSettings = () =>
+    fetch(`${API}/telegram/settings`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        setSettings(d);
+        setChatIds(d.chatIds ?? "");
+      })
+      .catch(() => { /* form stays hidden */ });
+
+  useEffect(() => {
+    loadStatus();
+    if (isOwner) loadSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOwner]);
+
+  const handleTest = async () => {
+    setTesting(true);
+    try {
+      const r = await fetch(`${API}/telegram/test`, { method: "POST" });
+      const d = await r.json().catch(() => null);
+      if (r.ok) toast.success("Test alert sent! Check your Telegram.");
+      else toast.error(d?.error || "Failed to send test alert");
+    } catch {
+      toast.error("Could not reach server");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    if (!chatIds.trim()) { toast.error("Enter at least one Chat ID"); return; }
+    if (!botToken.trim() && !settings?.hasOwn) { toast.error("Enter your Bot Token"); return; }
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/telegram/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ botToken: botToken.trim(), chatIds: chatIds.trim() }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) { toast.error(d?.error || "Failed to save"); return; }
+      toast.success("Your Telegram bot is saved! Send a test alert to confirm.");
+      setBotToken("");
+      await Promise.all([loadStatus(), loadSettings()]);
+    } catch {
+      toast.error("Could not reach server");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!confirm("Remove your bot? Alerts go back to the default channel (if any).")) return;
+    setRemoving(true);
+    try {
+      const r = await fetch(`${API}/telegram/settings`, { method: "DELETE" });
+      if (!r.ok) throw new Error();
+      toast.success("Removed — using the default channel again.");
+      setBotToken(""); setChatIds("");
+      await Promise.all([loadStatus(), loadSettings()]);
+    } catch {
+      toast.error("Failed to remove");
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const inputCls =
+    "w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 font-mono";
+
+  const statusLabel = status === null
+    ? "Checking…"
+    : !status.configured
+    ? "Telegram Not Configured"
+    : status.source === "tenant"
+    ? "Your Own Bot Connected"
+    : "Telegram Connected (shared channel)";
+
+  const statusHint = status === null
+    ? ""
+    : !status.configured
+    ? "Add your bot below to enable alerts"
+    : status.source === "tenant"
+    ? `${status.recipients} recipient${status.recipients !== 1 ? "s" : ""} — sale alerts go to YOUR Telegram`
+    : `${status.recipients} recipient${status.recipients !== 1 ? "s" : ""} on the shared default channel`;
+
+  return (
+    <Section icon={Bell} title="Sale Notifications" color="text-sky-600 bg-sky-50 dark:bg-sky-950/30">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+          <div className="flex items-center gap-2.5">
+            {status === null ? (
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            ) : status.configured ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-amber-500" />
+            )}
+            <div>
+              <p className="text-xs font-bold">{statusLabel}</p>
+              <p className="text-[11px] text-muted-foreground">{statusHint}</p>
+            </div>
+          </div>
+          {status?.configured && (
+            <button onClick={handleTest} disabled={testing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition-colors disabled:opacity-60">
+              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              {testing ? "Sending…" : "Test Alert"}
+            </button>
+          )}
+        </div>
+
+        {isOwner && settings?.supported && (
+          <form onSubmit={handleSave} className="rounded-xl border bg-muted/10 p-3 space-y-3">
+            <p className="font-bold text-xs text-foreground">
+              {settings.hasOwn ? "Your Bot" : "Connect Your Own Bot"}
+            </p>
+            <p className="text-[11px] text-muted-foreground -mt-1.5">
+              Sale &amp; low-stock alerts for <b>your shop only</b> will go to your own Telegram — separate from every other shop.
+            </p>
+            <Field label="Bot Token" hint={settings.hasOwn ? "Leave empty to keep your saved token." : "From @BotFather, looks like 123456789:AAH4bx…"}>
+              <input
+                type="text"
+                value={botToken}
+                onChange={(e) => setBotToken(e.target.value)}
+                placeholder={settings.botTokenMasked ?? "123456789:AAH4bx…"}
+                autoComplete="off"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Chat ID(s)" hint="Your Telegram Chat ID. Separate multiple recipients with commas: 123456789,987654321">
+              <input
+                type="text"
+                value={chatIds}
+                onChange={(e) => setChatIds(e.target.value)}
+                placeholder="123456789"
+                autoComplete="off"
+                className={inputCls}
+              />
+            </Field>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 h-10 rounded-xl bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-sky-600 active:scale-[0.98] transition-all disabled:opacity-50">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                {saving ? "Saving…" : settings.hasOwn ? "Update Bot" : "Save Bot"}
+              </button>
+              {settings.hasOwn && (
+                <button
+                  type="button"
+                  onClick={handleRemove}
+                  disabled={removing}
+                  className="h-10 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50">
+                  {removing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  Remove
+                </button>
+              )}
+            </div>
+          </form>
+        )}
+
+        <div className="rounded-xl border bg-muted/10 p-3 space-y-2 text-[11px] text-muted-foreground">
+          <p className="font-bold text-xs text-foreground">Setup Instructions</p>
+          <ol className="space-y-1.5 list-decimal list-inside leading-relaxed">
+            <li>Open Telegram and search for <span className="font-mono bg-muted px-1 rounded">@BotFather</span></li>
+            <li>Send <span className="font-mono bg-muted px-1 rounded">/newbot</span> and follow the prompts to get a <b>Bot Token</b></li>
+            <li>Start a chat with your new bot (press <b>Start</b>), then visit:<br />
+              <span className="font-mono bg-muted px-1 rounded break-all">api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span><br />
+              to find your <b>Chat ID</b></li>
+            <li>Paste the <b>Bot Token</b> and <b>Chat ID</b> above and press <b>Save Bot</b>, then send a Test Alert</li>
+          </ol>
+          <div className="mt-3 pt-3 border-t space-y-1">
+            <p className="font-bold text-xs text-foreground">Add Multiple Recipients</p>
+            <p>To send alerts to more than one person, separate each Chat ID with a comma:</p>
+            <p className="font-mono bg-muted px-2 py-1 rounded break-all">123456789,987654321,555000111</p>
+            <p>Each person must first send a message to your bot so Telegram allows it to reach them.</p>
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+/* ── Login Password ──
+ * Owner-only self-service rotation of the shop's email-login password
+ * (the password used at the first login step). Backed by
+ * /api/auth/change-password, which verifies the current password server-side. */
+function ChangePasswordSection() {
+  const [current, setCurrent]       = useState("");
+  const [next, setNext]             = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [show, setShow]             = useState(false);
+  const [busy, setBusy]             = useState(false);
+
+  const mismatch  = confirmPwd.length > 0 && next !== confirmPwd;
+  const tooShort  = next.length > 0 && next.length < 8;
+  const canSubmit = current.length > 0 && next.length >= 8 && next === confirmPwd && !busy;
+
+  const inputCls =
+    "w-full px-3 py-2.5 pr-10 rounded-xl border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono";
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/auth/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) {
+        toast.error(d?.error || "Failed to change password");
+        return;
+      }
+      toast.success(`Password updated for ${d?.email ?? "your account"}. Other devices must sign in again.`);
+      setCurrent(""); setNext(""); setConfirmPwd("");
+    } catch {
+      toast.error("Could not reach server");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section icon={KeyRound} title="Login Password" color="text-orange-600 bg-orange-50 dark:bg-orange-950/30">
+      <p className="text-[11px] text-muted-foreground -mt-1">
+        Change the email password used at the first login step. Other devices signed in with
+        the old password will be logged out.
+      </p>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Current Password">
+          <div className="relative">
+            <input
+              type={show ? "text" : "password"}
+              autoComplete="current-password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+              placeholder="Your current password"
+              className={inputCls}
+            />
+            <button
+              type="button"
+              onClick={() => setShow((s) => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={show ? "Hide passwords" : "Show passwords"}
+            >
+              {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </Field>
+        <Field label="New Password" hint="At least 8 characters">
+          <input
+            type={show ? "text" : "password"}
+            autoComplete="new-password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            placeholder="New password (min 8 chars)"
+            className={inputCls}
+          />
+          {tooShort && (
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+              Password must be at least 8 characters.
+            </p>
+          )}
+        </Field>
+        <Field label="Confirm New Password">
+          <input
+            type={show ? "text" : "password"}
+            autoComplete="new-password"
+            value={confirmPwd}
+            onChange={(e) => setConfirmPwd(e.target.value)}
+            placeholder="Type the new password again"
+            className={inputCls}
+          />
+          {mismatch && (
+            <p className="text-[11px] text-red-600 dark:text-red-400 font-medium mt-1">
+              Passwords don't match.
+            </p>
+          )}
+        </Field>
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="w-full h-11 rounded-xl bg-orange-500 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-orange-600 active:scale-[0.98] transition-all disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+          {busy ? "Updating…" : "Update Password"}
+        </button>
+      </form>
+    </Section>
   );
 }
 

@@ -1,3 +1,5 @@
+import { eq, isNull } from "drizzle-orm";
+import { db, tenantTelegramSettingsTable, storeSettingsTable } from "@workspace/db";
 import { logger } from "./logger";
 
 const API_BASE   = "https://api.telegram.org";
@@ -6,13 +8,74 @@ const STORE_NAME = process.env.STORE_NAME || "Toy Mall";
 const D_HEAVY = "▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰";
 const D_THIN  = "─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─";
 
-function getChatIds(): string[] {
-  const raw = process.env.TELEGRAM_CHAT_ID ?? "";
+export function splitChatIds(raw: string): string[] {
   return raw.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+function getChatIds(): string[] {
+  return splitChatIds(process.env.TELEGRAM_CHAT_ID ?? "");
+}
+
+export interface TelegramConfig {
+  token:   string;
+  chatIds: string[];
+  /** "tenant" = the shop's own bot from Settings; "global" = env fallback. */
+  source:  "tenant" | "global";
+}
+
+function envConfig(): TelegramConfig | null {
+  const token   = process.env.TELEGRAM_BOT_TOKEN;
+  const chatIds = getChatIds();
+  if (!token || chatIds.length === 0) return null;
+  return { token, chatIds, source: "global" };
+}
+
+/**
+ * Resolve the delivery config for a tenant's alerts: the tenant's own
+ * enabled row wins; otherwise the global env config (legacy behaviour).
+ * A DB error also falls back to env — an alert should degrade, not vanish.
+ */
+export async function resolveConfig(tenantId: string | null): Promise<TelegramConfig | null> {
+  if (tenantId) {
+    try {
+      const [row] = await db
+        .select()
+        .from(tenantTelegramSettingsTable)
+        .where(eq(tenantTelegramSettingsTable.tenantId, tenantId));
+      if (row?.enabled) {
+        const chatIds = splitChatIds(row.chatIds);
+        if (row.botToken && chatIds.length > 0) {
+          return { token: row.botToken, chatIds, source: "tenant" };
+        }
+      }
+    } catch (err) {
+      logger.warn({ err, tenantId }, "tenant telegram config lookup failed — falling back to env");
+    }
+  }
+  return envConfig();
+}
+
+/** The shop name for a tenant's alert header (store_settings.data.name),
+ *  falling back to the env STORE_NAME used by the legacy install. */
+async function resolveStoreName(tenantId: string | null): Promise<string> {
+  try {
+    const [row] = await db
+      .select({ data: storeSettingsTable.data })
+      .from(storeSettingsTable)
+      .where(tenantId == null
+        ? isNull(storeSettingsTable.tenantId)
+        : eq(storeSettingsTable.tenantId, tenantId))
+      .limit(1);
+    const name = (row?.data as { name?: unknown } | null)?.name;
+    if (typeof name === "string" && name.trim()) return name.trim();
+  } catch (err) {
+    logger.warn({ err, tenantId }, "store name lookup failed for telegram alert");
+  }
+  return STORE_NAME;
+}
+
 export function isConfigured(): boolean {
-  return !!(process.env.TELEGRAM_BOT_TOKEN && getChatIds().length > 0);
+  return envConfig() !== null;
 }
 
 export function recipientCount(): number {
@@ -43,11 +106,16 @@ async function sendToOne(token: string, chatId: string, text: string): Promise<v
   }
 }
 
+async function deliver(config: TelegramConfig, text: string): Promise<void> {
+  await Promise.all(config.chatIds.map((id) => sendToOne(config.token, id, text)));
+}
+
+/** Env-config-only send — used by the vendor-level surfaces (cross-tenant
+ *  daily report). Per-tenant alerts go through resolveConfig() + deliver(). */
 async function sendMessage(text: string): Promise<void> {
-  const token   = process.env.TELEGRAM_BOT_TOKEN;
-  const chatIds = getChatIds();
-  if (!token || chatIds.length === 0) return;
-  await Promise.all(chatIds.map((id) => sendToOne(token, id, text)));
+  const config = envConfig();
+  if (!config) return;
+  await deliver(config, text);
 }
 
 /**
@@ -100,9 +168,16 @@ export interface SaleAlertBill {
   createdAt:      string | Date;
 }
 
-export function sendSaleAlert(bill: SaleAlertBill, items: SaleAlertItem[]): void {
-  if (!isConfigured()) return;
+export function sendSaleAlert(tenantId: string | null, bill: SaleAlertBill, items: SaleAlertItem[]): void {
+  void (async () => {
+    const config = await resolveConfig(tenantId);
+    if (!config) return;
+    const storeName = await resolveStoreName(tenantId);
+    await deliver(config, buildSaleAlertText(storeName, bill, items));
+  })().catch((err) => logger.warn({ err }, "Telegram alert delivery error"));
+}
 
+function buildSaleAlertText(storeName: string, bill: SaleAlertBill, items: SaleAlertItem[]): string {
   const dt = new Date(bill.createdAt);
   const time = dt.toLocaleTimeString("en-IN", {
     hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata",
@@ -122,7 +197,7 @@ export function sendSaleAlert(bill: SaleAlertBill, items: SaleAlertItem[]): void
 
   const lines = [
     `🧾 <b>━━  SALE INVOICE  ━━</b> 🧾`,
-    `🏪  <b>${escapeHtml(STORE_NAME)}</b>`,
+    `🏪  <b>${escapeHtml(storeName)}</b>`,
     D_HEAVY,
     ``,
     row(`📅`, `${date}  •  ${time}`),
@@ -150,15 +225,15 @@ export function sendSaleAlert(bill: SaleAlertBill, items: SaleAlertItem[]): void
     D_HEAVY,
   ].filter((l): l is string => l !== null);
 
-  sendMessage(lines.join("\n")).catch((err) =>
-    logger.warn({ err }, "Telegram alert delivery error")
-  );
+  return lines.join("\n");
 }
 
-export function sendTestAlert(): Promise<void> {
-  if (!isConfigured()) {
-    return Promise.reject(new Error("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured"));
+export async function sendTestAlert(tenantId: string | null): Promise<void> {
+  const config = await resolveConfig(tenantId);
+  if (!config) {
+    throw new Error("Telegram is not configured");
   }
+  const storeName = await resolveStoreName(tenantId);
 
   const dt   = new Date();
   const time = dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
@@ -166,7 +241,7 @@ export function sendTestAlert(): Promise<void> {
 
   const lines = [
     `🧾 <b>━━  SALE INVOICE  ━━</b> 🧾`,
-    `🏪  <b>${escapeHtml(STORE_NAME)}</b>`,
+    `🏪  <b>${escapeHtml(storeName)}</b>`,
     D_HEAVY,
     ``,
     row(`📅`, `${date}  •  ${time}`),
@@ -198,7 +273,7 @@ export function sendTestAlert(): Promise<void> {
     `<i>✅ Telegram alerts are working correctly!</i>`,
   ];
 
-  return sendMessage(lines.join("\n"));
+  await deliver(config, lines.join("\n"));
 }
 
 export interface LowStockAlertItem {
@@ -207,16 +282,18 @@ export interface LowStockAlertItem {
   threshold:   number;
 }
 
-export function sendLowStockAlert(items: LowStockAlertItem[]): void {
-  if (!isConfigured() || items.length === 0) return;
+export function sendLowStockAlert(tenantId: string | null, items: LowStockAlertItem[]): void {
+  if (items.length === 0) return;
 
   const lines = items
     .map((i) => `⚠️ Low Stock: "${escapeHtml(i.productName)}" — only ${i.stock} unit${i.stock === 1 ? "" : "s"} left`)
     .join("\n");
 
-  sendMessage(lines).catch((err) =>
-    logger.warn({ err }, "Telegram low-stock alert delivery error")
-  );
+  void (async () => {
+    const config = await resolveConfig(tenantId);
+    if (!config) return;
+    await deliver(config, lines);
+  })().catch((err) => logger.warn({ err }, "Telegram low-stock alert delivery error"));
 }
 
 export interface DailySummaryTopProduct {
