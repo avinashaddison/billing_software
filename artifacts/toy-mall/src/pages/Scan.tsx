@@ -7,7 +7,7 @@ import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
   Phone, User, Wallet, Banknote, Smartphone,
   PackagePlus, ShoppingBag, ArrowUpCircle, RotateCcw, Camera, CameraOff,
-  Volume2, VolumeX, QrCode, BadgeCheck, Usb,
+  Volume2, VolumeX, QrCode, BadgeCheck, Usb, PackageSearch,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -792,10 +792,59 @@ export default function Scan() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [isBilling, items.length, showModal]);
 
+  /* ── Product-name search ──
+     Barcode stickers get torn, swapped or stolen — staff must still be able
+     to bill the item. The full product list is already in memory (skuCache),
+     so typing 2+ chars live-searches by NAME or SKU with zero network calls.
+     Picking a result re-enters the normal scan flow (handleScan) so beeps,
+     flashes, cart/stock-panel behaviour stay identical to a real scan. */
+  const [searchFocused, setSearchFocused]   = useState(false);
+  const [searchHighlight, setSearchHighlight] = useState(0);
+
+  const searchResults = useMemo<ScannedProduct[]>(() => {
+    const q = manualSku.trim().toLowerCase();
+    if (q.length < 2) return [];
+    if (skuCache.has(q)) return [];      // exact SKU → the classic flow handles it
+    const starts: ScannedProduct[] = [];
+    const contains: ScannedProduct[] = [];
+    for (const p of skuCache.values()) {
+      const name = p.name.toLowerCase();
+      const sku  = p.sku.toLowerCase();
+      if (name.startsWith(q) || sku.startsWith(q)) starts.push(p);
+      else if (name.includes(q) || sku.includes(q)) contains.push(p);
+      if (starts.length >= 8) break;
+    }
+    return [...starts, ...contains].slice(0, 8);
+  }, [manualSku, skuCache]);
+
+  useEffect(() => { setSearchHighlight(0); }, [searchResults.length, manualSku]);
+
+  const pickSearchResult = useCallback((p: ScannedProduct) => {
+    setManualSku("");
+    scanSourceRef.current = "usb";
+    handleScan(p.sku);
+    manualInputRef.current?.focus();
+  }, [handleScan]);
+
+  const showDropdown = searchFocused && searchResults.length > 0;
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setSearchHighlight((h) => Math.min(h + 1, searchResults.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHighlight((h) => Math.max(h - 1, 0)); }
+    else if (e.key === "Escape") { setSearchFocused(false); }
+  };
+
   const handleManual = (e: React.FormEvent) => {
     e.preventDefault();
     const sku = manualSku.trim().toUpperCase();
     if (!sku) return;
+    /* No exact SKU but name matches exist → Enter picks the highlighted one,
+       so "hand wa⏎" bills the Hand Watch even with its barcode missing. */
+    if (!skuCache.has(sku.toLowerCase()) && searchResults.length > 0) {
+      pickSearchResult(searchResults[Math.min(searchHighlight, searchResults.length - 1)]);
+      return;
+    }
     setManualSku("");
     scanSourceRef.current = "usb";
     setLookupSku(sku);
@@ -1022,23 +1071,77 @@ export default function Scan() {
         </div>
       )}
 
-      {/* ── Manual SKU Entry ── */}
+      {/* ── Manual SKU entry + product-name search ── */}
       <div className="px-4 pb-3 shrink-0">
-        <form onSubmit={handleManual} className="flex gap-2">
-          <Input ref={manualInputRef} value={manualSku} onChange={(e) => setManualSku(e.target.value)}
-            placeholder="Type SKU or scan barcode…"
-            className={`h-11 font-mono uppercase text-sm rounded-xl ${isStockIn ? "focus:border-blue-500" : "focus:border-green-500"}`}
-            data-testid="input-sku-manual"
-          />
-          <Button type="submit" size="sm"
-            className={`h-11 px-4 rounded-xl font-bold shrink-0 ${isStockIn ? "bg-blue-600 hover:bg-blue-500" : "bg-green-600 hover:bg-green-500"}`}
-            disabled={!manualSku.trim()}>
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-        </form>
+        <div className="relative">
+          <form onSubmit={handleManual} className="flex gap-2">
+            <Input ref={manualInputRef} value={manualSku} onChange={(e) => setManualSku(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Scan barcode, type SKU or product name…"
+              className={`h-11 font-mono text-sm rounded-xl ${isStockIn ? "focus:border-blue-500" : "focus:border-green-500"}`}
+              data-testid="input-sku-manual"
+              autoComplete="off"
+            />
+            <Button type="submit" size="sm"
+              className={`h-11 px-4 rounded-xl font-bold shrink-0 ${isStockIn ? "bg-blue-600 hover:bg-blue-500" : "bg-green-600 hover:bg-green-500"}`}
+              disabled={!manualSku.trim()}>
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </form>
+
+          {/* Live search results — barcode missing? find it by name. */}
+          {showDropdown && (
+            <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-card border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="px-3 py-1.5 border-b bg-muted/40 flex items-center gap-1.5">
+                <PackageSearch className={`w-3.5 h-3.5 ${isStockIn ? "text-blue-500" : "text-green-600"}`} />
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  {searchResults.length} match{searchResults.length !== 1 ? "es" : ""} — tap to {isBilling ? "add to cart" : "select"}
+                </span>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {searchResults.map((p, i) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    /* onMouseDown fires before the input's blur, so the click
+                       always lands even though the dropdown closes on blur */
+                    onMouseDown={(e) => { e.preventDefault(); pickSearchResult(p); }}
+                    onMouseEnter={() => setSearchHighlight(i)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b last:border-b-0 border-border/40 ${
+                      i === searchHighlight ? (isStockIn ? "bg-blue-50 dark:bg-blue-950/30" : "bg-green-50 dark:bg-green-950/30") : "hover:bg-muted/50"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-foreground truncate">{p.name}</p>
+                      <p className="text-[11px] font-mono text-muted-foreground">{p.sku}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-black tabular-nums">
+                        ₹{(p.salePrice ?? p.price).toLocaleString("en-IN")}
+                      </p>
+                      <p className={`text-[10px] font-bold ${
+                        p.stock <= 0
+                          ? "text-red-600 dark:text-red-400"
+                          : p.stock <= p.lowStockThreshold
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-muted-foreground"
+                      }`}>
+                        {p.stock <= 0 ? "Out of stock" : `${p.stock} in stock`}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-1.5 mt-1.5">
           <Usb className="w-3 h-3 text-muted-foreground/60" />
-          <span className="text-[10px] text-muted-foreground/60 font-medium">USB barcode scanner active — scan anytime</span>
+          <span className="text-[10px] text-muted-foreground/60 font-medium">
+            USB scanner active — barcode missing? just type the product name
+          </span>
         </div>
       </div>
 
