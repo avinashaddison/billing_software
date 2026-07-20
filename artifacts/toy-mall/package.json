@@ -78,6 +78,7 @@
     "zustand": "^4.5.7"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "jsbarcode": "^3.12.3",
     "qrcode.react": "^4.2.0"
   }
