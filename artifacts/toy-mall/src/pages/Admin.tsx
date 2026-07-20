@@ -4,6 +4,7 @@ import {
   Receipt, Loader2, AlertTriangle, Mail, Lock, KeyRound, Power, PowerOff,
   CheckCircle2, CalendarClock, Infinity, Pencil, Copy, ScrollText, X, Clock,
   IndianRupee, DatabaseBackup, Download, Eye, Cloud, Send, ArchiveRestore,
+  LayoutDashboard, Menu, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -340,51 +341,244 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
     }
   };
 
-  return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-white to-violet-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-violet-950/20">
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white shadow-lg shadow-violet-500/30">
-              <ShieldCheck className="w-5 h-5" strokeWidth={2.5} />
-            </div>
-            <div>
-              <h1 className="text-lg font-black tracking-tight">Addison Bill Admin</h1>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{me.email}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={backupNow} disabled={backingUp} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted disabled:opacity-50" title="Save a full database backup to Cloudflare R2 / Telegram now">
-              <DatabaseBackup className={`w-3.5 h-3.5 ${backingUp ? "animate-pulse" : ""}`} /> <span className="hidden sm:inline">{backingUp ? "Backing up…" : "Backup"}</span>
-            </button>
-            <button onClick={() => setAuditOpen(true)} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted" title="Audit log">
-              <ScrollText className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Audit Log</span>
-            </button>
-            <button onClick={refresh} className="p-2 rounded-xl bg-card border hover:bg-muted transition-colors" title="Refresh">
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </button>
-            <button onClick={logout} className="px-3 py-2 rounded-xl bg-card border text-xs font-bold flex items-center gap-1.5 hover:bg-muted">
-              <LogOut className="w-3.5 h-3.5" /> Sign out
-            </button>
-          </div>
+  /* ── Sidebar shell ── */
+  type Section = "dashboard" | "tenants" | "pricing" | "backups";
+  const [section, setSection] = useState<Section>("dashboard");
+  const [navOpen, setNavOpen] = useState(false);
+
+  const NAV: { key: Section; label: string; icon: React.ElementType; hint: string }[] = [
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, hint: "Overview & quick actions" },
+    { key: "tenants",   label: "Tenants",   icon: Building2,       hint: "Manage client shops" },
+    { key: "pricing",   label: "Pricing",   icon: IndianRupee,     hint: "Landing-page price" },
+    { key: "backups",   label: "Backups",   icon: DatabaseBackup,  hint: "R2, schedule & restore" },
+  ];
+  const SECTION_META: Record<Section, { title: string; sub: string }> = {
+    dashboard: { title: "Dashboard", sub: "Everything at a glance" },
+    tenants:   { title: "Tenants",   sub: `${tenants.length} client shop${tenants.length !== 1 ? "s" : ""} on the platform` },
+    pricing:   { title: "Subscription Pricing", sub: "Drives the public landing page" },
+    backups:   { title: "Database Backups", sub: "Cloudflare R2 · Telegram · restore" },
+  };
+
+  const goto = (s: Section) => { setSection(s); setNavOpen(false); };
+
+  /* Tenants that need attention: expired or expiring within 7 days. */
+  const attention = useMemo(() => {
+    const now = Date.now();
+    return tenants
+      .filter((t) => t.expiresAt && (new Date(t.expiresAt).getTime() - now) < 7 * 86_400_000)
+      .sort((a, b) => new Date(a.expiresAt!).getTime() - new Date(b.expiresAt!).getTime())
+      .slice(0, 6);
+  }, [tenants]);
+
+  const SidebarBody = (
+    <>
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-5 pt-6 pb-5">
+        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white shadow-lg shadow-violet-500/40 shrink-0">
+          <ShieldCheck className="w-5 h-5" strokeWidth={2.5} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-black tracking-tight text-white leading-tight">Addison Bill</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-300/80">Admin Panel</p>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 space-y-5">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Total Tenants"  value={stats?.totalTenants ?? 0}  gradient="from-violet-500 to-fuchsia-500" icon={Building2} />
-          <StatCard label="Active Tenants" value={stats?.activeTenants ?? 0} gradient="from-emerald-500 to-teal-500" icon={CheckCircle2} />
-          <StatCard label="Auth Users"     value={stats?.totalUsers ?? 0}    gradient="from-blue-500 to-cyan-500" icon={Users} />
-          <StatCard label="Legacy NULL"    value={stats?.legacyUsers ?? 0}   gradient="from-amber-500 to-orange-500" icon={AlertTriangle} />
+      {/* Nav */}
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+        {NAV.map(({ key, label, icon: Icon, hint }) => {
+          const active = section === key;
+          return (
+            <button
+              key={key}
+              onClick={() => goto(key)}
+              className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 ${
+                active ? "bg-white/10 text-white shadow-inner" : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-full bg-gradient-to-b from-violet-400 to-fuchsia-500 transition-all duration-300 ${active ? "h-6 opacity-100" : "h-0 opacity-0"}`} />
+              <Icon className={`w-4 h-4 shrink-0 transition-transform duration-200 ${active ? "scale-110" : "group-hover:scale-110"}`} />
+              <span className="flex-1 min-w-0">
+                <span className="block text-[13px] font-bold leading-tight">{label}</span>
+                <span className={`block text-[10px] leading-tight transition-colors ${active ? "text-violet-200/70" : "text-slate-500 group-hover:text-slate-400"}`}>{hint}</span>
+              </span>
+              {key === "tenants" && tenants.length > 0 && (
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black tabular-nums ${active ? "bg-white/15 text-white" : "bg-white/5 text-slate-400"}`}>
+                  {tenants.length}
+                </span>
+              )}
+              {attention.length > 0 && key === "dashboard" && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              )}
+            </button>
+          );
+        })}
+
+        <div className="pt-2 mt-2 border-t border-white/10">
+          <button
+            onClick={() => { setAuditOpen(true); setNavOpen(false); }}
+            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-200"
+          >
+            <ScrollText className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110" />
+            <span className="flex-1 text-[13px] font-bold">Audit Log</span>
+            <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+          </button>
+        </div>
+      </nav>
+
+      {/* User / sign out */}
+      <div className="px-3 pb-5 pt-3 border-t border-white/10 space-y-1">
+        <div className="flex items-center gap-2.5 px-3 py-2">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-white/20 flex items-center justify-center text-[11px] font-black text-white shrink-0 uppercase">
+            {me.email.slice(0, 1)}
+          </div>
+          <p className="text-[11px] font-mono text-slate-400 truncate" title={me.email}>{me.email}</p>
+        </div>
+        <button
+          onClick={logout}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-slate-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 text-[13px] font-bold"
+        >
+          <LogOut className="w-4 h-4" /> Sign out
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-[100dvh] flex bg-gradient-to-br from-slate-50 via-white to-violet-50/40 dark:from-slate-950 dark:via-slate-900 dark:to-violet-950/20">
+
+      {/* ── Sidebar (desktop) ── */}
+      <aside className="hidden lg:flex flex-col w-64 shrink-0 sticky top-0 h-[100dvh] bg-slate-950 relative overflow-hidden">
+        <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 w-64 h-64 rounded-full bg-violet-600/20 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-24 w-64 h-64 rounded-full bg-fuchsia-600/10 blur-3xl" />
+        <div className="relative flex flex-col h-full">{SidebarBody}</div>
+      </aside>
+
+      {/* ── Sidebar (mobile drawer) ── */}
+      {navOpen && (
+        <div className="lg:hidden fixed inset-0 z-40">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setNavOpen(false)} />
+          <aside className="absolute left-0 top-0 h-full w-72 bg-slate-950 flex flex-col animate-in slide-in-from-left duration-300">
+            {SidebarBody}
+          </aside>
+        </div>
+      )}
+
+      {/* ── Main ── */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Topbar */}
+        <div className="sticky top-0 z-20 bg-background/70 backdrop-blur-xl border-b">
+          <div className="px-4 md:px-8 py-3.5 flex items-center gap-3">
+            <button onClick={() => setNavOpen(true)} className="lg:hidden p-2 rounded-xl border bg-card hover:bg-muted transition-colors">
+              <Menu className="w-4 h-4" />
+            </button>
+            <div className="flex-1 min-w-0" key={section}>
+              <h1 className="text-lg font-black tracking-tight leading-tight animate-in fade-in slide-in-from-bottom-1 duration-300">
+                {SECTION_META[section].title}
+              </h1>
+              <p className="text-[11px] text-muted-foreground animate-in fade-in duration-500">{SECTION_META[section].sub}</p>
+            </div>
+            <button onClick={refresh} className="p-2.5 rounded-xl bg-card border hover:bg-muted transition-all active:scale-90" title="Refresh">
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <button
+              onClick={() => setCreating(true)}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30 flex items-center gap-1.5 hover:shadow-violet-500/50 hover:-translate-y-px active:scale-95 transition-all"
+            >
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Tenant</span>
+            </button>
+          </div>
         </div>
 
-        {/* Global subscription pricing (drives the public landing page) */}
-        <PricingCard />
+        {/* Section content */}
+        <div key={section} className="flex-1 px-4 md:px-8 py-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300 max-w-6xl w-full">
 
-        {/* Backup schedule + stored R2 backups with preview/download */}
-        <BackupsCard />
+          {/* ═══ DASHBOARD ═══ */}
+          {section === "dashboard" && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: "Total Tenants",  value: stats?.totalTenants ?? 0,  gradient: "from-violet-500 to-fuchsia-500", icon: Building2 },
+                  { label: "Active Tenants", value: stats?.activeTenants ?? 0, gradient: "from-emerald-500 to-teal-500",   icon: CheckCircle2 },
+                  { label: "Auth Users",     value: stats?.totalUsers ?? 0,    gradient: "from-blue-500 to-cyan-500",      icon: Users },
+                  { label: "Legacy NULL",    value: stats?.legacyUsers ?? 0,   gradient: "from-amber-500 to-orange-500",   icon: AlertTriangle },
+                ].map((s, i) => (
+                  <div key={s.label} className="animate-in fade-in zoom-in-95 duration-300" style={{ animationDelay: `${i * 70}ms`, animationFillMode: "backwards" }}>
+                    <StatCard label={s.label} value={s.value} gradient={s.gradient} icon={s.icon} />
+                  </div>
+                ))}
+              </div>
 
+              {/* Needs attention */}
+              {attention.length > 0 && (
+                <div className="rounded-2xl border border-amber-300/50 dark:border-amber-700/50 bg-amber-50/50 dark:bg-amber-950/20 p-4 md:p-5 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: "200ms", animationFillMode: "backwards" }}>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/30">
+                      <Clock className="w-4 h-4" strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-black">Needs Attention</h2>
+                      <p className="text-[11px] text-muted-foreground">Expired or expiring within 7 days</p>
+                    </div>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {attention.map((t) => {
+                      const lbl = expiryLabel(t.expiresAt);
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => { setSortBy("expiry"); setSearch(""); goto("tenants"); }}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-card hover:bg-muted hover:-translate-y-px transition-all text-left group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white shrink-0">
+                            <Building2 className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-black truncate">{t.name}</p>
+                            <p className={`text-[10px] font-bold ${lbl.tone === "bad" ? "text-rose-500" : "text-amber-600 dark:text-amber-400"}`}>{lbl.text}</p>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick actions */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  { label: "New Tenant", desc: "Onboard a client", icon: Plus, cls: "from-violet-500 to-fuchsia-600", onClick: () => setCreating(true) },
+                  { label: backingUp ? "Backing up…" : "Backup Now", desc: "R2 + Telegram", icon: DatabaseBackup, cls: "from-sky-500 to-indigo-600", onClick: backupNow },
+                  { label: "Manage Backups", desc: "Preview & restore", icon: ArchiveRestore, cls: "from-emerald-500 to-teal-600", onClick: () => goto("backups") },
+                  { label: "Audit Log", desc: "Every admin action", icon: ScrollText, cls: "from-slate-500 to-slate-700", onClick: () => setAuditOpen(true) },
+                ].map((a, i) => (
+                  <button
+                    key={a.label}
+                    onClick={a.onClick}
+                    disabled={a.label.startsWith("Backing")}
+                    className="rounded-2xl border bg-card p-4 text-left hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 animate-in fade-in zoom-in-95 disabled:opacity-60"
+                    style={{ animationDelay: `${250 + i * 60}ms`, animationFillMode: "backwards" }}
+                  >
+                    <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${a.cls} flex items-center justify-center text-white shadow-lg mb-3`}>
+                      <a.icon className={`w-4 h-4 ${a.label.startsWith("Backing") ? "animate-pulse" : ""}`} strokeWidth={2.5} />
+                    </div>
+                    <p className="text-sm font-black leading-tight">{a.label}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{a.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ═══ PRICING ═══ */}
+          {section === "pricing" && <PricingCard />}
+
+          {/* ═══ BACKUPS ═══ */}
+          {section === "backups" && <BackupsCard />}
+
+          {/* ═══ TENANTS ═══ */}
+          {section === "tenants" && (
+            <>
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
@@ -417,12 +611,6 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
             <option value="name">Name A–Z</option>
             <option value="expiry">Expiry soonest</option>
           </select>
-          <button
-            onClick={() => setCreating(true)}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white font-black text-sm shadow-lg shadow-violet-500/30 flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" /> New Tenant
-          </button>
         </div>
 
         {/* Tenants table */}
@@ -434,8 +622,9 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
           </div>
         ) : (
           <div className="rounded-2xl border bg-card overflow-hidden divide-y">
-            {filtered.map((t) => (
-              <div key={t.id} className="p-4 hover:bg-muted/30 transition-colors">
+            {filtered.map((t, ti) => (
+              <div key={t.id} className="p-4 hover:bg-muted/30 transition-colors animate-in fade-in slide-in-from-bottom-1 duration-300"
+                style={{ animationDelay: `${Math.min(ti * 45, 450)}ms`, animationFillMode: "backwards" }}>
                 <div className="flex items-start gap-3 flex-wrap">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 bg-gradient-to-br ${t.isActive ? "from-violet-500 to-fuchsia-500" : "from-slate-400 to-slate-600"}`}>
                     <Building2 className="w-5 h-5" />
@@ -523,6 +712,9 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
             ))}
           </div>
         )}
+            </>
+          )}
+        </div>
       </div>
 
       {creating && <CreateTenantDialog onClose={() => setCreating(false)} onCreated={() => { setCreating(false); void refresh(); }} />}
@@ -537,7 +729,7 @@ function StatCard({ label, value, gradient, icon: Icon }: {
   label: string; value: number; gradient: string; icon: React.ElementType;
 }) {
   return (
-    <div className="rounded-2xl border bg-card p-4 relative overflow-hidden">
+    <div className="rounded-2xl border bg-card p-4 relative overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
       <div aria-hidden className={`absolute -top-8 -right-8 w-20 h-20 rounded-full bg-gradient-to-br ${gradient} opacity-10 blur-xl`} />
       <div className={`relative inline-flex w-9 h-9 rounded-xl bg-gradient-to-br ${gradient} items-center justify-center text-white shadow-lg`}>
         <Icon className="w-4 h-4" strokeWidth={2.5} />
