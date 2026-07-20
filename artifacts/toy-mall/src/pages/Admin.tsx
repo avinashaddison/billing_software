@@ -54,6 +54,22 @@ interface Stats {
   legacyUsers:   number;
 }
 
+/** Stable, colourful avatar gradient per tenant — hashed from the id so a
+ *  tenant keeps its colour across reloads. */
+const AVATAR_GRADS = [
+  "from-violet-500 to-fuchsia-500",
+  "from-sky-500 to-cyan-400",
+  "from-emerald-500 to-teal-400",
+  "from-amber-500 to-orange-500",
+  "from-rose-500 to-pink-500",
+  "from-indigo-500 to-blue-500",
+] as const;
+function avatarGrad(id: string): string {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return AVATAR_GRADS[h % AVATAR_GRADS.length];
+}
+
 export default function AdminPage() {
   const [me, setMe]       = useState<PlatformMe | null>(null);
   const [checking, setChecking] = useState(true);
@@ -66,16 +82,21 @@ export default function AdminPage() {
       .finally(() => setChecking(false));
   }, []);
 
-  if (checking) {
-    return (
-      <div className="min-h-[100dvh] flex items-center justify-center">
-        <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (!me) return <LoginScreen onAuthed={setMe} />;
-  return <Dashboard me={me} onLogout={() => setMe(null)} />;
+  /* The admin panel is always-dark by design: the `dark` wrapper flips every
+     token (bg-card, bg-background, …) so dialogs and cards inherit the theme. */
+  return (
+    <div className="dark">
+      {checking ? (
+        <div className="min-h-[100dvh] flex items-center justify-center bg-[#05070f]">
+          <Loader2 className="w-7 h-7 animate-spin text-slate-500" />
+        </div>
+      ) : !me ? (
+        <LoginScreen onAuthed={setMe} />
+      ) : (
+        <Dashboard me={me} onLogout={() => setMe(null)} />
+      )}
+    </div>
+  );
 }
 
 /* ───────── Login ───────── */
@@ -392,7 +413,9 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
               key={key}
               onClick={() => goto(key)}
               className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 ${
-                active ? "bg-white/10 text-white shadow-inner" : "text-slate-400 hover:text-white hover:bg-white/5"
+                active
+                  ? "bg-white/10 text-white ring-1 ring-white/10 shadow-[0_0_24px_-6px_rgba(168,85,247,0.55)]"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
               }`}
             >
               <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-full bg-gradient-to-b from-violet-400 to-fuchsia-500 transition-all duration-300 ${active ? "h-6 opacity-100" : "h-0 opacity-0"}`} />
@@ -444,20 +467,29 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
   );
 
   return (
-    <div className="min-h-[100dvh] flex bg-gradient-to-br from-slate-50 via-white to-violet-50/40 dark:from-slate-950 dark:via-slate-900 dark:to-violet-950/20">
+    <div className="min-h-[100dvh] flex bg-[#05070f] text-slate-100 relative isolate">
+
+      {/* ── Ambient aurora backdrop ── */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="adm-orb absolute -top-48 -left-32 w-[560px] h-[560px] rounded-full bg-violet-600/25 blur-[120px]" />
+        <div className="adm-orb absolute top-1/3 -right-44 w-[520px] h-[520px] rounded-full bg-fuchsia-600/15 blur-[120px]" style={{ animationDelay: "-8s" }} />
+        <div className="adm-orb absolute -bottom-56 left-1/4 w-[620px] h-[620px] rounded-full bg-sky-600/15 blur-[130px]" style={{ animationDelay: "-14s" }} />
+        <div className="absolute inset-0 opacity-70"
+          style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#05070f]" />
+      </div>
 
       {/* ── Sidebar (desktop) ── */}
-      <aside className="hidden lg:flex flex-col w-64 shrink-0 sticky top-0 h-[100dvh] bg-slate-950 relative overflow-hidden">
-        <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 w-64 h-64 rounded-full bg-violet-600/20 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-24 w-64 h-64 rounded-full bg-fuchsia-600/10 blur-3xl" />
+      <aside className="hidden lg:flex flex-col w-64 shrink-0 sticky top-0 h-[100dvh] bg-white/[0.02] backdrop-blur-2xl border-r border-white/[0.06] relative overflow-hidden">
+        <div aria-hidden className="adm-glow-pulse pointer-events-none absolute -top-24 -left-24 w-64 h-64 rounded-full bg-violet-600/20 blur-3xl" />
         <div className="relative flex flex-col h-full">{SidebarBody}</div>
       </aside>
 
       {/* ── Sidebar (mobile drawer) ── */}
       {navOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setNavOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-72 bg-slate-950 flex flex-col animate-in slide-in-from-left duration-300">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setNavOpen(false)} />
+          <aside className="absolute left-0 top-0 h-full w-72 bg-[#0a0d1a]/95 backdrop-blur-2xl border-r border-white/10 flex flex-col animate-in slide-in-from-left duration-300">
             {SidebarBody}
           </aside>
         </div>
@@ -466,18 +498,18 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
       {/* ── Main ── */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Topbar */}
-        <div className="sticky top-0 z-20 bg-background/70 backdrop-blur-xl border-b">
+        <div className="sticky top-0 z-20 bg-[#05070f]/50 backdrop-blur-xl border-b border-white/[0.06]">
           <div className="px-4 md:px-8 py-3.5 flex items-center gap-3">
-            <button onClick={() => setNavOpen(true)} className="lg:hidden p-2 rounded-xl border bg-card hover:bg-muted transition-colors">
+            <button onClick={() => setNavOpen(true)} className="lg:hidden p-2 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] transition-colors">
               <Menu className="w-4 h-4" />
             </button>
             <div className="flex-1 min-w-0" key={section}>
-              <h1 className="text-lg font-black tracking-tight leading-tight animate-in fade-in slide-in-from-bottom-1 duration-300">
+              <h1 className="text-lg font-black tracking-tight leading-tight bg-gradient-to-r from-white via-white to-slate-400 bg-clip-text text-transparent animate-in fade-in slide-in-from-bottom-1 duration-300">
                 {SECTION_META[section].title}
               </h1>
-              <p className="text-[11px] text-muted-foreground animate-in fade-in duration-500">{SECTION_META[section].sub}</p>
+              <p className="text-[11px] text-slate-500 animate-in fade-in duration-500">{SECTION_META[section].sub}</p>
             </div>
-            <button onClick={refresh} className="p-2.5 rounded-xl bg-card border hover:bg-muted transition-all active:scale-90" title="Refresh">
+            <button onClick={refresh} className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] transition-all active:scale-90" title="Refresh">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
             <button
@@ -510,14 +542,14 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
 
               {/* Needs attention */}
               {attention.length > 0 && (
-                <div className="rounded-2xl border border-amber-300/50 dark:border-amber-700/50 bg-amber-50/50 dark:bg-amber-950/20 p-4 md:p-5 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: "200ms", animationFillMode: "backwards" }}>
+                <div className="rounded-2xl border border-amber-400/25 bg-amber-500/[0.06] backdrop-blur-xl p-4 md:p-5 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: "200ms", animationFillMode: "backwards" }}>
                   <div className="flex items-center gap-2.5 mb-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/30">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/40">
                       <Clock className="w-4 h-4" strokeWidth={2.5} />
                     </div>
                     <div>
-                      <h2 className="text-sm font-black">Needs Attention</h2>
-                      <p className="text-[11px] text-muted-foreground">Expired or expiring within 7 days</p>
+                      <h2 className="text-sm font-black text-amber-100">Needs Attention</h2>
+                      <p className="text-[11px] text-amber-200/50">Expired or expiring within 7 days</p>
                     </div>
                   </div>
                   <div className="grid sm:grid-cols-2 gap-2">
@@ -527,7 +559,7 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
                         <button
                           key={t.id}
                           onClick={() => { setSortBy("expiry"); setSearch(""); goto("tenants"); }}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-card hover:bg-muted hover:-translate-y-px transition-all text-left group"
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.04] ring-1 ring-white/[0.07] hover:ring-amber-400/40 hover:bg-white/[0.07] hover:-translate-y-px transition-all text-left group"
                         >
                           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white shrink-0">
                             <Building2 className="w-4 h-4" />
@@ -556,14 +588,15 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
                     key={a.label}
                     onClick={a.onClick}
                     disabled={a.label.startsWith("Backing")}
-                    className="rounded-2xl border bg-card p-4 text-left hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 animate-in fade-in zoom-in-95 disabled:opacity-60"
+                    className="adm-card relative overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.08] backdrop-blur-xl p-4 text-left hover:ring-violet-400/40 hover:shadow-[0_10px_44px_-14px_rgba(139,92,246,0.5)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 animate-in fade-in zoom-in-95 disabled:opacity-60"
                     style={{ animationDelay: `${250 + i * 60}ms`, animationFillMode: "backwards" }}
                   >
+                    <span className="adm-shimmer" aria-hidden />
                     <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${a.cls} flex items-center justify-center text-white shadow-lg mb-3`}>
                       <a.icon className={`w-4 h-4 ${a.label.startsWith("Backing") ? "animate-pulse" : ""}`} strokeWidth={2.5} />
                     </div>
                     <p className="text-sm font-black leading-tight">{a.label}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{a.desc}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{a.desc}</p>
                   </button>
                 ))}
               </div>
@@ -587,14 +620,14 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, id, or owner email…"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-400/40 transition-all"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
             title="Filter by status"
-            className="px-3 py-2.5 rounded-xl border bg-card text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="px-3 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-sm font-medium text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/40 [&>option]:bg-slate-900"
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>
@@ -605,7 +638,7 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
             title="Sort tenants"
-            className="px-3 py-2.5 rounded-xl border bg-card text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="px-3 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-sm font-medium text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/40 [&>option]:bg-slate-900"
           >
             <option value="newest">Newest first</option>
             <option value="name">Name A–Z</option>
@@ -615,19 +648,19 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
 
         {/* Tenants table */}
         {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-slate-500" /></div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">
+          <div className="rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.08] backdrop-blur-xl p-12 text-center text-slate-500">
             {tenants.length === 0 ? "No tenants yet — click 'New Tenant' to onboard your first client." : "No tenants match this search."}
           </div>
         ) : (
-          <div className="rounded-2xl border bg-card overflow-hidden divide-y">
+          <div className="rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.08] backdrop-blur-xl overflow-hidden divide-y divide-white/[0.06]">
             {filtered.map((t, ti) => (
-              <div key={t.id} className="p-4 hover:bg-muted/30 transition-colors animate-in fade-in slide-in-from-bottom-1 duration-300"
+              <div key={t.id} className="p-4 hover:bg-white/[0.04] transition-colors animate-in fade-in slide-in-from-bottom-1 duration-300"
                 style={{ animationDelay: `${Math.min(ti * 45, 450)}ms`, animationFillMode: "backwards" }}>
                 <div className="flex items-start gap-3 flex-wrap">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 bg-gradient-to-br ${t.isActive ? "from-violet-500 to-fuchsia-500" : "from-slate-400 to-slate-600"}`}>
-                    <Building2 className="w-5 h-5" />
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 bg-gradient-to-br shadow-lg ${t.isActive ? avatarGrad(t.id) : "from-slate-500 to-slate-700"}`}>
+                    <span className="text-sm font-black uppercase">{t.name.slice(0, 1)}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -725,17 +758,37 @@ function Dashboard({ me, onLogout }: { me: PlatformMe; onLogout: () => void }) {
   );
 }
 
+/** Ease-out count-up so stat numbers roll in instead of popping. */
+function useCountUp(target: number, ms = 900): number {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / ms);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setVal(Math.round(target * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return val;
+}
+
 function StatCard({ label, value, gradient, icon: Icon }: {
   label: string; value: number; gradient: string; icon: React.ElementType;
 }) {
+  const n = useCountUp(value);
   return (
-    <div className="rounded-2xl border bg-card p-4 relative overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
-      <div aria-hidden className={`absolute -top-8 -right-8 w-20 h-20 rounded-full bg-gradient-to-br ${gradient} opacity-10 blur-xl`} />
+    <div className="adm-card relative overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.08] backdrop-blur-xl p-4 hover:ring-white/20 hover:-translate-y-0.5 hover:shadow-[0_10px_44px_-14px_rgba(139,92,246,0.45)] transition-all duration-300">
+      <span className="adm-shimmer" aria-hidden />
+      <div aria-hidden className={`absolute -top-10 -right-10 w-28 h-28 rounded-full bg-gradient-to-br ${gradient} opacity-25 blur-2xl`} />
       <div className={`relative inline-flex w-9 h-9 rounded-xl bg-gradient-to-br ${gradient} items-center justify-center text-white shadow-lg`}>
         <Icon className="w-4 h-4" strokeWidth={2.5} />
       </div>
-      <p className="mt-3 text-3xl font-black tabular-nums">{value}</p>
-      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">{label}</p>
+      <p className="relative mt-3 text-3xl font-black tabular-nums bg-gradient-to-br from-white via-white to-slate-500 bg-clip-text text-transparent">{n}</p>
+      <p className="relative text-[10px] font-bold uppercase tracking-widest text-slate-500 mt-0.5">{label}</p>
     </div>
   );
 }
