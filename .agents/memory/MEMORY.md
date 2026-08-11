@@ -10,3 +10,5 @@
 - [Backup delivery vs restore sources](backup-restore-gap.md) — a backup with no restore path isn't a backup; CASCADE wipes tables you aren't restoring; pin a drill target by data_directory, not "localhost".
 - [Tenant scoping on writes](tenant-scoping-writes.md) — repeat the predicate on the primary row only; adding it to dependent cleanups/refund sums hides legacy NULL rows, breaking FK deletes and over-collecting bills.
 - [Vitest pulls a second Vite major](vitest-vite-version-clash.md) — adding vitest broke an untouched artifact's config typecheck with TS2769; pin vitest to the workspace's vite line, then dedupe.
+- [Bulk vs single action semantics](bulk-vs-single-action-semantics.md) — a batch "extend" resolving one date from now() shortens paid-up rows; share a pure per-row helper with the single-row route.
+- [Reused dialog state](reused-dialog-state.md) — a permanently-mounted `open={!!row}` dialog never re-runs its useState initialisers, so row A's typed values save onto row B.

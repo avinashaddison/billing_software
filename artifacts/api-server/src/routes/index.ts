@@ -19,6 +19,7 @@ import sharedCartRouter  from "./shared-cart";
 import telegramRouter    from "./telegram";
 import settingsRouter    from "./settings";
 import platformRouter    from "./platform";
+import platformInsightsRouter from "./platform-insights";
 import updatesRouter     from "./updates";
 import authRouter        from "./auth";
 import { PUBLIC_PATHS, requireAuth } from "../middlewares/auth";
@@ -71,6 +72,7 @@ async function tenantActiveGate(req: Request, res: Response, next: NextFunction)
 // Platform admin routes mount FIRST — the vendor's control plane must stay
 // reachable regardless of any per-tenant state.
 router.use(platformRouter);
+router.use(platformInsightsRouter);
 
 // Per-tenant suspend gate (the cloud equivalent of the old license gate).
 router.use(tenantActiveGate);

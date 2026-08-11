@@ -37,7 +37,7 @@ import Login          from "@/pages/Login";
 import StaffManagement from "@/pages/StaffManagement";
 import Checkout        from "@/pages/Checkout";
 import SettingsPage    from "@/pages/Settings";
-import AdminPage       from "@/pages/Admin";
+import AdminPage       from "@/pages/admin/index";
 import Landing         from "@/pages/Landing";
 import Legal           from "@/pages/Legal";
 

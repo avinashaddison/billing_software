@@ -29,6 +29,8 @@ import {
 import zlib from "node:zlib";
 import { logger } from "../lib/logger";
 import { recordAudit } from "../lib/audit";
+import { requirePlatformAdmin } from "../middlewares/platform-admin";
+import { anchorExtension, resolveExpiry, PRESET_DURATIONS } from "../lib/tenant-access";
 import { runDatabaseBackup } from "../lib/backup";
 import { isConfigured as telegramConfigured } from "../lib/telegram";
 import { isR2Configured, listR2Backups, downloadR2Backup, isBackupKey } from "../lib/r2";
@@ -60,75 +62,12 @@ const MIN_PASSWORD_LEN = 8;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SLUG_RE  = /^[a-z][a-z0-9-]{1,38}[a-z0-9]$/;
 
-/* Allowed shorthand durations for the /admin "Access" picker. The presets
-   keep the admin UX one-tap; anything else uses an explicit ISO date. */
-const PRESET_DURATIONS: Record<string, number> = {
-  "3d":     3  * 86_400_000,
-  "7d":     7  * 86_400_000,
-  "30d":    30 * 86_400_000,
-  "90d":    90 * 86_400_000,
-  "180d":   180 * 86_400_000,
-  "365d":   365 * 86_400_000,
-};
-
-/**
- * Resolve an expiry payload into a Date | null. Accepts:
- *   - "lifetime" / null / undefined  → null (no expiry)
- *   - one of the PRESET_DURATIONS keys → now() + that duration
- *   - any ISO 8601 date / datetime string → parsed Date
- * Throws on anything else.
- */
-function resolveExpiry(raw: unknown): Date | null {
-  if (raw == null || raw === "" || raw === "lifetime") return null;
-  if (typeof raw === "string") {
-    if (raw in PRESET_DURATIONS) return new Date(Date.now() + PRESET_DURATIONS[raw]);
-    const d = new Date(raw);
-    if (!Number.isNaN(d.getTime())) return d;
-  }
-  throw new Error("Invalid expiresAt — use 'lifetime', a preset (3d/7d/30d/90d/180d/365d), or an ISO date");
-}
-
 function isValidEmail(e: unknown): e is string {
   return typeof e === "string" && EMAIL_RE.test(e) && e.length <= 254;
 }
 
 function isValidPassword(pw: unknown): pw is string {
   return typeof pw === "string" && pw.length >= MIN_PASSWORD_LEN && pw.length <= 128;
-}
-
-/** Block everything unless the platform_session cookie maps to an active
- *  auth_users row with role = "platform_admin". Independent of tenant_session
- *  so the vendor can stay signed into /admin while also signing into a
- *  tenant's /login on the same browser. */
-async function requirePlatformAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
-  if (!req.platformUserId) {
-    res.status(401).json({ error: "Platform admin login required" });
-    return;
-  }
-  try {
-    const [me] = await db
-      .select({
-        id:       authUsersTable.id,
-        email:    authUsersTable.email,
-        role:     authUsersTable.role,
-        isActive: authUsersTable.isActive,
-      })
-      .from(authUsersTable)
-      .where(eq(authUsersTable.id, req.platformUserId));
-    if (!me || !me.isActive) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
-    }
-    if (me.role !== "platform_admin") {
-      res.status(403).json({ error: "Platform admin access required" });
-      return;
-    }
-    /* Cache the actor on the request so audit logging doesn't re-query. */
-    req.platformActor = { id: me.id, email: me.email };
-    next();
-  } catch {
-    res.status(500).json({ error: "Authorization check failed" });
-  }
 }
 
 /* ───── POST /api/platform/login — vendor-only sign-in ───────────────
@@ -575,11 +514,7 @@ router.post("/platform/tenants/:id/extend", requirePlatformAdmin, async (req, re
       .where(eq(tenantsTable.id, id));
     if (!existing) { res.status(404).json({ error: "Tenant not found" }); return; }
 
-    const now = Date.now();
-    const anchor = existing.expiresAt && existing.expiresAt.getTime() > now
-      ? existing.expiresAt.getTime()
-      : now;
-    const newExpiry = new Date(anchor + PRESET_DURATIONS[duration]);
+    const newExpiry = anchorExtension(existing.expiresAt, PRESET_DURATIONS[duration]);
 
     const [tenant] = await db
       .update(tenantsTable)

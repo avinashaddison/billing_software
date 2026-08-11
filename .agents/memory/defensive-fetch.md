@@ -33,3 +33,20 @@ set the `loaded` flag). Drive the render as `isLoading -> spinner`, else
 `disabled={... || !loaded}` so it can't submit until real data actually loaded.
 Defaulting *missing keys* after a successful response is fine; defaulting the
 *whole payload* on failure is not.
+
+## The sibling trap: "failed to load" must never render as "there is nothing"
+**Rule:** Every react-query call must destructure `error` and render a distinct
+error branch. `!data?.items?.length -> "No backups found"` is a lie when the
+request 500'd, and it is the most reassuring possible lie.
+
+**Why:** An operator reading "No recent backups" during an incident concludes
+the backups are *gone* and starts recovering from a worse source. Same for an
+empty audit log (reads as "nobody touched it") and a "shop not found" detail
+view (reads as "the shop was deleted"). The fallback inverts the meaning of the
+screen precisely when someone is relying on it.
+
+**How to apply:** Order the branches `isLoading -> error -> empty -> data`.
+Say what failed and that it does not imply absence. Also surface *soft* errors
+the server reports in a 200 body (e.g. a `listError` field when an upstream
+bucket is unreachable) — those never reach react-query's `error`. Reserve the
+empty state for a successful response that genuinely contained nothing.
