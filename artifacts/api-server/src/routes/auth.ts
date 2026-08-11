@@ -28,6 +28,7 @@ import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { recordAudit } from "../lib/audit";
 import { requireAdmin } from "../middlewares/auth";
 import { clientMeta, createSession } from "../lib/sessions";
+import { checkRateLimit, recordFailure, clearRateLimit, LOGIN_LIMIT } from "../lib/rate-limit";
 import {
   TENANT_COOKIE_NAME,
   signTenantCookie,
@@ -85,6 +86,33 @@ router.post("/auth/login-email", async (req, res): Promise<void> => {
   }
   const email = normaliseEmail(rawEmail);
 
+  /* ── Per-account brute-force guard ──────────────────────────────────────
+     This sits UNDER the per-IP `loginLimiter` in app.ts and closes two gaps
+     that limiter leaves open:
+
+       1. That limiter is skipped unless NODE_ENV === "production", so any
+          non-prod deployment has no login throttle at all.
+       2. It counts every attempt from an IP against one shared budget, so
+          several staff behind one shop router burn each other's allowance,
+          while an attacker rotating IPs is barely slowed against a single
+          targeted account.
+
+     This one keys on IP + email and counts FAILURES only, so it is gentler on
+     legitimate users (a correct password costs nothing) and much tighter on
+     account-targeted guessing. Including the IP in the key means an attacker
+     cannot lock a real owner out of their own shop by guessing at their
+     address from elsewhere. */
+  const { ip: loginIp } = clientMeta(req);
+  const limitKey = `login-email:${loginIp ?? "unknown"}:${email}`;
+  const limit = checkRateLimit(limitKey, LOGIN_LIMIT);
+  if (limit.limited) {
+    res.setHeader("Retry-After", String(limit.retryAfterSeconds));
+    res.status(429).json({
+      error: `Too many failed sign-in attempts. Please try again in ${Math.ceil(limit.retryAfterSeconds / 60)} minute(s).`,
+    });
+    return;
+  }
+
   try {
     /* We do NOT pre-filter by req.tenantId — email is the routing key.
        The looked-up user's tenantId then establishes the session tenant.
@@ -112,6 +140,7 @@ router.post("/auth/login-email", async (req, res): Promise<void> => {
     }
 
     if (!user || !user.isActive) {
+      recordFailure(limitKey, LOGIN_LIMIT);
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }
@@ -126,6 +155,10 @@ router.post("/auth/login-email", async (req, res): Promise<void> => {
       });
       return;
     }
+
+    /* Correct password — clear the counter so a user who mistyped a few times
+       and then got it right is never left throttled. */
+    clearRateLimit(limitKey);
 
     /* Record successful login (best-effort, never blocks the response). */
     db.update(authUsersTable)

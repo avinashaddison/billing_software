@@ -10,10 +10,23 @@
 import bcrypt from "bcryptjs";
 import { pool } from "@workspace/db";
 
-const OWNER_EMAIL    = "admin@example.com";
-const OWNER_PASSWORD = "admin123";
-const TENANT_ID      = "default";
-const TENANT_NAME    = "Default Shop";
+const OWNER_EMAIL = process.env["OWNER_EMAIL"]?.trim().toLowerCase() || "admin@example.com";
+const TENANT_ID   = process.env["TENANT_ID"]?.trim() || "default";
+const TENANT_NAME = process.env["TENANT_NAME"]?.trim() || "Default Shop";
+
+/* NEVER hardcode a password here — this file is committed, so any default in it
+   is public knowledge. Supply it at run time:
+
+     OWNER_PASSWORD='<strong-password>' \
+       pnpm --filter @workspace/scripts run bootstrap-email-auth */
+const OWNER_PASSWORD = process.env["OWNER_PASSWORD"] ?? "";
+if (OWNER_PASSWORD.length < 8) {
+  console.error(
+    "Refusing to run: set OWNER_PASSWORD to at least 8 characters.\n" +
+    "  OWNER_PASSWORD='<strong-password>' pnpm --filter @workspace/scripts run bootstrap-email-auth",
+  );
+  process.exit(1);
+}
 
 async function main(): Promise<void> {
   console.log("Bootstrapping email/password owner user...");
@@ -44,8 +57,8 @@ async function main(): Promise<void> {
     [TENANT_ID, OWNER_EMAIL.toLowerCase(), hash],
   );
   console.log("Created owner user:", inserted.rows[0].email, "role:", inserted.rows[0].role);
-  console.log("Password:", OWNER_PASSWORD);
-  console.log("You can now log in at /login");
+  /* Password deliberately not printed — see reset-hirasons-owner.ts. */
+  console.log("You can now log in at /login with the password you supplied.");
   process.exit(0);
 }
 

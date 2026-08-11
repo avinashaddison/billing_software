@@ -5,6 +5,8 @@ import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { requireWrite } from "../middlewares/auth";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
+import { logger } from "../lib/logger";
+import { round2, checkLinePrice, isAbsurdPrice, priceGuardMode, isSaneNumber } from "../lib/price-integrity";
 
 const router: IRouter = Router();
 
@@ -99,7 +101,7 @@ function isValidCheckoutBody(body: unknown): body is {
     if (!/^\d{10}$/.test(b.customerPhone)) return false;
   }
   if (b.discount !== undefined) {
-    if (typeof b.discount !== "number" || (b.discount as number) < 0) return false;
+    if (!isSaneNumber(b.discount) || b.discount < 0) return false;
   }
   if (b.discountType !== undefined) {
     if (b.discountType !== "percent" && b.discountType !== "amount") return false;
@@ -108,9 +110,15 @@ function isValidCheckoutBody(body: unknown): body is {
     if (!item || typeof item !== "object") return false;
     const it = item as Record<string, unknown>;
 
-    // Common fields for both shapes
-    if (typeof it.quantity !== "number" || (it.quantity as number) <= 0) return false;
-    if (typeof it.price    !== "number" || (it.price    as number) <  0) return false;
+    /* Common fields for both shapes.
+       isSaneNumber, not `typeof === "number"`: NaN and Infinity are both
+       numbers to typeof, and would sail through here into a numeric(15,2)
+       column — aborting the transaction mid-sale or storing a corrupt line.
+       Quantity must also be a whole number: `stock` is an integer column, so a
+       fractional quantity fails inside the transaction rather than here, which
+       the cashier sees as a checkout that mysteriously died. */
+    if (!isSaneNumber(it.quantity) || it.quantity <= 0 || !Number.isInteger(it.quantity)) return false;
+    if (!isSaneNumber(it.price)    || it.price    <  0) return false;
 
     // Manual line: requires `name`, forbids productId/MRP/discount fields
     if (typeof it.name === "string" && typeof it.productId !== "string") {
@@ -124,16 +132,16 @@ function isValidCheckoutBody(body: unknown): body is {
     // Catalogue line
     if (typeof it.productId !== "string") return false;
     if (it.mrp !== undefined && it.mrp !== null) {
-      if (typeof it.mrp !== "number" || (it.mrp as number) <= 0) return false;
+      if (!isSaneNumber(it.mrp) || it.mrp <= 0) return false;
     }
     if (it.preDiscountPrice !== undefined && it.preDiscountPrice !== null) {
-      if (typeof it.preDiscountPrice !== "number" || (it.preDiscountPrice as number) < 0) return false;
+      if (!isSaneNumber(it.preDiscountPrice) || it.preDiscountPrice < 0) return false;
     }
     if (it.discountType !== undefined && it.discountType !== null) {
       if (it.discountType !== "percent" && it.discountType !== "amount") return false;
     }
     if (it.discountValue !== undefined && it.discountValue !== null) {
-      if (typeof it.discountValue !== "number" || (it.discountValue as number) < 0) return false;
+      if (!isSaneNumber(it.discountValue) || it.discountValue < 0) return false;
     }
     return true;
   });
@@ -189,8 +197,8 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
             productSku:  "—",
             customName:  name,
             quantity:    item.quantity,
-            price:       item.price,
-            subtotal:    item.price * item.quantity,
+            price:       round2(item.price),
+            subtotal:    round2(round2(item.price) * item.quantity),
             // Sentinels well above any realistic threshold so the low-stock
             // filter (newStock <= threshold) never picks up manual lines.
             newStock:    Number.MAX_SAFE_INTEGER,
@@ -219,6 +227,7 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
           .set({ stock: sql`${productsTable.stock} - ${item.quantity}` })
           .where(and(
             eq(productsTable.id, item.productId),
+            tenantWhereWrite(productsTable.tenantId, tenantId),
             gte(productsTable.stock, item.quantity),
           ))
           .returning({ stock: productsTable.stock });
@@ -237,36 +246,91 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
           userId:    req.staffId ?? null,
         });
 
+        /* ── Price integrity ──────────────────────────────────────────────
+           The catalogue is the server's own source of truth, so the browser no
+           longer gets to decide what the shop earned without being checked.
+           This WARNS rather than rejects by default: 87% of real sale lines sit
+           below the current catalogue price for entirely legitimate reasons
+           (cashier discounts, later price changes, an 8-hour-old cart), so
+           blocking would refuse genuine sales. See lib/price-integrity.ts. */
+        const priceCheck = checkLinePrice({
+          product,
+          submittedPrice: item.price,
+          discountType:   item.discountType ?? null,
+          discountValue:  item.discountValue ?? null,
+        });
+
+        if (isAbsurdPrice(priceCheck)) {
+          throw new Error(
+            `Refusing "${product.name}": ₹${priceCheck.submitted} is not a possible price ` +
+            `for an item listed at ₹${priceCheck.cataloguePrice}.`
+          );
+        }
+
+        const guardMode = priceGuardMode();
+        if (!priceCheck.matches && guardMode !== "off") {
+          logger.warn({
+            event:          "price_mismatch",
+            tenantId,
+            staffId:        req.staffId ?? null,
+            userId:         req.userId ?? null,
+            productId:      product.id,
+            productSku:     product.sku,
+            productName:    product.name,
+            cataloguePrice: priceCheck.cataloguePrice,
+            expectedPrice:  priceCheck.expected,
+            submittedPrice: priceCheck.submitted,
+            deviationPct:   Math.round(priceCheck.deviation * 1000) / 10,
+            quantity:       item.quantity,
+          }, "checkout line price does not match catalogue price + declared discount");
+
+          if (guardMode === "strict") {
+            throw new Error(
+              `Price mismatch on "${product.name}": expected ₹${priceCheck.expected}, got ₹${priceCheck.submitted}.`
+            );
+          }
+        }
+
+        const linePrice = round2(item.price);
+
         processedItems.push({
           productId:        item.productId,
           productName:      product.name,
           productSku:       product.sku,
           customName:       null,
           quantity:         item.quantity,
-          price:            item.price,
-          mrp:              item.mrp,
-          preDiscountPrice: item.preDiscountPrice,
+          price:            linePrice,
+          /* Rounded on the way in, like every other money field. These are
+             stored verbatim on the sale item and later read back for receipts
+             and reports, so an unrounded 349.99000000000004 would persist and
+             resurface as a receipt that doesn't add up. */
+          mrp:              item.mrp              != null ? round2(item.mrp)              : undefined,
+          preDiscountPrice: item.preDiscountPrice != null ? round2(item.preDiscountPrice) : undefined,
           discountType:     item.discountType,
-          discountValue:    item.discountValue,
-          subtotal:         item.price * item.quantity,
+          discountValue:    item.discountValue    != null ? round2(item.discountValue)    : undefined,
+          subtotal:         round2(linePrice * item.quantity),
           purchasePrice:    product.purchasePrice != null ? Number(product.purchasePrice) : undefined,
           newStock:         decremented.stock,
           threshold:        product.lowStockThreshold,
         });
       }
 
-      const subtotal   = processedItems.reduce((s, i) => s + i.subtotal, 0);
+      /* Every money figure is rounded to paise at the boundary. Postgres stores
+         numeric(15,2), so an unrounded JS double (349.99 * 7 is 2449.9300000000003)
+         gets silently truncated on write, and the saved bill stops agreeing with
+         the sum of its own lines. */
+      const subtotal   = round2(processedItems.reduce((s, i) => s + i.subtotal, 0));
       const itemsCount = processedItems.reduce((s, i) => s + i.quantity, 0);
 
       let discountAmount = 0;
       if (discount && discount > 0 && discountType) {
         if (discountType === "percent") {
-          discountAmount = Math.min(subtotal * discount / 100, subtotal);
+          discountAmount = Math.min(round2(subtotal * discount / 100), subtotal);
         } else {
-          discountAmount = Math.min(discount, subtotal);
+          discountAmount = Math.min(round2(discount), subtotal);
         }
       }
-      const totalAmount = subtotal - discountAmount;
+      const totalAmount = round2(subtotal - discountAmount);
 
       const isCredit = paymentMode === "credit";
       const amountPaid    = isCredit ? 0 : totalAmount;
@@ -479,10 +543,15 @@ router.post("/bills/:id/payment", async (req, res): Promise<void> => {
       const [refundRow] = await tx
         .select({ refunded: sql<string>`coalesce(sum(${returnsTable.refundAmount}), 0)` })
         .from(returnsTable)
+        /* Scoped by billId alone, on purpose. The bill above was already
+           ownership-checked, and billId identifies its returns uniquely — but a
+           legacy return row with a NULL tenant_id would be EXCLUDED by a tenant
+           predicate, under-counting refunds, inflating the cap and letting the
+           bill over-collect. Correct money beats a redundant guard. */
         .where(eq(returnsTable.billId, id));
       const refunded    = Number(refundRow?.refunded ?? 0);
-      const cap         = Math.max(0, total - refunded);
-      const newPaid     = Math.min(cap, prevPaid + amount);
+      const cap         = round2(Math.max(0, total - refunded));
+      const newPaid     = round2(Math.min(cap, prevPaid + amount));
       const status      = computeBillStatus(total, newPaid, refunded);
 
       const [row] = await tx
@@ -494,13 +563,18 @@ router.post("/bills/:id/payment", async (req, res): Promise<void> => {
           // mode the customer used to pay it off (cash/upi).
           ...(status === "paid" && newPaymentMode ? { paymentMode: newPaymentMode } : {}),
         })
-        .where(eq(billsTable.id, id))
+        /* Scoped on the UPDATE itself, not just on the locked SELECT above, so
+           the tenant guarantee cannot be lost in a later refactor. */
+        .where(and(
+          eq(billsTable.id, id),
+          tenantWhereWrite(billsTable.tenantId, req.tenantId),
+        ))
         .returning();
 
       // Money-movement ledger: record the ACTUAL amount applied (the delta,
       // which can be smaller than requested when the refund cap clamps it) as a
       // 'collection'. This is what the EOD "dues collected" figure sums.
-      const applied = newPaid - prevPaid;
+      const applied = round2(newPaid - prevPaid);
       if (applied > 0) {
         await tx.insert(billPaymentsTable).values({
           tenantId:    bill.tenantId,

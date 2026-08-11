@@ -1,7 +1,8 @@
 import { schedule, type ScheduledTask } from "node-cron";
 import { eq, sql, desc, and, or, lt, isNotNull } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, authSessionsTable, platformSettingsTable } from "@workspace/db";
-import { sendDailySalesSummary } from "./telegram";
+import { sendDailySalesSummary, sendBackupFailureAlert, isConfigured as isTelegramConfigured } from "./telegram";
+import { isR2Configured } from "./r2";
 import { runDatabaseBackup } from "./backup";
 import { logger } from "./logger";
 
@@ -103,6 +104,16 @@ export function startDailyReportScheduler(): void {
      admin-configurable (platform_settings.backupHour, editable live from the
      admin panel); BACKUP_HOUR env is the fallback for fresh installs. Runs
      before the cleanup so a backup captures the pre-prune state. */
+  /* A backup with nowhere to go is not a backup. Complain loudly at boot rather
+     than letting the shop find out on the day it needs to restore. */
+  if (!isR2Configured() && !isTelegramConfigured()) {
+    logger.error(
+      "DATABASE BACKUPS ARE NOT CONFIGURED — the nightly job will run but has nowhere to " +
+      "store the file. Set R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET, " +
+      "or TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID.",
+    );
+  }
+
   void readPersistedBackupHour().then((hour) => applyBackupSchedule(hour));
 }
 
@@ -142,8 +153,10 @@ export function applyBackupSchedule(hour: number): void {
   currentBackupHour = h;
   logger.info({ backupHour: h, timezone: "Asia/Kolkata" }, "Scheduling nightly DB backup (R2 / Telegram)");
   backupTask = schedule(`30 ${h} * * *`, () => {
-    runDatabaseBackup().catch((err) =>
-      logger.error({ err }, "Nightly database backup failed")
-    );
+    runDatabaseBackup().catch((err) => {
+      logger.error({ err }, "Nightly database backup failed");
+      /* Push it to Telegram too — nobody reads server logs at 2:30 AM. */
+      void sendBackupFailureAlert(err instanceof Error ? err.message : String(err));
+    });
   }, { timezone: "Asia/Kolkata" });
 }

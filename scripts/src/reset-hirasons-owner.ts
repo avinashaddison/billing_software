@@ -8,9 +8,26 @@
 import bcrypt from "bcryptjs";
 import { pool } from "@workspace/db";
 
-const NEW_EMAIL    = "owner@hirasons.com";
-const NEW_PASSWORD = "admin123";
-const TENANT_ID    = "hira-sons";
+const NEW_EMAIL = process.env["OWNER_EMAIL"]?.trim().toLowerCase() || "owner@hirasons.com";
+const TENANT_ID = "hira-sons";
+
+/* NEVER hardcode a password here. This file is committed to the repo, so any
+   default written into it is effectively public — and this script writes to a
+   LIVE shop account. Supply the password at run time instead:
+
+     OWNER_PASSWORD='<strong-password>' \
+       pnpm --filter @workspace/scripts exec tsx ./src/reset-hirasons-owner.ts
+
+   The script refuses to run without one, so a weak shared default can never
+   reach production again. */
+const NEW_PASSWORD = process.env["OWNER_PASSWORD"] ?? "";
+if (NEW_PASSWORD.length < 8) {
+  console.error(
+    "Refusing to run: set OWNER_PASSWORD to at least 8 characters.\n" +
+    "  OWNER_PASSWORD='<strong-password>' pnpm --filter @workspace/scripts exec tsx ./src/reset-hirasons-owner.ts",
+  );
+  process.exit(1);
+}
 
 async function main(): Promise<void> {
   const hash = await bcrypt.hash(NEW_PASSWORD, 12);
@@ -44,9 +61,10 @@ async function main(): Promise<void> {
     console.log("  now:", NEW_EMAIL);
   }
 
-  console.log("\nLogin credentials:");
-  console.log("  Email:   ", NEW_EMAIL);
-  console.log("  Password:", NEW_PASSWORD);
+  /* The password is deliberately NOT printed: terminal scrollback, CI logs and
+     shell history are all places a live shop's owner password must not land. */
+  console.log("\nDone. Login email:", NEW_EMAIL);
+  console.log("Password: (the value you passed in OWNER_PASSWORD — not printed)");
   process.exit(0);
 }
 

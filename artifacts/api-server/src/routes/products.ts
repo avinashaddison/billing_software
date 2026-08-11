@@ -432,6 +432,13 @@ router.delete("/products/:id", requireWrite("products"), async (req, res): Promi
         return { status: "has_history" as const };
       }
 
+      /* The two dependent cleanups below are scoped by productId alone, on
+         purpose. The product itself is ownership-checked above and productId is
+         globally unique, so a tenant predicate adds no isolation — but it WOULD
+         skip any legacy dependent row carrying a NULL tenant_id, leaving a
+         stock-log behind that then breaks the product delete on its foreign key.
+         The tenant guarantee belongs on the product delete itself, below. */
+
       /* 1. Remove stock-movement logs (history has no value without the product) */
       await tx.delete(stockLogsTable).where(eq(stockLogsTable.productId, id));
 
@@ -444,7 +451,10 @@ router.delete("/products/:id", requireWrite("products"), async (req, res): Promi
       /* 3. Delete the product itself */
       const [deleted] = await tx
         .delete(productsTable)
-        .where(eq(productsTable.id, id))
+        .where(and(
+          eq(productsTable.id, id),
+          tenantWhereWrite(productsTable.tenantId, req.tenantId),
+        ))
         .returning();
       return { status: "ok" as const, product: deleted };
     });
@@ -516,12 +526,18 @@ router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promi
 
     if (!product) return { status: "not_found" as const };
 
+    /* Each stock write repeats the tenant predicate rather than relying solely
+       on the ownership SELECT above — same reasoning as the delete route: the
+       guarantee should live on the statement that actually changes data. */
     let updatedProduct: typeof productsTable.$inferSelect | undefined;
     if (type === "IN") {
       [updatedProduct] = await tx
         .update(productsTable)
         .set({ stock: sql`${productsTable.stock} + ${quantity}` })
-        .where(eq(productsTable.id, params.data.id))
+        .where(and(
+          eq(productsTable.id, params.data.id),
+          tenantWhereWrite(productsTable.tenantId, req.tenantId),
+        ))
         .returning();
     } else if (type === "OUT") {
       /* Guarded decrement: the row only updates if enough stock is still on
@@ -531,6 +547,7 @@ router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promi
         .set({ stock: sql`${productsTable.stock} - ${quantity}` })
         .where(and(
           eq(productsTable.id, params.data.id),
+          tenantWhereWrite(productsTable.tenantId, req.tenantId),
           gte(productsTable.stock, quantity),
         ))
         .returning();
@@ -540,7 +557,10 @@ router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promi
       [updatedProduct] = await tx
         .update(productsTable)
         .set({ stock: quantity })
-        .where(eq(productsTable.id, params.data.id))
+        .where(and(
+          eq(productsTable.id, params.data.id),
+          tenantWhereWrite(productsTable.tenantId, req.tenantId),
+        ))
         .returning();
     }
 

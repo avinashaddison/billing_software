@@ -119,6 +119,30 @@ async function sendMessage(text: string): Promise<void> {
 }
 
 /**
+ * Alert when a nightly database backup fails.
+ *
+ * A backup that quietly stops working looks exactly like one that is working,
+ * right up until the day it is needed — which is the worst possible moment to
+ * discover the difference. Failures used to go to the log only, where nobody
+ * was watching.
+ *
+ * Best-effort by design: this must never throw back into the scheduler and
+ * mask the original failure.
+ */
+export async function sendBackupFailureAlert(reason: string): Promise<void> {
+  try {
+    await sendMessage(
+      "🚨 <b>Database backup FAILED</b>\n\n" +
+      `<code>${escapeHtml(reason).slice(0, 500)}</code>\n\n` +
+      "Tonight's backup did not complete. Please check the server logs — " +
+      "the shop is running without a fresh restore point until this is fixed."
+    );
+  } catch (err) {
+    logger.warn({ err }, "could not deliver backup-failure alert");
+  }
+}
+
+/**
  * Send a file (e.g. a gzipped DB backup) as a Telegram document to every
  * configured chat — or an explicit override list (BACKUP_TELEGRAM_CHAT_ID).
  * Uses multipart/form-data via the global FormData/Blob (Node 18+). Silently

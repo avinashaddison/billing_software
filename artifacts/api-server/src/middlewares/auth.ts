@@ -58,6 +58,25 @@ export const PUBLIC_PATHS: ReadonlySet<string> = new Set([
  *    transient DB error must not mass-logout the whole tenant. This is
  *    deliberately different from the account-active check below, which 500s.
  */
+/**
+ * Idle window after which a dormant session stops being accepted.
+ *
+ * The cookie itself lives for a year and its `iat` was never checked, so a
+ * copied cookie used to work indefinitely. Rather than enforce an age on the
+ * cookie (which would sign everyone out the moment it shipped), expiry is
+ * driven by `auth_sessions.lastSeenAt`, which every authenticated request
+ * already refreshes. Anyone using the app regularly is therefore never
+ * disturbed; only genuinely forgotten devices stop working.
+ *
+ * Set SESSION_IDLE_DAYS to tune, or 0 to disable.
+ */
+function sessionIdleTimeoutMs(): number {
+  const raw = process.env["SESSION_IDLE_DAYS"];
+  const days = raw === undefined || raw.trim() === "" ? 30 : Number(raw);
+  if (!Number.isFinite(days) || days <= 0) return 0;
+  return days * 24 * 60 * 60 * 1000;
+}
+
 async function validateOrUpgradeSession(
   req: Request,
   res: Response,
@@ -65,23 +84,54 @@ async function validateOrUpgradeSession(
   subjectId: string,
 ): Promise<boolean> {
   if (req.sessionId) {
-    let row: { revokedAt: Date | null } | undefined;
-    try {
-      [row] = await db
-        .select({ revokedAt: authSessionsTable.revokedAt })
-        .from(authSessionsTable)
-        .where(and(
-          eq(authSessionsTable.id, req.sessionId),
-          eq(authSessionsTable.subjectKind, subjectKind),
-          eq(authSessionsTable.subjectId, subjectId),
-        ));
-    } catch (err) {
-      logger.warn({ err }, "session status check failed — allowing (fail-open)");
-      return true;
+    let row: { revokedAt: Date | null; lastSeenAt: Date | null } | undefined;
+    /* One retry, because Neon suspends idle connections and a single transient
+       failure is routine. A PERSISTENT failure now denies the request. This
+       used to fail OPEN — meaning a session the owner had just revoked kept
+       working for as long as the database was unhappy. */
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        [row] = await db
+          .select({
+            revokedAt:  authSessionsTable.revokedAt,
+            lastSeenAt: authSessionsTable.lastSeenAt,
+          })
+          .from(authSessionsTable)
+          .where(and(
+            eq(authSessionsTable.id, req.sessionId),
+            eq(authSessionsTable.subjectKind, subjectKind),
+            eq(authSessionsTable.subjectId, subjectId),
+          ));
+        lastErr = undefined;
+        break;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    if (lastErr !== undefined) {
+      /* 503 and deliberately NOT 401: the session is probably valid, we simply
+         cannot confirm it right now. A 401 would clear the cookie and sign the
+         whole shop out over a momentary database blip, which is exactly the
+         mass-logout the old fail-open was trying to avoid. A 503 denies this
+         one request — closed, but harmless — and the SPA retries. */
+      logger.error({ err: lastErr }, "session status check failed twice — denying request (fail-closed)");
+      res.status(503).json({ error: "Service temporarily unavailable, please retry" });
+      return false;
     }
     if (!row || row.revokedAt) {
       res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
       res.status(401).json({ error: "Session revoked" });
+      return false;
+    }
+
+    /* Idle expiry. Deliberately read-only: the session row is left alone and
+       the scheduled cleanup job prunes it later, so nothing is written to a
+       live database on the request path. */
+    const idleMs = sessionIdleTimeoutMs();
+    if (idleMs > 0 && row.lastSeenAt instanceof Date && Date.now() - row.lastSeenAt.getTime() > idleMs) {
+      res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
+      res.status(401).json({ error: "Session expired, please sign in again" });
       return false;
     }
     /* Throttled, fire-and-forget last-seen bump: at most one write per minute
