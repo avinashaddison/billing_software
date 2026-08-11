@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   round2,
   catalogueEffectivePrice,
@@ -6,6 +6,10 @@ import {
   checkLinePrice,
   isAbsurdPrice,
   isSaneNumber,
+  exceedsDiscountCeiling,
+  checkBillDiscount,
+  maxDiscountPct,
+  DEFAULT_MAX_DISCOUNT_PCT,
 } from "./price-integrity";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z");
@@ -169,5 +173,176 @@ describe("isAbsurdPrice", () => {
   it("stays quiet for a zero-priced catalogue item, where there is no basis to judge", () => {
     const freebie = { price: "0", salePrice: null, salePriceUntil: null };
     expect(isAbsurdPrice(checkLinePrice({ product: freebie, submittedPrice: 500, now: NOW }))).toBe(false);
+  });
+});
+
+describe("maxDiscountPct", () => {
+  const KEY = "PRICE_GUARD_MAX_DISCOUNT_PCT";
+  const original = process.env[KEY];
+  afterEach(() => {
+    if (original === undefined) delete process.env[KEY];
+    else process.env[KEY] = original;
+  });
+
+  it("defaults when unset", () => {
+    delete process.env[KEY];
+    expect(maxDiscountPct()).toBe(DEFAULT_MAX_DISCOUNT_PCT);
+  });
+
+  it("honours a shop running a genuine deep clearance", () => {
+    process.env[KEY] = "90";
+    expect(maxDiscountPct()).toBe(90);
+  });
+
+  it("ignores values that would refuse every discounted sale in the shop", () => {
+    for (const bad of ["0", "-10", "abc", "", "1000"]) {
+      process.env[KEY] = bad;
+      expect(maxDiscountPct()).toBe(DEFAULT_MAX_DISCOUNT_PCT);
+    }
+  });
+});
+
+describe("exceedsDiscountCeiling", () => {
+  const product = { price: "500.00", salePrice: null, salePriceUntil: null };
+
+  it("refuses the attack this exists for: a ₹500 toy billed at ₹1", () => {
+    expect(exceedsDiscountCeiling(checkLinePrice({ product, submittedPrice: 1, now: NOW }))).toBe(true);
+  });
+
+  it("cannot be talked around by ALSO declaring the discount", () => {
+    /* The crux. A crafted payload can claim any discount it likes, so a guard
+       that trusts the declared discount would wave this straight through. */
+    const check = checkLinePrice({
+      product, submittedPrice: 1, discountType: "percent", discountValue: 99.8, now: NOW,
+    });
+    expect(check.matches).toBe(true);            // the declared discount "explains" it
+    expect(exceedsDiscountCeiling(check)).toBe(true);  // and it is refused anyway
+  });
+
+  it("lets through the deepest discount seen in 60 days of real sales (50.5%)", () => {
+    const keyring = { price: "150.00", salePrice: "99.00", salePriceUntil: null };
+    const check = checkLinePrice({ product: keyring, submittedPrice: 49, now: NOW });
+    expect(Math.round(check.impliedDiscountPct * 10) / 10).toBe(50.5);
+    expect(exceedsDiscountCeiling(check)).toBe(false);
+  });
+
+  it("leaves ordinary trading alone", () => {
+    for (const price of [500, 475, 425, 250, 151]) {
+      expect(exceedsDiscountCeiling(checkLinePrice({ product, submittedPrice: price, now: NOW }))).toBe(false);
+    }
+  });
+
+  it("judges a product on sale against its sale price, not the list price it no longer sells at", () => {
+    const onSale = { price: "1000.00", salePrice: "200.00", salePriceUntil: future };
+    /* ₹100 is 90% off the list price but only 50% off the price actually being
+       charged — the shop is not being robbed, so it must go through. */
+    expect(exceedsDiscountCeiling(checkLinePrice({ product: onSale, submittedPrice: 100, now: NOW }))).toBe(false);
+    expect(exceedsDiscountCeiling(checkLinePrice({ product: onSale, submittedPrice: 20, now: NOW }))).toBe(true);
+  });
+
+  it("respects a raised ceiling", () => {
+    const check = checkLinePrice({ product, submittedPrice: 75, now: NOW });  // 85% off
+    expect(exceedsDiscountCeiling(check, 70)).toBe(true);
+    expect(exceedsDiscountCeiling(check, 90)).toBe(false);
+  });
+
+  it("sits exactly on the boundary without firing", () => {
+    const check = checkLinePrice({ product, submittedPrice: 150, now: NOW });  // exactly 70% off
+    expect(check.impliedDiscountPct).toBeCloseTo(70, 9);
+    expect(exceedsDiscountCeiling(check, 70)).toBe(false);
+  });
+
+  it("exempts a product with no catalogue price, where there is nothing to measure against", () => {
+    const freebie = { price: "0", salePrice: null, salePriceUntil: null };
+    expect(exceedsDiscountCeiling(checkLinePrice({ product: freebie, submittedPrice: 0, now: NOW }))).toBe(false);
+  });
+
+  it("never lets a non-finite price through", () => {
+    expect(exceedsDiscountCeiling(checkLinePrice({ product, submittedPrice: Number.NaN, now: NOW }))).toBe(true);
+  });
+
+  it("does not fire on a line sold ABOVE catalogue, which costs the shop nothing", () => {
+    expect(exceedsDiscountCeiling(checkLinePrice({ product, submittedPrice: 600, now: NOW }))).toBe(false);
+  });
+
+  it("keeps the ceiling clear of a stale-cart price drop", () => {
+    /* Yesterday's price still in an 8-hour-old cart, today's catalogue lower:
+       a mismatch worth warning about, never worth refusing the sale over. */
+    const cheaperNow = { price: "300.00", salePrice: null, salePriceUntil: null };
+    const check = checkLinePrice({ product: cheaperNow, submittedPrice: 280, now: NOW });
+    expect(check.matches).toBe(false);
+    expect(exceedsDiscountCeiling(check)).toBe(false);
+  });
+});
+
+describe("checkBillDiscount", () => {
+  /* A ₹1000 bill of catalogue-priced goods, sold at catalogue price. */
+  const honest = { catalogueBasisTotal: 1000, guardedSubtotal: 1000, subtotal: 1000 };
+
+  it("closes the way around the line ceiling: honest lines, 100% off the bill", () => {
+    /* Every line passes its own check, then the whole bill is discounted to
+       zero. This is the bypass the per-line guard cannot see. */
+    const check = checkBillDiscount({ ...honest, discountAmount: 1000 });
+    expect(check.blocked).toBe(true);
+    expect(Math.round(check.offPct)).toBe(100);
+    expect(check.guardedTotal).toBe(0);
+  });
+
+  it("leaves an ordinary bill discount alone", () => {
+    for (const discountAmount of [0, 50, 100, 250]) {
+      expect(checkBillDiscount({ ...honest, discountAmount }).blocked).toBe(false);
+    }
+  });
+
+  it("catches a line discount and a bill discount that only breach the ceiling together", () => {
+    /* Lines already 50% off (each fine on its own), then 50% off the bill:
+       75% in total, past the ceiling. Neither guard alone would notice. */
+    const check = checkBillDiscount({
+      catalogueBasisTotal: 1000, guardedSubtotal: 500, subtotal: 500, discountAmount: 250,
+    });
+    expect(Math.round(check.offPct)).toBe(75);
+    expect(check.blocked).toBe(true);
+  });
+
+  it("sits exactly on the ceiling without refusing the sale", () => {
+    const check = checkBillDiscount({ ...honest, discountAmount: 700, maxPct: 70 });
+    expect(check.offPct).toBeCloseTo(70, 9);
+    expect(check.blocked).toBe(false);
+  });
+
+  it("ignores a bill with nothing priceable, instead of calling it 100% off", () => {
+    /* All manual lines — no catalogue price exists to judge them against. */
+    const check = checkBillDiscount({
+      catalogueBasisTotal: 0, guardedSubtotal: 0, subtotal: 400, discountAmount: 400,
+    });
+    expect(check.blocked).toBe(false);
+  });
+
+  it("does not treat a manual line as a free giveaway on the catalogue lines", () => {
+    /* ₹1000 of catalogue goods + a ₹1000 manual line, ₹200 off the bill. The
+       discount is shared, so the catalogue half is only 10% down — fine. */
+    const check = checkBillDiscount({
+      catalogueBasisTotal: 1000, guardedSubtotal: 1000, subtotal: 2000, discountAmount: 200,
+    });
+    expect(check.guardedTotal).toBe(900);
+    expect(check.blocked).toBe(false);
+  });
+
+  it("still catches a deep discount hidden behind a large manual line", () => {
+    const check = checkBillDiscount({
+      catalogueBasisTotal: 1000, guardedSubtotal: 1000, subtotal: 2000, discountAmount: 1900,
+    });
+    expect(check.blocked).toBe(true);
+  });
+
+  it("respects a raised ceiling", () => {
+    const args = { ...honest, discountAmount: 850 };   // 85% off
+    expect(checkBillDiscount({ ...args, maxPct: 70 }).blocked).toBe(true);
+    expect(checkBillDiscount({ ...args, maxPct: 90 }).blocked).toBe(false);
+  });
+
+  it("refuses rather than trusts a non-finite figure", () => {
+    expect(checkBillDiscount({ ...honest, discountAmount: Number.NaN }).blocked).toBe(true);
+    expect(checkBillDiscount({ ...honest, subtotal: Number.POSITIVE_INFINITY, discountAmount: 0 }).blocked).toBe(true);
   });
 });

@@ -33,7 +33,8 @@ import { runDatabaseBackup } from "../lib/backup";
 import { isConfigured as telegramConfigured } from "../lib/telegram";
 import { isR2Configured, listR2Backups, downloadR2Backup, isBackupKey } from "../lib/r2";
 import { getBackupHour, applyBackupSchedule } from "../lib/scheduler";
-import { restoreDatabaseBackup } from "../lib/restore";
+import { restoreDatabaseBackup, restoreSnapshot } from "../lib/restore";
+import multer from "multer";
 import {
   PLATFORM_COOKIE_NAME,
   signTenantCookie,
@@ -947,6 +948,59 @@ router.post("/platform/backups/restore", requirePlatformAdmin, async (req, res):
     res.status(500).json({ error: err?.message || "Restore failed — the database was left unchanged" });
   }
 });
+
+/* ───── POST /api/platform/backups/restore-upload — restore from a file ─────
+ * The nightly backup can deliver to Telegram, but restore could previously only
+ * read from Cloudflare R2. A shop with only Telegram configured therefore had
+ * backups it had no way to restore — the worst kind of backup. This accepts the
+ * .json.gz directly, so the copy sitting in a Telegram chat is enough to
+ * recover. Same protections as the R2 path: platform admin, typed
+ * confirmation, safety backup first, one transaction. */
+const backupUpload = multer({
+  storage: multer.memoryStorage(),
+  /* Comfortably above Telegram's own 50 MB document ceiling, so any file the
+     backup job could have sent is accepted. */
+  limits: { fileSize: 64 * 1024 * 1024 },
+});
+
+router.post(
+  "/platform/backups/restore-upload",
+  requirePlatformAdmin,
+  backupUpload.single("file"),
+  async (req, res): Promise<void> => {
+    const confirm = String(req.body?.confirm ?? "");
+    if (confirm !== "RESTORE") {
+      res.status(400).json({ error: 'Confirmation missing — type RESTORE to proceed' });
+      return;
+    }
+    if (!req.file?.buffer?.length) {
+      res.status(400).json({ error: "No backup file uploaded" });
+      return;
+    }
+    try {
+      const summary = await restoreSnapshot(req.file.buffer, {
+        source: req.file.originalname || "uploaded snapshot",
+      });
+      void recordAudit({
+        action:     "platform.backup_restore_upload",
+        actorId:    req.platformActor!.id,
+        actorEmail: req.platformActor!.email,
+        ip:         req.ip,
+        metadata:   {
+          filename:     req.file.originalname,
+          sizeBytes:    req.file.size,
+          tables:       summary.tables,
+          rowsRestored: summary.rowsRestored,
+          safetyBackup: summary.safetyBackup,
+        },
+      });
+      res.json({ ok: true, ...summary });
+    } catch (err: any) {
+      logger.error({ err, filename: req.file?.originalname }, "database restore from upload failed");
+      res.status(500).json({ error: err?.message || "Restore failed — the database was left unchanged" });
+    }
+  },
+);
 
 /* ───── GET /api/platform/backups/download?key= — fetch the .json.gz ───── */
 router.get("/platform/backups/download", requirePlatformAdmin, async (req, res): Promise<void> => {

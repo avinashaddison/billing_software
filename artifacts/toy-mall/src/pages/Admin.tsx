@@ -3,7 +3,7 @@ import {
   ShieldCheck, LogOut, RefreshCw, Plus, Search, Building2, Users, Package,
   Receipt, Loader2, AlertTriangle, Mail, Lock, KeyRound, Power, PowerOff,
   CheckCircle2, CalendarClock, Infinity, Pencil, Copy, ScrollText, X, Clock,
-  IndianRupee, DatabaseBackup, Download, Eye, Cloud, Send, ArchiveRestore,
+  IndianRupee, DatabaseBackup, Download, Eye, Cloud, Send, ArchiveRestore, FileUp,
   LayoutDashboard, Menu, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -939,6 +939,9 @@ function BackupsCard() {
   const [restoreTarget, setRestoreTarget] = useState<BackupFile | null>(null);
   const [restoreConfirm, setRestoreConfirm] = useState("");
   const [restoring, setRestoring] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadConfirm, setUploadConfirm] = useState("");
+  const [uploadRestoring, setUploadRestoring] = useState(false);
 
   const load = async () => {
     try {
@@ -1020,6 +1023,33 @@ function BackupsCard() {
       await load();
     } catch { toast.error("Server unreachable", { id: t }); }
     finally { setRestoring(false); }
+  };
+
+  /* Restore from a file the owner has on their device — the Telegram copy.
+     Without this, a shop with no R2 has backups and no way to use them. */
+  const doRestoreUpload = async () => {
+    if (!uploadFile || uploadConfirm !== "RESTORE" || uploadRestoring) return;
+    setUploadRestoring(true);
+    const t = toast.loading("Restoring database — do not close this tab…");
+    try {
+      const fd = new FormData();
+      fd.append("confirm", uploadConfirm);   // before the file, so it is parsed first
+      fd.append("file", uploadFile);
+      const r = await fetch(`${API}/platform/backups/restore-upload`, {
+        method: "POST", credentials: "include", body: fd,
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(d.error || "Restore failed — database unchanged", { id: t }); return; }
+      toast.success(
+        `Restored ${d.tables} tables (${Number(d.rowsRestored ?? 0).toLocaleString("en-IN")} rows). ` +
+        `A safety backup of the previous data was saved first.`,
+        { id: t, duration: 8000 },
+      );
+      setUploadFile(null);
+      setUploadConfirm("");
+      await load();
+    } catch { toast.error("Server unreachable", { id: t }); }
+    finally { setUploadRestoring(false); }
   };
 
   const download = async (f: BackupFile) => {
@@ -1152,6 +1182,72 @@ function BackupsCard() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ── Restore from a file ──────────────────────────────────────────
+             Backups go to Telegram as well as R2, but restore could only ever
+             read from R2 — so a shop with Telegram alone had backups it could
+             not actually use. This takes the file directly. */}
+          <div className="mt-4">
+            <span className="block text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">
+              Restore from a file
+            </span>
+            <div className="rounded-xl border p-3.5 space-y-3">
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Every backup is also sent to Telegram. Save that{" "}
+                <span className="font-mono font-bold">.json.gz</span> file to this device and upload it
+                here — this works even when Cloudflare R2 is not set up.
+              </p>
+              <input
+                key={uploadFile ? "picked" : "empty"}
+                type="file"
+                accept=".gz,application/gzip"
+                disabled={uploadRestoring}
+                onChange={(e) => { setUploadFile(e.target.files?.[0] ?? null); setUploadConfirm(""); }}
+                className="block w-full text-xs file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-muted file:text-xs file:font-bold hover:file:bg-muted/70"
+              />
+              {uploadFile && (
+                <div className="space-y-3 pt-1">
+                  <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 space-y-1.5 text-xs text-red-500 font-medium">
+                    <p className="font-black">⚠ This replaces ALL current data — for EVERY tenant.</p>
+                    <p className="font-mono break-all">{uploadFile.name} · {fmtMb(uploadFile.size)}</p>
+                    <p>A safety backup of today's data is taken automatically first, and the restore is
+                       all-or-nothing — if anything fails, nothing changes.</p>
+                    <p>Devices logged in after this backup was taken may need to sign in again.</p>
+                  </div>
+                  <label className="block space-y-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                      Type <span className="text-red-500">RESTORE</span> to confirm
+                    </span>
+                    <input
+                      value={uploadConfirm}
+                      onChange={(e) => setUploadConfirm(e.target.value.toUpperCase())}
+                      placeholder="RESTORE"
+                      disabled={uploadRestoring}
+                      className="w-full px-3 py-2.5 rounded-xl border bg-muted/30 text-sm font-mono font-black tracking-widest focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                    />
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => { setUploadFile(null); setUploadConfirm(""); }}
+                      disabled={uploadRestoring}
+                      className="py-2.5 rounded-xl border font-bold text-sm hover:bg-muted disabled:opacity-40"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={doRestoreUpload}
+                      disabled={uploadConfirm !== "RESTORE" || uploadRestoring}
+                      className="py-2.5 rounded-xl bg-red-500 text-white font-black text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+                    >
+                      {uploadRestoring
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Restoring…</>
+                        : <><FileUp className="w-4 h-4" /> Restore</>}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}

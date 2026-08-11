@@ -9,30 +9,36 @@
  * revenue and profit report is built from those saved rows, so the shop's
  * numbers could be wrong with nothing to reveal it.
  *
- * ── Why this does NOT hard-reject by default ───────────────────────────────
- * Measured against live data, 87% of recent sale lines sit BELOW the product's
- * current catalogue price. That is expected and legitimate:
- *   - cashiers apply per-line discounts as a normal part of selling,
- *   - catalogue prices change after a sale, so old lines no longer match,
- *   - the cart persists for 8 hours, so a price can legitimately move between
- *     scanning an item and completing the bill.
- * Rejecting mismatches would therefore refuse a large share of genuine sales
- * and stop a working shop from selling — strictly worse than the problem it
- * fixes.
+ * ── Two different questions ────────────────────────────────────────────────
+ * "Does this price match the catalogue?" and "could any honest discount
+ * explain this price?" are not the same question, and they need different
+ * answers.
  *
- * ── What this actually guarantees, stated honestly ─────────────────────────
- * In the default "warn" mode the submitted price is STILL what gets stored.
- * This is detection, not prevention: it makes tampering visible and auditable,
- * and it blocks only prices no discount could explain. A cashier or a stolen
- * session can still bill a ₹500 item at ₹1 and have it recorded — the shop
- * will simply have a loud warning naming the staff member, product and amount.
+ * The first has to stay a warning. Measured over 60 days of real sales, 961 of
+ * 969 catalogue lines match the catalogue once BOTH the sale price and the
+ * declared discount are taken into account — but the remainder are ordinary
+ * trading: a cashier knocking ₹25 off, a price edited after the sale, an
+ * 8-hour-old cart. Rejecting those would refuse genuine sales at the counter.
  *
- * Closing that properly needs the client to send a server-verifiable discount
- * (an authorised discount reason or a signed price snapshot) so the server can
- * derive the price itself and reject anything else. That is a product change,
- * not a patch, and it is the right next step once the warnings have been
- * reviewed. PRICE_GUARD_MODE=strict is available but will reject legitimate
- * sales until that work is done.
+ * The second can be enforced, and is. No honest sale gives away almost the
+ * whole value of an item, so any line discounted past a ceiling is refused.
+ * Over those same 969 lines the deepest real discount was 50.5%, and nothing
+ * came within 20 points of the 70% default — so this blocks tampering without
+ * touching a single real sale. Tune with PRICE_GUARD_MAX_DISCOUNT_PCT.
+ *
+ * ── Why the ceiling ignores the declared discount ──────────────────────────
+ * This is the crux. A guard that trusts the client's declared discount is not
+ * a guard at all: whoever can send `price: 1` can just as easily send
+ * `discountValue: 99.8` alongside it, and the line "matches" perfectly. So the
+ * ceiling is measured against the catalogue price alone, treating the total
+ * gap as the discount whether it was declared or not. It is the one part of
+ * this that a crafted payload cannot argue its way around.
+ *
+ * ── What this guarantees, stated plainly ───────────────────────────────────
+ * A ₹500 toy can no longer be billed at ₹1, by anyone, in any mode except
+ * "off". Smaller unexplained discounts are still recorded as submitted and
+ * raise a warning naming the staff member, product and amount — detection, not
+ * prevention, because at that size refusing the sale is the worse outcome.
  */
 
 export type PriceGuardMode = "off" | "warn" | "strict";
@@ -41,6 +47,23 @@ export function priceGuardMode(): PriceGuardMode {
   const raw = process.env["PRICE_GUARD_MODE"]?.trim().toLowerCase();
   if (raw === "off" || raw === "strict") return raw;
   return "warn";
+}
+
+/** Default ceiling, in percent off the catalogue price. */
+export const DEFAULT_MAX_DISCOUNT_PCT = 70;
+
+/**
+ * How deep a discount a single line may carry before checkout refuses it.
+ *
+ * Read per call rather than cached so a shop running a genuine clearance can
+ * raise it and have the counter working again immediately, without a redeploy.
+ * Values outside 1–100 are ignored in favour of the default: a stray `0` in the
+ * environment would otherwise refuse every discounted sale in the shop.
+ */
+export function maxDiscountPct(): number {
+  const raw = Number(process.env["PRICE_GUARD_MAX_DISCOUNT_PCT"]);
+  if (!Number.isFinite(raw) || raw <= 0 || raw > 100) return DEFAULT_MAX_DISCOUNT_PCT;
+  return raw;
 }
 
 /**
@@ -139,6 +162,18 @@ export interface LinePriceCheck {
   deviation: number;
   /** Catalogue price used as the basis, before any declared line discount. */
   cataloguePrice: number;
+  /**
+   * Cheapest price the catalogue could plausibly be quoting, before discounts.
+   * The ceiling is measured against this so a product on sale is judged against
+   * its sale price, not the higher list price it is no longer sold at.
+   */
+  bestBasis: number;
+  /**
+   * Total discount on this line as a percentage of `bestBasis`, counting the
+   * declared discount and any further unexplained drop as one number. Negative
+   * when the line sold above catalogue.
+   */
+  impliedDiscountPct: number;
 }
 
 /** Compare a submitted line price against what the catalogue + declared discount imply. */
@@ -159,7 +194,84 @@ export function checkLinePrice(args: {
     (base) => Math.abs(submitted - applyLineDiscount(base, args.discountType, args.discountValue)) < 0.011,
   );
   const deviation = cataloguePrice > 0 ? (submitted - cataloguePrice) / cataloguePrice : 0;
-  return { expected, submitted, matches, deviation, cataloguePrice };
+  const positiveBases = catalogueBases(args.product, now).filter((b) => b > 0);
+  const bestBasis = positiveBases.length > 0 ? Math.min(...positiveBases) : 0;
+  const impliedDiscountPct =
+    bestBasis > 0 && Number.isFinite(submitted) ? (1 - submitted / bestBasis) * 100 : 0;
+  return { expected, submitted, matches, deviation, cataloguePrice, bestBasis, impliedDiscountPct };
+}
+
+/**
+ * True when a line gives away more of the item's value than any honest sale
+ * would — the tampering and fat-finger case.
+ *
+ * Deliberately does NOT exempt lines that "match" a declared discount; see the
+ * note at the top of this file. A product with no usable catalogue price is
+ * exempt, because there is nothing to measure the discount against.
+ */
+export function exceedsDiscountCeiling(check: LinePriceCheck, maxPct: number = maxDiscountPct()): boolean {
+  if (check.bestBasis <= 0) return false;
+  if (!Number.isFinite(check.submitted)) return true;
+  return check.impliedDiscountPct > maxPct + 1e-9;
+}
+
+export interface BillDiscountCheck {
+  /** What the shop actually receives for the catalogue-priced lines. */
+  guardedTotal: number;
+  /** What the catalogue says those same lines are worth. */
+  catalogueBasisTotal: number;
+  /** How far below catalogue the bill lands, in percent. */
+  offPct: number;
+  /** True when the bill as a whole is discounted past the ceiling. */
+  blocked: boolean;
+}
+
+/**
+ * Hold the WHOLE BILL to the same ceiling as its individual lines.
+ *
+ * The per-line ceiling has an obvious way around it: send every line at its
+ * honest catalogue price, then discount the entire bill by 100%. The total is
+ * zero, no single line ever looked wrong, and a line-only guard waves it
+ * through. This closes that route.
+ *
+ * Manual lines (no catalogue product) are excluded from both sides rather than
+ * counted as free, since there is no listed price to judge them against — the
+ * bill discount is apportioned so only the catalogue-backed share is measured.
+ */
+export function checkBillDiscount(args: {
+  /** Catalogue value of the priced lines, before any discount. */
+  catalogueBasisTotal: number;
+  /** Submitted value of those same lines, before the bill discount. */
+  guardedSubtotal: number;
+  /** Submitted value of the entire bill, including manual lines. */
+  subtotal: number;
+  /** Bill-level discount in rupees, already clamped to the subtotal. */
+  discountAmount: number;
+  maxPct?: number;
+}): BillDiscountCheck {
+  const maxPct = args.maxPct ?? maxDiscountPct();
+  const { catalogueBasisTotal, guardedSubtotal, subtotal, discountAmount } = args;
+
+  if (!isSaneNumber(catalogueBasisTotal) || catalogueBasisTotal <= 0) {
+    return { guardedTotal: 0, catalogueBasisTotal: 0, offPct: 0, blocked: false };
+  }
+  if (!isSaneNumber(guardedSubtotal) || !isSaneNumber(subtotal) || !isSaneNumber(discountAmount)) {
+    return { guardedTotal: 0, catalogueBasisTotal, offPct: 100, blocked: true };
+  }
+
+  const guardedShare = subtotal > 0 ? guardedSubtotal / subtotal : 0;
+  const guardedTotal = guardedSubtotal - discountAmount * guardedShare;
+  const offPct       = (1 - guardedTotal / catalogueBasisTotal) * 100;
+  const floor        = catalogueBasisTotal * (1 - maxPct / 100);
+
+  return {
+    guardedTotal,
+    catalogueBasisTotal,
+    offPct,
+    /* A paisa of slack so float noise on a bill that sits exactly on the
+       ceiling cannot refuse a sale. */
+    blocked: guardedTotal < floor - 0.011,
+  };
 }
 
 /**

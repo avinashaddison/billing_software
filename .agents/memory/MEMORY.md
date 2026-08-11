@@ -6,6 +6,7 @@
 - [Verifying authenticated UI](verifying-authenticated-ui.md) — no known passwords + live data; mint a signed session cookie AND seed the Zustand localStorage store, or the SPA redirects before any call.
 - [IST date ranges](ist-date-ranges.md) — filter, build and display on Asia/Kolkata calendar days; clamp month arithmetic (31 Mar −1mo ≠ 3 Mar); totals over a capped list need their own query.
 - [Adding a store setting](store-settings-add-field.md) — store_settings.data is JSON (no migration); a new field must be added to interface+defaults+form-init+isDirty-compare or Save/Reset desyncs; receipt headerAlign center|left lives in Bill.tsx.
-- [Price integrity guard](price-integrity-guard.md) — most real sale lines are below catalogue price, so checkout warns instead of blocking; the sale-price rule must mirror the products route or every discounted sale alarms.
+- [Price integrity guard](price-integrity-guard.md) — enforce a discount CEILING that ignores client-declared discounts, at line AND whole-bill level; plain mismatches only warn.
+- [Backup delivery vs restore sources](backup-restore-gap.md) — a backup with no restore path isn't a backup; CASCADE wipes tables you aren't restoring; pin a drill target by data_directory, not "localhost".
 - [Tenant scoping on writes](tenant-scoping-writes.md) — repeat the predicate on the primary row only; adding it to dependent cleanups/refund sums hides legacy NULL rows, breaking FK deletes and over-collecting bills.
 - [Vitest pulls a second Vite major](vitest-vite-version-clash.md) — adding vitest broke an untouched artifact's config typecheck with TS2769; pin vitest to the workspace's vite line, then dedupe.

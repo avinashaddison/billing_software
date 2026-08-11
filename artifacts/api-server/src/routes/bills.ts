@@ -6,7 +6,7 @@ import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { requireWrite } from "../middlewares/auth";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 import { logger } from "../lib/logger";
-import { round2, checkLinePrice, isAbsurdPrice, priceGuardMode, isSaneNumber } from "../lib/price-integrity";
+import { round2, checkLinePrice, isAbsurdPrice, exceedsDiscountCeiling, checkBillDiscount, maxDiscountPct, priceGuardMode, isSaneNumber } from "../lib/price-integrity";
 
 const router: IRouter = Router();
 
@@ -185,6 +185,11 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
         threshold:        number;
       }[] = [];
 
+      /* Catalogue value of the lines that can actually be price-checked, so the
+         bill-level discount can be held to the same ceiling as the lines. */
+      let catalogueBasisTotal = 0;
+      let guardedSubtotal     = 0;
+
       for (const item of items) {
         if (isManualLine(item)) {
           // ── Manual / non-inventory line ──
@@ -249,10 +254,13 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
         /* ── Price integrity ──────────────────────────────────────────────
            The catalogue is the server's own source of truth, so the browser no
            longer gets to decide what the shop earned without being checked.
-           This WARNS rather than rejects by default: 87% of real sale lines sit
-           below the current catalogue price for entirely legitimate reasons
-           (cashier discounts, later price changes, an 8-hour-old cart), so
-           blocking would refuse genuine sales. See lib/price-integrity.ts. */
+
+           A line that merely fails to match only WARNS — ordinary discounting
+           and stale carts land there, and refusing those would stop a working
+           shop from selling. A line discounted past the ceiling is REFUSED: no
+           honest sale gives away nearly the whole value of an item, and the
+           deepest real discount in 60 days of sales was 50.5% against a 70%
+           limit. See lib/price-integrity.ts. */
         const priceCheck = checkLinePrice({
           product,
           submittedPrice: item.price,
@@ -268,6 +276,31 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
         }
 
         const guardMode = priceGuardMode();
+
+        if (guardMode !== "off" && exceedsDiscountCeiling(priceCheck)) {
+          logger.error({
+            event:          "price_ceiling_blocked",
+            tenantId,
+            staffId:        req.staffId ?? null,
+            userId:         req.userId ?? null,
+            productId:      product.id,
+            productSku:     product.sku,
+            productName:    product.name,
+            cataloguePrice: priceCheck.cataloguePrice,
+            bestBasis:      priceCheck.bestBasis,
+            submittedPrice: priceCheck.submitted,
+            discountPct:    Math.round(priceCheck.impliedDiscountPct * 10) / 10,
+            maxDiscountPct: maxDiscountPct(),
+            quantity:       item.quantity,
+          }, "checkout line refused — discount exceeds the allowed ceiling");
+
+          throw new Error(
+            `Refusing "${product.name}": ₹${priceCheck.submitted} is ${Math.round(priceCheck.impliedDiscountPct)}% off ` +
+            `the listed price of ₹${priceCheck.bestBasis}, beyond the ${maxDiscountPct()}% limit. ` +
+            `If this discount is intentional, ask the owner to raise the limit.`
+          );
+        }
+
         if (!priceCheck.matches && guardMode !== "off") {
           logger.warn({
             event:          "price_mismatch",
@@ -289,6 +322,11 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
               `Price mismatch on "${product.name}": expected ₹${priceCheck.expected}, got ₹${priceCheck.submitted}.`
             );
           }
+        }
+
+        if (priceCheck.bestBasis > 0) {
+          catalogueBasisTotal += priceCheck.bestBasis * item.quantity;
+          guardedSubtotal     += round2(item.price) * item.quantity;
         }
 
         const linePrice = round2(item.price);
@@ -330,6 +368,39 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
           discountAmount = Math.min(round2(discount), subtotal);
         }
       }
+      /* ── Bill-level discount ceiling ────────────────────────────────────
+         The per-line ceiling is not enough on its own. A client can send every
+         line at its honest catalogue price and then discount the whole bill by
+         100%, reaching a zero total by a different route and sailing past a
+         guard that only ever looks at lines. Hold the final figure to the same
+         limit, measured against what the catalogue says the priced lines are
+         worth. Manual lines have no catalogue price, so they are excluded from
+         both sides rather than being treated as free. */
+      if (priceGuardMode() !== "off") {
+        const billCheck = checkBillDiscount({
+          catalogueBasisTotal, guardedSubtotal, subtotal, discountAmount,
+        });
+        if (billCheck.blocked) {
+          logger.error({
+            event:               "bill_discount_blocked",
+            tenantId,
+            staffId:             req.staffId ?? null,
+            userId:              req.userId ?? null,
+            catalogueBasisTotal: round2(billCheck.catalogueBasisTotal),
+            guardedTotal:        round2(billCheck.guardedTotal),
+            discountAmount,
+            discountType:        discountType ?? null,
+            maxDiscountPct:      maxDiscountPct(),
+          }, "checkout refused — bill discount exceeds the allowed ceiling");
+
+          throw new Error(
+            `Refusing this bill: ₹${round2(billCheck.guardedTotal)} is ${Math.round(billCheck.offPct)}% off ` +
+            `the listed value of ₹${round2(billCheck.catalogueBasisTotal)}, beyond the ${maxDiscountPct()}% limit. ` +
+            `If this discount is intentional, ask the owner to raise the limit.`
+          );
+        }
+      }
+
       const totalAmount = round2(subtotal - discountAmount);
 
       const isCredit = paymentMode === "credit";
