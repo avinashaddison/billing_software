@@ -1,4 +1,5 @@
-- [DB migrations, tenancy & which DB the app uses](db-tenancy-migrations.md) — app hits NEON, not the executeSql `heliumdb`; idempotent boot SQL only (never drizzle push); per-tenant uniqueness via COALESCE sentinel index.
+- [DB migrations, tenancy & which DB the app uses](db-tenancy-migrations.md) — app hits NEON, not the executeSql `heliumdb`; idempotent boot SQL only (never drizzle push); migrations are additive-only so they can't bootstrap an empty DB.
+- [Dev orchestrator vs per-artifact workflows](replit-workflow-orchestrator-clash.md) — repo owns its own API 8080 / web 5000 orchestrator; auto-added per-artifact workflows steal the ports and blank the preview.
 - [End-of-day money math](eod-reporting.md) — duesCollected from bill_payments 'collection' rows; profit over coveredRevenue; duesCreated still from mutable payment_mode (known gap).
 - [Defensive fetch handling](defensive-fetch.md) — check r.ok before r.json() (non-JSON error pages crash); never fall back to defaults on a failed load that feeds a Save-able form (overwrites real data).
 - [API error-handling contract](api-error-handling.md) — centralized 4-arg errorHandler (Express 5 auto-forwards rejections); apiNotFound after router/before SPA; 5xx never leaks err.message; structural ZodError detection (no zod import).

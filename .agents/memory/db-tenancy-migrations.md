@@ -10,6 +10,11 @@ description: How schema changes are applied (idempotent boot SQL), the NEON-vs-h
 
 # Migration convention
 - Schema changes = hand-written **idempotent** raw SQL in `lib/db/migrations/NNNN_*.sql`, registered in the `MIGRATION_FILES` array in `artifacts/api-server/src/lib/migrate.ts`, applied on every boot. Never `drizzle-kit push` / `generate`.
+
+# Boot migrations CANNOT bootstrap an empty database
+- Every numbered migration is **additive** (ALTER/CREATE INDEX/backfill) and assumes the base tables already exist. **No migration creates the base tables.** So pointing the app at a brand-new/empty Postgres gives: migrations "succeed" or retry-fail quietly, then boot fails with `relation "staff_profiles" does not exist` from `bootstrapDefaultOwner`, while `/api/healthz` still returns 200.
+- **Why this is confusing:** the server stays up and healthy-looking because `runBootMigrations()` and `bootstrapDefaultOwner()` are fired async after `listen` and are designed not to kill the process. A green health check does NOT mean the schema is there.
+- **How to apply:** the "never push" rule protects the *existing populated* DB from destructive resets — it does not mean a fresh DB can self-provision. Seeding a new/empty database needs the base schema created first (Drizzle push against that empty DB, or a dumped base DDL) and only then the additive migrations. Check for base tables before assuming a DB-connection problem.
 - **Why idempotent is load-bearing:** Render free-tier cold-starts re-run all migrations on every spin-up. A non-idempotent migration (the removed `0005`) once nulled sale prices on every restart. Use `IF NOT EXISTS` / `DROP ... IF EXISTS` / guarded `DO $$` blocks everywhere.
 - The Drizzle schema files (lib/db/src/schema) are for **types only** here; they can lag the raw SQL. Keep them roughly in sync for readability, but the SQL migration is the source of truth (e.g. expression/partial unique indexes are only in the SQL).
 
