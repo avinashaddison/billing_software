@@ -141,6 +141,40 @@ export interface QrCodeResponse {
   qrDataUrl: string;
 }
 
+export interface ProductEntrySummary {
+  productId: string;
+  productName: string;
+  productSku: string;
+  /** Total quantity moved for this product across the range */
+  totalQuantity: number;
+  /** Number of separate movement events in the range */
+  entryCount: number;
+  /** Timestamp of the earliest movement in the range */
+  firstEntryAt: string;
+  /** Timestamp of the most recent movement in the range */
+  lastEntryAt: string;
+}
+
+export type StockEntrySummaryTotals = {
+  /** Distinct products with at least one movement in the range */
+  productCount: number;
+  /** Total quantity moved across the whole range */
+  totalQuantity: number;
+  /** Total number of movement events across the whole range */
+  entryCount: number;
+};
+
+/**
+ * Per-product rollup plus range-wide totals. The totals are computed over the WHOLE matching range, not just the returned `products` page, so they stay accurate when the row list is capped by `limit`.
+
+ */
+export interface StockEntrySummary {
+  totals: StockEntrySummaryTotals;
+  products: ProductEntrySummary[];
+  /** True when more products matched than `limit` returned */
+  truncated: boolean;
+}
+
 export interface DashboardSummary {
   totalProducts: number;
   totalStock: number;
@@ -320,6 +354,16 @@ export type ListStockLogsParams = {
    */
   today?: boolean;
   /**
+   * Start of the date range (inclusive), YYYY-MM-DD in IST
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
+  from?: string;
+  /**
+   * End of the date range (inclusive), YYYY-MM-DD in IST
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
+  to?: string;
+  /**
    * Number of logs to return
    */
   limit?: number;
@@ -333,6 +377,43 @@ export type ListStockLogsType =
   (typeof ListStockLogsType)[keyof typeof ListStockLogsType];
 
 export const ListStockLogsType = {
+  IN: "IN",
+  OUT: "OUT",
+  ADJUSTMENT: "ADJUSTMENT",
+  RETURN: "RETURN",
+} as const;
+
+export type ListStockEntrySummaryParams = {
+  /**
+   * Start of the date range (inclusive), YYYY-MM-DD in IST
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
+  from?: string;
+  /**
+   * End of the date range (inclusive), YYYY-MM-DD in IST
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
+  to?: string;
+  /**
+   * Movement type to summarise. Defaults to IN (stock entry).
+   */
+  type?: ListStockEntrySummaryType;
+  /**
+   * Filter by product name or SKU
+   */
+  search?: string;
+  /**
+   * Maximum number of product rows to return
+   * @minimum 1
+   * @maximum 1000
+   */
+  limit?: number;
+};
+
+export type ListStockEntrySummaryType =
+  (typeof ListStockEntrySummaryType)[keyof typeof ListStockEntrySummaryType];
+
+export const ListStockEntrySummaryType = {
   IN: "IN",
   OUT: "OUT",
   ADJUSTMENT: "ADJUSTMENT",

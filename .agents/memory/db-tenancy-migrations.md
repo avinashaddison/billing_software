@@ -11,6 +11,10 @@ description: How schema changes are applied (idempotent boot SQL), the NEON-vs-h
 # Migration convention
 - Schema changes = hand-written **idempotent** raw SQL in `lib/db/migrations/NNNN_*.sql`, registered in the `MIGRATION_FILES` array in `artifacts/api-server/src/lib/migrate.ts`, applied on every boot. Never `drizzle-kit push` / `generate`.
 
+# FIRST: `relation "..." does not exist` usually means the WRONG DB, not a missing schema
+- Most common cause by far: the API server process started **before** `NEON_DATABASE_URL` was present in the environment, so it fell back to the empty built-in DB and every query fails on missing tables. **Restart the API server workflow and re-read the boot log before concluding anything about the schema.**
+- Corollary: do not "fix" this by pushing/creating schema. That would write a second, empty copy of the app into the wrong database while the real populated NEON DB sits untouched. Confirm which DB the process actually connected to first.
+
 # Boot migrations CANNOT bootstrap an empty database
 - Every numbered migration is **additive** (ALTER/CREATE INDEX/backfill) and assumes the base tables already exist. **No migration creates the base tables.** So pointing the app at a brand-new/empty Postgres gives: migrations "succeed" or retry-fail quietly, then boot fails with `relation "staff_profiles" does not exist` from `bootstrapDefaultOwner`, while `/api/healthz` still returns 200.
 - **Why this is confusing:** the server stays up and healthy-looking because `runBootMigrations()` and `bootstrapDefaultOwner()` are fired async after `listen` and are designed not to kill the process. A green health check does NOT mean the schema is there.

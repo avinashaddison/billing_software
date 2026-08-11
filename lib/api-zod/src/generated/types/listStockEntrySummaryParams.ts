@@ -5,21 +5,9 @@
  * Toy Mall Inventory Management API
  * OpenAPI spec version: 0.1.0
  */
-import type { ListStockLogsType } from "./listStockLogsType";
+import type { ListStockEntrySummaryType } from "./listStockEntrySummaryType";
 
-export type ListStockLogsParams = {
-  /**
-   * Filter by product ID
-   */
-  productId?: string;
-  /**
-   * Filter by log type
-   */
-  type?: ListStockLogsType;
-  /**
-   * Only return logs created today (server time)
-   */
-  today?: boolean;
+export type ListStockEntrySummaryParams = {
   /**
    * Start of the date range (inclusive), YYYY-MM-DD in IST
    * @pattern ^\d{4}-\d{2}-\d{2}$
@@ -31,11 +19,17 @@ export type ListStockLogsParams = {
    */
   to?: string;
   /**
-   * Number of logs to return
+   * Movement type to summarise. Defaults to IN (stock entry).
+   */
+  type?: ListStockEntrySummaryType;
+  /**
+   * Filter by product name or SKU
+   */
+  search?: string;
+  /**
+   * Maximum number of product rows to return
+   * @minimum 1
+   * @maximum 1000
    */
   limit?: number;
-  /**
-   * Offset for pagination
-   */
-  offset?: number;
 };

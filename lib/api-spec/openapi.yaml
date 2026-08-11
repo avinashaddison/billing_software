@@ -272,6 +272,18 @@ paths:
           schema:
             type: boolean
           description: Only return logs created today (server time)
+        - name: from
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Start of the date range (inclusive), YYYY-MM-DD in IST
+        - name: to
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: End of the date range (inclusive), YYYY-MM-DD in IST
         - name: limit
           in: query
           schema:
@@ -293,6 +305,56 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/StockLog"
+
+  /stock-logs/entry-summary:
+    get:
+      operationId: listStockEntrySummary
+      tags: [stock-logs]
+      summary: Per-product stock entry (stock-in) summary for a date range
+      description: >
+        Groups stock movements by product over an IST date range so the shop can
+        see which products were entered, how much was entered in total, and when
+        each product was last entered.
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Start of the date range (inclusive), YYYY-MM-DD in IST
+        - name: to
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: End of the date range (inclusive), YYYY-MM-DD in IST
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [IN, OUT, ADJUSTMENT, RETURN]
+            default: IN
+          description: Movement type to summarise. Defaults to IN (stock entry).
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Filter by product name or SKU
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 200
+          description: Maximum number of product rows to return
+      responses:
+        "200":
+          description: Per-product entry summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockEntrySummary"
 
   /sales:
     get:
@@ -684,6 +746,71 @@ components:
         - type
         - quantity
         - createdAt
+
+    ProductEntrySummary:
+      type: object
+      properties:
+        productId:
+          type: string
+        productName:
+          type: string
+        productSku:
+          type: string
+        totalQuantity:
+          type: integer
+          description: Total quantity moved for this product across the range
+        entryCount:
+          type: integer
+          description: Number of separate movement events in the range
+        firstEntryAt:
+          type: string
+          description: Timestamp of the earliest movement in the range
+        lastEntryAt:
+          type: string
+          description: Timestamp of the most recent movement in the range
+      required:
+        - productId
+        - productName
+        - productSku
+        - totalQuantity
+        - entryCount
+        - firstEntryAt
+        - lastEntryAt
+
+    StockEntrySummary:
+      type: object
+      description: >
+        Per-product rollup plus range-wide totals. The totals are computed over
+        the WHOLE matching range, not just the returned `products` page, so they
+        stay accurate when the row list is capped by `limit`.
+      properties:
+        totals:
+          type: object
+          properties:
+            productCount:
+              type: integer
+              description: Distinct products with at least one movement in the range
+            totalQuantity:
+              type: integer
+              description: Total quantity moved across the whole range
+            entryCount:
+              type: integer
+              description: Total number of movement events across the whole range
+          required:
+            - productCount
+            - totalQuantity
+            - entryCount
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductEntrySummary"
+        truncated:
+          type: boolean
+          description: True when more products matched than `limit` returned
+      required:
+        - totals
+        - products
+        - truncated
 
     Sale:
       type: object

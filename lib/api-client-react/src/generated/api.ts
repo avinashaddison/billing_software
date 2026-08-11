@@ -28,12 +28,14 @@ import type {
   HealthStatus,
   ListProductsParams,
   ListSalesParams,
+  ListStockEntrySummaryParams,
   ListStockLogsParams,
   Product,
   QrCodeResponse,
   ReceivablesSummary,
   RecordPaymentInput,
   Sale,
+  StockEntrySummary,
   StockLog,
   StockUpdateBody,
   StockUpdateResponse,
@@ -911,6 +913,111 @@ export function useListStockLogs<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListStockLogsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Groups stock movements by product over an IST date range so the shop can see which products were entered, how much was entered in total, and when each product was last entered.
+
+ * @summary Per-product stock entry (stock-in) summary for a date range
+ */
+export const getListStockEntrySummaryUrl = (
+  params?: ListStockEntrySummaryParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/stock-logs/entry-summary?${stringifiedParams}`
+    : `/api/stock-logs/entry-summary`;
+};
+
+export const listStockEntrySummary = async (
+  params?: ListStockEntrySummaryParams,
+  options?: RequestInit,
+): Promise<StockEntrySummary> => {
+  return customFetch<StockEntrySummary>(getListStockEntrySummaryUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListStockEntrySummaryQueryKey = (
+  params?: ListStockEntrySummaryParams,
+) => {
+  return [
+    `/api/stock-logs/entry-summary`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListStockEntrySummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof listStockEntrySummary>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListStockEntrySummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listStockEntrySummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListStockEntrySummaryQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listStockEntrySummary>>
+  > = ({ signal }) =>
+    listStockEntrySummary(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listStockEntrySummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListStockEntrySummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listStockEntrySummary>>
+>;
+export type ListStockEntrySummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Per-product stock entry (stock-in) summary for a date range
+ */
+
+export function useListStockEntrySummary<
+  TData = Awaited<ReturnType<typeof listStockEntrySummary>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListStockEntrySummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listStockEntrySummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListStockEntrySummaryQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

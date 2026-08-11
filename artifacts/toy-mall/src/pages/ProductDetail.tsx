@@ -4,7 +4,7 @@ import { useSearch, useLocation, Link } from "wouter";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import { useScanFlash, ScanFlash } from "@/components/ui/ScanFlash";
 import {
-  useGetProductBySku, useUpdateStock,
+  useGetProductBySku, useUpdateStock, useListStockLogs,
   getGetProductBySkuQueryKey, getGetDashboardSummaryQueryKey,
   getGetTodayActivityQueryKey, getListProductsQueryKey,
   getGetLowStockProductsQueryKey, getListStockLogsQueryKey,
@@ -92,6 +92,28 @@ export default function ProductDetail() {
 
 
   const updateStock = useUpdateStock();
+
+  /* Recent stock entries (IN) for this product. Answers "when did we last take
+     this in, and how much?" on the product page itself, instead of making the
+     owner scan the shop-wide activity log for it. */
+  const entryParams = { productId: product?.id ?? "", type: "IN" as const, limit: 5 };
+  const { data: entryLogs, isPending: entriesPending } = useListStockLogs(entryParams, {
+    query: { queryKey: getListStockLogsQueryKey(entryParams), enabled: !!product?.id },
+  });
+  const lastEntry = entryLogs?.[0];
+
+  /* Stock history is filtered on IST calendar days, so it must be displayed in
+     IST too — on a device set to another timezone the local-time date would
+     disagree with the date the entry is actually filed under. */
+  const istDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric",
+    });
+  const istDateTime = (iso: string) =>
+    new Date(iso).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric",
+      hour: "numeric", minute: "2-digit", hour12: true,
+    });
 
   useEffect(() => {
     if (isError) {
@@ -633,10 +655,45 @@ export default function ProductDetail() {
                 {savingImg && <p className="text-xs text-muted-foreground mt-1">Saving…</p>}
               </div>
 
-              {/* Stock history link */}
+              {/* Stock entry history */}
               <div className="mt-4 pt-4 border-t">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Stock Entry
+                  </p>
+                  {lastEntry && (
+                    <span className="text-xs font-bold">
+                      Last: {istDate(lastEntry.createdAt)}
+                    </span>
+                  )}
+                </div>
+
+                {entriesPending ? (
+                  <div className="space-y-1.5 mb-3">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-4/5" />
+                  </div>
+                ) : entryLogs && entryLogs.length > 0 ? (
+                  <ul className="space-y-1.5 mb-3">
+                    {entryLogs.map((l) => (
+                      <li key={l.id} className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground font-medium">
+                          {istDateTime(l.createdAt)}
+                        </span>
+                        <span className="font-bold text-green-600 dark:text-green-400">
+                          +{l.quantity}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted-foreground mb-3">
+                    No stock entry recorded yet.
+                  </p>
+                )}
+
                 <Link href="/logs" className="flex items-center justify-between text-sm font-semibold text-primary hover:underline">
-                  View stock history
+                  View full stock history
                   <ChevronRight className="w-4 h-4" />
                 </Link>
               </div>

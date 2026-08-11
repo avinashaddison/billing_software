@@ -3,4 +3,6 @@
 - [End-of-day money math](eod-reporting.md) — duesCollected from bill_payments 'collection' rows; profit over coveredRevenue; duesCreated still from mutable payment_mode (known gap).
 - [Defensive fetch handling](defensive-fetch.md) — check r.ok before r.json() (non-JSON error pages crash); never fall back to defaults on a failed load that feeds a Save-able form (overwrites real data).
 - [API error-handling contract](api-error-handling.md) — centralized 4-arg errorHandler (Express 5 auto-forwards rejections); apiNotFound after router/before SPA; 5xx never leaks err.message; structural ZodError detection (no zod import).
+- [Verifying authenticated UI](verifying-authenticated-ui.md) — no known passwords + live data; mint a signed session cookie AND seed the Zustand localStorage store, or the SPA redirects before any call.
+- [IST date ranges](ist-date-ranges.md) — filter, build and display on Asia/Kolkata calendar days; clamp month arithmetic (31 Mar −1mo ≠ 3 Mar); totals over a capped list need their own query.
 - [Adding a store setting](store-settings-add-field.md) — store_settings.data is JSON (no migration); a new field must be added to interface+defaults+form-init+isDirty-compare or Save/Reset desyncs; receipt headerAlign center|left lives in Bill.tsx.

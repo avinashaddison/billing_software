@@ -251,6 +251,10 @@ export const GetProductQrResponse = zod.object({
 /**
  * @summary List stock logs
  */
+export const listStockLogsQueryFromRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
+export const listStockLogsQueryToRegExp = new RegExp("^\\d{4}-\\d{2}-\\d{2}$");
 export const listStockLogsQueryLimitDefault = 50;
 export const listStockLogsQueryOffsetDefault = 0;
 
@@ -264,6 +268,16 @@ export const ListStockLogsQueryParams = zod.object({
     .boolean()
     .optional()
     .describe("Only return logs created today (server time)"),
+  from: zod.coerce
+    .string()
+    .regex(listStockLogsQueryFromRegExp)
+    .optional()
+    .describe("Start of the date range (inclusive), YYYY-MM-DD in IST"),
+  to: zod.coerce
+    .string()
+    .regex(listStockLogsQueryToRegExp)
+    .optional()
+    .describe("End of the date range (inclusive), YYYY-MM-DD in IST"),
   limit: zod.coerce
     .number()
     .default(listStockLogsQueryLimitDefault)
@@ -285,6 +299,88 @@ export const ListStockLogsResponseItem = zod.object({
   createdAt: zod.string(),
 });
 export const ListStockLogsResponse = zod.array(ListStockLogsResponseItem);
+
+/**
+ * Groups stock movements by product over an IST date range so the shop can see which products were entered, how much was entered in total, and when each product was last entered.
+
+ * @summary Per-product stock entry (stock-in) summary for a date range
+ */
+export const listStockEntrySummaryQueryFromRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
+export const listStockEntrySummaryQueryToRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
+export const listStockEntrySummaryQueryTypeDefault = `IN`;
+export const listStockEntrySummaryQueryLimitDefault = 200;
+export const listStockEntrySummaryQueryLimitMax = 1000;
+
+export const ListStockEntrySummaryQueryParams = zod.object({
+  from: zod.coerce
+    .string()
+    .regex(listStockEntrySummaryQueryFromRegExp)
+    .optional()
+    .describe("Start of the date range (inclusive), YYYY-MM-DD in IST"),
+  to: zod.coerce
+    .string()
+    .regex(listStockEntrySummaryQueryToRegExp)
+    .optional()
+    .describe("End of the date range (inclusive), YYYY-MM-DD in IST"),
+  type: zod
+    .enum(["IN", "OUT", "ADJUSTMENT", "RETURN"])
+    .default(listStockEntrySummaryQueryTypeDefault)
+    .describe("Movement type to summarise. Defaults to IN (stock entry)."),
+  search: zod.coerce
+    .string()
+    .optional()
+    .describe("Filter by product name or SKU"),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listStockEntrySummaryQueryLimitMax)
+    .default(listStockEntrySummaryQueryLimitDefault)
+    .describe("Maximum number of product rows to return"),
+});
+
+export const ListStockEntrySummaryResponse = zod
+  .object({
+    totals: zod.object({
+      productCount: zod
+        .number()
+        .describe("Distinct products with at least one movement in the range"),
+      totalQuantity: zod
+        .number()
+        .describe("Total quantity moved across the whole range"),
+      entryCount: zod
+        .number()
+        .describe("Total number of movement events across the whole range"),
+    }),
+    products: zod.array(
+      zod.object({
+        productId: zod.string(),
+        productName: zod.string(),
+        productSku: zod.string(),
+        totalQuantity: zod
+          .number()
+          .describe("Total quantity moved for this product across the range"),
+        entryCount: zod
+          .number()
+          .describe("Number of separate movement events in the range"),
+        firstEntryAt: zod
+          .string()
+          .describe("Timestamp of the earliest movement in the range"),
+        lastEntryAt: zod
+          .string()
+          .describe("Timestamp of the most recent movement in the range"),
+      }),
+    ),
+    truncated: zod
+      .boolean()
+      .describe("True when more products matched than `limit` returned"),
+  })
+  .describe(
+    "Per-product rollup plus range-wide totals. The totals are computed over the WHOLE matching range, not just the returned `products` page, so they stay accurate when the row list is capped by `limit`.\n",
+  );
 
 /**
  * @summary List sales records
