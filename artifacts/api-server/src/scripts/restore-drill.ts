@@ -29,6 +29,7 @@ import zlib from "node:zlib";
 import pg from "pg";
 import { pool as livePool } from "@workspace/db";
 import { restoreSnapshot, type PoolLike } from "../lib/restore";
+import { dumpDatabaseSnapshot, type SnapshotSource } from "../lib/backup";
 
 const execFileAsync = promisify(execFile);
 
@@ -197,32 +198,13 @@ async function main(): Promise<void> {
       maxBuffer: 64 * 1024 * 1024,
     });
 
-    /* ── 2. Take a snapshot in the nightly backup's format (read-only) ── */
+    /* ── 2. Take a snapshot with the REAL dump code (read-only) ── */
     console.log("2/5  Taking a snapshot of live data (SELECT only)…");
-    const { rows: tableRows } = await livePool.query<{ tablename: string }>(
-      `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
-    );
-    const data: Record<string, unknown[]> = {};
+    const snap = await dumpDatabaseSnapshot(livePool as unknown as SnapshotSource);
     const liveCounts: Record<string, number> = {};
-    let totalRows = 0;
-    for (const { tablename } of tableRows) {
-      const { rows } = await livePool.query(`SELECT * FROM "${tablename.replace(/"/g, '""')}"`);
-      data[tablename] = rows;
-      liveCounts[tablename] = rows.length;
-      totalRows += rows.length;
-    }
-    const payload = {
-      meta: {
-        app: "addisonbill",
-        format: "json-snapshot-v1",
-        generatedAt: new Date().toISOString(),
-        tables: tableRows.length,
-        totalRows,
-      },
-      data,
-    };
-    const gz = zlib.gzipSync(Buffer.from(JSON.stringify(payload), "utf8"), { level: 9 });
-    console.log(`     ${tableRows.length} tables, ${totalRows} rows, ${(gz.length / 1024 / 1024).toFixed(2)} MB gzipped`);
+    for (const [table, rows] of Object.entries(snap.payload.data)) liveCounts[table] = rows.length;
+    const gz = zlib.gzipSync(Buffer.from(JSON.stringify(snap.payload), "utf8"), { level: 9 });
+    console.log(`     ${snap.tables} tables, ${snap.totalRows} rows, ${(gz.length / 1024 / 1024).toFixed(2)} MB gzipped`);
 
     /* ── 3. Restore it into the scratch database with the REAL restore code ── */
     console.log("3/5  Restoring into the scratch database…");

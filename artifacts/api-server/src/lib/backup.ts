@@ -16,12 +16,16 @@
  * driver returns native JS values (timestamps → Date → ISO strings, jsonb →
  * objects), so the snapshot is complete and restorable programmatically. Fine
  * for a shop-scale DB; revisit (stream to storage) if any table grows huge.
+ *
+ * The dump runs as ONE REPEATABLE READ transaction so every table is read at
+ * the same instant — see dumpDatabaseSnapshot.
  */
 import zlib from "node:zlib";
 import { pool } from "@workspace/db";
 import { logger } from "./logger";
 import { isConfigured, sendDocument } from "./telegram";
 import { isR2Configured, uploadBackupToR2, pruneOldR2Backups } from "./r2";
+import { SNAPSHOT_FORMAT } from "./snapshot-format";
 
 /** Telegram bot document hard limit is 50 MB; stay comfortably under it. */
 const MAX_DOC_BYTES = 48 * 1024 * 1024;
@@ -47,6 +51,86 @@ function backupChatIds(): string[] | undefined {
   return ids.length > 0 ? ids : undefined;
 }
 
+/** Structural view of a pg Pool, so the restore rehearsal can dump through its
+ *  own connection without importing pg types here. */
+export interface SnapshotSource {
+  connect(): Promise<{
+    query<T = Record<string, unknown>>(text: string): Promise<{ rows: T[] }>;
+    release(): void;
+  }>;
+}
+
+export interface DatabaseSnapshot {
+  payload: { meta: Record<string, unknown>; data: Record<string, unknown[]> };
+  tables: number;
+  totalRows: number;
+  /** IST date/time stamps for building the backup filename. */
+  dateStr: string;
+  timeStr: string;
+}
+
+/**
+ * Dump every public-schema table as ONE consistent snapshot.
+ *
+ * The whole dump runs in a single REPEATABLE READ, READ ONLY transaction on a
+ * single connection, so every table is read as of the same instant. Dumping
+ * table-by-table on the shared pool instead would let a sale committed
+ * mid-dump appear in `sale_items` but not in `bills` — a snapshot whose
+ * foreign keys don't line up, which the restore would rightly refuse,
+ * discovered only on the day the backup is actually needed.
+ */
+export async function dumpDatabaseSnapshot(
+  source: SnapshotSource = pool as unknown as SnapshotSource,
+): Promise<DatabaseSnapshot> {
+  const client = await source.connect();
+  try {
+    await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+    // Enumerate real tables in the public schema (skips views). Table names come
+    // from the catalog (trusted); still identifier-quoted defensively.
+    const { rows: tableRows } = await client.query<{ tablename: string }>(
+      `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
+    );
+
+    const data: Record<string, unknown[]> = {};
+    let totalRows = 0;
+    for (const { tablename } of tableRows) {
+      const quoted = `"${tablename.replace(/"/g, '""')}"`;
+      const { rows } = await client.query(`SELECT * FROM ${quoted}`);
+      data[tablename] = rows;
+      totalRows += rows.length;
+    }
+    await client.query("COMMIT");
+
+    const now     = new Date();
+    const dateStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    const timeStr = now
+      .toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false })
+      .replace(/:/g, "");
+    return {
+      payload: {
+        meta: {
+          app:         "addisonbill",
+          format:      SNAPSHOT_FORMAT,
+          generatedAt: now.toISOString(),
+          date:        dateStr,
+          tables:      tableRows.length,
+          totalRows,
+        },
+        data,
+      },
+      tables: tableRows.length,
+      totalRows,
+      dateStr,
+      timeStr,
+    };
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * Dump the whole database and deliver it to R2 and/or Telegram. Throws on
  * misconfiguration or when no destination accepted the file, so callers (the
@@ -62,37 +146,7 @@ export async function runDatabaseBackup(): Promise<BackupSummary> {
 
   const startedAt = Date.now();
 
-  // Enumerate real tables in the public schema (skips views). Table names come
-  // from the catalog (trusted); still identifier-quoted defensively.
-  const { rows: tableRows } = await pool.query<{ tablename: string }>(
-    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
-  );
-
-  const data: Record<string, unknown[]> = {};
-  let totalRows = 0;
-  for (const { tablename } of tableRows) {
-    const quoted = `"${tablename.replace(/"/g, '""')}"`;
-    const { rows } = await pool.query(`SELECT * FROM ${quoted}`);
-    data[tablename] = rows;
-    totalRows += rows.length;
-  }
-
-  const now     = new Date();
-  const dateStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-  const timeStr = now
-    .toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false })
-    .replace(/:/g, "");
-  const payload = {
-    meta: {
-      app:         "addisonbill",
-      format:      "json-snapshot-v1",
-      generatedAt: now.toISOString(),
-      date:        dateStr,
-      tables:      tableRows.length,
-      totalRows,
-    },
-    data,
-  };
+  const { payload, tables, totalRows, dateStr, timeStr } = await dumpDatabaseSnapshot();
 
   const gz = zlib.gzipSync(Buffer.from(JSON.stringify(payload), "utf8"), { level: 9 });
   /* Date + time in the name so a manual backup never overwrites the nightly
@@ -126,7 +180,7 @@ export async function runDatabaseBackup(): Promise<BackupSummary> {
         const caption = [
           `🗄️ <b>Addison Bill — Database Backup</b>`,
           `📅 ${dateStr}`,
-          `📦 ${tableRows.length} tables · ${totalRows.toLocaleString("en-IN")} rows`,
+          `📦 ${tables} tables · ${totalRows.toLocaleString("en-IN")} rows`,
           `💾 ${sizeMb.toFixed(2)} MB (gzip)`,
           r2Key ? `☁️ Also stored in Cloudflare R2` : null,
         ].filter(Boolean).join("\n");
@@ -145,14 +199,14 @@ export async function runDatabaseBackup(): Promise<BackupSummary> {
 
   logger.info(
     {
-      tables: tableRows.length, totalRows, sizeMb: Number(sizeMb.toFixed(2)),
+      tables, totalRows, sizeMb: Number(sizeMb.toFixed(2)),
       r2: r2Key ?? false, telegram: telegramSent, ms: Date.now() - startedAt,
     },
     "Database backup complete",
   );
 
   return {
-    tables: tableRows.length,
+    tables,
     totalRows,
     sizeBytes: gz.length,
     filename,
