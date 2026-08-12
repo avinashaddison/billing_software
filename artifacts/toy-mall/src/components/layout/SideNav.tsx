@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, PencilLine, AlertTriangle, BarChart3 } from "lucide-react";
+import { Home, Package, PackagePlus, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, PencilLine, AlertTriangle, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -45,6 +45,9 @@ export function SideNav() {
   const navItems = [
     { name: "Dashboard",   href: "/dashboard",         icon: Home,        highlight: false, resource: "dashboard" },
     { name: "Products",    href: "/products",          icon: Package,     highlight: false, resource: "products"  },
+    /* Stock-in workstation. Separate from Scan (billing-first) and Logs
+       (read-only history) — this is where stock actually comes IN. */
+    { name: "Products Entry", href: "/stock-entry",    icon: PackagePlus, highlight: false, resource: "scan"      },
     { name: "Scan",        href: "/scan",              icon: ScanLine,    highlight: true,  resource: "scan"      },
     /* Manual Bill — deep-links to /checkout with ?manual=1 so the dialog
        auto-opens on arrival. Sits next to the bread-and-butter Billing

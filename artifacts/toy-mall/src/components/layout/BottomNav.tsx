@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Package, ScanLine, Clock, User, IndianRupee, ShoppingCart, ArrowRight, PencilLine } from "lucide-react";
+import { Home, Package, PackagePlus, ScanLine, Clock, User, IndianRupee, ShoppingCart, ArrowRight, PencilLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/hooks/use-auth";
@@ -20,6 +20,8 @@ export function BottomNav() {
   const allItems = [
     { name: "Home",    href: "/dashboard", icon: Home,       resource: "dashboard" },
     { name: "Products",href: "/products", icon: Package,    resource: "products"  },
+    /* Stock-in workstation. Short label — the bar is at its practical limit. */
+    { name: "Entry",   href: "/stock-entry", icon: PackagePlus, resource: "scan" },
     { name: "Scan",    href: "/scan",     icon: ScanLine,   resource: "scan",    highlight: true },
     /* Manual Bill — deep-links into /checkout with ?manual=1 so the
        dialog auto-opens. Same permission gate as billing since it

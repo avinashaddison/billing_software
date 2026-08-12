@@ -16,6 +16,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Dashboard      from "@/pages/Dashboard";
 import Products       from "@/pages/Products";
 import ProductsNew    from "@/pages/ProductsNew";
+import ProductsEntry  from "@/pages/ProductsEntry";
 import ProductDetail  from "@/pages/ProductDetail";
 import BulkSalePrice  from "@/pages/BulkSalePrice";
 import Scan           from "@/pages/Scan";
@@ -199,6 +200,7 @@ function Router() {
             <Route path="/products"     component={() => <Protected resource="products"><Products /></Protected>} />
             <Route path="/products/new" component={() => <Protected resource="products"><ProductsNew /></Protected>} />
             <Route path="/products/bulk-sale-price" component={() => <Protected resource="products"><BulkSalePrice /></Protected>} />
+            <Route path="/stock-entry" component={() => <Protected resource="scan"><ProductsEntry /></Protected>} />
             <Route path="/product"      component={() => <Protected resource="products"><ProductDetail /></Protected>} />
             <Route path="/scan"         component={() => <Protected resource="scan"><Scan /></Protected>} />
             <Route path="/logs"         component={() => <Protected resource="logs"><Logs /></Protected>} />
