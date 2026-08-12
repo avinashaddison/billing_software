@@ -21,7 +21,12 @@ A multi-tenant billing and inventory web app for retail shops. It includes an Ex
 
 ## Database
 - Uses `DATABASE_URL` (or `NEON_DATABASE_URL`). Already provisioned in Replit.
-- Push schema: `pnpm --filter @workspace/db run push`.
+- **Fresh DB setup (Replit):** `drizzle-kit push` requires a TTY and will fail in the shell. Instead, generate the base schema SQL and apply it directly:
+  ```
+  cd lib/db && npx drizzle-kit generate --config ./drizzle.config.ts --name init_schema
+  psql $DATABASE_URL -f drizzle/0000_init_schema.sql
+  ```
+  Then restart the app — the boot migration runner applies all additive migrations (0001–0017) automatically.
 - The API also runs idempotent boot migrations on startup.
 
 ## Production / Deployment
