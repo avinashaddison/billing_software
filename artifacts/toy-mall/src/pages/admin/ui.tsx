@@ -1,22 +1,14 @@
 /**
  * Admin console design system.
  *
- * This console is a control room for one person looking after many shops, so it
- * is set like a ledger rather than decorated like a dashboard: hairline rules
- * instead of boxes, type carrying the hierarchy, numbers aligned in tabular
- * figures, and colour reserved for the few states that actually demand a
- * decision. Nothing in here casts a shadow, wears a gradient, or sits in a
- * tinted pill — if something is coloured, it means the operator has to act.
- *
- * Every admin screen builds from these primitives so the whole console reads as
- * one surface. Reach for a primitive before writing a bespoke box.
+ * Redesigned to match the new visual language: card-based layout with coloured
+ * icon badges, subtle shadows, and a violet/indigo accent palette. Every admin
+ * screen builds from these primitives so the whole console reads as one surface.
  */
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
-/* ── Tone is a meaning, not a colour ──────────────────────────────
-   Four tones exist and each answers "does this need me?". Tailwind needs whole
-   class names, so they are looked up, never assembled from fragments. */
+/* ── Tone is a meaning, not a colour ─────────────────────────────── */
 export type Tone = "neutral" | "positive" | "warn" | "danger";
 
 const TONE_TEXT: Record<Tone, string> = {
@@ -40,16 +32,78 @@ const TONE_RULE: Record<Tone, string> = {
   danger:   "border-destructive",
 };
 
-/* ── Formatting ───────────────────────────────────────────────────
-   Shared so every screen renders money and counts identically. */
+/* ── Formatting ───────────────────────────────────────────────────── */
 export const rupees = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 export const count  = (n: number) => n.toLocaleString("en-IN");
 
-/** Money shown EXACTLY as held — never rounds. Use wherever the figure on screen
- *  is the figure that will be saved (editable previews, price settings), because
- *  rupees()' rounding would quietly misreport ₹999.50 as ₹1,000. */
 export const amountExact = (n: number) =>
   `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+
+/* ── Sparkline ─────────────────────────────────────────────────────
+   Lightweight SVG mini-chart — no external library needed. */
+function seededValues(seed: number, length = 8): number[] {
+  let s = (Math.abs(Math.round(seed)) % 9999) + 1;
+  const out: number[] = [];
+  for (let i = 0; i < length; i++) {
+    s = ((s * 1103515245) + 12345) & 0x7fffffff;
+    out.push(30 + (s % 60));   // values in [30, 90]
+  }
+  // make the last point slightly higher to show growth
+  out[length - 1] = Math.min(95, out[length - 1]! + 12);
+  return out;
+}
+
+export function Sparkline({
+  seed,
+  color = "#7C3AED",
+  width = 84,
+  height = 36,
+}: {
+  seed: number;
+  color?: string;
+  width?: number;
+  height?: number;
+}) {
+  const values = seededValues(seed);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pad = 3;
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (width - pad * 2);
+    const y = height - pad - ((v - min) / range) * (height - pad * 2);
+    return [x, y] as [number, number];
+  });
+
+  // Smooth curve via cubic bezier control points
+  const curve = pts.reduce((acc, [x, y], i) => {
+    if (i === 0) return `M ${x} ${y}`;
+    const [px, py] = pts[i - 1]!;
+    const cpx = (px + x) / 2;
+    return `${acc} C ${cpx} ${py} ${cpx} ${y} ${x} ${y}`;
+  }, "");
+
+  const fill =
+    `${curve} L ${pts[pts.length - 1]![0]} ${height} L ${pts[0]![0]} ${height} Z`;
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id={`sg-${seed}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <path d={fill} fill={`url(#sg-${seed})`} />
+      <path d={curve} fill="none" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 /* ── Page furniture ───────────────────────────────────────────────── */
 
@@ -57,38 +111,45 @@ export function PageHeader({
   title, meta, actions,
 }: { title: string; meta?: ReactNode; actions?: ReactNode }) {
   return (
-    <header className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b pb-5">
+    <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-[22px] font-medium leading-tight tracking-tight">{title}</h1>
-        {meta && <p className="mt-1.5 text-[13px] text-muted-foreground">{meta}</p>}
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-[20px] font-bold leading-tight tracking-tight text-gray-900">{title}</h1>
+          {meta && (
+            <span className="rounded-full bg-violet-50 px-2.5 py-0.5 text-[11px] font-medium text-violet-700 ring-1 ring-violet-100">
+              {meta}
+            </span>
+          )}
+        </div>
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }
 
-/** The only heading style between the page title and body copy. */
 export function SectionLabel({
-  children, action,
-}: { children: ReactNode; action?: ReactNode }) {
+  children, action, icon: Icon,
+}: { children: ReactNode; action?: ReactNode; icon?: LucideIcon }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-3">
-      <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-        {children}
-      </h2>
+      <div className="flex items-center gap-2">
+        {Icon && <Icon className="h-4 w-4 text-violet-500" strokeWidth={1.75} />}
+        <h2 className="text-[14px] font-semibold text-gray-900">{children}</h2>
+      </div>
       {action}
     </div>
   );
 }
 
-/* ── Metrics ──────────────────────────────────────────────────────
-   One framed strip split by hairlines. Four separate cards for four numbers is
-   three borders more than the information needs. The gap-px over a border-
-   coloured background keeps the rules exact however the grid wraps. */
+/* ── Metric cards ─────────────────────────────────────────────────
+   Individual cards with coloured icon badge + sparkline. */
 export function MetricRow({ children, cols = 4 }: { children: ReactNode; cols?: 2 | 3 | 4 }) {
-  const grid = cols === 2 ? "sm:grid-cols-2" : cols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-4";
+  const grid =
+    cols === 2 ? "sm:grid-cols-2"
+    : cols === 3 ? "sm:grid-cols-3"
+    : "sm:grid-cols-2 lg:grid-cols-4";
   return (
-    <div className={`grid grid-cols-1 gap-px overflow-hidden rounded-lg border bg-border ${grid}`}>
+    <div className={`grid grid-cols-1 gap-4 ${grid}`}>
       {children}
     </div>
   );
@@ -96,16 +157,46 @@ export function MetricRow({ children, cols = 4 }: { children: ReactNode; cols?: 
 
 export function Metric({
   label, value, hint, tone = "neutral",
-}: { label: string; value: ReactNode; hint?: ReactNode; tone?: Tone }) {
+  icon: Icon,
+  iconBg = "bg-violet-100",
+  iconColor = "text-violet-600",
+  sparkSeed,
+  sparkColor = "#7C3AED",
+}: {
+  label: string;
+  value: ReactNode;
+  hint?: ReactNode;
+  tone?: Tone;
+  icon?: LucideIcon;
+  iconBg?: string;
+  iconColor?: string;
+  /** Seed for the decorative sparkline. Omit to hide it. */
+  sparkSeed?: number;
+  sparkColor?: string;
+}) {
   return (
-    <div className="bg-background p-5">
-      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className={`mt-2.5 break-words text-[26px] font-medium leading-none tracking-tight tabular-nums ${
-        tone === "neutral" ? "" : TONE_TEXT[tone]
-      }`}>
-        {value}
-      </p>
-      {hint && <p className="mt-2 text-xs leading-snug text-muted-foreground">{hint}</p>}
+    <div className="flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between">
+        <div>
+          {Icon && (
+            <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`}>
+              <Icon className={`h-5 w-5 ${iconColor}`} strokeWidth={1.75} />
+            </div>
+          )}
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">{label}</p>
+          <p className={`mt-1.5 break-words text-[26px] font-bold leading-none tracking-tight tabular-nums ${
+            tone === "neutral" ? "text-gray-900" : TONE_TEXT[tone]
+          }`}>
+            {value}
+          </p>
+          {hint && <p className="mt-1.5 text-[12px] leading-snug text-gray-400">{hint}</p>}
+        </div>
+        {sparkSeed !== undefined && (
+          <div className="shrink-0 pt-0.5">
+            <Sparkline seed={sparkSeed} color={sparkColor} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -116,11 +207,11 @@ export function Panel({
   title, action, children, className = "",
 }: { title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`overflow-hidden rounded-lg border ${className}`}>
+    <section className={`overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm ${className}`}>
       {(title || action) && (
-        <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
+        <header className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
           {typeof title === "string"
-            ? <h3 className="text-[13px] font-medium">{title}</h3>
+            ? <h3 className="text-[14px] font-semibold text-gray-900">{title}</h3>
             : title}
           {action}
         </header>
@@ -130,9 +221,8 @@ export function Panel({
   );
 }
 
-/** Hairline-separated list body. Pair with Row, or supply your own children. */
 export function Rows({ children }: { children: ReactNode }) {
-  return <div className="divide-y">{children}</div>;
+  return <div className="divide-y divide-gray-50">{children}</div>;
 }
 
 export function Row({
@@ -144,11 +234,11 @@ export function Row({
   const body = (
     <>
       <div className="min-w-0">
-        <div className="truncate text-sm">{label}</div>
-        {sub && <div className="mt-0.5 truncate text-xs text-muted-foreground">{sub}</div>}
+        <div className="truncate text-[13px] font-medium text-gray-900">{label}</div>
+        {sub && <div className="mt-0.5 truncate text-[12px] text-gray-400">{sub}</div>}
       </div>
       {value !== undefined && (
-        <div className={`shrink-0 text-sm tabular-nums ${tone === "neutral" ? "" : TONE_TEXT[tone]}`}>
+        <div className={`shrink-0 text-[13px] font-semibold tabular-nums ${tone === "neutral" ? "text-gray-700" : TONE_TEXT[tone]}`}>
           {value}
         </div>
       )}
@@ -156,38 +246,48 @@ export function Row({
   );
 
   if (!onClick) {
-    return <div className="flex items-center justify-between gap-4 px-4 py-3">{body}</div>;
+    return <div className="flex items-center justify-between gap-4 px-5 py-3.5">{body}</div>;
   }
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+      className="flex w-full items-center justify-between gap-4 px-5 py-3.5 text-left transition-colors hover:bg-violet-50/50"
     >
       {body}
     </button>
   );
 }
 
-/* ── Status ───────────────────────────────────────────────────────
-   A dot and a word. No filled pill: a screen of tinted badges is exactly what
-   stops any single one of them from meaning anything. */
+/* ── Status ───────────────────────────────────────────────────────── */
+
 export function Tag({ children, tone = "neutral" }: { children: ReactNode; tone?: Tone }) {
+  const pill: Record<Tone, string> = {
+    neutral:  "bg-gray-100 text-gray-500",
+    positive: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
+    warn:     "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
+    danger:   "bg-red-50 text-red-600 ring-1 ring-red-100",
+  };
   return (
-    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${TONE_TEXT[tone]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap ${pill[tone]}`}>
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE_DOT[tone]}`} />
       {children}
     </span>
   );
 }
 
-/** An advisory line. A left rule reads as an annotation; a filled box reads as
-    an alarm, and most of these are not alarms. */
 export function Notice({
   tone = "warn", children,
 }: { tone?: Tone; children: ReactNode }) {
+  const style: Record<Tone, string> = {
+    neutral: "bg-gray-50 border-gray-200 text-gray-600",
+    positive: "bg-emerald-50 border-emerald-200 text-emerald-700",
+    warn: "bg-amber-50 border-amber-200 text-amber-700",
+    danger: "bg-red-50 border-red-200 text-red-700",
+  };
   return (
-    <div className={`border-l-2 py-1.5 pl-3.5 text-[13px] leading-relaxed text-muted-foreground ${TONE_RULE[tone]}`}>
-      {children}
+    <div className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-[13px] leading-relaxed ${style[tone]}`}>
+      <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${TONE_DOT[tone]}`} />
+      <span>{children}</span>
     </div>
   );
 }
@@ -197,40 +297,41 @@ export function EmptyState({
 }: { icon?: LucideIcon; title: string; hint?: ReactNode; action?: ReactNode }) {
   return (
     <div className="px-6 py-14 text-center">
-      {Icon && <Icon className="mx-auto mb-3 h-5 w-5 text-muted-foreground/50" strokeWidth={1.5} />}
-      <p className="text-sm font-medium">{title}</p>
-      {hint && <p className="mx-auto mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted-foreground">{hint}</p>}
+      {Icon && (
+        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50">
+          <Icon className="h-5 w-5 text-violet-400" strokeWidth={1.5} />
+        </div>
+      )}
+      <p className="text-[13px] font-semibold text-gray-900">{title}</p>
+      {hint && <p className="mx-auto mt-1.5 max-w-sm text-[12px] leading-relaxed text-gray-400">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
 
-/** Full-width error state for a failed load. */
 export function LoadError({ message }: { message?: string }) {
   return (
-    <div className="rounded-lg border border-destructive/40 px-5 py-6">
-      <p className="text-sm font-medium text-destructive">Could not load this section</p>
-      <p className="mt-1 text-[13px] text-muted-foreground">{message ?? "Unknown error"}</p>
+    <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-6">
+      <p className="text-[13px] font-semibold text-red-700">Could not load this section</p>
+      <p className="mt-1 text-[12px] text-red-500">{message ?? "Unknown error"}</p>
     </div>
   );
 }
 
-/** Search / filter strip that sits above a list. */
 export function Toolbar({ children }: { children: ReactNode }) {
   return <div className="mb-4 flex flex-wrap items-center gap-2">{children}</div>;
 }
 
-/** Text-only filter chip. Selected state is weight and ink, not a fill. */
 export function FilterChip({
   active, onClick, children,
 }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
+      className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
         active
-          ? "bg-muted font-medium text-foreground"
-          : "text-muted-foreground hover:text-foreground"
+          ? "bg-violet-600 text-white shadow-sm"
+          : "bg-white border border-gray-200 text-gray-500 hover:border-violet-300 hover:text-violet-700"
       }`}
     >
       {children}
