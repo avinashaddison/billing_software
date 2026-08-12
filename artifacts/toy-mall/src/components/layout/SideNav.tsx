@@ -47,7 +47,7 @@ export function SideNav() {
     { name: "Products",    href: "/products",          icon: Package,     highlight: false, resource: "products"  },
     /* Stock-in workstation. Separate from Scan (billing-first) and Logs
        (read-only history) — this is where stock actually comes IN. */
-    { name: "Products Entry", href: "/stock-entry",    icon: PackagePlus, highlight: false, resource: "scan"      },
+    { name: "Entry Data",  href: "/stock-entry",       icon: PackagePlus, highlight: false, resource: "scan"      },
     { name: "Scan",        href: "/scan",              icon: ScanLine,    highlight: true,  resource: "scan"      },
     /* Manual Bill — deep-links to /checkout with ?manual=1 so the dialog
        auto-opens on arrival. Sits next to the bread-and-butter Billing

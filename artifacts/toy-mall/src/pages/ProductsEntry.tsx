@@ -1,5 +1,5 @@
 /**
- * Products Entry — the stock-in workstation.
+ * Entry Data — the stock-in workstation.
  *
  * Deliberately separate from /scan (billing-first, stock-in hidden behind a
  * mode toggle) and from /logs (read-only history). This page does one job:
@@ -387,7 +387,7 @@ export default function ProductsEntry() {
               <PackagePlus className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold leading-tight sm:text-2xl">Products Entry</h1>
+              <h1 className="text-xl font-semibold leading-tight sm:text-2xl">Entry Data</h1>
               <p className="text-sm text-muted-foreground">
                 Scan a barcode to add stock and see when it was last stocked
               </p>
