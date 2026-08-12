@@ -12,7 +12,7 @@
  * in-memory product list instead.
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import {
   PackagePlus, ScanLine, Camera, CameraOff, Loader2, Search, X,
   Volume2, VolumeX, Plus, Minus, Boxes, AlertTriangle, Keyboard,
@@ -79,6 +79,11 @@ const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
 /* The endpoint has no server-side cap, so bound it here: this is both the
    payload size and the population the totals below are computed over. */
 const RECENT_LIMIT = 500;
+
+/* A product's own entry history: a short preview by default, expandable to the
+   full record in place so "when did we last stock this" never needs a page. */
+const HISTORY_PREVIEW = 6;
+const HISTORY_FULL    = 200;
 
 /* ── API helpers ────────────────────────────────────────────────── */
 /* Every helper checks res.ok BEFORE res.json(): an HTML error page thrown by
@@ -170,6 +175,7 @@ export default function ProductsEntry() {
      (locked out of a page they're meant to live in), while a catalog-only
      manager would get an enabled button and a 403. */
   const canAddStock = usePermission("scan") === "write";
+  const urlQuery = useSearch();
 
   const [mode, setMode]           = useState<InputMode>("scan");
   const [muted, setMuted]         = useState(() => isSoundMuted());
@@ -186,6 +192,8 @@ export default function ProductsEntry() {
   const [qty, setQty]             = useState(1);
   const [adding, setAdding]       = useState(false);
   const [justAdded, setJustAdded] = useState<{ added: number; newStock: number } | null>(null);
+  const [historyLimit, setHistoryLimit] = useState(HISTORY_PREVIEW);
+  const [historyNonce, setHistoryNonce] = useState(0);   // bumped to force a refetch
 
   const [recent, setRecent]         = useState<StockLog[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
@@ -197,6 +205,8 @@ export default function ProductsEntry() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const videoRef       = useRef<HTMLVideoElement>(null);
   const addingRef      = useRef(false);   // synchronous double-submit guard
+  const selectionRef   = useRef(0);       // bumped on every new product selection
+  const recentReqRef   = useRef(0);       // newest feed request wins
 
   const { flash, triggerFlash } = useScanFlash();
 
@@ -241,8 +251,12 @@ export default function ProductsEntry() {
      custom range shows a quiet hint instead of firing a doomed request. */
   const rangeInvalid = rangeKey === "custom" && !!customFrom && !!customTo && customFrom > customTo;
 
+  /* Only the newest request may paint. Flicking through ranges fires several
+     at once, and without this an older, slower one can land last and leave
+     the feed and its totals describing a range nobody selected. */
   const loadRecent = useCallback(async () => {
     if (rangeInvalid) return;
+    const req = ++recentReqRef.current;
     setRecentLoading(true);
     try {
       const rows = await fetchStockLogs({
@@ -251,11 +265,11 @@ export default function ProductsEntry() {
         ...(range.from ? { from: range.from } : {}),
         ...(range.to   ? { to:   range.to   } : {}),
       });
-      setRecent(rows);
+      if (recentReqRef.current === req) setRecent(rows);
     } catch {
       /* Non-fatal: the feed is context, not the job. Keep whatever we had. */
     } finally {
-      setRecentLoading(false);
+      if (recentReqRef.current === req) setRecentLoading(false);
     }
   }, [range.from, range.to, rangeInvalid]);
 
@@ -269,9 +283,11 @@ export default function ProductsEntry() {
      would put B's quantity onto A. Every path routes through here (USB gun,
      camera, typed code, manual search result) so none can skip it. */
   const beginLookup = useCallback((code: string) => {
+    selectionRef.current += 1;   // invalidates any in-flight write's panel updates
     setProduct(null);
     setHistory(null);
     setJustAdded(null);
+    setHistoryLimit(HISTORY_PREVIEW);   // a newly picked product starts collapsed
     setLookupCode(code);
   }, []);
 
@@ -313,18 +329,14 @@ export default function ProductsEntry() {
     setJustAdded(null);
 
     lookupByCode(lookupCode)
-      .then(async (p) => {
+      .then((p) => {
         if (cancelled) return;
         playScanBeep();
         setProduct(p);
         setQty(1);
-        setHistory(null);
-        try {
-          const logs = await fetchStockLogs({ productId: p.id, type: "IN", limit: "6" });
-          if (!cancelled) setHistory(logs);
-        } catch {
-          if (!cancelled) setHistory([]);   // history is optional context
-        }
+        /* History loads in its own effect below, keyed on the product, so
+           expanding to the full record and refreshing after a write both
+           reuse one path instead of each duplicating this fetch. */
       })
       .catch((err: Error) => {
         if (cancelled) return;
@@ -348,6 +360,33 @@ export default function ProductsEntry() {
     return () => { cancelled = true; };
   }, [lookupCode, mode]);
 
+  /* ── That product's own entry history ─────────────────────────── */
+  const productId = product?.id ?? null;
+  useEffect(() => {
+    if (!productId) return;
+    let cancelled = false;
+    fetchStockLogs({ productId, type: "IN", limit: String(historyLimit) })
+      .then((logs) => { if (!cancelled) setHistory(logs); })
+      .catch(() => { if (!cancelled) setHistory([]); });   // history is optional context
+    return () => { cancelled = true; };
+  }, [productId, historyLimit, historyNonce]);
+
+  /* Deep link from a product page's "full stock history" link: open with that
+     product already loaded. Fires once — re-running would fight the operator
+     by yanking the panel back to the linked product after their next scan. */
+  /* Keyed on the sku, not a once-only flag: wouter keeps this page mounted
+     when only the query changes, so a flag would silently ignore the second
+     product you link to. */
+  const deepLinkedSku = useRef<string | null>(null);
+  useEffect(() => {
+    const sku = new URLSearchParams(urlQuery).get("sku");
+    if (!sku || deepLinkedSku.current === sku) return;
+    deepLinkedSku.current = sku;
+    /* Deliberately leaves the input on Scan: the product is already loaded
+       either way, and switching to Manual would mute the USB gun. */
+    beginLookup(sku);
+  }, [urlQuery, beginLookup]);
+
   /* Keep the scan box focused so the gun always has a target. */
   useEffect(() => {
     if (mode === "scan") scanInputRef.current?.focus();
@@ -363,6 +402,11 @@ export default function ProductsEntry() {
     }
     addingRef.current = true;
     setAdding(true);
+    /* If the operator scans the next item before this write comes back, the
+       selection has moved on. The write still counted, but none of the panel
+       updates below may land: they would put this product — and a live Add
+       button for it — back on screen over the one now being looked up. */
+    const gen = selectionRef.current;
     try {
       const result = await postStockIn(product.id, qty, userId);
       playStockIn();
@@ -371,18 +415,19 @@ export default function ProductsEntry() {
          write would make `product.stock + qty` quietly wrong. */
       const fresh = result.product;
       const newStock = typeof fresh?.stock === "number" ? fresh.stock : product.stock + qty;
-      setProduct(fresh ? { ...product, ...fresh } : { ...product, stock: newStock });
-      setJustAdded({ added: qty, newStock });
-      setQty(1);
+      if (selectionRef.current === gen) {
+        setProduct(fresh ? { ...product, ...fresh } : { ...product, stock: newStock });
+        setJustAdded({ added: qty, newStock });
+        setQty(1);
+        setHistoryNonce((n) => n + 1);
+      }
+      /* Named, so it still reads correctly if the panel has moved on. */
       toast.success(`+${qty} added to ${product.name}`, { description: `Now ${newStock} in stock` });
 
-      /* Refresh both histories so the page reflects the write it just made,
-         and drop the cached product list the rest of the app reads from. */
+      /* Shared views refresh either way — the write happened regardless of
+         what is on screen now. */
       void loadRecent();
       void queryClient.invalidateQueries({ queryKey: getListProductsQueryKey({}) });
-      fetchStockLogs({ productId: product.id, type: "IN", limit: "6" })
-        .then(setHistory)
-        .catch(() => { /* keep the stale list rather than blanking it */ });
 
       if (mode === "scan") scanInputRef.current?.focus();
     } catch (err) {
@@ -718,14 +763,22 @@ export default function ProductsEntry() {
                           </div>
                         </div>
                         <div>
-                          <div className="text-xs font-medium text-emerald-800">Last {history.length} entries</div>
+                          <div className="text-xs font-medium text-emerald-800">
+                            {historyLimit === HISTORY_PREVIEW
+                              ? `Last ${history.length} entries`
+                              : history.length >= HISTORY_FULL
+                                ? `Latest ${history.length} entries`
+                                : `All ${history.length} entries`}
+                          </div>
                           <div className="text-base font-semibold text-emerald-900">
                             +{history.reduce((s, h) => s + h.quantity, 0)} total
                           </div>
                         </div>
                       </div>
 
-                      <ul className="divide-y rounded-xl border">
+                      <ul className={`divide-y rounded-xl border ${
+                        historyLimit === HISTORY_PREVIEW ? "" : "max-h-[320px] overflow-y-auto"
+                      }`}>
                         {history.map((h) => (
                           <li key={h.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                             <div className="min-w-0">
@@ -738,6 +791,27 @@ export default function ProductsEntry() {
                           </li>
                         ))}
                       </ul>
+
+                      {/* A full page of entries came back, so there may be more
+                          behind it — offer the whole record rather than implying
+                          the preview is all there is. */}
+                      {historyLimit === HISTORY_PREVIEW ? (
+                        history.length >= HISTORY_PREVIEW && (
+                          <button
+                            onClick={() => setHistoryLimit(HISTORY_FULL)}
+                            className="mt-2 w-full rounded-xl border border-dashed py-2 text-sm font-medium text-primary hover:bg-muted/50"
+                          >
+                            View full stock history
+                          </button>
+                        )
+                      ) : (
+                        <button
+                          onClick={() => setHistoryLimit(HISTORY_PREVIEW)}
+                          className="mt-2 w-full rounded-xl border border-dashed py-2 text-sm font-medium text-muted-foreground hover:bg-muted/50"
+                        >
+                          Show less
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -862,23 +936,30 @@ export default function ProductsEntry() {
                 </div>
               )}
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {[
-                  { key: "entries", label: totalsLabel, value: totals.entries, sub: "entries" },
-                  { key: "units",   label: "Units",     value: totals.units,   sub: "added" },
-                  { key: "items",   label: "Items",     value: totals.skus,    sub: "products" },
-                ].map((s) => (
-                  <div key={s.key} className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
-                    <div className="text-xl font-bold tabular-nums">{s.value}</div>
-                    <div className="text-[11px] leading-tight text-muted-foreground">{s.label} {s.sub}</div>
+              {/* Hidden while the custom range is inverted: no request went out,
+                  so these would be the PREVIOUS range's numbers sitting under
+                  the new range's label. */}
+              {!rangeInvalid && (
+                <>
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {[
+                      { key: "entries", label: totalsLabel, value: totals.entries, sub: "entries" },
+                      { key: "units",   label: "Units",     value: totals.units,   sub: "added" },
+                      { key: "items",   label: "Items",     value: totals.skus,    sub: "products" },
+                    ].map((s) => (
+                      <div key={s.key} className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
+                        <div className="text-xl font-bold tabular-nums">{s.value}</div>
+                        <div className="text-[11px] leading-tight text-muted-foreground">{s.label} {s.sub}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              {truncated && (
-                <p className="mt-2 text-[11px] leading-tight text-muted-foreground">
-                  Showing the latest {RECENT_LIMIT} entries — the totals above cover these only.
-                </p>
+                  {truncated && (
+                    <p className="mt-2 text-[11px] leading-tight text-muted-foreground">
+                      Showing the latest {RECENT_LIMIT} entries — the totals above cover these only.
+                    </p>
+                  )}
+                </>
               )}
             </div>
 

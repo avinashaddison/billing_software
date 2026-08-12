@@ -17,4 +17,5 @@
 - [Read-only "view as" session scope](view-as-readonly-scope.md) — the blanket write-refusal covers the TENANT surface only; platform routes stay outside it on purpose.
 - [lib/db composite build](lib-db-composite-build.md) — no build script but a real project reference with a stale dist; new schema exports are invisible until `npx tsc -b lib/db`.
 - [Permission gates mirror the server](permission-gate-mirrors-server.md) — gate a page on the resource the server's requireWrite checks, not the one the page is about; a new resource key locks out all existing staff.
-- [Scan-then-confirm stale selection](scan-lookup-stale-selection.md) — clear the selection when the async lookup STARTS or the confirm button still acts on the previous item; funnel every entry path through one helper.
+- [Scan-then-confirm stale selection](scan-lookup-stale-selection.md) — clear the selection when the async lookup STARTS, and generation-check the write's own completion handler; funnel every entry path through one helper.
+- [Filter-change request races](filter-change-request-race.md) — newest-request-wins token on any filtered list, and never leave the previous filter's totals sitting under the new filter's label.

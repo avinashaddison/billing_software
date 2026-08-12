@@ -11,7 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useCart } from "@/contexts/cart-context";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, usePermission } from "@/hooks/use-auth";
 import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode, Truck } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -55,6 +55,7 @@ export default function ProductDetail() {
     return () => window.removeEventListener("keydown", onKey);
   }, [setLocation]);
   const isOwner = role === "owner";
+  const canEnterStock = usePermission("scan") === "write";
   const store = useStoreSettings();
   const { addItem, count } = useCart();
 
@@ -692,9 +693,15 @@ export default function ProductDetail() {
                   </p>
                 )}
 
-                <Link href="/logs" className="flex items-center justify-between text-sm font-semibold text-primary hover:underline">
-                  View full stock history
-                  <ChevronRight className="w-4 h-4" />
+                {/* The entry page is the one screen that shows this product's
+                    complete entry record AND lets you add to it. Staff without
+                    `scan` write can't open it, so send them to the read-only log. */}
+                <Link
+                  href={canEnterStock ? `/stock-entry?sku=${encodeURIComponent(sku)}` : "/logs"}
+                  className="flex items-center justify-between gap-2 text-sm font-semibold text-primary hover:underline"
+                >
+                  {canEnterStock ? "Full stock history & add stock" : "View full stock history"}
+                  <ChevronRight className="w-4 h-4 shrink-0" />
                 </Link>
               </div>
             </div>

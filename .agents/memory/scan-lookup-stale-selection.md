@@ -14,3 +14,9 @@ On any screen where scanning/picking a code triggers an **async lookup** and a b
 - Clearing on every scan also makes an unexpected re-scan (e.g. a camera left running that catches another label) *visible* rather than silent, which is why it beats trying to suppress the alternate input paths.
 - Prefer the server's returned row over `local + delta` when showing the new value; a concurrent sale between lookup and write makes the arithmetic a lie.
 - If a write can be lost after committing, never word the failure toast as a definite failure — point the operator at the authoritative feed, because a blind retry doubles the quantity.
+
+# The same rule applies to the write's own completion handler
+
+Clearing at lookup-start is only half of it. The commit handler captured the *old* item in its closure, so when its response lands it happily calls the panel setters again — re-mounting the previous item, with a live confirm button, on top of the one now being looked up. A double-submit guard does not help: the second selection is a scan, not a second submit.
+
+**How to apply:** keep a selection generation counter that the `beginLookup` helper increments. Capture it at the top of the write, and after the await apply the *panel* updates only if the generation still matches. Shared/global refreshes (activity feed, cached lists) should run either way — the write really did happen — and a success toast that names the item still reads correctly after the panel has moved on.
