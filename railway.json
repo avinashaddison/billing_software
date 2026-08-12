@@ -5,7 +5,7 @@
     "buildCommand": "pnpm run build:prod"
   },
   "deploy": {
-    "startCommand": "node artifacts/api-server/dist/index.mjs",
+    "startCommand": "NODE_ENV=production node artifacts/api-server/dist/index.mjs",
     "healthcheckPath": "/api/healthz",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
