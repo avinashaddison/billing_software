@@ -13,6 +13,10 @@
     "test": "pnpm -r --if-present run test"
   },
   "private": true,
+  "packageManager": "pnpm@10.26.1",
+  "engines": {
+    "node": ">=20.19.0 <21"
+  },
   "devDependencies": {
     "prettier": "^3.9.6",
     "typescript": "~5.9.3"
