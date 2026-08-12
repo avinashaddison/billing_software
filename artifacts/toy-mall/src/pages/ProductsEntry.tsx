@@ -63,6 +63,23 @@ interface StockLog {
 
 type InputMode = "scan" | "manual";
 
+/* Feed date filter. Every range is expressed as IST calendar days because
+   that is exactly what /stock-logs `from`/`to` compare against (inclusive). */
+type RangeKey = "all" | "today" | "yesterday" | "7d" | "month" | "custom";
+
+const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
+  { key: "all",       label: "Latest" },
+  { key: "today",     label: "Today" },
+  { key: "yesterday", label: "Yesterday" },
+  { key: "7d",        label: "7 days" },
+  { key: "month",     label: "This month" },
+  { key: "custom",    label: "Custom" },
+];
+
+/* The endpoint has no server-side cap, so bound it here: this is both the
+   payload size and the population the totals below are computed over. */
+const RECENT_LIMIT = 500;
+
 /* ── API helpers ────────────────────────────────────────────────── */
 /* Every helper checks res.ok BEFORE res.json(): an HTML error page thrown by
    a proxy would otherwise blow up in the JSON parser with a useless message. */
@@ -98,6 +115,14 @@ async function postStockIn(productId: string, quantity: number, userId?: string)
 /* ── Date helpers (shop's business day is an IST calendar day) ──── */
 const istDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: IST });
 const todayIst = () => new Date().toLocaleDateString("en-CA", { timeZone: IST });
+
+/* Calendar arithmetic on a YYYY-MM-DD string, parsed as UTC so shifting days
+   can never drift across an offset boundary and land on the wrong date. */
+const shiftDay = (day: string, deltaDays: number): string => {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + deltaDays)).toISOString().slice(0, 10);
+};
+const monthStart = (day: string) => `${day.slice(0, 7)}-01`;
 
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-IN", { timeZone: IST, hour: "numeric", minute: "2-digit", hour12: true });
@@ -164,6 +189,9 @@ export default function ProductsEntry() {
 
   const [recent, setRecent]         = useState<StockLog[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [rangeKey, setRangeKey]     = useState<RangeKey>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo]     = useState("");
 
   const scanInputRef   = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -197,16 +225,39 @@ export default function ProductsEntry() {
   }, [search, allProducts]);
 
   /* ── Recent entries feed ── */
+  const range = useMemo((): { from?: string; to?: string; label: string } => {
+    const today = todayIst();
+    switch (rangeKey) {
+      case "today":     return { from: today, to: today, label: "Today" };
+      case "yesterday": { const y = shiftDay(today, -1); return { from: y, to: y, label: "Yesterday" }; }
+      case "7d":        return { from: shiftDay(today, -6), to: today, label: "Last 7 days" };
+      case "month":     return { from: monthStart(today), to: today, label: "This month" };
+      case "custom":    return { from: customFrom || undefined, to: customTo || undefined, label: "Custom range" };
+      default:          return { label: "Latest" };
+    }
+  }, [rangeKey, customFrom, customTo]);
+
+  /* The endpoint 400s on an inverted range. Catch it here so a half-filled
+     custom range shows a quiet hint instead of firing a doomed request. */
+  const rangeInvalid = rangeKey === "custom" && !!customFrom && !!customTo && customFrom > customTo;
+
   const loadRecent = useCallback(async () => {
+    if (rangeInvalid) return;
+    setRecentLoading(true);
     try {
-      const rows = await fetchStockLogs({ type: "IN", limit: "60" });
+      const rows = await fetchStockLogs({
+        type:  "IN",
+        limit: String(RECENT_LIMIT),
+        ...(range.from ? { from: range.from } : {}),
+        ...(range.to   ? { to:   range.to   } : {}),
+      });
       setRecent(rows);
     } catch {
       /* Non-fatal: the feed is context, not the job. Keep whatever we had. */
     } finally {
       setRecentLoading(false);
     }
-  }, []);
+  }, [range.from, range.to, rangeInvalid]);
 
   useEffect(() => { void loadRecent(); }, [loadRecent]);
 
@@ -352,15 +403,23 @@ export default function ProductsEntry() {
   /* ── Derived: this product's last entry + recent-feed rollups ─── */
   const lastEntry = history?.[0] ?? null;
 
-  const todayTotals = useMemo(() => {
-    const today = todayIst();
-    const rows = recent.filter((r) => istDay(r.createdAt) === today);
+  /* With no range picked the feed means "latest activity", and the number the
+     operator is accountable for is today's. Once they choose a range, the
+     tiles describe that range instead. */
+  const totals = useMemo(() => {
+    const rows = rangeKey === "all"
+      ? recent.filter((r) => istDay(r.createdAt) === todayIst())
+      : recent;
     return {
       entries: rows.length,
       units:   rows.reduce((s, r) => s + r.quantity, 0),
       skus:    new Set(rows.map((r) => r.productId)).size,
     };
-  }, [recent]);
+  }, [recent, rangeKey]);
+
+  const totalsLabel = rangeKey === "all" ? "Today" : range.label;
+  /* Totals only cover what came back, so say so rather than quietly under-report. */
+  const truncated = recent.length >= RECENT_LIMIT;
 
   const groupedRecent = useMemo(() => {
     const map = new Map<string, StockLog[]>();
@@ -763,28 +822,80 @@ export default function ProductsEntry() {
                 <h3 className="text-sm font-semibold">Recent stock entries</h3>
               </div>
 
+              {/* Date filter — IST calendar days, sent to the server as from/to
+                  so the range covers everything, not just the loaded page. */}
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {RANGE_OPTIONS.map((o) => (
+                  <button
+                    key={o.key}
+                    onClick={() => setRangeKey(o.key)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                      rangeKey === o.key
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+
+              {rangeKey === "custom" && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={customFrom}
+                    max={todayIst()}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="h-9 flex-1 text-xs"
+                    aria-label="From date"
+                  />
+                  <span className="shrink-0 text-xs text-muted-foreground">to</span>
+                  <Input
+                    type="date"
+                    value={customTo}
+                    max={todayIst()}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="h-9 flex-1 text-xs"
+                    aria-label="To date"
+                  />
+                </div>
+              )}
+
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {[
-                  { label: "Today", value: todayTotals.entries, sub: "entries" },
-                  { label: "Units",  value: todayTotals.units,   sub: "added" },
-                  { label: "Items",  value: todayTotals.skus,    sub: "products" },
+                  { key: "entries", label: totalsLabel, value: totals.entries, sub: "entries" },
+                  { key: "units",   label: "Units",     value: totals.units,   sub: "added" },
+                  { key: "items",   label: "Items",     value: totals.skus,    sub: "products" },
                 ].map((s) => (
-                  <div key={s.label} className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
+                  <div key={s.key} className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
                     <div className="text-xl font-bold tabular-nums">{s.value}</div>
                     <div className="text-[11px] leading-tight text-muted-foreground">{s.label} {s.sub}</div>
                   </div>
                 ))}
               </div>
+
+              {truncated && (
+                <p className="mt-2 text-[11px] leading-tight text-muted-foreground">
+                  Showing the latest {RECENT_LIMIT} entries — the totals above cover these only.
+                </p>
+              )}
             </div>
 
             <div className="max-h-[540px] overflow-y-auto">
-              {recentLoading ? (
+              {rangeInvalid ? (
+                <div className="px-4 py-10 text-center text-sm text-amber-700">
+                  The start date is after the end date.
+                </div>
+              ) : recentLoading ? (
                 <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading…
                 </div>
               ) : recent.length === 0 ? (
                 <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                  No stock entries yet.
+                  {rangeKey === "all"
+                    ? "No stock entries yet."
+                    : `No stock entries for ${range.label.toLowerCase()}.`}
                 </div>
               ) : (
                 groupedRecent.map(([day, rows]) => (
