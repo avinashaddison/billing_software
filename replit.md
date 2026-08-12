@@ -20,7 +20,9 @@ A multi-tenant billing and inventory web app for retail shops. It includes an Ex
 - Vite is configured with `allowedHosts: true` and host `0.0.0.0` for the Replit iframe proxy.
 
 ## Database
-- Uses `DATABASE_URL` (or `NEON_DATABASE_URL`). Already provisioned in Replit.
+- Uses `NEON_DATABASE_URL` when set (takes precedence), otherwise `DATABASE_URL`.
+- **`NEON_DATABASE_URL` is set in Replit secrets → the app runs against the Neon production database (real shops, products, bills).** The Replit built-in DB (`DATABASE_URL`) also has a full schema copy from initial setup but is empty and unused while the Neon secret exists.
+- After adding/changing DB secrets, restart the "Start application" workflow — the running process keeps its old environment until restarted.
 - **Fresh DB setup (Replit):** `drizzle-kit push` requires a TTY and will fail in the shell. Instead, generate the base schema SQL and apply it directly:
   ```
   cd lib/db && npx drizzle-kit generate --config ./drizzle.config.ts --name init_schema

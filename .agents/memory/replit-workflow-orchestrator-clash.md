@@ -20,6 +20,10 @@ already launches, and they win the race for the port:
   `EADDRINUSE: 0.0.0.0:8080`, which fails the whole `Start application` workflow.
 - the toy-mall artifact workflow gets a platform-assigned Vite port (not 5000), so the
   preview on 5000 goes blank even though the app is running fine somewhere else.
+- SECOND failure mode (seen Aug 2026): both workflows run `pnpm run build && start` in the
+  SAME dist/ dir, so concurrent boots race — one rewrites dist/ while the other starts →
+  `Cannot find module .../dist/index.mjs` (MODULE_NOT_FOUND), not a port error at all.
+  Whichever loses shows FAILED; the app may still be fine under the winner.
 
 **Why it's easy to misdiagnose:** the symptom looks like "the app is broken" / "preview
 is dead", but both servers are actually healthy — they are just on unexpected ports, and

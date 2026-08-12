@@ -5,6 +5,8 @@ description: How schema changes are applied (idempotent boot SQL), the NEON-vs-h
 
 # Which DB the app actually uses
 - At runtime the app connects to `NEON_DATABASE_URL ?? DATABASE_URL` (lib/db/src/index.ts). On Replit, `NEON_DATABASE_URL` is set, so the app **and its boot migrations hit NEON**.
+- TRAP (since Aug 2026 import): the built-in `DATABASE_URL` DB carries a full but EMPTY schema copy (created while NEON secret was absent). Tables existing there proves nothing — check row counts (Neon has real data: ~1k+ products, 10 tenants).
+- Quick tell in boot logs for "which env did this process get": the pg SSL-modes warning appears only with the Neon URL, and the "BACKUPS NOT CONFIGURED" error appears only when Telegram secrets are missing from the process env.
 - The code-execution `executeSql` callback / Replit built-in DB talk to a **separate** `heliumdb` (`DATABASE_URL`). Introspecting via executeSql does **not** reflect the app's real (NEON) schema — it can show stale/old constraints.
 - **How to verify a schema change actually landed:** restart "Start application" and read the boot log — each migration logs `migration applied (or already up-to-date)`; a bad migration throws and crashes boot. Don't trust executeSql introspection for the app DB.
 
