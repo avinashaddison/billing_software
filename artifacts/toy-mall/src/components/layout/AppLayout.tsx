@@ -3,6 +3,7 @@ import { SideNav }   from "./SideNav";
 import { useOnline }  from "@/hooks/use-online";
 import { WifiOff }   from "lucide-react";
 import { BulbLaari } from "@/components/ui/BulbLaari";
+import { AppNotices } from "./AppNotices";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -23,6 +24,9 @@ export function AppLayout({ children }: AppLayoutProps) {
             No internet connection — billing data may not sync
           </div>
         )}
+
+        {/* ── Vendor notices + read-only support session ── */}
+        <AppNotices />
 
         {/*
           Mobile bottom padding:

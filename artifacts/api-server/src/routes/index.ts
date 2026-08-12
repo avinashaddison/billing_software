@@ -21,6 +21,11 @@ import settingsRouter    from "./settings";
 import platformRouter    from "./platform";
 import platformInsightsRouter from "./platform-insights";
 import platformPeopleRouter from "./platform-people";
+import platformMoneyRouter from "./platform-money";
+import platformNoticesRouter from "./platform-notices";
+import platformHealthRouter from "./platform-health";
+import appNoticesRouter from "./app-notices";
+import { readOnlySessionGate } from "../middlewares/read-only-session";
 import updatesRouter     from "./updates";
 import authRouter        from "./auth";
 import { PUBLIC_PATHS, requireAuth } from "../middlewares/auth";
@@ -39,6 +44,9 @@ const router: IRouter = Router();
  * so the two gates can never disagree about which paths are public.
  */
 async function tenantActiveGate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  /* Read-only vendor support may inspect a suspended or expired shop — that
+     is usually why it is being opened. It cannot change anything. */
+  if (req.viewAsReadOnly) { next(); return; }
   if (PUBLIC_PATHS.has(req.path)) { next(); return; }
   if (!req.tenantId) { next(); return; }
   try {
@@ -75,9 +83,20 @@ async function tenantActiveGate(req: Request, res: Response, next: NextFunction)
 router.use(platformRouter);
 router.use(platformInsightsRouter);
 router.use(platformPeopleRouter);
+router.use(platformMoneyRouter);
+router.use(platformNoticesRouter);
+router.use(platformHealthRouter);
 
 // Per-tenant suspend gate (the cloud equivalent of the old license gate).
 router.use(tenantActiveGate);
+
+// Vendor "view as shop" support sessions are read-only. This must sit ahead
+// of every tenant router so a write is refused no matter which route it hits.
+// It is deliberately BEHIND the platform routers above: those carry their own
+// admin gate, and the vendor's console is normally open in another tab of the
+// same browser — freezing it for the hour a support session lasts would be a
+// regression, not a safeguard.
+router.use(readOnlySessionGate);
 
 // Global authentication gate — everything past this point (except the public
 // allowlist in PUBLIC_PATHS) requires a valid PIN or email session. Mounted
@@ -104,5 +123,6 @@ router.use(uploadRouter);
 router.use(sharedCartRouter);
 router.use(telegramRouter);
 router.use(settingsRouter);
+router.use(appNoticesRouter);
 
 export default router;

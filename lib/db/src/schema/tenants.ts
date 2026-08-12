@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, timestamp, index } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, boolean, timestamp, index } from "drizzle-orm/pg-core";
 
 /**
  * tenants — one row per business sharing this installation.
@@ -26,6 +26,10 @@ export const tenantsTable = pgTable(
     isActive:  boolean("is_active").notNull().default(true),
     /** Access expiry. NULL = lifetime; past = blocked by tenantActiveGate. */
     expiresAt: timestamp("expires_at", { withTimezone: true }),
+    /** Optional cap on staff accounts. NULL = unlimited (every existing shop). */
+    maxStaff:     integer("max_staff"),
+    /** Optional cap on products. NULL = unlimited. */
+    maxProducts:  integer("max_products"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

@@ -163,6 +163,8 @@ router.get("/platform/tenants", requirePlatformAdmin, async (_req, res): Promise
         isActive:  tenantsTable.isActive,
         expiresAt: tenantsTable.expiresAt,
         createdAt: tenantsTable.createdAt,
+        maxStaff:  tenantsTable.maxStaff,
+        maxProducts: tenantsTable.maxProducts,
       })
       .from(tenantsTable)
       .orderBy(tenantsTable.createdAt);
@@ -393,6 +395,20 @@ router.patch("/platform/tenants/:id", requirePlatformAdmin, async (req, res): Pr
   if (req.body?.expiresAt !== undefined) {
     try { updates.expiresAt = resolveExpiry(req.body.expiresAt); }
     catch (e: any) { res.status(400).json({ error: e?.message ?? "Invalid expiresAt" }); return; }
+  }
+
+  /* Per-shop caps. null/"" clears the cap back to unlimited; anything else
+     must be a sane whole number. */
+  for (const key of ["maxStaff", "maxProducts"] as const) {
+    if (req.body?.[key] === undefined) continue;
+    const raw = req.body[key];
+    if (raw === null || raw === "") { updates[key] = null; continue; }
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > 100_000) {
+      res.status(400).json({ error: `${key === "maxStaff" ? "Staff" : "Product"} limit must be a whole number of at least 1, or empty for unlimited` });
+      return;
+    }
+    updates[key] = n;
   }
 
   /* Optional owner-email change. Targets the SAME owner the panel displays

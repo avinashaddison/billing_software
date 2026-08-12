@@ -13,7 +13,7 @@ import { CreateTenantDialog, EditTenantDialog, ExtendTenantDialog } from "./Tena
 import { PeopleDialog } from "./People";
 import { ShopDetailDialog } from "./ShopDetail";
 import {
-  BulkActionDialog, ResetPasswordDialog, ToggleActiveDialog,
+  BulkActionDialog, ResetPasswordDialog, ToggleActiveDialog, ForceSignOutDialog, ViewAsDialog,
   type BulkAction, type Shop,
 } from "./ShopActions";
 
@@ -36,6 +36,8 @@ export default function ShopsList() {
   const [detailShopId, setDetailShopId] = useState<string | null>(null);
   const [toggleShop, setToggleShop] = useState<Shop | null>(null);
   const [pwdShop, setPwdShop] = useState<Shop | null>(null);
+  const [signOutShop, setSignOutShop] = useState<Shop | null>(null);
+  const [viewAsShop, setViewAsShop] = useState<Shop | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkAction | null>(null);
 
   const shops = useMemo<Shop[]>(() => {
@@ -204,6 +206,8 @@ export default function ShopsList() {
                         onUsers={setUsersTenantId}
                         onPassword={setPwdShop}
                         onToggle={setToggleShop}
+                onViewAs={setViewAsShop}
+                onSignOut={setSignOutShop}
                       />
                     </td>
                   </tr>
@@ -243,6 +247,8 @@ export default function ShopsList() {
                   onUsers={setUsersTenantId}
                   onPassword={setPwdShop}
                   onToggle={setToggleShop}
+                onViewAs={setViewAsShop}
+                onSignOut={setSignOutShop}
                 />
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -273,6 +279,8 @@ export default function ShopsList() {
       <ShopDetailDialog shopId={detailShopId} open={!!detailShopId} onOpenChange={(o) => !o && setDetailShopId(null)} />
       <ToggleActiveDialog shop={toggleShop} open={!!toggleShop} onOpenChange={(o) => !o && setToggleShop(null)} />
       <ResetPasswordDialog shop={pwdShop} open={!!pwdShop} onOpenChange={(o) => !o && setPwdShop(null)} />
+      <ForceSignOutDialog shop={signOutShop} open={!!signOutShop} onOpenChange={(o) => !o && setSignOutShop(null)} />
+      <ViewAsDialog shop={viewAsShop} open={!!viewAsShop} onOpenChange={(o) => !o && setViewAsShop(null)} />
       <BulkActionDialog
         action={bulkAction}
         shops={selectedShops}
@@ -329,7 +337,7 @@ function ActivityLabel({ shop }: { shop: Shop }) {
 }
 
 function RowMenu({
-  shop, onDetail, onEdit, onExtend, onUsers, onPassword, onToggle,
+  shop, onDetail, onEdit, onExtend, onUsers, onPassword, onToggle, onViewAs, onSignOut,
 }: {
   shop: Shop;
   onDetail: (id: string) => void;
@@ -338,6 +346,8 @@ function RowMenu({
   onUsers: (id: string) => void;
   onPassword: (s: Shop) => void;
   onToggle: (s: Shop) => void;
+  onViewAs: (s: Shop) => void;
+  onSignOut: (s: Shop) => void;
 }) {
   return (
     <DropdownMenu>
@@ -354,6 +364,9 @@ function RowMenu({
         <DropdownMenuItem onClick={() => onExtend(shop)}>Extend access</DropdownMenuItem>
         <DropdownMenuItem onClick={() => onUsers(shop.id)}>View logins</DropdownMenuItem>
         <DropdownMenuItem onClick={() => onPassword(shop)}>Reset password</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => onViewAs(shop)}>View as shop</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onSignOut(shop)}>Sign out all devices</DropdownMenuItem>
         <DropdownMenuSeparator />
         {shop.isActive ? (
           <DropdownMenuItem

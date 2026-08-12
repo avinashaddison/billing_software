@@ -16,12 +16,14 @@
  */
 
 import { Router, type IRouter } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { randomInt } from "node:crypto";
-import { db, authUsersTable, staffProfilesTable } from "@workspace/db";
+import { db, authUsersTable, staffProfilesTable, authSessionsTable, tenantsTable } from "@workspace/db";
 import { recordAudit } from "../lib/audit";
 import { requirePlatformAdmin } from "../middlewares/platform-admin";
+import { clientMeta, createSession } from "../lib/sessions";
+import { TENANT_COOKIE_NAME, signTenantCookie, tenantCookieOptions } from "../middlewares/tenant";
 
 const router: IRouter = Router();
 
@@ -290,6 +292,175 @@ router.post("/platform/tenants/:id/users/:userId/password", requirePlatformAdmin
     res.json({ ok: true, email: target.email });
   } catch {
     res.status(500).json({ error: "Failed to reset this password" });
+  }
+});
+
+/* ───── POST /api/platform/tenants/:id/signout-all ───────────────────
+ *
+ * Kick every device belonging to this shop off immediately.
+ *
+ * Switching a login off stops the NEXT sign-in; it does not touch a phone
+ * that is already signed in and holding a year-long cookie. For a stolen
+ * phone or a sacked manager that distinction is the whole problem, so this
+ * revokes the session rows themselves — requireAuth checks them on every
+ * request, so access dies within one request.
+ *
+ * Sessions are matched by tenant AND by subject id, because legacy rows from
+ * before tenanting carry a NULL tenant_id and would otherwise survive.
+ */
+router.post("/platform/tenants/:id/signout-all", requirePlatformAdmin, async (req, res): Promise<void> => {
+  const tenantId = String(req.params.id);
+  try {
+    const [shop] = await db
+      .select({ id: tenantsTable.id, name: tenantsTable.name })
+      .from(tenantsTable)
+      .where(eq(tenantsTable.id, tenantId));
+    if (!shop) { res.status(404).json({ error: "Shop not found" }); return; }
+
+    const [staffIds, userIds] = await Promise.all([
+      db.select({ id: staffProfilesTable.id }).from(staffProfilesTable).where(eq(staffProfilesTable.tenantId, tenantId)),
+      db.select({ id: authUsersTable.id }).from(authUsersTable).where(eq(authUsersTable.tenantId, tenantId)),
+    ]);
+    const subjects = [...staffIds.map((r) => r.id), ...userIds.map((r) => r.id)];
+
+    const revoked = await db
+      .update(authSessionsTable)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          isNull(authSessionsTable.revokedAt),
+          subjects.length > 0
+            ? or(eq(authSessionsTable.tenantId, tenantId), inArray(authSessionsTable.subjectId, subjects))
+            : eq(authSessionsTable.tenantId, tenantId),
+        ),
+      )
+      .returning({ id: authSessionsTable.id });
+
+    void recordAudit({
+      action:       "tenant.sessions_revoked",
+      actorId:      req.platformActor!.id,
+      actorEmail:   req.platformActor!.email,
+      targetTenant: tenantId,
+      ip:           req.ip,
+      metadata:     { devices: revoked.length },
+    });
+    res.json({ ok: true, shopName: shop.name, devices: revoked.length });
+  } catch {
+    res.status(500).json({ error: "Failed to sign those devices out" });
+  }
+});
+
+/** A support session is deliberately short — it is for looking at a problem
+ *  right now, not a standing key to someone else's shop. */
+const VIEW_AS_MINUTES = 60;
+
+/* ───── POST /api/platform/tenants/:id/view-as ───────────────────────
+ *
+ * Open the shop's own app as the vendor, READ-ONLY.
+ *
+ * Three things make this safe to point at a live, trading shop:
+ *   1. the cookie carries a signed `ro` claim that no client can forge;
+ *   2. a gate rejects every non-GET request carrying that claim, so nothing
+ *      can be created, edited or deleted while viewing;
+ *   3. it expires on its own after an hour, and the session row is visible in
+ *      the shop's own device list as "Vendor support" rather than pretending
+ *      to be the owner's phone.
+ */
+router.post("/platform/tenants/:id/view-as", requirePlatformAdmin, async (req, res): Promise<void> => {
+  const tenantId = String(req.params.id);
+  try {
+    const [shop] = await db
+      .select({ id: tenantsTable.id, name: tenantsTable.name })
+      .from(tenantsTable)
+      .where(eq(tenantsTable.id, tenantId));
+    if (!shop) { res.status(404).json({ error: "Shop not found" }); return; }
+
+    /* requireAuth validates the subject against the database, so the session
+       has to belong to a real, active account in this shop. Prefer an owner
+       login; fall back to any active staff profile for shops that only ever
+       used PINs. */
+    const [owner] = await db
+      .select({ id: authUsersTable.id, email: authUsersTable.email })
+      .from(authUsersTable)
+      .where(and(
+        eq(authUsersTable.tenantId, tenantId),
+        eq(authUsersTable.role, "owner"),
+        eq(authUsersTable.isActive, true),
+      ))
+      .orderBy(authUsersTable.createdAt);
+
+    let subjectKind: "email" | "pin" = "email";
+    let subjectId = owner?.id ?? "";
+    let asLabel = owner?.email ?? "";
+
+    if (!owner) {
+      const [staff] = await db
+        .select({ id: staffProfilesTable.id, name: staffProfilesTable.name })
+        .from(staffProfilesTable)
+        .where(and(eq(staffProfilesTable.tenantId, tenantId), eq(staffProfilesTable.isActive, true)))
+        .orderBy(staffProfilesTable.createdAt);
+      if (!staff) {
+        res.status(400).json({ error: "This shop has no active account to view it through" });
+        return;
+      }
+      subjectKind = "pin";
+      subjectId = staff.id;
+      asLabel = staff.name;
+    }
+
+    const { userAgent, ip } = clientMeta(req);
+    const sid = await createSession({
+      tenantId,
+      subjectKind,
+      subjectId,
+      /* Shown in the shop's own devices list — never disguised as their phone. */
+      userAgent: `Vendor support (read-only) · ${req.platformActor!.email} · ${userAgent ?? "unknown"}`.slice(0, 400),
+      ip,
+    });
+
+    res.cookie(
+      TENANT_COOKIE_NAME,
+      signTenantCookie({
+        tenantId,
+        staffId:   subjectKind === "pin" ? subjectId : null,
+        userId:    subjectKind === "email" ? subjectId : null,
+        kind:      subjectKind,
+        sessionId: sid,
+        readOnly:  true,
+      }),
+      { ...tenantCookieOptions(), maxAge: VIEW_AS_MINUTES * 60 * 1000 },
+    );
+
+    void recordAudit({
+      action:       "tenant.viewed_as",
+      actorId:      req.platformActor!.id,
+      actorEmail:   req.platformActor!.email,
+      targetTenant: tenantId,
+      ip:           req.ip,
+      metadata:     { as: asLabel, subjectKind, minutes: VIEW_AS_MINUTES },
+    });
+
+    res.json({ ok: true, shopName: shop.name, as: asLabel, minutes: VIEW_AS_MINUTES });
+  } catch {
+    res.status(500).json({ error: "Failed to open that shop" });
+  }
+});
+
+/* ───── POST /api/platform/view-as/exit — end the support session ───── */
+router.post("/platform/view-as/exit", requirePlatformAdmin, async (req, res): Promise<void> => {
+  try {
+    /* Revoke the row as well as dropping the cookie, so a copy of the cookie
+       taken during the session is dead too. */
+    if (req.sessionId) {
+      await db
+        .update(authSessionsTable)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(authSessionsTable.id, req.sessionId), isNull(authSessionsTable.revokedAt)));
+    }
+    res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to close the support session" });
   }
 });
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAdminMe } from "./api";
 import { LoginScreen } from "./LoginScreen";
-import { Loader2, LayoutDashboard, Building2, IndianRupee, DatabaseBackup, ScrollText, LogOut, Menu, ShieldCheck } from "lucide-react";
+import { Loader2, LayoutDashboard, Building2, IndianRupee, DatabaseBackup, ScrollText, LogOut, Menu, ShieldCheck, Wallet, Megaphone, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Dashboard from "./Dashboard";
@@ -9,14 +9,20 @@ import ShopsList from "./ShopsList";
 import Pricing from "./Pricing";
 import Backups from "./Backups";
 import AuditLog from "./AuditLog";
+import Money from "./Money";
+import Notices from "./Notices";
+import Health from "./Health";
 
-type Section = "dashboard" | "shops" | "pricing" | "backups" | "audit";
+type Section = "dashboard" | "shops" | "money" | "notices" | "pricing" | "backups" | "health" | "audit";
 
 const NAV = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "shops",     label: "Shops",     icon: Building2 },
+  { key: "money",     label: "Money",     icon: Wallet },
+  { key: "notices",   label: "Notices",   icon: Megaphone },
   { key: "pricing",   label: "Pricing",   icon: IndianRupee },
   { key: "backups",   label: "Backups",   icon: DatabaseBackup },
+  { key: "health",    label: "Health",    icon: Activity },
   { key: "audit",     label: "Audit Log", icon: ScrollText },
 ] as const;
 
@@ -127,6 +133,9 @@ export default function AdminConsole() {
           <div className="p-6 md:p-10 max-w-7xl mx-auto w-full">
             {section === "dashboard" && <Dashboard onNavigate={setSection} />}
             {section === "shops" && <ShopsList />}
+            {section === "money" && <Money />}
+            {section === "notices" && <Notices />}
+            {section === "health" && <Health />}
             {section === "pricing" && <Pricing />}
             {section === "backups" && <Backups />}
             {section === "audit" && <AuditLog />}

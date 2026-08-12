@@ -139,6 +139,8 @@ export function CreateTenantDialog({ open, onOpenChange }: { open: boolean; onOp
 export function EditTenantDialog({ tenant, open, onOpenChange }: { tenant: any; open: boolean; onOpenChange: (open: boolean) => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [maxStaff, setMaxStaff] = useState("");
+  const [maxProducts, setMaxProducts] = useState("");
   const [busy, setBusy] = useState(false);
   const queryClient = useQueryClient();
 
@@ -150,8 +152,10 @@ export function EditTenantDialog({ tenant, open, onOpenChange }: { tenant: any; 
     if (open && tenant) {
       setName(tenant.name || "");
       setEmail(tenant.ownerEmail || "");
+      setMaxStaff(tenant.maxStaff == null ? "" : String(tenant.maxStaff));
+      setMaxProducts(tenant.maxProducts == null ? "" : String(tenant.maxProducts));
     }
-  }, [open, tenant?.id, tenant?.name, tenant?.ownerEmail]);
+  }, [open, tenant?.id, tenant?.name, tenant?.ownerEmail, tenant?.maxStaff, tenant?.maxProducts]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,6 +163,14 @@ export function EditTenantDialog({ tenant, open, onOpenChange }: { tenant: any; 
     const body: Record<string, unknown> = {};
     if (name.trim() && name.trim() !== tenant.name) body.name = name.trim();
     if (email.trim().toLowerCase() !== (tenant.ownerEmail || "").toLowerCase()) body.ownerEmail = email.trim();
+
+    /* Blank means "no limit". Compare against the current value so an
+       untouched field is never sent — sending it would clear a cap set
+       elsewhere. */
+    const capChanged = (typed: string, current: number | null | undefined) =>
+      (typed.trim() === "" ? null : Number(typed)) !== (current ?? null);
+    if (capChanged(maxStaff, tenant.maxStaff)) body.maxStaff = maxStaff.trim() === "" ? null : Number(maxStaff);
+    if (capChanged(maxProducts, tenant.maxProducts)) body.maxProducts = maxProducts.trim() === "" ? null : Number(maxProducts);
     if (Object.keys(body).length === 0) { toast.info("No changes"); onOpenChange(false); return; }
     
     setBusy(true);
@@ -194,6 +206,21 @@ export function EditTenantDialog({ tenant, open, onOpenChange }: { tenant: any; 
               <Label>Shop Name</Label>
               <Input required autoFocus value={name} onChange={e => setName(e.target.value)} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Staff limit</Label>
+                <Input type="number" min={1} inputMode="numeric" placeholder="No limit"
+                       value={maxStaff} onChange={e => setMaxStaff(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Product limit</Label>
+                <Input type="number" min={1} inputMode="numeric" placeholder="No limit"
+                       value={maxProducts} onChange={e => setMaxProducts(e.target.value)} />
+              </div>
+            </div>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Leave blank for no limit. The shop is told to contact you when it reaches a limit; nothing it has already added is removed.
+            </p>
             <div className="space-y-2">
               <Label>Owner Email</Label>
               <Input required type="email" value={email} onChange={e => setEmail(e.target.value)} />

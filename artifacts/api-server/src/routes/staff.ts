@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { db, staffProfilesTable, staffPermissionsTable, authUsersTable, tenantsTable, authSessionsTable } from "@workspace/db";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { requireAdmin } from "../middlewares/auth";
+import { tenantLimitBlock } from "../lib/limits";
 import { clientMeta, createSession } from "../lib/sessions";
 import {
   TENANT_COOKIE_NAME,
@@ -287,6 +288,9 @@ router.post("/staff", requireAdmin, async (req, res): Promise<void> => {
     res.status(400).json({ error: "PIN must be exactly 4 digits" }); return;
   }
   const safeRole = VALID_ROLES.includes(role) ? role : "staff";
+
+  const capped = await tenantLimitBlock(req.tenantId, "staff");
+  if (capped) { res.status(403).json({ error: capped }); return; }
 
   try {
     const hashed = await hashPin(String(pin));

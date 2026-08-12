@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Loader2, Eye, EyeOff, AlertTriangle, LogOut, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { adminQueryKeys } from "./api";
@@ -347,6 +347,156 @@ export function BulkActionDialog({
                 {action ? VERB[action] : ""} {count}
               </Button>
             </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ─────────────── kick every device off ─────────────── */
+
+/* Suspending a shop only stops the NEXT sign-in. A phone that is already
+ * signed in keeps working off a long-lived cookie, which for a stolen phone or
+ * a sacked manager is exactly the wrong behaviour. This ends those sessions. */
+export function ForceSignOutDialog({
+  shop, open, onOpenChange,
+}: { shop: Shop | null; open: boolean; onOpenChange: (o: boolean) => void }) {
+  const [busy, setBusy] = useState(false);
+
+  const run = async () => {
+    if (!shop) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/platform/tenants/${shop.id}/signout-all`, {
+        method: "POST", credentials: "include",
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(d.error || "Could not sign those devices out"); return; }
+      const n = typeof d.devices === "number" ? d.devices : 0;
+      toast.success(
+        n === 0
+          ? `No one was signed in at ${shop.name}`
+          : `${n} ${n === 1 ? "device" : "devices"} signed out of ${shop.name}`,
+      );
+      onOpenChange(false);
+    } catch {
+      toast.error("Server unreachable");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sign every device out of {shop?.name}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Every phone, tablet and computer currently signed in at this shop is signed out
+            straight away, including any half-finished bill on screen. Nobody is locked out —
+            they can sign back in with their usual PIN or password. Use this when a device is
+            lost or someone has left.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {shop?.activity === "trading" && (
+          <div className="flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>This shop is trading right now — someone may be mid-bill at the counter.</span>
+          </div>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <Button variant="destructive" disabled={busy} onClick={run}>
+            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+            Sign out all devices
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/* ─────────────── open the shop read-only ─────────────── */
+
+export function ViewAsDialog({
+  shop, open, onOpenChange,
+}: { shop: Shop | null; open: boolean; onOpenChange: (o: boolean) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState<{ as: string; minutes: number } | null>(null);
+
+  /* Permanently mounted and reused for every shop, so this has to be cleared
+     on open or the previous shop's session is offered for this one. */
+  useEffect(() => { if (open) { setReady(null); setBusy(false); } }, [open, shop?.id]);
+
+  const start = async () => {
+    if (!shop) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/platform/tenants/${shop.id}/view-as`, {
+        method: "POST", credentials: "include",
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(d.error || "Could not open this shop"); return; }
+      setReady({ as: typeof d.as === "string" ? d.as : "", minutes: typeof d.minutes === "number" ? d.minutes : 60 });
+    } catch {
+      toast.error("Server unreachable");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* Opened from a direct click rather than after the await, so the browser
+     does not treat it as a pop-up. */
+  const openShop = () => {
+    window.open(`${BASE}/`, "_blank", "noopener");
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Open {shop?.name} read-only</DialogTitle>
+          <DialogDescription>
+            Opens the shop&apos;s own app exactly as their staff see it, so you can follow a
+            problem through their screens instead of asking them to describe it.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2 text-sm">
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+            <p className="font-medium">While the session is open</p>
+            <ul className="space-y-1 text-muted-foreground">
+              <li>You can look at everything. You cannot change anything — saving, billing and deleting are all refused.</li>
+              <li>It ends by itself after an hour.</li>
+              <li>The shop can see it in their own device list, listed as vendor support.</li>
+            </ul>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            This signs this browser into {shop?.name}. If you were signed into another shop in
+            this browser, that session is replaced. Your admin console stays signed in.
+          </p>
+          {ready && (
+            <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
+              <p className="font-medium">Ready{ready.as ? ` — viewing as ${ready.as}` : ""}</p>
+              <p className="text-xs text-muted-foreground">Expires in {ready.minutes} minutes.</p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          {ready ? (
+            <Button onClick={openShop}>
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Open shop app
+            </Button>
+          ) : (
+            <Button onClick={start} disabled={busy}>
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Start read-only session
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>

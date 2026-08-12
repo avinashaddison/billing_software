@@ -18,6 +18,7 @@ import {
   GetProductQrParams,
 } from "@workspace/api-zod";
 import QRCode from "qrcode";
+import { tenantLimitBlock } from "../lib/limits";
 
 const router: IRouter = Router();
 
@@ -89,6 +90,9 @@ router.post("/products", requireWrite("products"), async (req, res): Promise<voi
   }
 
   const { name, sku, barcode, category, price, salePrice, salePriceUntil, purchasePrice, stock, lowStockThreshold, imageUrl, supplierId } = parsed.data;
+
+  const capped = await tenantLimitBlock(req.tenantId, "products");
+  if (capped) { res.status(403).json({ error: capped }); return; }
 
   /* Reject negative money/stock — the generated validators don't bound these,
      so without the guard a negative price or opening stock would persist and

@@ -22,3 +22,18 @@ A `^\d{4}-\d{2}-\d{2}$` regex accepts `2026-02-30`. Casting that to `::date` mak
 
 # Trap: totals over a capped list
 When a summary endpoint returns a row list capped by `limit`, compute range-wide totals in a **separate aggregate query**, not by summing the returned rows — otherwise anything labelled "period total" silently under-reports as soon as the cap is hit. Expose a `truncated` flag so the UI can say the list is partial while the totals are not.
+
+## Deriving a neighbouring IST month label
+
+Never step a `Date` (UTC) by a month and *then* format it in IST. For the first
+5.5 hours of an IST month that instant is still the previous month in UTC, so
+"last month" lands two months back and the card silently reads zero.
+
+Derive the current label in IST first (`toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }).slice(0,7)`),
+then do the arithmetic on the `YYYY-MM` string itself.
+
+**Why:** the aggregation is grouped on IST calendar months, so the lookup label
+must be produced by the same calendar the grouping used.
+
+**How to apply:** any time a summary card looks up a month key in a list that
+was grouped with `AT TIME ZONE 'Asia/Kolkata'`.

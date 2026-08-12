@@ -16,3 +16,5 @@ export * from "./staff";
 export * from "./store_settings";
 export * from "./platform_settings";
 export * from "./tenant_telegram";
+export * from "./tenant_payments";
+export * from "./announcements";

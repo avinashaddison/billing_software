@@ -43,6 +43,13 @@ declare global {
        *  the actor's auth_users row so handlers can log audit events
        *  without re-querying the DB. */
       platformActor?: { id: string; email: string };
+      /** True when the tenant cookie carries the signed `ro` claim minted by
+       *  "view as shop". Enforced by readOnlySessionGate — a request with this
+       *  set may read and may not write. */
+      viewAsReadOnly?: boolean;
+      /** Cookie issued-at (ms). Used to age out support sessions server-side,
+       *  since a copied cookie carries no browser maxAge. */
+      sessionIssuedAt?: number;
     }
   }
 }
@@ -83,6 +90,9 @@ interface CookiePayload {
   sid?: string | null;
   /** Issued-at (ms). */
   iat: number;
+  /** Read-only vendor support session ("view as shop"). Signed, so the client
+   *  cannot drop it to gain write access. */
+  ro?: boolean;
 }
 
 export interface DecodedSession {
@@ -91,6 +101,10 @@ export interface DecodedSession {
   userId:    string | null;
   kind:      AuthKind | null;
   sessionId: string | null;
+  /** Vendor support session — read-only. */
+  readOnly:  boolean;
+  /** When the cookie was minted (ms), or null on a malformed claim. */
+  issuedAt:  number | null;
 }
 
 /**
@@ -106,6 +120,7 @@ export function signTenantCookie(args: {
   userId?:   string | null;
   kind:      AuthKind | null;
   sessionId?: string | null;
+  readOnly?: boolean;
 }): string {
   const payload: CookiePayload = {
     t: args.tenantId,
@@ -114,6 +129,7 @@ export function signTenantCookie(args: {
     k: args.kind,
     sid: args.sessionId ?? null,
     iat: Date.now(),
+    ...(args.readOnly ? { ro: true } : {}),
   };
   const b64 = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const sig = sign(b64);
@@ -148,6 +164,8 @@ export function verifyTenantCookie(raw: string | undefined): DecodedSession | nu
       userId:    typeof obj.u === "string" ? obj.u : null,
       kind,
       sessionId: typeof obj.sid === "string" ? obj.sid : null,
+      readOnly:  obj.ro === true,
+      issuedAt:  typeof obj.iat === "number" ? obj.iat : null,
     };
   } catch {
     return null;
@@ -165,6 +183,8 @@ export function tenantContext(req: Request, _res: Response, next: NextFunction):
   if (decoded?.userId)    req.userId    = decoded.userId;
   if (decoded?.kind)      req.authKind  = decoded.kind;
   if (decoded?.sessionId) req.sessionId = decoded.sessionId;
+  if (decoded?.readOnly)  req.viewAsReadOnly = true;
+  if (typeof decoded?.issuedAt === "number") req.sessionIssuedAt = decoded.issuedAt;
 
   /* Platform session — independent cookie so the vendor can be signed into
      /admin while ALSO logged into a tenant via /login on the same browser.

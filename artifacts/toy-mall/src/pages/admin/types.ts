@@ -22,6 +22,7 @@ export interface OverviewData {
     outstanding: number;
     lastSaleAt: string | null;
     productCount: number; staffCount: number; userCount: number;
+    maxStaff: number | null; maxProducts: number | null;
   }>;
   unassigned: { bills: number; revenue: number } | null;
 }
@@ -49,6 +50,49 @@ export interface TenantPeople {
     id: string; name: string; role: string; isActive: boolean;
     lockedUntil: string | null; failedAttempts: number; createdAt: string;
   }>;
+}
+
+export interface PaymentRow {
+  id: string; tenantId: string; shopName: string | null;
+  amount: string; method: string; note: string | null;
+  coversDays: number | null; coversUntil: string | null;
+  paidAt: string; recordedBy: string | null;
+}
+
+export interface MoneyData {
+  payments: PaymentRow[];
+  byMonth: Array<{ month: string; total: string; count: number }>;
+  renewals: Array<{
+    id: string; name: string; isActive: boolean; expiresAt: string | null;
+    lastPaidAt: string | null; paidTotal: string;
+  }>;
+  summary: { thisMonth: string; lastMonth: string; allTime: string; count: number; payingShops: number };
+}
+
+export type NoticeLevel = "info" | "warning" | "critical";
+
+export interface NoticeRow {
+  id: string; tenantId: string | null; shopName: string | null;
+  title: string; body: string; level: NoticeLevel;
+  isActive: boolean; isLive: boolean;
+  startsAt: string | null; endsAt: string | null;
+  createdBy: string | null; createdAt: string;
+}
+
+export interface HealthData {
+  database: {
+    name: string; sizeBytes: number; sizePretty: string;
+    connections: { total: number; active: number };
+    migrations: { applied: number; latest: string | null };
+    biggestTables: Array<{ name: string; sizePretty: string; sizeBytes: number; rowEstimate: number }>;
+  };
+  shops: { total: number; active: number; suspended: number; expired: number; expiring7d: number; lifetime: number };
+  sessions: { live: number; activeDay: number; revoked: number };
+  server: {
+    uptimeSeconds: number; nodeVersion: string; env: string;
+    memory: { rssBytes: number; heapUsedBytes: number; heapTotalBytes: number };
+  };
+  checkedAt: string;
 }
 
 export type AccessKey = "3d" | "7d" | "30d" | "90d" | "180d" | "365d" | "lifetime";

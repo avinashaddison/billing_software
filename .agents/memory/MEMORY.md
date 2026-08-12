@@ -14,3 +14,5 @@
 - [Reused dialog state](reused-dialog-state.md) — a permanently-mounted `open={!!row}` dialog never re-runs its useState initialisers, so row A's typed values save onto row B.
 - [Credentials: replace, never retrieve](credential-reset-not-retrieval.md) — hashed PINs/passwords can't be shown; reset-and-reveal-once, never audit the plaintext, always clear the lockout too.
 - ["Last one standing" guards](invariant-guards-need-locks.md) — count-siblings-then-write leaves a shop with zero owners under concurrency; lock the whole sibling set FOR UPDATE in a stable id order.
+- [Read-only "view as" session scope](view-as-readonly-scope.md) — the blanket write-refusal covers the TENANT surface only; platform routes stay outside it on purpose.
+- [lib/db composite build](lib-db-composite-build.md) — no build script but a real project reference with a stale dist; new schema exports are invisible until `npx tsc -b lib/db`.

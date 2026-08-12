@@ -102,6 +102,8 @@ router.get("/platform/overview", requirePlatformAdmin, async (_req, res): Promis
           isActive:  tenantsTable.isActive,
           expiresAt: tenantsTable.expiresAt,
           createdAt: tenantsTable.createdAt,
+          maxStaff:  tenantsTable.maxStaff,
+          maxProducts: tenantsTable.maxProducts,
         })
         .from(tenantsTable)
         .orderBy(tenantsTable.createdAt),
