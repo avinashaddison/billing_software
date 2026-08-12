@@ -401,7 +401,17 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
         }
       }
 
-      const totalAmount = round2(subtotal - discountAmount);
+      /* ── Whole-rupee settlement ──────────────────────────────────────────
+         Nobody in the shop handles paise, so the bill settles at the nearest
+         rupee: 780.90 is collected as 781, 780.40 as 780. Only the FINAL figure
+         moves — line prices and subtotals stay exact, so per-item reporting and
+         profit are untouched. The receipt prints the difference as "Round Off"
+         so the printed lines still add up to what was actually paid.
+
+         Deliberately applied after the discount ceiling above, which must judge
+         the real discount rather than a rounded one. */
+      const exactTotal  = round2(subtotal - discountAmount);
+      const totalAmount = Math.round(exactTotal);
 
       const isCredit = paymentMode === "credit";
       const amountPaid    = isCredit ? 0 : totalAmount;
@@ -508,6 +518,7 @@ router.get("/bills", async (req, res): Promise<void> => {
     refundedAmount: refunds.get(b.id) ?? 0,
     discount:       b.discount != null ? Number(b.discount) : null,
     discountType:   b.discountType ?? null,
+    discountAmount: b.discountAmount != null ? Number(b.discountAmount) : null,
   })));
 });
 
@@ -554,6 +565,11 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
       refundedAmount,
       discount:       bill.discount != null ? Number(bill.discount) : null,
       discountType:   bill.discountType ?? null,
+      /* The resolved rupee discount. The receipt needs this as a real figure:
+         now that bills settle at the nearest rupee it can no longer infer the
+         discount from (subtotal − total), because that gap also holds the
+         round-off. */
+      discountAmount: bill.discountAmount != null ? Number(bill.discountAmount) : null,
     },
     items: items.map((i) => ({
       ...i,

@@ -532,13 +532,27 @@ export default function Checkout() {
   const [discountValue, setDiscountValue] = useState("");
   const [discountType, setDiscountType]   = useState<"percent" | "amount">("percent");
 
-  const discountNum    = parseFloat(discountValue) || 0;
+  const discountNum = parseFloat(discountValue) || 0;
+
+  /* Mirror the server's arithmetic step for step (bills.ts checkout): it
+     normalises every line to paise BEFORE summing, rounds the discount, then
+     settles the final figure at the nearest whole rupee. Summing raw floats
+     here instead would occasionally land a paise out and flip the rupee, so the
+     QR would charge one amount and the receipt would print another. */
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const normalizedSubtotal = r2(
+    items.reduce((s, i) => s + r2(r2(effectivePrice(i)) * i.quantity), 0),
+  );
+
   const discountAmount = discountNum > 0
     ? discountType === "percent"
-      ? Math.min(total * discountNum / 100, total)
-      : Math.min(discountNum, total)
+      ? Math.min(r2(normalizedSubtotal * discountNum / 100), normalizedSubtotal)
+      : Math.min(r2(discountNum), normalizedSubtotal)
     : 0;
-  const finalTotal = Math.max(0, total - discountAmount);
+
+  const exactTotal = Math.max(0, r2(normalizedSubtotal - discountAmount));
+  const finalTotal = Math.round(exactTotal);
+  const roundOff   = finalTotal - exactTotal;
 
   const qrActive = dynamicQrMode && !!upiId && paymentMode === "upi";
 
@@ -870,6 +884,14 @@ export default function Checkout() {
                   {discountAmount > 0 && (
                     <p className="text-xs text-muted-foreground mt-0.5 line-through">
                       ₹{total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                  )}
+                  {/* Say so out loud: the cashier is collecting a different
+                      figure from the one the lines add up to. */}
+                  {Math.abs(roundOff) >= 0.005 && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Rounded {roundOff > 0 ? "up" : "down"} from ₹
+                      {exactTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">

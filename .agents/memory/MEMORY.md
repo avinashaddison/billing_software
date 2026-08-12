@@ -19,4 +19,5 @@
 - [Permission gates mirror the server](permission-gate-mirrors-server.md) — gate a page on the resource the server's requireWrite checks, not the one the page is about; a new resource key locks out all existing staff.
 - [Scan-then-confirm stale selection](scan-lookup-stale-selection.md) — clear the selection when the async lookup STARTS, and generation-check the write's own completion handler; funnel every entry path through one helper.
 - [Filter-change request races](filter-change-request-race.md) — newest-request-wins token on any filtered list, and never leave the previous filter's totals sitting under the new filter's label.
+- [Rounding breaks inferred figures](rounding-breaks-inferred-figures.md) — changing a stored total's precision corrupts anything derived by algebra from it (receipt discount, refund ratios); read the line rows instead.
 - [Restyle delegation regressions](restyle-delegation-regressions.md) — "purely visual" subagent restyles drop retry actions from error branches and round editable previews; diff-review, don't trust their summaries.

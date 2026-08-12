@@ -34,6 +34,9 @@ interface BillData {
     customerPhone?: string | null;
     discount?: number | null;
     discountType?: string | null;
+    /** Resolved rupee discount as stored by the server. Absent on bills created
+     *  before the field was returned, which fall back to a derived value. */
+    discountAmount?: number | null;
   };
   items: BillItem[];
 }
@@ -516,7 +519,21 @@ export default function Bill() {
           const mrpTotal       = items.reduce((s, i) => s + (i.mrp ?? i.price) * i.quantity, 0);
           const saleSavings    = items.reduce((sum, i) =>
             i.mrp != null && i.mrp > i.price ? sum + (i.mrp - i.price) * i.quantity : sum, 0);
-          const manualDiscount = Math.max(0, itemsSubtotal - bill.totalAmount);
+          /* Prefer the discount the server actually recorded. Deriving it from
+             (subtotal − total) was safe once, but bills now settle at the
+             nearest whole rupee, so that gap also contains the round-off — a
+             40p round-down would otherwise masquerade as a 40p discount.
+             Bills predating the stored field still fall back to the gap. */
+          const manualDiscount = bill.discountAmount != null
+            ? bill.discountAmount
+            : Math.max(0, itemsSubtotal - bill.totalAmount);
+          /* Whatever is left is the whole-rupee rounding. It is bounded by
+             ±0.50 by construction; anything wider means legacy data we should
+             not editorialise about, so it stays hidden rather than printing a
+             nonsense adjustment on a customer's receipt. */
+          const roundOffRaw  = bill.totalAmount - (itemsSubtotal - manualDiscount);
+          const roundOff     = Math.abs(roundOffRaw) <= 0.5 ? roundOffRaw : 0;
+          const showRoundOff = Math.abs(roundOff) >= 0.005;
           const totalSavings   = saleSavings + manualDiscount;
           const totalQty       = items.reduce((s, i) => s + i.quantity, 0);
           const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1012,7 +1029,19 @@ export default function Bill() {
                   </div>
                 )}
 
-                <div className={`grid grid-cols-[1fr_auto] gap-x-2 leading-tight text-[12px] font-black ${totalSavings > 0.001 ? "border-t border-dashed border-black/60 mt-1.5 pt-1.5" : ""}`}>
+                {/* Round Off — the paise dropped (or added) to settle the bill
+                    at a whole rupee, so the printed lines reconcile to the
+                    amount actually collected. */}
+                {showRoundOff && (
+                  <div className={`grid grid-cols-[1fr_auto] gap-x-2 leading-tight ${totalSavings > 0.001 ? "mt-0.5" : ""}`}>
+                    <span className="text-black/80">Round Off</span>
+                    <span className="text-right tabular-nums">
+                      {roundOff < 0 ? "−" : "+"}₹{fmt(Math.abs(roundOff))}
+                    </span>
+                  </div>
+                )}
+
+                <div className={`grid grid-cols-[1fr_auto] gap-x-2 leading-tight text-[12px] font-black ${totalSavings > 0.001 || showRoundOff ? "border-t border-dashed border-black/60 mt-1.5 pt-1.5" : ""}`}>
                   <span>NET TOTAL</span>
                   <span className="text-right tabular-nums">₹{fmt(bill.totalAmount)}</span>
                 </div>

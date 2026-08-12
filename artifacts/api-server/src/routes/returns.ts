@@ -126,6 +126,21 @@ router.post("/returns", async (req, res): Promise<void> => {
         .where(eq(billsTable.id, billId))
         .for("update");
 
+      /* The denominator for the refund ratio has to be the bill's ACTUAL line
+         total, read from the lines themselves. It used to be inferred as
+         (totalAmount + discountAmount), but that invariant died when bills
+         began settling at the nearest whole rupee: a bill whose lines come to
+         780.40 collects 780, so the inferred 780.40 would refund 40p more than
+         the customer ever handed over. Measuring against the lines and scaling
+         by what was actually collected folds the order discount AND the
+         round-off into one ratio, and returns the identical answer on older
+         bills where the two figures already agree. */
+      const [billLinesRow] = await tx
+        .select({ gross: sql<string>`coalesce(sum(${saleItemsTable.subtotal}), 0)` })
+        .from(saleItemsTable)
+        .where(eq(saleItemsTable.saleId, billId));
+      const billLinesTotal = Number(billLinesRow?.gross ?? 0);
+
       for (const [pid, qty] of requestedByProduct) {
         const [product] = await tx
           .select()
@@ -180,23 +195,21 @@ router.post("/returns", async (req, res): Promise<void> => {
         }
 
         /* Refund the NET amount the customer actually paid for these units.
-           `gross` is the pre-bill-discount line total; scale it by the bill's
-           net ratio so any ORDER-LEVEL discount (bills.discountAmount) is
-           passed through to the refund. Without this, returning units from a
-           discounted bill would refund MORE than the customer paid.
+           `gross` is this product's pre-bill-discount line total; scale it by
+           the ratio of what was COLLECTED for the whole bill against what its
+           lines come to, so an ORDER-LEVEL discount and the whole-rupee
+           round-off are both passed through to the refund. Without this,
+           returning units from a discounted bill would refund MORE than the
+           customer paid.
 
-             billSubtotal = totalAmount + discountAmount   (checkout invariant)
-             netRatio     = totalAmount / billSubtotal      (≤ 1)
-             netPerUnit   = gross / sold * netRatio
-             refund       = netPerUnit * qty                (rounded to paise)
+             netRatio   = totalAmount / billLinesTotal      (≤ 1)
+             netPerUnit = gross / sold * netRatio
+             refund     = netPerUnit * qty                  (rounded to paise)
 
-           discountAmount was backfilled for all historical bills by migration
-           0014, so old bills refund correctly too. No discount → ratio 1. */
-        const billTotal    = Number(bill.totalAmount);
-        const billDiscount = Number(bill.discountAmount ?? 0);
-        const billSubtotal = billTotal + billDiscount;
-        const netRatio     = billSubtotal > 0 ? billTotal / billSubtotal : 1;
-        const netPerUnit   = sold > 0 ? (gross / sold) * netRatio : Number(product.price);
+           No discount and no round-off → ratio 1. */
+        const billTotal  = Number(bill.totalAmount);
+        const netRatio   = billLinesTotal > 0 ? billTotal / billLinesTotal : 1;
+        const netPerUnit = sold > 0 ? (gross / sold) * netRatio : Number(product.price);
         const refundAmount = Math.round(netPerUnit * qty * 100) / 100;
         totalRefund += refundAmount;
 
