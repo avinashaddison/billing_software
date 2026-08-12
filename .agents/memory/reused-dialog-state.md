@@ -29,3 +29,20 @@ This is easy to miss in review because the submit handler correctly targets
   row's selection, which reads as intentional and is easy to submit by accident.
 - Whenever a dialog takes a `row`/`item`/`target` prop *and* an `open` prop
   from the parent, assume it is reused and check how its state initialises.
+
+# The same dialog also leaks *async replies* between rows
+
+Re-seeding state on open fixes the form fields, but a reused dialog has a
+second failure mode: a request fired for entity A can resolve after the user
+has switched to entity B, and its success handler then writes A's result into
+the dialog now showing B. For a one-time credential reveal that is worse than
+a crash — the wrong name is shown against a real secret, and A's secret is
+lost silently.
+
+**Why:** the dialog outlives the row it is displaying, so "the currently open
+row" at request time and at response time are different values.
+
+**How to apply:** capture the target id in a local at call time, keep the live
+one in a ref, and drop the response (no state write, no toast) if they no
+longer match. Pair it with a single in-flight write at a time — overlapping
+mutations from one reused dialog are almost never intentional.

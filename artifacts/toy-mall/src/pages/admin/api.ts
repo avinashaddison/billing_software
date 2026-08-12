@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { OverviewData, TenantDetailData } from "./types";
+import { OverviewData, TenantDetailData, TenantPeople } from "./types";
 
 const BASE = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
 const API = `${BASE}/api`;
@@ -52,7 +52,7 @@ export function useAdminTenantDetail(id: string) {
 }
 
 export function useAdminTenantUsers(id: string) {
-  return useQuery({
+  return useQuery<TenantPeople>({
     queryKey: adminQueryKeys.users(id),
     queryFn: () => fetcher(`${API}/platform/tenants/${id}/users`),
     enabled: !!id,

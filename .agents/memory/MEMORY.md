@@ -12,3 +12,5 @@
 - [Vitest pulls a second Vite major](vitest-vite-version-clash.md) — adding vitest broke an untouched artifact's config typecheck with TS2769; pin vitest to the workspace's vite line, then dedupe.
 - [Bulk vs single action semantics](bulk-vs-single-action-semantics.md) — a batch "extend" resolving one date from now() shortens paid-up rows; share a pure per-row helper with the single-row route.
 - [Reused dialog state](reused-dialog-state.md) — a permanently-mounted `open={!!row}` dialog never re-runs its useState initialisers, so row A's typed values save onto row B.
+- [Credentials: replace, never retrieve](credential-reset-not-retrieval.md) — hashed PINs/passwords can't be shown; reset-and-reveal-once, never audit the plaintext, always clear the lockout too.
+- ["Last one standing" guards](invariant-guards-need-locks.md) — count-siblings-then-write leaves a shop with zero owners under concurrency; lock the whole sibling set FOR UPDATE in a stable id order.

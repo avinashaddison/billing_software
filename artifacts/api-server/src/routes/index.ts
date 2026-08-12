@@ -20,6 +20,7 @@ import telegramRouter    from "./telegram";
 import settingsRouter    from "./settings";
 import platformRouter    from "./platform";
 import platformInsightsRouter from "./platform-insights";
+import platformPeopleRouter from "./platform-people";
 import updatesRouter     from "./updates";
 import authRouter        from "./auth";
 import { PUBLIC_PATHS, requireAuth } from "../middlewares/auth";
@@ -73,6 +74,7 @@ async function tenantActiveGate(req: Request, res: Response, next: NextFunction)
 // reachable regardless of any per-tenant state.
 router.use(platformRouter);
 router.use(platformInsightsRouter);
+router.use(platformPeopleRouter);
 
 // Per-tenant suspend gate (the cloud equivalent of the old license gate).
 router.use(tenantActiveGate);

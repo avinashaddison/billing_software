@@ -40,6 +40,17 @@ export interface TenantDetailData {
   users: Array<{ email: string; role: string; isActive: boolean; lastLoginAt: string | null }>;
 }
 
+export interface TenantPeople {
+  users: Array<{
+    id: string; email: string; role: string; isActive: boolean;
+    lastLoginAt: string | null; createdAt: string;
+  }>;
+  staff: Array<{
+    id: string; name: string; role: string; isActive: boolean;
+    lockedUntil: string | null; failedAttempts: number; createdAt: string;
+  }>;
+}
+
 export type AccessKey = "3d" | "7d" | "30d" | "90d" | "180d" | "365d" | "lifetime";
 
 export const ACCESS_PRESETS: { key: AccessKey; label: string }[] = [

@@ -6,9 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ACCESS_PRESETS, AccessKey, OverviewData } from "./types";
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, CheckCircle2, Copy } from "lucide-react";
+import { Loader2, CheckCircle2, Copy } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { adminQueryKeys, useAdminTenantUsers } from "./api";
+import { adminQueryKeys } from "./api";
 
 const BASE = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
 const API = `${BASE}/api`;
@@ -268,68 +268,6 @@ export function ExtendTenantDialog({ tenant, open, onOpenChange }: { tenant: any
             <Button type="submit" disabled={busy}>Extend</Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export function ViewUsersDialog({ tenantId, open, onOpenChange }: { tenantId: string | null; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { data, isLoading, error } = useAdminTenantUsers(tenantId || "");
-  
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Logins & Staff</DialogTitle>
-          <DialogDescription>Users with access to this shop.</DialogDescription>
-        </DialogHeader>
-        {isLoading ? (
-          <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-        ) : error ? (
-          <div className="py-12 text-center">
-            <AlertTriangle className="mx-auto mb-3 h-6 w-6 text-destructive" />
-            <p className="text-sm font-medium text-destructive">Could not load this shop's logins</p>
-            <p className="mt-1 text-sm text-muted-foreground">{(error as Error).message}</p>
-          </div>
-        ) : (
-          <div className="space-y-6 py-4">
-            <div>
-              <h3 className="text-sm font-semibold mb-3">Owner & Admin Logins (Email)</h3>
-              <div className="space-y-2">
-                {data?.users?.map((u: any) => (
-                  <div key={u.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                    <div>
-                      <p className="font-semibold text-sm">{u.email}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Last login: {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never'}</p>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${u.isActive ? "bg-emerald-500/10 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
-                      {u.isActive ? "Active" : "Off"}
-                    </span>
-                  </div>
-                ))}
-                {!data?.users?.length && <p className="text-sm text-muted-foreground">No users found.</p>}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-semibold mb-3">Staff Accounts (PIN)</h3>
-              <div className="space-y-2">
-                {data?.staff?.map((s: any) => (
-                  <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                    <div>
-                      <p className="font-semibold text-sm">{s.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 uppercase tracking-widest">{s.role}</p>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${s.isActive ? "bg-emerald-500/10 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
-                      {s.isActive ? "Active" : "Off"}
-                    </span>
-                  </div>
-                ))}
-                {!data?.staff?.length && <p className="text-sm text-muted-foreground">No staff found.</p>}
-              </div>
-            </div>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

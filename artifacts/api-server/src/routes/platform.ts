@@ -559,11 +559,13 @@ router.get("/platform/tenants/:id/users", requirePlatformAdmin, async (req, res)
        above; the panel shows both so the vendor sees the full roster. */
     const staff = await db
       .select({
-        id:        staffProfilesTable.id,
-        name:      staffProfilesTable.name,
-        role:      staffProfilesTable.role,
-        isActive:  staffProfilesTable.isActive,
-        createdAt: staffProfilesTable.createdAt,
+        id:             staffProfilesTable.id,
+        name:           staffProfilesTable.name,
+        role:           staffProfilesTable.role,
+        isActive:       staffProfilesTable.isActive,
+        lockedUntil:    staffProfilesTable.lockedUntil,
+        failedAttempts: staffProfilesTable.failedAttempts,
+        createdAt:      staffProfilesTable.createdAt,
       })
       .from(staffProfilesTable)
       .where(eq(staffProfilesTable.tenantId, id))

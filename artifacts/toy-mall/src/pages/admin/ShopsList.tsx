@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CreateTenantDialog, EditTenantDialog, ExtendTenantDialog, ViewUsersDialog } from "./TenantDialogs";
+import { CreateTenantDialog, EditTenantDialog, ExtendTenantDialog } from "./TenantDialogs";
+import { PeopleDialog } from "./People";
 import { ShopDetailDialog } from "./ShopDetail";
 import {
   BulkActionDialog, ResetPasswordDialog, ToggleActiveDialog,
@@ -263,7 +264,12 @@ export default function ShopsList() {
       <CreateTenantDialog open={createOpen} onOpenChange={setCreateOpen} />
       <EditTenantDialog tenant={editTenant} open={!!editTenant} onOpenChange={(o) => !o && setEditTenant(null)} />
       <ExtendTenantDialog tenant={extendTenant} open={!!extendTenant} onOpenChange={(o) => !o && setExtendTenant(null)} />
-      <ViewUsersDialog tenantId={usersTenantId} open={!!usersTenantId} onOpenChange={(o) => !o && setUsersTenantId(null)} />
+      <PeopleDialog
+        tenantId={usersTenantId}
+        shopName={data?.shops.find((s) => s.id === usersTenantId)?.name}
+        open={!!usersTenantId}
+        onOpenChange={(o) => !o && setUsersTenantId(null)}
+      />
       <ShopDetailDialog shopId={detailShopId} open={!!detailShopId} onOpenChange={(o) => !o && setDetailShopId(null)} />
       <ToggleActiveDialog shop={toggleShop} open={!!toggleShop} onOpenChange={(o) => !o && setToggleShop(null)} />
       <ResetPasswordDialog shop={pwdShop} open={!!pwdShop} onOpenChange={(o) => !o && setPwdShop(null)} />
