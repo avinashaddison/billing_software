@@ -3,6 +3,15 @@ name: Backup delivery vs restore sources
 description: A backup with no restore path is not a backup; plus the CASCADE collateral trap and how to rehearse a restore without risking production.
 ---
 
+# Prod deployment can hold delivery secrets the workspace lacks
+
+The production deployment keeps its own secret set: the R2_* keys were absent
+from the workspace while the prod scheduler had been uploading nightlies for
+days. Workspace secret listings say nothing about prod delivery — list the
+bucket itself before concluding backups are not running. Both environments
+share one bucket/prefix, so a workspace left running overnight would add
+duplicate nightlies (harmless; halves effective retention days).
+
 # Check that every backup destination has a restore path
 
 Backups delivered to one place while restore reads from another is a silent,
