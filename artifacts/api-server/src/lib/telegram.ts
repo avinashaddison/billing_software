@@ -333,20 +333,26 @@ export interface DailySummaryData {
   itemsSold:   number;
   cashSales:   number;
   upiSales:    number;
+  /** Refunds processed today — shown as a deduction with the net figure. */
+  refundsTotal: number;
+  returnsCount: number;
   topProducts: DailySummaryTopProduct[];
 }
 
 export function sendDailySalesSummary(data: DailySummaryData): Promise<void> {
   if (!isConfigured()) return Promise.resolve();
 
-  const { date, totalAmount, billCount, itemsSold, cashSales, upiSales, topProducts } = data;
+  const { date, totalAmount, billCount, itemsSold, cashSales, upiSales, refundsTotal, returnsCount, topProducts } = data;
 
   const [year, month, day] = date.split("-");
   const dateLabel = new Date(`${year}-${month}-${day}T12:00:00+05:30`).toLocaleDateString("en-IN", {
     weekday: "long", day: "2-digit", month: "long", year: "numeric", timeZone: "Asia/Kolkata",
   });
 
-  if (billCount === 0) {
+  /* Quiet-day branch ONLY when truly nothing happened. A day with zero bills
+     but processed returns must still fall through to the full layout so the
+     refunds (and the negative net figure) are reported, not silently hidden. */
+  if (billCount === 0 && refundsTotal <= 0) {
     const lines = [
       `📊 <b>━━  DAILY SALES REPORT  ━━</b> 📊`,
       `🏪  <b>${escapeHtml(STORE_NAME)}</b>`,
@@ -378,6 +384,10 @@ export function sendDailySalesSummary(data: DailySummaryData): Promise<void> {
     D_THIN,
     ``,
     row(`🧾  Total Revenue  :`, fmt(totalAmount)),
+    ...(refundsTotal > 0 ? [
+      row(`↩️  Returns (${returnsCount})    :`, `− ${fmt(refundsTotal)}`),
+      row(`💰  Net Revenue    :`, fmt(totalAmount - refundsTotal)),
+    ] : []),
     row(`🔖  Bills Raised   :`, String(billCount)),
     row(`📦  Items Sold     :`, String(itemsSold)),
     ``,

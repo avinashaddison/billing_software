@@ -21,7 +21,7 @@ import { useStoreSettings } from "@/lib/store-info";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-interface DayRevenue { day: string; totalAmount: number; billCount: number; }
+interface DayRevenue { day: string; totalAmount: number; billCount: number; refunds?: number; netAmount?: number; }
 
 /* ── Revenue chart ───────────────────────────────────────────────── */
 function RevenueChart() {
@@ -31,7 +31,10 @@ function RevenueChart() {
   useEffect(() => {
     fetch(`${BASE_URL}/api/reports/revenue?days=7`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((d) => setData(Array.isArray(d) ? d : []))
+      .then((d) => setData((Array.isArray(d) ? d : []).map((r: DayRevenue) => ({
+        /* Net-of-returns; recomputed here if the payload predates netAmount. */
+        ...r, netAmount: r.netAmount ?? (r.totalAmount - (r.refunds ?? 0)),
+      }))))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -39,7 +42,7 @@ function RevenueChart() {
   const fmt = (d: string) =>
     new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 
-  const totalRevenue = data.reduce((s, d) => s + d.totalAmount, 0);
+  const totalRevenue = data.reduce((s, d) => s + (d.netAmount ?? d.totalAmount), 0);
   const totalBills = data.reduce((s, d) => s + d.billCount, 0);
 
   return (
@@ -97,7 +100,7 @@ function RevenueChart() {
                   backgroundColor: "hsl(var(--card))", boxShadow: "0 8px 24px rgba(0,0,0,0.12)"
                 }}
               />
-              <Area dataKey="totalAmount" stroke="hsl(var(--primary))" strokeWidth={2.5}
+              <Area dataKey="netAmount" stroke="hsl(var(--primary))" strokeWidth={2.5}
                 fill="url(#revenueGrad)" dot={false} activeDot={{ r: 4, fill: "hsl(var(--primary))" }} />
             </AreaChart>
           </ResponsiveContainer>

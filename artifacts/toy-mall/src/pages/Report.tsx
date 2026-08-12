@@ -14,11 +14,11 @@ import ProfitTab from "./report/ProfitTab";
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 /* ── Types ──────────────────────────────────────────────────────── */
-interface DayRevenue   { day: string; totalAmount: number; billCount: number; itemsCount: number; }
+interface DayRevenue   { day: string; totalAmount: number; billCount: number; itemsCount: number; refunds?: number; netAmount?: number; }
 interface TopProduct   { productName: string; productSku: string; totalQty: number; totalRevenue: number; profit: number | null; margin: number | null; }
 interface TopCustomer  { customerPhone: string | null; customerName: string | null; totalSpent: number; billCount: number; }
 interface HourBucket   { hour: number; totalAmount: number; billCount: number; }
-interface PeriodTotals { totalAmount: number; billCount: number; itemsSold: number; }
+interface PeriodTotals { totalAmount: number; billCount: number; itemsSold: number; refunds?: number; netAmount?: number; }
 
 interface EodReport {
   date:           string;
@@ -38,6 +38,10 @@ interface EodReport {
   discount:       number;
   returnsTotal:   number;
   returnsCount:   number;
+  returnsCost?:   number;
+  netRevenue?:    number;
+  netProfit?:     number;
+  netMargin?:     number;
   stockIn:        { totalUnits: number; txCount: number };
   yesterday:      PeriodTotals;
   lastWeek:       PeriodTotals;
@@ -211,10 +215,12 @@ export default function Report() {
   const formatDay = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   const isToday   = date === todayIndia();
 
-  /* Deltas — fall back to null when there's no comparison base */
-  const deltaRev   = eod ? pctDelta(eod.totalAmount, eod.yesterday.totalAmount) : null;
-  const deltaBills = eod ? pctDelta(eod.billCount,   eod.yesterday.billCount)   : null;
-  const deltaWeek  = eod ? pctDelta(eod.totalAmount, eod.lastWeek.totalAmount)  : null;
+  /* Deltas — net-of-returns on both sides so a heavy-returns day compares
+     honestly. Falls back to null when there's no comparison base. */
+  const netRev     = eod ? eod.netRevenue ?? (eod.totalAmount - eod.returnsTotal) : 0;
+  const deltaRev   = eod ? pctDelta(netRev, eod.yesterday.netAmount ?? eod.yesterday.totalAmount) : null;
+  const deltaBills = eod ? pctDelta(eod.billCount, eod.yesterday.billCount) : null;
+  const deltaWeek  = eod ? pctDelta(netRev, eod.lastWeek.netAmount ?? eod.lastWeek.totalAmount) : null;
 
   /* Quick presets */
   const setRelative = (days: number) => {
@@ -245,6 +251,8 @@ export default function Report() {
       ["Dues Collected", eod.duesCollected],
       ["Discount Given", eod.discount],
       ["Returns Total", eod.returnsTotal],
+      ["Net Revenue (after returns)", eod.netRevenue ?? (eod.totalAmount - eod.returnsTotal)],
+      ["Net Profit (after returns)", eod.netProfit ?? eod.grossProfit],
     ]);
   };
   const downloadProductsCsv = () => {
@@ -413,13 +421,22 @@ function OverviewTab({
     { name: "Credit", value: eod.creditSales, color: PAYMENT_COLORS[2] },
   ].filter((d) => d.value > 0)), [eod]);
 
+  /* Headline figures are net of returns; `??` fallbacks recompute them from
+     the gross fields if the API payload predates the net fields. */
+  const netRevenue = eod.netRevenue ?? (eod.totalAmount - eod.returnsTotal);
+  const netProfit  = eod.netProfit  ?? eod.grossProfit;
+  const netMargin  = eod.netMargin  ?? eod.margin;
+  const trendData  = useMemo(() => revenue.map((r) => ({
+    ...r, netAmount: r.netAmount ?? (r.totalAmount - (r.refunds ?? 0)),
+  })), [revenue]);
+
   return (
     <>
       {/* Hero KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="Revenue"     accent="green"  icon={IndianRupee} value={fmt(eod.totalAmount)}  delta={deltaRev}   deltaLbl="vs yest"
-          hint={eod.returnsTotal > 0 ? `net ${fmt(eod.totalAmount - eod.returnsTotal)} after returns` : undefined} />
-        <Kpi label="Profit"      accent="teal"   icon={TrendingUp}  value={fmt(eod.grossProfit)}  hint={eod.profitCoverage > 0 ? `${eod.margin.toFixed(0)}% margin` : "set cost prices for margin"} />
+        <Kpi label="Revenue"     accent="green"  icon={IndianRupee} value={fmt(netRevenue)}  delta={deltaRev}   deltaLbl="vs yest"
+          hint={eod.returnsTotal > 0 ? `${fmt(eod.totalAmount)} billed − ${fmt(eod.returnsTotal)} returns` : undefined} />
+        <Kpi label="Profit"      accent="teal"   icon={TrendingUp}  value={fmt(netProfit)}  hint={eod.profitCoverage > 0 ? `${netMargin.toFixed(0)}% margin${eod.returnsTotal > 0 ? " after returns" : ""}` : "set cost prices for margin"} />
         <Kpi label="Bills"       accent="blue"   icon={FileText}    value={fmt2(eod.billCount)}   delta={deltaBills} deltaLbl="vs yest" />
         <Kpi label="Customers"   accent="purple" icon={Users}       value={fmt2(eod.uniqueCustomers)} hint={`${fmt2(eod.itemsSold)} items sold`} />
       </div>
@@ -447,11 +464,11 @@ function OverviewTab({
           </div>
         }
       >
-        {revenue.every((r) => r.totalAmount === 0) ? (
+        {trendData.every((r) => r.totalAmount === 0 && r.netAmount === 0) ? (
           <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No sales data in this window</div>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={revenue} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
+            <AreaChart data={trendData} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%"   stopColor="hsl(var(--primary))" stopOpacity={0.35} />
@@ -462,11 +479,11 @@ function OverviewTab({
               <XAxis dataKey="day" tickFormatter={formatDay} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip
-                formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Revenue"]}
+                formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Net Revenue"]}
                 labelFormatter={formatDay}
                 contentStyle={{ fontSize: 11, borderRadius: 10, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))" }}
               />
-              <Area type="monotone" dataKey="totalAmount" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#revGrad)" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              <Area type="monotone" dataKey="netAmount" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#revGrad)" dot={{ r: 3 }} activeDot={{ r: 5 }} />
             </AreaChart>
           </ResponsiveContainer>
         )}

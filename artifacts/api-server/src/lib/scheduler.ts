@@ -1,6 +1,6 @@
 import { schedule, type ScheduledTask } from "node-cron";
 import { eq, sql, desc, and, or, lt, isNotNull } from "drizzle-orm";
-import { db, billsTable, saleItemsTable, productsTable, authSessionsTable, platformSettingsTable } from "@workspace/db";
+import { db, billsTable, saleItemsTable, productsTable, authSessionsTable, platformSettingsTable, returnsTable } from "@workspace/db";
 import { sendDailySalesSummary, sendBackupFailureAlert, isConfigured as isTelegramConfigured } from "./telegram";
 import { isR2Configured } from "./r2";
 import { runDatabaseBackup } from "./backup";
@@ -43,6 +43,16 @@ async function fetchDailySummary(dateStr: string) {
     .from(billsTable)
     .where(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${dateStr}`);
 
+  /* Refunds processed today — deliberately UNSCOPED by tenant, matching the
+   * bills query above: this nightly summary is the legacy global report. */
+  const [returnsSummary] = await db
+    .select({
+      refunds: sql<string>`COALESCE(SUM(${returnsTable.refundAmount}), 0)`.as("refunds"),
+      count:   sql<number>`COUNT(*)::int`.as("count"),
+    })
+    .from(returnsTable)
+    .where(sql`DATE(${returnsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${dateStr}`);
+
   const topProducts = await db
     .select({
       productName:  productsTable.name,
@@ -64,6 +74,8 @@ async function fetchDailySummary(dateStr: string) {
     itemsSold:   Number(salesSummary.itemsSold),
     cashSales:   Number(salesSummary.cashSales),
     upiSales:    Number(salesSummary.upiSales),
+    refundsTotal: Number(returnsSummary?.refunds ?? 0),
+    returnsCount: Number(returnsSummary?.count ?? 0),
     topProducts: topProducts.map((p) => ({
       productName:  p.productName,
       totalQty:     Number(p.totalQty),

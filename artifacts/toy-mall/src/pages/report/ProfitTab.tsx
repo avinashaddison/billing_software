@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Download, Loader2, Search, IndianRupee, Wallet, PiggyBank, Percent,
   ArrowUp, ArrowDown, ArrowUpDown, AlertTriangle, PackagePlus, Plus, Grid3X3,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useStoreSettings } from "@/lib/store-info";
@@ -36,6 +37,12 @@ interface ProfitReport {
     qty:             number;
     billCount:       number;
     uncostedRevenue: number;
+    /* Net-of-returns figures (optional so an older API payload still renders). */
+    refunds?:        number;
+    returnsCount?:   number;
+    netRevenue?:     number;
+    netProfit?:      number;
+    netMargin?:      number;
   };
   purchases: { units: number; txCount: number; estValue: number };
 }
@@ -221,6 +228,14 @@ export default function ProfitTab() {
 
   const uncostedCount = report ? report.rows.filter((r) => !r.costKnown).length : 0;
 
+  /* Net-of-returns headline figures; `??` fallbacks recompute from gross
+     fields when the API payload predates them. */
+  const refundsTotal = report?.totals.refunds ?? 0;
+  const returnsCount = report?.totals.returnsCount ?? 0;
+  const netRevenue   = report ? (report.totals.netRevenue ?? report.totals.revenue - refundsTotal) : 0;
+  const netProfit    = report ? (report.totals.netProfit  ?? report.totals.profit) : 0;
+  const netMargin    = report ? (report.totals.netMargin  ?? report.totals.margin) : 0;
+
   /* ── Selection helpers ── */
   const range = useMemo(() => {
     if (!anchor) return null;
@@ -343,7 +358,7 @@ export default function ProfitTab() {
     try {
       const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet("Profit Report", { views: [{ state: "frozen", ySplit: 9 }] });
+      const ws = wb.addWorksheet("Profit Report", { views: [{ state: "frozen", ySplit: 12 }] });
 
       ws.columns = [
         { width: 5 }, { width: 42 }, { width: 16 }, { width: 18 }, { width: 9 },
@@ -366,9 +381,12 @@ export default function ProfitTab() {
       const RUPEE = '"₹"#,##0.00';
       const summary: [string, number | string, string?][] = [
         ["Billed Revenue",              report.totals.revenue, RUPEE],
+        [`Returns (${returnsCount})`,   -refundsTotal, RUPEE],
+        ["Net Revenue",                 netRevenue, RUPEE],
         ["Total Investment (goods sold)", report.totals.investment, RUPEE],
-        ["Total Profit",                report.totals.profit, RUPEE],
-        ["Profit Margin",               `${report.totals.margin.toFixed(1)}%`],
+        ["Profit (before returns)",     report.totals.profit, RUPEE],
+        ["Net Profit (after returns)",  netProfit, RUPEE],
+        ["Net Profit Margin",           `${netMargin.toFixed(1)}%`],
       ];
       summary.forEach(([label, value, numFmt], i) => {
         const r = ws.getRow(4 + i);
@@ -380,7 +398,7 @@ export default function ProfitTab() {
       });
 
       const HEADERS = ["#", "Item", "SKU", "Category", "Qty", "Revenue", "Investment", "Profit", "Margin %"];
-      const headerRow = ws.getRow(9);
+      const headerRow = ws.getRow(12);
       HEADERS.forEach((h, i) => {
         const c = headerRow.getCell(i + 1);
         c.value = h;
@@ -392,7 +410,7 @@ export default function ProfitTab() {
       headerRow.height = 20;
 
       rows.forEach((r, i) => {
-        const row = ws.getRow(10 + i);
+        const row = ws.getRow(13 + i);
         row.getCell(1).value = i + 1;
         row.getCell(2).value = r.name + (r.kind === "manual" ? "  (manual)" : "");
         row.getCell(3).value = r.sku ?? "—";
@@ -420,7 +438,7 @@ export default function ProfitTab() {
         }
       });
 
-      const totalRow = ws.getRow(10 + rows.length);
+      const totalRow = ws.getRow(13 + rows.length);
       totalRow.getCell(2).value = "TOTAL";
       totalRow.getCell(5).value = view.qty;
       totalRow.getCell(6).value = view.revenue;
@@ -512,10 +530,12 @@ export default function ProfitTab() {
           {/* ── KPI cards ── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: "Billed Revenue",   value: money(report.totals.revenue),    icon: IndianRupee, cls: "text-blue-700 dark:text-blue-400",     iconBg: "bg-blue-500" },
+              { label: refundsTotal > 0 ? "Net Revenue" : "Billed Revenue", value: money(netRevenue), icon: IndianRupee, cls: "text-blue-700 dark:text-blue-400", iconBg: "bg-blue-500",
+                hint: refundsTotal > 0 ? `${money(report.totals.revenue)} billed − ${money(refundsTotal)} returns` : undefined },
               { label: "Total Investment", value: money(report.totals.investment), icon: Wallet,      cls: "text-orange-700 dark:text-orange-400", iconBg: "bg-orange-500", hint: "Cost of goods sold" },
-              { label: "Total Profit",     value: money(report.totals.profit),     icon: PiggyBank,   cls: report.totals.profit >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400", iconBg: report.totals.profit >= 0 ? "bg-emerald-500" : "bg-rose-500" },
-              { label: "Profit Margin",    value: `${report.totals.margin.toFixed(1)}%`, icon: Percent, cls: "text-purple-700 dark:text-purple-400", iconBg: "bg-purple-500" },
+              { label: refundsTotal > 0 ? "Net Profit" : "Total Profit", value: money(netProfit), icon: PiggyBank, cls: netProfit >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400", iconBg: netProfit >= 0 ? "bg-emerald-500" : "bg-rose-500",
+                hint: refundsTotal > 0 ? "after returns" : undefined },
+              { label: "Profit Margin",    value: `${netMargin.toFixed(1)}%`, icon: Percent, cls: "text-purple-700 dark:text-purple-400", iconBg: "bg-purple-500" },
             ].map((k) => (
               <div key={k.label} className="bg-card border rounded-2xl p-3.5 flex items-center gap-3">
                 <div className={`w-9 h-9 rounded-xl ${k.iconBg} text-white flex items-center justify-center shrink-0`}>
@@ -534,6 +554,12 @@ export default function ProfitTab() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[11px] font-bold text-muted-foreground px-1">
             <span>🧾 {report.totals.billCount.toLocaleString("en-IN")} bills</span>
             <span>📦 {report.totals.qty.toLocaleString("en-IN")} units sold</span>
+            {returnsCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                <Undo2 className="w-3.5 h-3.5" />
+                {returnsCount} return{returnsCount !== 1 ? "s" : ""} (−{money(refundsTotal)})
+              </span>
+            )}
             <span className="inline-flex items-center gap-1">
               <PackagePlus className="w-3.5 h-3.5" />
               Stock purchased: {report.purchases.units.toLocaleString("en-IN")} units

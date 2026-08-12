@@ -13,6 +13,29 @@ const router: IRouter = Router();
 const istDayStart = (day: string) => sql`${day}::timestamp AT TIME ZONE 'Asia/Kolkata'`;
 
 /**
+ * CTE: per-(bill, product) sold quantity + cost of the ORIGINAL sale lines —
+ * used to reverse cost-of-goods when units come back as returns. Aggregated
+ * per bill+product BEFORE joining `returns` so a product billed on two lines
+ * of the same bill can't fan out and double-count the refund. A bill-product
+ * with `unknown_lines > 0` has no reliable cost, so its returns are excluded
+ * from profit adjustments — mirroring the "covered" profit base used
+ * everywhere else in this file (never invent a cost).
+ */
+const lineCostsCte = () => db.$with("line_costs").as(
+  db.select({
+      billId:       saleItemsTable.saleId,
+      productId:    saleItemsTable.productId,
+      soldQty:      sql<string>`SUM(${saleItemsTable.quantity})`.as("sold_qty"),
+      totalCost:    sql<string>`SUM(COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) * ${saleItemsTable.quantity})`.as("total_cost"),
+      unknownLines: sql<number>`COUNT(*) FILTER (WHERE COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) IS NULL)::int`.as("unknown_lines"),
+    })
+    .from(saleItemsTable)
+    .leftJoin(productsTable, sql`${saleItemsTable.productId} = ${productsTable.id}`)
+    .where(sql`${saleItemsTable.productId} IS NOT NULL`)
+    .groupBy(saleItemsTable.saleId, saleItemsTable.productId),
+);
+
+/**
  * GET /api/reports/revenue?days=7
  * Returns daily revenue for the past N days (default 7).
  */
@@ -20,25 +43,40 @@ router.get("/reports/revenue", async (req, res): Promise<void> => {
   const days = Math.min(parseInt(String(req.query.days ?? 7), 10) || 7, 90);
   const fromDay = istShiftDay(istToday(), -(days - 1));
 
-  const rows = await db
-    .select({
-      day:         sql<string>`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`.as("day"),
-      totalAmount: sql<string>`SUM(${billsTable.totalAmount})`.as("total_amount"),
-      billCount:   sql<number>`COUNT(*)`.as("bill_count"),
-      itemsCount:  sql<number>`SUM(${billsTable.itemsCount})`.as("items_count"),
-    })
-    .from(billsTable)
-    .where(and(
-      sql`${billsTable.createdAt} >= ${istDayStart(fromDay)}`,
-      tenantWhere(billsTable.tenantId, req.tenantId),
-    ))
-    .groupBy(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`)
-    .orderBy(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`);
+  const [rows, refundRows] = await Promise.all([
+    db.select({
+        day:         sql<string>`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`.as("day"),
+        totalAmount: sql<string>`SUM(${billsTable.totalAmount})`.as("total_amount"),
+        billCount:   sql<number>`COUNT(*)`.as("bill_count"),
+        itemsCount:  sql<number>`SUM(${billsTable.itemsCount})`.as("items_count"),
+      })
+      .from(billsTable)
+      .where(and(
+        sql`${billsTable.createdAt} >= ${istDayStart(fromDay)}`,
+        tenantWhere(billsTable.tenantId, req.tenantId),
+      ))
+      .groupBy(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`)
+      .orderBy(sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`),
+
+    /* Refunds processed per IST day — netted off the same day's revenue so a
+     * return actually pulls the trend line down (bills stay immutable). */
+    db.select({
+        day:     sql<string>`DATE(${returnsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`.as("day"),
+        refunds: sql<string>`SUM(${returnsTable.refundAmount})`.as("refunds"),
+      })
+      .from(returnsTable)
+      .where(and(
+        sql`${returnsTable.createdAt} >= ${istDayStart(fromDay)}`,
+        tenantWhere(returnsTable.tenantId, req.tenantId),
+      ))
+      .groupBy(sql`DATE(${returnsTable.createdAt} AT TIME ZONE 'Asia/Kolkata')`),
+  ]);
 
   // Build a map of existing data
   const dataMap = new Map(
     rows.map((r) => [r.day, { totalAmount: Number(r.totalAmount), billCount: Number(r.billCount), itemsCount: Number(r.itemsCount) }])
   );
+  const refundMap = new Map(refundRows.map((r) => [r.day, Number(r.refunds)]));
 
   // Fill every day in the window with zeros if no data
   const today = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) + "T00:00:00");
@@ -48,7 +86,16 @@ router.get("/reports/revenue", async (req, res): Promise<void> => {
     d.setDate(d.getDate() - i);
     const dayStr = d.toLocaleDateString("en-CA");
     const existing = dataMap.get(dayStr);
-    result.push({ day: dayStr, totalAmount: existing?.totalAmount ?? 0, billCount: existing?.billCount ?? 0, itemsCount: existing?.itemsCount ?? 0 });
+    const gross    = existing?.totalAmount ?? 0;
+    const refunds  = refundMap.get(dayStr) ?? 0;
+    result.push({
+      day: dayStr,
+      totalAmount: gross,
+      billCount:   existing?.billCount ?? 0,
+      itemsCount:  existing?.itemsCount ?? 0,
+      refunds,
+      netAmount:   gross - refunds,
+    });
   }
 
   res.json(result);
@@ -129,13 +176,23 @@ type SalesTotals = {
   creditSales: number;
   discount:    number;
   uniqueCustomers: number;
+  /** Refunds processed on this IST day — totalAmount − refunds = net revenue. */
+  refunds:     number;
 };
 
 /** One day's totals — used both for the requested date AND for the
  *  "yesterday" / "same day last week" comparison rows so the front-end
  *  can render delta chips without an extra round trip. */
 async function dailyTotals(targetDate: string, tenantId: string | null): Promise<SalesTotals> {
-  const [row] = await db
+  const refundsQuery = db
+    .select({ refunds: sql<string>`COALESCE(SUM(${returnsTable.refundAmount}), 0)`.as("refunds") })
+    .from(returnsTable)
+    .where(and(
+      sql`DATE(${returnsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`,
+      tenantWhere(returnsTable.tenantId, tenantId),
+    ));
+
+  const salesQuery = db
     .select({
       totalAmount: sql<string>`COALESCE(SUM(${billsTable.totalAmount}), 0)`.as("total_amount"),
       billCount:   sql<number>`COUNT(*)::int`.as("bill_count"),
@@ -156,6 +213,8 @@ async function dailyTotals(targetDate: string, tenantId: string | null): Promise
       tenantWhere(billsTable.tenantId, tenantId),
     ));
 
+  const [[row], [refundRow]] = await Promise.all([salesQuery, refundsQuery]);
+
   return {
     totalAmount: Number(row?.totalAmount ?? 0),
     billCount:   row?.billCount ?? 0,
@@ -165,6 +224,7 @@ async function dailyTotals(targetDate: string, tenantId: string | null): Promise
     creditSales: Number(row?.creditSales ?? 0),
     discount:    Number(row?.discount ?? 0),
     uniqueCustomers: row?.uniqueCustomers ?? 0,
+    refunds:     Number(refundRow?.refunds ?? 0),
   };
 }
 
@@ -189,11 +249,14 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
   const targetDate = dateStr || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const tenantId   = req.tenantId;
 
+  const lineCosts = lineCostsCte();
+
   /* Run independent queries in parallel — big speed win when the day has
    * a lot of bills, since these would otherwise be 6 sequential round trips. */
   const [
     today, yesterday, lastWeek,
     topProducts, profitSummary, stockIn, hourly, topCustomers, paymentsToday, returnsToday,
+    returnsImpact,
   ] = await Promise.all([
     dailyTotals(targetDate,              tenantId),
     dailyTotals(shiftDate(targetDate, -1), tenantId),
@@ -313,6 +376,25 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
         tenantWhere(returnsTable.tenantId, tenantId),
       ))
       .then((rows) => rows[0] ?? { total: 0, count: 0 }),
+
+    /* Profit impact of today's returns: the refund value on cost-covered
+     * lines comes OUT of profit, while the cost of the returned goods goes
+     * BACK (the units are in stock and sellable again). */
+    db.with(lineCosts)
+      .select({
+        coveredRefunds: sql<string>`COALESCE(SUM(${returnsTable.refundAmount}) FILTER (WHERE ${lineCosts.unknownLines} = 0), 0)`.as("covered_refunds"),
+        returnedCost:   sql<string>`COALESCE(SUM((${lineCosts.totalCost} / NULLIF(${lineCosts.soldQty}, 0)) * ${returnsTable.quantity}) FILTER (WHERE ${lineCosts.unknownLines} = 0), 0)`.as("returned_cost"),
+      })
+      .from(returnsTable)
+      .innerJoin(lineCosts, and(
+        eq(lineCosts.billId, returnsTable.billId),
+        eq(lineCosts.productId, returnsTable.productId),
+      ))
+      .where(and(
+        sql`DATE(${returnsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${targetDate}`,
+        tenantWhere(returnsTable.tenantId, tenantId),
+      ))
+      .then((rows) => rows[0] ?? { coveredRefunds: "0", returnedCost: "0" }),
   ]);
 
   const totalCost      = Number(profitSummary?.totalCost ?? 0);
@@ -325,6 +407,20 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
   const coveredRevenue = Number(profitSummary?.coveredRevenue ?? 0);
   const grossProfit    = coveredRevenue - totalCost;
   const margin         = coveredRevenue > 0 ? (grossProfit / coveredRevenue) * 100 : 0;
+
+  /* Net-of-returns view. A refund reduces the revenue of the day the return
+   * was PROCESSED (bills stay immutable — standard net-sales practice).
+   * Profit loses the refunded value but regains the cost of the returned
+   * goods; both adjustments only apply to returns whose original line cost
+   * is known (same "covered" rule as above). Refunds on unknown-cost lines
+   * still reduce net revenue — the cash left the drawer either way. */
+  const returnsTotal   = Number(returnsToday?.total ?? 0);
+  const coveredRefunds = Number(returnsImpact?.coveredRefunds ?? 0);
+  const returnsCost    = Number(returnsImpact?.returnedCost ?? 0);
+  const netRevenue     = today.totalAmount - returnsTotal;
+  const netProfit      = grossProfit - coveredRefunds + returnsCost;
+  const netCoveredRev  = coveredRevenue - coveredRefunds;
+  const netMargin      = netCoveredRev > 0 ? (netProfit / netCoveredRev) * 100 : 0;
 
   /* Receivables created today = credit sales (the entire bill is unpaid).
    * Receivables collected today = ledger 'collection' payments dated today
@@ -371,15 +467,21 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
 
     // Discounts + returns
     discount:       today.discount,
-    returnsTotal:   Number(returnsToday?.total ?? 0),
+    returnsTotal,
     returnsCount:   returnsToday?.count ?? 0,
+    returnsCost,
+
+    // Net-of-returns headline figures
+    netRevenue,
+    netProfit,
+    netMargin,
 
     // Stock IN
     stockIn: { totalUnits: stockIn.totalIn, txCount: stockIn.txCount },
 
-    // Comparison rows for delta chips
-    yesterday: { totalAmount: yesterday.totalAmount, billCount: yesterday.billCount, itemsSold: yesterday.itemsSold },
-    lastWeek:  { totalAmount: lastWeek.totalAmount,  billCount: lastWeek.billCount,  itemsSold: lastWeek.itemsSold  },
+    // Comparison rows for delta chips (netAmount lets the UI compare net-to-net)
+    yesterday: { totalAmount: yesterday.totalAmount, billCount: yesterday.billCount, itemsSold: yesterday.itemsSold, refunds: yesterday.refunds, netAmount: yesterday.totalAmount - yesterday.refunds },
+    lastWeek:  { totalAmount: lastWeek.totalAmount,  billCount: lastWeek.billCount,  itemsSold: lastWeek.itemsSold,  refunds: lastWeek.refunds,  netAmount: lastWeek.totalAmount  - lastWeek.refunds  },
 
     // Hourly
     hourly: hourlyFull,
@@ -448,8 +550,9 @@ router.get("/reports/profit", async (req, res): Promise<void> => {
   );
 
   const lineCost = sql`COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice})`;
+  const lineCosts = lineCostsCte();
 
-  const [skuRows, manualRows, billTotals, purchases] = await Promise.all([
+  const [skuRows, manualRows, billTotals, purchases, returnsAgg, returnsImpact] = await Promise.all([
     /* Catalogue items sold in the range, one row per SKU. */
     db.select({
         productId:    saleItemsTable.productId,
@@ -506,6 +609,38 @@ router.get("/reports/profit", async (req, res): Promise<void> => {
         tenantWhere(stockLogsTable.tenantId, tenantId),
       ))
       .then((rows) => rows[0] ?? { units: 0, txCount: 0, estValue: "0" }),
+
+    /* ALL refunds processed in the range — netted against billed revenue. */
+    db.select({
+        refunds: sql<string>`COALESCE(SUM(${returnsTable.refundAmount}), 0)`.as("refunds"),
+        count:   sql<number>`COUNT(*)::int`.as("count"),
+      })
+      .from(returnsTable)
+      .where(and(
+        sql`${returnsTable.createdAt} >= ${lo}`,
+        sql`${returnsTable.createdAt} < ${hi}`,
+        tenantWhere(returnsTable.tenantId, tenantId),
+      ))
+      .then((rows) => rows[0] ?? { refunds: "0", count: 0 }),
+
+    /* Cost-covered slice of those refunds + the cost of goods that came back
+     * into stock (see lineCostsCte for the fan-out / unknown-cost rules). */
+    db.with(lineCosts)
+      .select({
+        coveredRefunds: sql<string>`COALESCE(SUM(${returnsTable.refundAmount}) FILTER (WHERE ${lineCosts.unknownLines} = 0), 0)`.as("covered_refunds"),
+        returnedCost:   sql<string>`COALESCE(SUM((${lineCosts.totalCost} / NULLIF(${lineCosts.soldQty}, 0)) * ${returnsTable.quantity}) FILTER (WHERE ${lineCosts.unknownLines} = 0), 0)`.as("returned_cost"),
+      })
+      .from(returnsTable)
+      .innerJoin(lineCosts, and(
+        eq(lineCosts.billId, returnsTable.billId),
+        eq(lineCosts.productId, returnsTable.productId),
+      ))
+      .where(and(
+        sql`${returnsTable.createdAt} >= ${lo}`,
+        sql`${returnsTable.createdAt} < ${hi}`,
+        tenantWhere(returnsTable.tenantId, tenantId),
+      ))
+      .then((rows) => rows[0] ?? { coveredRefunds: "0", returnedCost: "0" }),
   ]);
 
   const rows = [
@@ -556,12 +691,22 @@ router.get("/reports/profit", async (req, res): Promise<void> => {
   }
   const totalProfit = coveredRevenue - totalCost;
 
+  /* Net-of-returns totals — same rules as the EOD report: every refund nets
+   * against revenue; profit only adjusts for returns whose original line
+   * cost is known (refund comes out, cost of restocked goods goes back). */
+  const billedRevenue  = Number(billTotals.totalAmount);
+  const refunds        = Number(returnsAgg.refunds);
+  const coveredRefunds = Number(returnsImpact.coveredRefunds);
+  const returnedCost   = Number(returnsImpact.returnedCost);
+  const netProfit      = totalProfit - coveredRefunds + returnedCost;
+  const netCoveredRev  = coveredRevenue - coveredRefunds;
+
   res.json({
     from,
     to,
     rows,
     totals: {
-      revenue:         Number(billTotals.totalAmount),
+      revenue:         billedRevenue,
       itemRevenue:     coveredRevenue + uncostedRevenue,
       investment:      totalCost,
       profit:          totalProfit,
@@ -569,6 +714,11 @@ router.get("/reports/profit", async (req, res): Promise<void> => {
       qty:             totalQty,
       billCount:       Number(billTotals.billCount),
       uncostedRevenue,
+      refunds,
+      returnsCount:    Number(returnsAgg.count),
+      netRevenue:      billedRevenue - refunds,
+      netProfit,
+      netMargin:       netCoveredRev > 0 ? (netProfit / netCoveredRev) * 100 : 0,
     },
     purchases: {
       units:    Number(purchases.units),
