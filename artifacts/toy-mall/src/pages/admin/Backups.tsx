@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { useAdminBackups, adminQueryKeys } from "./api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DatabaseBackup, Download, UploadCloud, ArchiveRestore, Loader2, PlayCircle, Settings, HardDrive, ShieldAlert, AlertTriangle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { UploadCloud, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { PageHeader, SectionLabel, Panel, Rows, EmptyState, LoadError } from "./ui";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const BASE = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
 const API = `${BASE}/api`;
@@ -16,8 +17,6 @@ export default function Backups() {
   const queryClient = useQueryClient();
   
   const [backingUp, setBackingUp] = useState(false);
-  /* Left null until the real schedule arrives. Seeding this with a guess and
-   * letting Save write it back would silently overwrite the live schedule. */
   const [hour, setHour] = useState<number | null>(null);
   const [savingHour, setSavingHour] = useState(false);
   
@@ -128,161 +127,159 @@ export default function Backups() {
     finally { setUploadRestoring(false); }
   };
 
-  return (
-    <div className="space-y-6 max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Database Backups</h1>
-        <p className="text-muted-foreground mt-1">Manage automated and manual backups</p>
+  if (isLoading || (!data && !error)) {
+    return (
+      <div className="animate-in fade-in duration-300">
+        <PageHeader title="Database backups" meta="Manage automated and manual backups" />
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+          <Skeleton className="h-40 rounded-lg" />
+          <Skeleton className="h-40 rounded-lg" />
+        </div>
       </div>
+    );
+  }
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="pb-3 border-b bg-muted/20">
-            <CardTitle className="text-lg flex items-center gap-2"><Settings className="w-5 h-5 text-primary"/> Schedule</CardTitle>
-            <CardDescription>Daily automated backup</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-4">
-            <div className="flex items-end gap-3">
-              <div className="space-y-2 flex-1">
-                <label className="text-sm font-medium">Backup Time (0-23 UTC)</label>
+  return (
+    <div className="animate-in fade-in duration-300">
+      <PageHeader title="Database backups" meta="Manage automated and manual backups" />
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <div>
+          <SectionLabel>Schedule</SectionLabel>
+          <Panel>
+            <div className="p-4">
+              <label className="text-[13px] font-medium">Backup time (0-23 UTC)</label>
+              <div className="mt-2 flex items-center gap-3">
                 <Input
                   type="number" min={0} max={23}
                   value={hour ?? ""}
                   placeholder={isLoading ? "Loading…" : "—"}
                   disabled={isLoading || !!error}
                   onChange={(e) => setHour(e.target.value === "" ? null : Number(e.target.value))}
+                  className="h-9 w-24 rounded-md"
                 />
+                <Button variant="secondary" size="sm" onClick={saveHour} disabled={savingHour || hour === null} className="h-9">
+                  Save
+                </Button>
               </div>
-              <Button variant="secondary" onClick={saveHour} disabled={savingHour || hour === null}>Save</Button>
             </div>
-          </CardContent>
-        </Card>
+          </Panel>
+        </div>
 
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="pb-3 border-b bg-muted/20">
-            <CardTitle className="text-lg flex items-center gap-2"><PlayCircle className="w-5 h-5 text-emerald-500"/> Manual Backup</CardTitle>
-            <CardDescription>Create a snapshot right now</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <Button onClick={backupNow} disabled={backingUp} className="w-full bg-emerald-600 hover:bg-emerald-700">
-              {backingUp ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <DatabaseBackup className="w-4 h-4 mr-2" />}
-              Backup Now
-            </Button>
-            <p className="text-xs text-muted-foreground text-center mt-3">Backups are saved to Cloudflare R2 and Telegram.</p>
-          </CardContent>
-        </Card>
+        <div>
+          <SectionLabel>Manual backup</SectionLabel>
+          <Panel>
+            <div className="p-4">
+              <Button onClick={backupNow} disabled={backingUp} variant="secondary" className="h-9 w-full">
+                {backingUp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} /> : null}
+                Backup now
+              </Button>
+              <p className="mt-3 text-center text-[13px] text-muted-foreground">
+                Backups are saved to Cloudflare R2 and Telegram.
+              </p>
+            </div>
+          </Panel>
+        </div>
       </div>
 
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader className="pb-3 border-b bg-muted/20 flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-lg flex items-center gap-2"><HardDrive className="w-5 h-5 text-primary"/> R2 Snapshots</CardTitle>
-            <CardDescription>Recent backups available to restore</CardDescription>
-          </div>
-          <div>
-            <input type="file" accept=".gz,.json.gz,application/gzip" className="hidden" ref={fileInputRef} onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-              <UploadCloud className="w-4 h-4 mr-2" /> Upload Snapshot
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
-          ) : error ? (
-            <div className="p-12 text-center">
-              <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-destructive" />
-              <p className="font-medium text-destructive">Could not load your backups</p>
-              <p className="mt-1 text-sm text-muted-foreground">{(error as Error).message}</p>
-              <p className="mt-1 text-sm text-muted-foreground">This is a problem reading the list — it does not mean the backups are gone.</p>
-            </div>
+      <div className="mt-10">
+        <SectionLabel
+          action={
+            <>
+              <input type="file" accept=".gz,.json.gz,application/gzip" className="hidden" ref={fileInputRef} onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
+              <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="-mr-2 h-7 gap-1 text-[13px] font-normal text-muted-foreground">
+                <UploadCloud className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Upload snapshot
+              </Button>
+            </>
+          }
+        >
+          R2 Snapshots
+        </SectionLabel>
+        
+        <Panel>
+          {error ? (
+            <LoadError message={(error as Error).message} />
           ) : data?.listError ? (
-            <div className="p-12 text-center">
-              <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-destructive" />
-              <p className="font-medium text-destructive">{data.listError}</p>
-            </div>
+            <LoadError message={data.listError} />
           ) : !data?.files?.length ? (
-            <div className="p-12 text-center text-muted-foreground">No recent backups found in R2.</div>
+            <EmptyState title="No recent backups found in R2" />
           ) : (
-            <div className="divide-y">
+            <Rows>
               {data.files.map((f: any) => (
-                <div key={f.key} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                  <div>
-                    <p className="font-semibold text-sm">{f.filename}</p>
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">{((f.sizeBytes ?? 0) / 1024 / 1024).toFixed(2)} MB &middot; {f.lastModified ? new Date(f.lastModified).toLocaleString() : "Unknown date"}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => download(f)}>
-                      <Download className="w-4 h-4 mr-2" /> Download
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => setRestoreTarget(f)}>
-                      <ArchiveRestore className="w-4 h-4 mr-2" /> Restore
-                    </Button>
-                  </div>
+                <div key={f.key} className="flex items-center justify-between gap-4 px-4 py-3">
+                   <div className="min-w-0">
+                     <div className="truncate text-sm font-medium">{f.filename}</div>
+                     <div className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                       {((f.sizeBytes ?? 0) / 1024 / 1024).toFixed(2)} MB · {f.lastModified ? new Date(f.lastModified).toLocaleString() : "Unknown date"}
+                     </div>
+                   </div>
+                   <div className="flex shrink-0 items-center gap-2">
+                     <Button variant="ghost" size="sm" onClick={() => download(f)} className="h-8 text-[13px]">
+                       Download
+                     </Button>
+                     <Button variant="ghost" size="sm" onClick={() => setRestoreTarget(f)} className="h-8 text-[13px] text-destructive hover:bg-destructive/10 hover:text-destructive">
+                       Restore
+                     </Button>
+                   </div>
                 </div>
               ))}
-            </div>
+            </Rows>
           )}
-        </CardContent>
-      </Card>
+        </Panel>
+      </div>
 
-      {/* Restore Dialog */}
       <Dialog open={!!restoreTarget} onOpenChange={(o) => !o && setRestoreTarget(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <ShieldAlert className="w-5 h-5" /> Danger: Database Restore
-            </DialogTitle>
+            <DialogTitle>Danger: Database Restore</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg border border-destructive/20 font-medium">
+            <div className="border-l-2 border-destructive py-1.5 pl-3.5 text-[13px] leading-relaxed text-muted-foreground">
               You are about to overwrite the ENTIRE platform database with the snapshot:
               <br/><br/>
-              <span className="font-mono bg-destructive/20 px-1 py-0.5 rounded">{restoreTarget?.filename}</span>
+              <span className="font-mono text-foreground">{restoreTarget?.filename}</span>
               <br/><br/>
               All changes since this snapshot will be permanently lost. This affects all tenants.
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Type RESTORE to confirm</label>
-              <Input value={restoreConfirm} onChange={(e) => setRestoreConfirm(e.target.value)} placeholder="RESTORE" className="font-mono text-destructive" />
+              <label className="text-[13px] font-medium">Type RESTORE to confirm</label>
+              <Input value={restoreConfirm} onChange={(e) => setRestoreConfirm(e.target.value)} placeholder="RESTORE" className="h-9 rounded-md font-mono" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRestoreTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={doRestore} disabled={restoreConfirm !== "RESTORE" || restoring}>
-              {restoring ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Restore Database
+            <Button variant="ghost" onClick={() => setRestoreTarget(null)} className="h-9 text-[13px]">Cancel</Button>
+            <Button variant="destructive" onClick={doRestore} disabled={restoreConfirm !== "RESTORE" || restoring} className="h-9 text-[13px]">
+              {restoring && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
+              Restore database
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Upload Restore Dialog */}
       <Dialog open={!!uploadFile} onOpenChange={(o) => !o && setUploadFile(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <ShieldAlert className="w-5 h-5" /> Danger: Upload Restore
-            </DialogTitle>
+            <DialogTitle>Danger: Upload Restore</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg border border-destructive/20 font-medium">
+            <div className="border-l-2 border-destructive py-1.5 pl-3.5 text-[13px] leading-relaxed text-muted-foreground">
               You are about to overwrite the ENTIRE platform database with the uploaded file:
               <br/><br/>
-              <span className="font-mono bg-destructive/20 px-1 py-0.5 rounded">{uploadFile?.name}</span>
+              <span className="font-mono text-foreground">{uploadFile?.name}</span>
               <br/><br/>
               All changes since this snapshot will be permanently lost. This affects all tenants.
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Type RESTORE to confirm</label>
-              <Input value={uploadConfirm} onChange={(e) => setUploadConfirm(e.target.value)} placeholder="RESTORE" className="font-mono text-destructive" />
+              <label className="text-[13px] font-medium">Type RESTORE to confirm</label>
+              <Input value={uploadConfirm} onChange={(e) => setUploadConfirm(e.target.value)} placeholder="RESTORE" className="h-9 rounded-md font-mono" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => { setUploadFile(null); if(fileInputRef.current) fileInputRef.current.value=""; }}>Cancel</Button>
-            <Button variant="destructive" onClick={doUploadRestore} disabled={uploadConfirm !== "RESTORE" || uploadRestoring}>
-              {uploadRestoring ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Restore Uploaded Database
+            <Button variant="ghost" onClick={() => { setUploadFile(null); if(fileInputRef.current) fileInputRef.current.value=""; }} className="h-9 text-[13px]">Cancel</Button>
+            <Button variant="destructive" onClick={doUploadRestore} disabled={uploadConfirm !== "RESTORE" || uploadRestoring} className="h-9 text-[13px]">
+              {uploadRestoring && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
+              Restore database
             </Button>
           </DialogFooter>
         </DialogContent>

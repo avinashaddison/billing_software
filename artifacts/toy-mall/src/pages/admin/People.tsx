@@ -5,15 +5,13 @@ import { adminQueryKeys, useAdminTenantUsers } from "./api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import {
-  AlertTriangle, Copy, Eye, EyeOff, KeyRound, Loader2, Lock, LockOpen,
-  Mail, ShieldCheck, UserRound, Check, X,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { SectionLabel, Panel, Rows, Tag, Notice, LoadError } from "./ui";
 
 const BASE = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
 const API = `${BASE}/api`;
 
-type Row = { kind: "user" | "staff"; id: string; label: string };
+type RowDef = { kind: "user" | "staff"; id: string; label: string };
 
 function minutesLeft(until: string | null): number {
   if (!until) return 0;
@@ -33,11 +31,8 @@ export function PeopleDialog({
   const [pwdFor, setPwdFor] = useState<string | null>(null);
   const [pwdValue, setPwdValue] = useState("");
   const [showPwd, setShowPwd] = useState(false);
-  const [confirmOff, setConfirmOff] = useState<Row | null>(null);
+  const [confirmOff, setConfirmOff] = useState<RowDef | null>(null);
 
-  /* This dialog is mounted once and reused for every shop, so every bit of
-   * in-progress state has to be cleared when a different shop is opened —
-   * otherwise a PIN issued for one shop is still on screen for the next. */
   useEffect(() => {
     setBusy(null);
     setPinFor(null); setPinValue(""); setIssuedPin(null);
@@ -50,10 +45,6 @@ export function PeopleDialog({
     queryClient.invalidateQueries({ queryKey: adminQueryKeys.overview });
   };
 
-  /* The dialog is mounted once and reused for every shop, so a reply can
-   * land after the vendor has already switched shops. Every request records
-   * which shop it was for and is thrown away if that is no longer the one on
-   * screen — otherwise one shop's new PIN appears under another shop's name. */
   const tenantRef = useRef(tenantId);
   useEffect(() => { tenantRef.current = tenantId; }, [tenantId]);
 
@@ -100,7 +91,7 @@ export function PeopleDialog({
     refresh();
   };
 
-  const toggle = async (row: Row, next: boolean) => {
+  const toggle = async (row: RowDef, next: boolean) => {
     const path = row.kind === "staff" ? `/staff/${row.id}` : `/users/${row.id}`;
     const d = await send("PATCH", path, { isActive: next }, `toggle-${row.id}`);
     setConfirmOff(null);
@@ -126,237 +117,202 @@ export function PeopleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>People &amp; access</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-2xl rounded-lg">
+        <DialogHeader className="px-6 py-5 border-b sticky top-0 bg-background z-10">
+          <DialogTitle className="text-[22px] font-medium leading-tight tracking-tight text-foreground">People &amp; access</DialogTitle>
+          <DialogDescription className="mt-1.5 text-[13px] text-muted-foreground">
             Everyone who can sign in{shopName ? ` to ${shopName}` : ""}. You can set a new PIN or password here, but you
-            cannot read the current one — they are stored scrambled, so nobody can look them up.
+            cannot read the current one.
           </DialogDescription>
         </DialogHeader>
 
-        {issuedPin && (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-              New PIN for {issuedPin.name}
-            </p>
-            <div className="mt-2 flex items-center gap-3">
-              <span className="font-mono text-3xl font-bold tracking-[0.3em] tabular-nums">{issuedPin.pin}</span>
-              <Button size="sm" variant="outline" onClick={() => copy(issuedPin.pin)}>
-                <Copy className="mr-2 h-4 w-4" /> Copy
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setIssuedPin(null)}>Done</Button>
+        <div className="p-6">
+          {issuedPin && (
+            <div className="mb-8">
+              <Notice tone="positive">
+                <p className="text-[13px] font-medium text-foreground">New PIN for {issuedPin.name}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-4">
+                  <span className="font-mono text-[26px] font-medium tracking-[0.2em] tabular-nums leading-none text-foreground">{issuedPin.pin}</span>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => copy(issuedPin.pin)}>Copy</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setIssuedPin(null)}>Done</Button>
+                  </div>
+                </div>
+                <p className="mt-2.5 text-xs text-muted-foreground">Write it down or tell them now — once you close this, it cannot be shown again.</p>
+              </Notice>
             </div>
-            <p className="mt-2 text-xs text-emerald-700/80 dark:text-emerald-400/80">
-              Write it down or tell them now — once you close this, it cannot be shown again.
-            </p>
-          </div>
-        )}
+          )}
 
-        {isLoading ? (
-          <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-        ) : error ? (
-          <div className="py-12 text-center">
-            <AlertTriangle className="mx-auto mb-3 h-6 w-6 text-destructive" />
-            <p className="text-sm font-medium text-destructive">Could not load this shop's people</p>
-            <p className="mt-1 text-sm text-muted-foreground">{(error as Error).message}</p>
-          </div>
-        ) : (
-          <div className="space-y-6 py-2">
-            <section>
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                <Mail className="h-4 w-4 text-primary" /> Email logins
-              </h3>
-              <div className="space-y-2">
-                {(data?.users ?? []).map((u) => {
-                  const row: Row = { kind: "user", id: u.id, label: u.email };
-                  return (
-                    <div key={u.id} className="rounded-xl border bg-card p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-semibold">{u.email}</p>
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              {u.role}
-                            </span>
-                            {!u.isActive && (
-                              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
-                                Switched off
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {u.lastLoginAt ? `Last signed in ${new Date(u.lastLoginAt).toLocaleString("en-IN")}` : "Never signed in"}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <Button
-                            size="sm" variant="ghost"
-                            disabled={!!busy}
-                            onClick={() => { setPwdFor(pwdFor === u.id ? null : u.id); setPwdValue(""); setShowPwd(false); }}
-                          >
-                            <KeyRound className="mr-2 h-4 w-4" /> Password
-                          </Button>
-                          <ToggleButton
-                            active={u.isActive}
-                            busy={busy === `toggle-${u.id}`} anyBusy={!!busy}
-                            onOn={() => toggle(row, true)}
-                            onOff={() => setConfirmOff(row)}
-                          />
-                        </div>
-                      </div>
-
-                      {pwdFor === u.id && (
-                        <div className="mt-3 space-y-2 rounded-lg border bg-muted/30 p-3">
-                          <label className="text-xs font-medium">New password for {u.email}</label>
-                          <div className="flex gap-2">
-                            <div className="relative flex-1">
-                              <Input
-                                type={showPwd ? "text" : "password"}
-                                value={pwdValue}
-                                onChange={(e) => setPwdValue(e.target.value)}
-                                placeholder="At least 8 characters"
-                                autoComplete="new-password"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowPwd((v) => !v)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                aria-label={showPwd ? "Hide password" : "Show password"}
-                              >
-                                {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </button>
+          {isLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.75} /></div>
+          ) : error ? (
+            <LoadError message={(error as Error).message} />
+          ) : (
+            <div className="space-y-8">
+              <div>
+                <SectionLabel>Email logins</SectionLabel>
+                <Panel>
+                  <Rows>
+                    {(data?.users ?? []).map((u) => {
+                      const row: RowDef = { kind: "user", id: u.id, label: u.email };
+                      return (
+                        <div key={u.id} className="p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-medium text-foreground truncate">{u.email}</p>
+                                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{u.role}</span>
+                                {!u.isActive && <Tag tone="danger">Off</Tag>}
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {u.lastLoginAt ? `Last in ${new Date(u.lastLoginAt).toLocaleString("en-IN")}` : "Never signed in"}
+                              </p>
                             </div>
-                            <Button size="sm" onClick={() => resetPassword(u.id)} disabled={!!busy || pwdValue.length < 8}>
-                              {busy === `pwd-${u.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : "Set"}
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => { setPwdFor(null); setPwdValue(""); }}>Cancel</Button>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <Button
+                                size="sm" variant="outline" className="h-7 text-xs"
+                                disabled={!!busy}
+                                onClick={() => { setPwdFor(pwdFor === u.id ? null : u.id); setPwdValue(""); setShowPwd(false); }}
+                              >
+                                Password
+                              </Button>
+                              <ToggleButton
+                                active={u.isActive}
+                                busy={busy === `toggle-${u.id}`} anyBusy={!!busy}
+                                onOn={() => toggle(row, true)}
+                                onOff={() => setConfirmOff(row)}
+                              />
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground">They will need this to sign in — tell them straight away.</p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {(data?.users ?? []).length === 0 && (
-                  <p className="rounded-xl border border-dashed py-4 text-center text-sm text-muted-foreground">
-                    This shop has no email logins
-                  </p>
-                )}
-              </div>
-            </section>
 
-            <section>
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                <UserRound className="h-4 w-4 text-primary" /> Staff (sign in with a 4-digit PIN)
-              </h3>
-              <div className="space-y-2">
-                {(data?.staff ?? []).map((s) => {
-                  const row: Row = { kind: "staff", id: s.id, label: s.name };
-                  const locked = minutesLeft(s.lockedUntil);
-                  return (
-                    <div key={s.id} className="rounded-xl border bg-card p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-semibold">{s.name}</p>
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              {s.role}
-                            </span>
-                            {!s.isActive && (
-                              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
-                                Switched off
-                              </span>
-                            )}
-                            {locked > 0 && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-600">
-                                <Lock className="h-3 w-3" /> Locked {locked}m
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {locked > 0
-                              ? `Too many wrong PINs — cannot sign in for ${locked} more minute${locked === 1 ? "" : "s"}`
-                              : s.failedAttempts > 0
-                                ? `${s.failedAttempts} wrong PIN ${s.failedAttempts === 1 ? "try" : "tries"} so far`
-                                : "No sign-in problems"}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          {locked > 0 && (
-                            <Button size="sm" variant="outline" onClick={() => unlock(s.id)} disabled={!!busy}>
-                              {busy === `unlock-${s.id}` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockOpen className="mr-2 h-4 w-4" />}
-                              Unlock
-                            </Button>
+                          {pwdFor === u.id && (
+                            <div className="mt-4 rounded-md bg-muted/40 p-3">
+                              <label className="text-xs font-medium text-foreground">New password for {u.email}</label>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <Input
+                                  type={showPwd ? "text" : "password"}
+                                  value={pwdValue}
+                                  onChange={(e) => setPwdValue(e.target.value)}
+                                  placeholder="At least 8 characters"
+                                  autoComplete="new-password"
+                                  className="h-8 text-[13px] w-full max-w-[200px]"
+                                />
+                                <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" onClick={() => setShowPwd((v) => !v)}>
+                                  {showPwd ? "Hide" : "Show"}
+                                </Button>
+                                <Button size="sm" className="h-8 text-xs" onClick={() => resetPassword(u.id)} disabled={!!busy || pwdValue.length < 8}>
+                                  {busy === `pwd-${u.id}` ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.75} /> : "Set"}
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setPwdFor(null); setPwdValue(""); }}>Cancel</Button>
+                              </div>
+                            </div>
                           )}
-                          <Button
-                            size="sm" variant="ghost"
-                            disabled={!!busy}
-                            onClick={() => { setPinFor(pinFor === s.id ? null : s.id); setPinValue(""); }}
-                          >
-                            <ShieldCheck className="mr-2 h-4 w-4" /> New PIN
-                          </Button>
-                          <ToggleButton
-                            active={s.isActive}
-                            busy={busy === `toggle-${s.id}`} anyBusy={!!busy}
-                            onOn={() => toggle(row, true)}
-                            onOff={() => setConfirmOff(row)}
-                          />
                         </div>
-                      </div>
-
-                      {pinFor === s.id && (
-                        <div className="mt-3 space-y-2 rounded-lg border bg-muted/30 p-3">
-                          <label className="text-xs font-medium">Choose a PIN for {s.name}, or leave it blank for a random one</label>
-                          <div className="flex gap-2">
-                            <Input
-                              inputMode="numeric"
-                              maxLength={4}
-                              value={pinValue}
-                              onChange={(e) => setPinValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                              placeholder="4 digits"
-                              className="w-32 font-mono tracking-[0.3em]"
-                            />
-                            <Button size="sm" onClick={() => setNewPin(s.id)} disabled={!!busy}>
-                              {busy === `pin-${s.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : pinValue ? "Set this PIN" : "Generate one"}
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => { setPinFor(null); setPinValue(""); }}>Cancel</Button>
-                          </div>
-                          <p className="text-xs text-muted-foreground">This also clears any lockout. Their old PIN stops working immediately.</p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {(data?.staff ?? []).length === 0 && (
-                  <p className="rounded-xl border border-dashed py-4 text-center text-sm text-muted-foreground">
-                    This shop has no staff accounts
-                  </p>
-                )}
+                      );
+                    })}
+                    {(data?.users ?? []).length === 0 && (
+                      <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">This shop has no email logins</div>
+                    )}
+                  </Rows>
+                </Panel>
               </div>
-            </section>
-          </div>
-        )}
 
-        {confirmOff && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
-            <p className="text-sm font-semibold text-destructive">
-              Stop {confirmOff.label} from signing in?
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              They will be refused at the login screen until you switch them back on. Nothing they have already recorded is deleted.
-            </p>
-            <div className="mt-3 flex gap-2">
-              <Button size="sm" variant="destructive" onClick={() => toggle(confirmOff, false)} disabled={!!busy}>
-                {busy === `toggle-${confirmOff.id}` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                Yes, switch off
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setConfirmOff(null)}>
-                <X className="mr-2 h-4 w-4" /> Keep access
-              </Button>
+              <div>
+                <SectionLabel>Staff (PIN)</SectionLabel>
+                <Panel>
+                  <Rows>
+                    {(data?.staff ?? []).map((s) => {
+                      const row: RowDef = { kind: "staff", id: s.id, label: s.name };
+                      const locked = minutesLeft(s.lockedUntil);
+                      return (
+                        <div key={s.id} className="p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-medium text-foreground truncate">{s.name}</p>
+                                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.role}</span>
+                                {!s.isActive && <Tag tone="danger">Off</Tag>}
+                                {locked > 0 && <Tag tone="warn">Locked {locked}m</Tag>}
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {locked > 0
+                                  ? `Too many wrong PINs — blocked for ${locked}m`
+                                  : s.failedAttempts > 0
+                                    ? `${s.failedAttempts} wrong PIN ${s.failedAttempts === 1 ? "try" : "tries"} so far`
+                                    : "No sign-in problems"}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                              {locked > 0 && (
+                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => unlock(s.id)} disabled={!!busy}>
+                                  {busy === `unlock-${s.id}` ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" strokeWidth={1.75} /> : null}
+                                  Unlock
+                                </Button>
+                              )}
+                              <Button
+                                size="sm" variant="outline" className="h-7 text-xs"
+                                disabled={!!busy}
+                                onClick={() => { setPinFor(pinFor === s.id ? null : s.id); setPinValue(""); }}
+                              >
+                                New PIN
+                              </Button>
+                              <ToggleButton
+                                active={s.isActive}
+                                busy={busy === `toggle-${s.id}`} anyBusy={!!busy}
+                                onOn={() => toggle(row, true)}
+                                onOff={() => setConfirmOff(row)}
+                              />
+                            </div>
+                          </div>
+
+                          {pinFor === s.id && (
+                            <div className="mt-4 rounded-md bg-muted/40 p-3">
+                              <label className="text-xs font-medium text-foreground">New PIN for {s.name}</label>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <Input
+                                  inputMode="numeric"
+                                  maxLength={4}
+                                  value={pinValue}
+                                  onChange={(e) => setPinValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                                  placeholder="4 digits"
+                                  className="h-8 w-24 font-mono tracking-[0.2em] text-[13px]"
+                                />
+                                <Button size="sm" className="h-8 text-xs" onClick={() => setNewPin(s.id)} disabled={!!busy}>
+                                  {busy === `pin-${s.id}` ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.75} /> : pinValue ? "Set this PIN" : "Generate random"}
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setPinFor(null); setPinValue(""); }}>Cancel</Button>
+                              </div>
+                              <p className="mt-2 text-[11px] text-muted-foreground">Clears any lockout. Old PIN stops working immediately.</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {(data?.staff ?? []).length === 0 && (
+                      <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">This shop has no staff accounts</div>
+                    )}
+                  </Rows>
+                </Panel>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {confirmOff && (
+            <div className="mt-8">
+              <Notice tone="warn">
+                <p className="text-[13px] font-medium text-foreground">Stop {confirmOff.label} from signing in?</p>
+                <p className="mt-1 text-xs text-muted-foreground">They will be refused at the login screen until switched back on. Data is not deleted.</p>
+                <div className="mt-3 flex items-center gap-2">
+                  <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => toggle(confirmOff, false)} disabled={!!busy}>
+                    {busy === `toggle-${confirmOff.id}` ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" strokeWidth={1.75} /> : null}
+                    Yes, switch off
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setConfirmOff(null)}>Cancel</Button>
+                </div>
+              </Notice>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -368,12 +324,12 @@ function ToggleButton({
   return (
     <Button
       size="sm"
-      variant={active ? "ghost" : "outline"}
-      className={active ? "text-destructive hover:bg-destructive/10 hover:text-destructive" : "text-emerald-600"}
+      variant="ghost"
+      className={`h-7 text-xs ${active ? "text-destructive hover:bg-destructive/10 hover:text-destructive" : "text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-600"}`}
       onClick={active ? onOff : onOn}
       disabled={anyBusy}
     >
-      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : active ? "Switch off" : "Switch on"}
+      {busy ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.75} /> : active ? "Switch off" : "Switch on"}
     </Button>
   );
 }

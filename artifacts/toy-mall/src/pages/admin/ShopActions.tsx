@@ -16,11 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Eye, EyeOff, AlertTriangle, LogOut, ExternalLink } from "lucide-react";
+import { Loader2, Eye, EyeOff, LogOut, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { adminQueryKeys } from "./api";
-import { ACCESS_PRESETS, AccessKey, OverviewData } from "./types";
+import { ACCESS_PRESETS, type AccessKey, type OverviewData } from "./types";
+import { Notice, Rows, Row } from "./ui";
 
 const BASE = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
 const API = `${BASE}/api`;
@@ -74,15 +75,16 @@ export function ToggleActiveDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {suspending && shop?.activity === "trading" && (
-          <div className="flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>This shop is actively trading — it last billed {shop.lastSaleAt ? new Date(shop.lastSaleAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "recently"}.</span>
+          <div className="my-2">
+            <Notice tone="danger">
+              This shop is actively trading — it last billed {shop.lastSaleAt ? new Date(shop.lastSaleAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "recently"}.
+            </Notice>
           </div>
         )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <Button variant={suspending ? "destructive" : "default"} disabled={busy} onClick={run}>
-            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
             {suspending ? "Suspend shop" : "Reactivate shop"}
           </Button>
         </AlertDialogFooter>
@@ -161,10 +163,10 @@ export function ResetPasswordDialog({
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                   aria-label={show ? "Hide password" : "Show password"}
                 >
-                  {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {show ? <EyeOff className="h-4 w-4" strokeWidth={1.75} /> : <Eye className="h-4 w-4" strokeWidth={1.75} />}
                 </button>
               </div>
-              {tooShort && <p className="text-xs text-destructive">Use at least 8 characters.</p>}
+              {tooShort && <p className="text-[13px] text-destructive">Use at least 8 characters.</p>}
             </div>
 
             <div className="space-y-2">
@@ -177,14 +179,14 @@ export function ResetPasswordDialog({
                 placeholder="Type it again"
                 autoComplete="new-password"
               />
-              {mismatch && <p className="text-xs text-destructive">The two passwords do not match.</p>}
+              {mismatch && <p className="text-[13px] text-destructive">The two passwords do not match.</p>}
             </div>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
             <Button type="submit" disabled={!valid || busy}>
-              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
               Set password
             </Button>
           </DialogFooter>
@@ -283,19 +285,22 @@ export function BulkActionDialog({
         </DialogHeader>
 
         {failures ? (
-          <div className="space-y-2 py-2">
-            <p className="text-sm font-medium">These shops were not changed:</p>
-            <div className="max-h-56 space-y-1.5 overflow-y-auto">
-              {failures.map((f) => (
-                <div key={f.id} className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
-                  <p className="font-medium">{nameOf(f.id)}</p>
-                  <p className="text-xs text-muted-foreground">{f.error || "Unknown error"}</p>
-                </div>
-              ))}
+          <div className="space-y-3 py-4">
+            <p className="text-[13px] font-medium">These shops were not changed:</p>
+            <div className="max-h-56 overflow-y-auto rounded-lg border">
+              <Rows>
+                {failures.map((f) => (
+                  <Row 
+                    key={f.id} 
+                    label={nameOf(f.id)} 
+                    sub={f.error || "Unknown error"} 
+                  />
+                ))}
+              </Rows>
             </div>
           </div>
         ) : (
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-4">
             {action === "extend" && (
               <div className="space-y-2">
                 <Label>Add</Label>
@@ -309,25 +314,23 @@ export function BulkActionDialog({
             )}
 
             {action === "suspend" && trading.length > 0 && (
-              <div className="flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>
-                  {trading.length === 1
-                    ? `${trading[0].name} is actively trading.`
-                    : `${trading.length} of these shops are actively trading.`}
-                </span>
-              </div>
+              <Notice tone="danger">
+                {trading.length === 1
+                  ? `${trading[0].name} is actively trading.`
+                  : `${trading.length} of these shops are actively trading.`}
+              </Notice>
             )}
 
-            <div className="max-h-40 overflow-y-auto rounded-lg border bg-muted/30 p-3">
-              <ul className="space-y-1 text-sm">
+            <div className="max-h-40 overflow-y-auto rounded-lg border">
+              <Rows>
                 {shops.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between gap-3">
-                    <span className="truncate">{s.name}</span>
-                    <span className="shrink-0 font-mono text-xs text-muted-foreground">{s.id}</span>
-                  </li>
+                  <Row 
+                    key={s.id} 
+                    label={s.name} 
+                    value={<span className="font-mono text-muted-foreground">{s.id}</span>} 
+                  />
                 ))}
-              </ul>
+              </Rows>
             </div>
           </div>
         )}
@@ -343,7 +346,7 @@ export function BulkActionDialog({
                 onClick={run}
                 disabled={busy || count === 0}
               >
-                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
                 {action ? VERB[action] : ""} {count}
               </Button>
             </>
@@ -400,15 +403,16 @@ export function ForceSignOutDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {shop?.activity === "trading" && (
-          <div className="flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>This shop is trading right now — someone may be mid-bill at the counter.</span>
+          <div className="my-2">
+            <Notice tone="danger">
+              This shop is trading right now — someone may be mid-bill at the counter.
+            </Notice>
           </div>
         )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <Button variant="destructive" disabled={busy} onClick={run}>
-            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} /> : <LogOut className="mr-2 h-4 w-4" strokeWidth={1.75} />}
             Sign out all devices
           </Button>
         </AlertDialogFooter>
@@ -464,24 +468,30 @@ export function ViewAsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-2 text-sm">
-          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-            <p className="font-medium">While the session is open</p>
-            <ul className="space-y-1 text-muted-foreground">
-              <li>You can look at everything. You cannot change anything — saving, billing and deleting are all refused.</li>
-              <li>It ends by itself after an hour.</li>
-              <li>The shop can see it in their own device list, listed as vendor support.</li>
-            </ul>
-          </div>
-          <p className="text-xs text-muted-foreground">
+        <div className="space-y-4 py-4">
+          <Notice tone="neutral">
+            <div className="space-y-1 text-foreground">
+              <p className="font-medium text-[13px]">While the session is open:</p>
+              <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
+                <li>You can look at everything. You cannot change anything — saving, billing and deleting are all refused.</li>
+                <li>It ends by itself after an hour.</li>
+                <li>The shop can see it in their own device list, listed as vendor support.</li>
+              </ul>
+            </div>
+          </Notice>
+
+          <p className="text-[13px] leading-relaxed text-muted-foreground">
             This signs this browser into {shop?.name}. If you were signed into another shop in
             this browser, that session is replaced. Your admin console stays signed in.
           </p>
+
           {ready && (
-            <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
-              <p className="font-medium">Ready{ready.as ? ` — viewing as ${ready.as}` : ""}</p>
-              <p className="text-xs text-muted-foreground">Expires in {ready.minutes} minutes.</p>
-            </div>
+            <Notice tone="positive">
+              <div className="text-foreground">
+                <p className="font-medium">Ready{ready.as ? ` — viewing as ${ready.as}` : ""}</p>
+                <p className="mt-0.5 text-muted-foreground">Expires in {ready.minutes} minutes.</p>
+              </div>
+            </Notice>
           )}
         </div>
 
@@ -489,12 +499,12 @@ export function ViewAsDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           {ready ? (
             <Button onClick={openShop}>
-              <ExternalLink className="mr-2 h-4 w-4" />
+              <ExternalLink className="mr-2 h-4 w-4" strokeWidth={1.75} />
               Open shop app
             </Button>
           ) : (
             <Button onClick={start} disabled={busy}>
-              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
               Start read-only session
             </Button>
           )}

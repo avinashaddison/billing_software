@@ -1,10 +1,8 @@
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useAdminTenantDetail } from "./api";
-import { Loader2, Package, IndianRupee, FileText, AlertTriangle, Users, TrendingUp } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-const rupees = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+import { MetricRow, Metric, SectionLabel, Panel, Rows, Row, Tag, count, rupees, Tone, LoadError } from "./ui";
 
 export function ShopDetailDialog({
   shopId, open, onOpenChange,
@@ -13,190 +11,140 @@ export function ShopDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[90dvh] flex-col overflow-hidden p-0 sm:max-w-4xl">
+      <DialogContent className="flex h-[90dvh] flex-col overflow-hidden p-0 sm:max-w-4xl rounded-lg">
         {isLoading ? (
           <div className="flex flex-1 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" strokeWidth={1.75} />
           </div>
         ) : error ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
-            <AlertTriangle className="h-8 w-8 text-destructive" />
-            <DialogTitle className="text-lg">Could not load this shop</DialogTitle>
-            <DialogDescription>{(error as Error).message}</DialogDescription>
+          <div className="p-6">
+             <LoadError message={(error as Error).message} />
           </div>
         ) : !data ? (
-          <div className="flex flex-1 items-center justify-center p-6 text-muted-foreground">
+          <div className="flex flex-1 items-center justify-center p-6 text-[13px] text-muted-foreground">
             Shop details not found.
           </div>
         ) : (
           <>
-            <div className="flex shrink-0 items-center justify-between border-b bg-muted/20 p-6">
+            <div className="flex shrink-0 items-center justify-between border-b px-6 py-5">
               <div className="min-w-0">
-                <DialogTitle className="truncate text-2xl font-bold">{data.shop.name}</DialogTitle>
-                <DialogDescription className="mt-1 font-mono text-xs">{data.shop.id}</DialogDescription>
+                <DialogTitle className="text-[22px] font-medium leading-tight tracking-tight text-foreground">{data.shop.name}</DialogTitle>
+                <DialogDescription className="mt-1 font-mono text-[11px] text-muted-foreground">{data.shop.id}</DialogDescription>
               </div>
               <div className="shrink-0 text-right">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
-                    data.shop.isActive ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"
-                  }`}
-                >
+                <Tag tone={data.shop.isActive ? "positive" : "danger"}>
                   {data.shop.isActive ? "Active" : "Suspended"}
-                </span>
-                <p className="mt-2 text-[10px] text-muted-foreground">
+                </Tag>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
                   Created {new Date(data.shop.createdAt).toLocaleDateString("en-IN")}
                 </p>
               </div>
             </div>
 
-            <ScrollArea className="flex-1 bg-muted/10 p-6">
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-                  <Card>
-                    <CardContent className="flex flex-col gap-1 p-4">
-                      <div className="mb-1 flex items-center gap-2 text-muted-foreground">
-                        <Package className="h-4 w-4" /> <span className="text-xs font-semibold uppercase">Inventory</span>
-                      </div>
-                      <p className="text-2xl font-bold tracking-tight tabular-nums">{data.inventory.products.toLocaleString("en-IN")}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        products / {data.inventory.stockUnits.toLocaleString("en-IN")} units
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="flex flex-col gap-1 p-4">
-                      <div className="mb-1 flex items-center gap-2 text-muted-foreground">
-                        <IndianRupee className="h-4 w-4" /> <span className="text-xs font-semibold uppercase">Stock value</span>
-                      </div>
-                      <p className="text-2xl font-bold tracking-tight tabular-nums text-teal-600">{rupees(data.inventory.stockValue)}</p>
-                      <p className="text-[10px] text-muted-foreground">At selling price</p>
-                    </CardContent>
-                  </Card>
-                  <Card className={data.inventory.lowStock > 0 ? "border-amber-200 bg-amber-50/50 dark:bg-amber-950/20" : ""}>
-                    <CardContent className="flex flex-col gap-1 p-4">
-                      <div className="mb-1 flex items-center gap-2 text-muted-foreground">
-                        <AlertTriangle className="h-4 w-4" /> <span className="text-xs font-semibold uppercase">Low stock</span>
-                      </div>
-                      <p className={`text-2xl font-bold tracking-tight tabular-nums ${data.inventory.lowStock > 0 ? "text-amber-600" : ""}`}>
-                        {data.inventory.lowStock.toLocaleString("en-IN")}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">Items needing restock</p>
-                    </CardContent>
-                  </Card>
-                  <Card className={data.receivables.outstanding > 0 ? "border-rose-200 bg-rose-50/50 dark:bg-rose-950/20" : ""}>
-                    <CardContent className="flex flex-col gap-1 p-4">
-                      <div className="mb-1 flex items-center gap-2 text-muted-foreground">
-                        <FileText className="h-4 w-4" /> <span className="text-xs font-semibold uppercase">Receivables</span>
-                      </div>
-                      <p className={`text-2xl font-bold tracking-tight tabular-nums ${data.receivables.outstanding > 0 ? "text-rose-600" : ""}`}>
-                        {rupees(data.receivables.outstanding)}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">Across {data.receivables.openBills} bills</p>
-                    </CardContent>
-                  </Card>
-                </div>
+            <ScrollArea className="flex-1">
+              <div className="mx-auto w-full max-w-3xl space-y-10 p-6 md:p-8">
+                
+                <MetricRow cols={4}>
+                  <Metric label="Inventory" value={count(data.inventory.products)} hint={`products / ${count(data.inventory.stockUnits)} units`} />
+                  <Metric label="Stock value" value={rupees(data.inventory.stockValue)} hint="At selling price" />
+                  <Metric label="Low stock" value={count(data.inventory.lowStock)} hint="Items needing restock" tone={data.inventory.lowStock > 0 ? "warn" : "neutral"} />
+                  <Metric label="Receivables" value={rupees(data.receivables.outstanding)} hint={`Across ${count(data.receivables.openBills)} bills`} tone={data.receivables.outstanding > 0 ? "danger" : "neutral"} />
+                </MetricRow>
 
                 <TrendStrip series={data.series} />
 
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
                   <div>
-                    <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                      <Package className="h-4 w-4 text-primary" /> Top products (30 days)
-                    </h3>
-                    <div className="space-y-2">
-                      {data.topProducts.map((p, i) => (
-                        <div key={i} className="flex items-center justify-between rounded-xl border bg-card p-3 text-sm">
-                          <div className="min-w-0 flex-1 pr-4">
-                            <p className="truncate font-semibold">{p.name}</p>
-                            <p className="text-xs text-muted-foreground">{p.qty} sold</p>
-                          </div>
-                          <p className="shrink-0 font-bold tabular-nums text-emerald-600">{rupees(p.revenue)}</p>
-                        </div>
-                      ))}
-                      {data.topProducts.length === 0 && (
-                        <p className="rounded-xl border border-dashed py-4 text-center text-sm text-muted-foreground">No sales in the last 30 days</p>
-                      )}
-                    </div>
+                    <SectionLabel>Top products (30d)</SectionLabel>
+                    <Panel>
+                      <Rows>
+                        {data.topProducts.map((p, i) => (
+                          <Row
+                            key={i}
+                            label={p.name}
+                            sub={`${count(p.qty)} sold`}
+                            value={rupees(p.revenue)}
+                          />
+                        ))}
+                        {data.topProducts.length === 0 && (
+                          <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">No sales in the last 30 days</div>
+                        )}
+                      </Rows>
+                    </Panel>
                   </div>
 
                   <div>
-                    <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                      <FileText className="h-4 w-4 text-primary" /> Recent bills
-                    </h3>
-                    <div className="space-y-2">
-                      {data.recentBills.slice(0, 5).map((b, i) => (
-                        <div key={i} className="flex items-center justify-between rounded-xl border bg-card p-3 text-sm">
-                          <div className="min-w-0 flex-1 pr-4">
-                            <div className="flex items-center gap-2">
-                              <p className="font-bold">#{b.billNumber}</p>
-                              <span
-                                className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                                  b.paymentStatus === "PAID"
-                                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                    : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
-                                }`}
-                              >
-                                {b.paymentStatus}
-                              </span>
-                            </div>
-                            <p className="truncate text-xs text-muted-foreground">{b.customerName || "Walk-in"}</p>
-                          </div>
-                          <div className="shrink-0 text-right">
-                            <p className="font-bold tabular-nums">{rupees(b.total)}</p>
-                            <p className="text-[10px] capitalize text-muted-foreground">{b.paymentMode.toLowerCase()}</p>
-                          </div>
-                        </div>
-                      ))}
-                      {data.recentBills.length === 0 && (
-                        <p className="rounded-xl border border-dashed py-4 text-center text-sm text-muted-foreground">No bills yet</p>
-                      )}
-                    </div>
+                    <SectionLabel>Recent bills</SectionLabel>
+                    <Panel>
+                      <Rows>
+                        {data.recentBills.slice(0, 5).map((b, i) => {
+                          const statusTone: Tone = b.paymentStatus === "PAID" ? "positive" : "danger";
+                          return (
+                            <Row
+                              key={i}
+                              label={`#${b.billNumber}`}
+                              sub={b.customerName || "Walk-in"}
+                              value={
+                                <div className="text-right">
+                                  <div>{rupees(b.total)}</div>
+                                  <div className="mt-0.5 text-[10px] text-muted-foreground">
+                                    <Tag tone={statusTone}>{b.paymentStatus}</Tag> · {b.paymentMode.toLowerCase()}
+                                  </div>
+                                </div>
+                              }
+                            />
+                          );
+                        })}
+                        {data.recentBills.length === 0 && (
+                          <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">No bills yet</div>
+                        )}
+                      </Rows>
+                    </Panel>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                    <Users className="h-4 w-4 text-primary" /> Who can sign in
-                  </h3>
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Owner logins</p>
-                      {data.users.map((u, i) => (
-                        <div key={i} className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm">
-                          <div className="min-w-0">
-                            <p className="truncate font-medium">{u.email}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {u.lastLoginAt ? `Last in ${new Date(u.lastLoginAt).toLocaleDateString("en-IN")}` : "Never signed in"}
-                            </p>
-                          </div>
-                          <span className={`shrink-0 text-[10px] font-bold uppercase ${u.isActive ? "text-emerald-600" : "text-muted-foreground"}`}>
-                            {u.isActive ? "Active" : "Off"}
-                          </span>
-                        </div>
-                      ))}
-                      {data.users.length === 0 && (
-                        <p className="rounded-xl border border-dashed py-4 text-center text-sm text-muted-foreground">No email logins</p>
-                      )}
+                  <SectionLabel>Access &amp; Logins</SectionLabel>
+                  <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
+                    <div>
+                      <h3 className="mb-3 text-[13px] font-medium text-foreground">Owner logins</h3>
+                      <Panel>
+                        <Rows>
+                          {data.users.map((u, i) => (
+                            <Row
+                              key={i}
+                              label={u.email}
+                              sub={u.lastLoginAt ? `Last in ${new Date(u.lastLoginAt).toLocaleDateString("en-IN")}` : "Never signed in"}
+                              value={<Tag tone={u.isActive ? "positive" : "neutral"}>{u.isActive ? "Active" : "Off"}</Tag>}
+                            />
+                          ))}
+                          {data.users.length === 0 && (
+                            <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">No email logins</div>
+                          )}
+                        </Rows>
+                      </Panel>
                     </div>
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Staff (PIN)</p>
-                      {data.staff.map((s, i) => (
-                        <div key={i} className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm">
-                          <div className="min-w-0">
-                            <p className="truncate font-medium">{s.name}</p>
-                            <p className="text-xs uppercase tracking-wider text-muted-foreground">{s.role}</p>
-                          </div>
-                          <span className={`shrink-0 text-[10px] font-bold uppercase ${s.isActive ? "text-emerald-600" : "text-muted-foreground"}`}>
-                            {s.isActive ? "Active" : "Off"}
-                          </span>
-                        </div>
-                      ))}
-                      {data.staff.length === 0 && (
-                        <p className="rounded-xl border border-dashed py-4 text-center text-sm text-muted-foreground">No staff accounts</p>
-                      )}
+                    <div>
+                      <h3 className="mb-3 text-[13px] font-medium text-foreground">Staff (PIN)</h3>
+                      <Panel>
+                        <Rows>
+                          {data.staff.map((s, i) => (
+                            <Row
+                              key={i}
+                              label={s.name}
+                              sub={s.role}
+                              value={<Tag tone={s.isActive ? "positive" : "neutral"}>{s.isActive ? "Active" : "Off"}</Tag>}
+                            />
+                          ))}
+                          {data.staff.length === 0 && (
+                            <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">No staff accounts</div>
+                          )}
+                        </Rows>
+                      </Panel>
                     </div>
                   </div>
                 </div>
+                
               </div>
             </ScrollArea>
           </>
@@ -206,32 +154,27 @@ export function ShopDetailDialog({
   );
 }
 
-/** Last 14 days of billing, so a support call starts with "you stopped selling
- *  on Tuesday" rather than a number with no shape to it. */
 function TrendStrip({ series }: { series: { day: string; revenue: number; bills: number }[] }) {
   const peak = Math.max(1, ...series.map((d) => d.revenue));
   const total = series.reduce((sum, d) => sum + d.revenue, 0);
 
   return (
-    <div className="rounded-2xl border bg-card p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <TrendingUp className="h-4 w-4 text-primary" /> Last 14 days
-        </h3>
-        <p className="text-sm font-semibold tabular-nums">{rupees(total)}</p>
-      </div>
-      <div className="flex h-24 items-end gap-1">
+    <div>
+      <SectionLabel action={<span className="text-sm font-medium tabular-nums text-foreground">{rupees(total)}</span>}>
+        Last 14 days
+      </SectionLabel>
+      <div className="flex h-24 items-end gap-px overflow-hidden rounded-lg border bg-border p-px">
         {series.map((d) => (
-          <div key={d.day} className="group relative flex flex-1 flex-col items-center justify-end">
+          <div key={d.day} className="group relative flex h-full flex-1 flex-col items-center justify-end bg-background">
             <div
-              className={`w-full rounded-t transition-colors ${d.revenue > 0 ? "bg-primary/70 group-hover:bg-primary" : "bg-muted"}`}
-              style={{ height: d.revenue > 0 ? `${Math.max(4, (d.revenue / peak) * 100)}%` : "3px" }}
-              title={`${d.day} — ${rupees(d.revenue)} over ${d.bills} ${d.bills === 1 ? "bill" : "bills"}`}
+              className={`w-full transition-colors ${d.revenue > 0 ? "bg-muted-foreground/30 group-hover:bg-muted-foreground/50" : ""}`}
+              style={{ height: d.revenue > 0 ? `${Math.max(4, (d.revenue / peak) * 100)}%` : "0%" }}
+              title={`${d.day} — ${rupees(d.revenue)} over ${count(d.bills)} ${d.bills === 1 ? "bill" : "bills"}`}
             />
           </div>
         ))}
       </div>
-      <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
+      <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
         <span>{series[0]?.day.slice(5)}</span>
         <span>{series.at(-1)?.day.slice(5)}</span>
       </div>

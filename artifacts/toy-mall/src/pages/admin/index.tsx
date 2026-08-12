@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useAdminMe } from "./api";
 import { LoginScreen } from "./LoginScreen";
-import { Loader2, LayoutDashboard, Building2, IndianRupee, DatabaseBackup, ScrollText, LogOut, Menu, ShieldCheck, Wallet, Megaphone, Activity } from "lucide-react";
+import {
+  Loader2, LayoutDashboard, Building2, IndianRupee, DatabaseBackup,
+  ScrollText, LogOut, Menu, Wallet, Megaphone, Activity,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Dashboard from "./Dashboard";
@@ -15,16 +19,37 @@ import Health from "./Health";
 
 type Section = "dashboard" | "shops" | "money" | "notices" | "pricing" | "backups" | "health" | "audit";
 
-const NAV = [
-  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "shops",     label: "Shops",     icon: Building2 },
-  { key: "money",     label: "Money",     icon: Wallet },
-  { key: "notices",   label: "Notices",   icon: Megaphone },
-  { key: "pricing",   label: "Pricing",   icon: IndianRupee },
-  { key: "backups",   label: "Backups",   icon: DatabaseBackup },
-  { key: "health",    label: "Health",    icon: Activity },
-  { key: "audit",     label: "Audit Log", icon: ScrollText },
-] as const;
+/* Grouped by the job being done — watch, run, verify — so the rail reads as
+ * three decisions instead of eight equally-weighted buttons. */
+type NavItem = { key: Section; label: string; icon: LucideIcon };
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Overview",
+    items: [
+      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { key: "shops",     label: "Shops",     icon: Building2 },
+    ],
+  },
+  {
+    label: "Operate",
+    items: [
+      { key: "money",   label: "Money",   icon: Wallet },
+      { key: "notices", label: "Notices", icon: Megaphone },
+      { key: "pricing", label: "Pricing", icon: IndianRupee },
+    ],
+  },
+  {
+    label: "Maintain",
+    items: [
+      { key: "backups", label: "Backups",   icon: DatabaseBackup },
+      { key: "health",  label: "Health",    icon: Activity },
+      { key: "audit",   label: "Audit log", icon: ScrollText },
+    ],
+  },
+];
+
+const NAV_FLAT = NAV_GROUPS.flatMap((g) => g.items);
 
 export default function AdminConsole() {
   const { data: me, isLoading, refetch } = useAdminMe();
@@ -39,8 +64,8 @@ export default function AdminConsole() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="admin-console flex min-h-[100dvh] items-center justify-center bg-background">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.75} />
       </div>
     );
   }
@@ -50,87 +75,97 @@ export default function AdminConsole() {
   }
 
   const SidebarContent = (
-    <div className="flex flex-col h-full bg-card/50 backdrop-blur-xl border-r">
-      <div className="p-6 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-lg shrink-0">
-          <ShieldCheck className="w-6 h-6" strokeWidth={2.5} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-bold leading-tight">Addison Bill</p>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mt-0.5">Console</p>
-        </div>
+    <div className="flex h-full flex-col border-r bg-background">
+      <div className="px-5 py-6">
+        <p className="text-[13px] font-medium tracking-tight">Addison Bill</p>
+        <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          Console
+        </p>
       </div>
 
-      <ScrollArea className="flex-1 px-4">
-        <div className="space-y-1 py-2">
-          {NAV.map((item) => {
-            const active = section === item.key;
-            return (
-              <button
-                key={item.key}
-                onClick={() => {
-                  setSection(item.key);
-                  setNavOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
-              >
-                <item.icon className="w-4 h-4 shrink-0" />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
+      <ScrollArea className="flex-1 px-2.5">
+        <nav className="space-y-6 pb-4">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              <p className="px-2.5 pb-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/70">
+                {group.label}
+              </p>
+              <div className="space-y-px">
+                {group.items.map((item) => {
+                  const active = section === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => {
+                        setSection(item.key);
+                        setNavOpen(false);
+                      }}
+                      className={`relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors ${
+                        active
+                          ? "bg-muted font-medium text-foreground"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      }`}
+                    >
+                      {/* The accent colour appears exactly once per screen:
+                          on the thing you are currently looking at. */}
+                      <span
+                        className={`absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary transition-opacity ${
+                          active ? "opacity-100" : "opacity-0"
+                        }`}
+                      />
+                      <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
       </ScrollArea>
 
-      <div className="p-4 mt-auto border-t">
-        <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 rounded-xl mb-2">
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold uppercase shrink-0">
-            {me.email.slice(0, 1)}
-          </div>
-          <p className="text-xs font-medium truncate text-muted-foreground">{me.email}</p>
-        </div>
-        <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={logout}>
-          <LogOut className="w-4 h-4 mr-2" />
+      <div className="border-t px-2.5 py-3">
+        <p className="truncate px-2.5 pb-2 text-xs text-muted-foreground">{me.email}</p>
+        <button
+          onClick={logout}
+          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        >
+          <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.75} />
           Sign out
-        </Button>
+        </button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-[100dvh] flex bg-background">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:block w-72 shrink-0 h-[100dvh] sticky top-0">
+    <div className="admin-console flex min-h-[100dvh] bg-background text-foreground">
+      {/* Desktop rail */}
+      <aside className="sticky top-0 hidden h-[100dvh] w-60 shrink-0 lg:block">
         {SidebarContent}
       </aside>
 
-      {/* Mobile Drawer */}
+      {/* Mobile drawer */}
       {navOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setNavOpen(false)} />
-          <aside className="relative w-72 h-full shadow-2xl animate-in slide-in-from-left duration-200">
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div className="absolute inset-0 bg-foreground/20" onClick={() => setNavOpen(false)} />
+          <aside className="relative w-60 animate-in slide-in-from-left duration-150">
             {SidebarContent}
           </aside>
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 min-w-0 flex flex-col h-[100dvh] overflow-hidden">
-        {/* Mobile Header */}
-        <div className="lg:hidden sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b p-4 flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={() => setNavOpen(true)}>
-            <Menu className="w-4 h-4" />
+      <main className="flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="sticky top-0 z-20 flex items-center gap-2 border-b bg-background px-3 py-2.5 lg:hidden">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setNavOpen(true)}>
+            <Menu className="h-4 w-4" strokeWidth={1.75} />
           </Button>
-          <p className="font-semibold">{NAV.find((n) => n.key === section)?.label}</p>
+          <p className="text-[13px] font-medium">
+            {NAV_FLAT.find((n) => n.key === section)?.label}
+          </p>
         </div>
 
-        {/* Content Area */}
         <ScrollArea className="flex-1">
-          <div className="p-6 md:p-10 max-w-7xl mx-auto w-full">
+          <div className="mx-auto w-full max-w-6xl px-5 py-8 md:px-10 md:py-10">
             {section === "dashboard" && <Dashboard onNavigate={setSection} />}
             {section === "shops" && <ShopsList />}
             {section === "money" && <Money />}

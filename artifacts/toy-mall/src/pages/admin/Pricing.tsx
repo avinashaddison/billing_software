@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { useAdminPricing } from "./api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { IndianRupee, Loader2, AlertTriangle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  PageHeader, MetricRow, Metric, Panel, LoadError, amountExact
+} from "./ui";
 
 export default function Pricing() {
   const { data, isLoading, error } = useAdminPricing();
@@ -53,77 +56,72 @@ export default function Pricing() {
   };
 
   if (isLoading) {
-    return <div className="p-8"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>;
+    return (
+      <div className="animate-in fade-in duration-300">
+        <PageHeader title="Subscription pricing" meta="Drives the public landing page" />
+        <div className="mt-8 grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-4 border bg-border rounded-lg h-[114px]"></div>
+      </div>
+    );
   }
 
-  /* Never show an editable price form seeded with zeroes when the real prices
-   * failed to load — saving that would wipe the live landing-page pricing. */
   if (error) {
     return (
-      <div className="max-w-xl rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center">
-        <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-destructive" />
-        <p className="font-medium text-destructive">Could not load your current pricing</p>
-        <p className="mt-1 text-sm text-muted-foreground">{(error as Error).message}</p>
-        <p className="mt-1 text-sm text-muted-foreground">The form stays hidden so a blank value can't overwrite your live prices.</p>
+      <div className="animate-in fade-in duration-300">
+        <PageHeader title="Subscription pricing" meta="Drives the public landing page" />
+        <LoadError message={(error as Error).message} />
       </div>
     );
   }
 
   const deal = Number(dealPrice) || 0;
+  const orig = Number(originalPrice) || 0;
   const perMonth = Math.round(deal / 12);
 
   return (
-    <div className="space-y-6 max-w-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Subscription Pricing</h1>
-        <p className="text-muted-foreground mt-1">Drives the public landing page</p>
-      </div>
+    <div className="animate-in fade-in duration-300 pb-12">
+      <PageHeader title="Subscription pricing" meta="Drives the public landing page" />
+      
+      <MetricRow cols={2}>
+        <Metric label="Deal price" value={amountExact(deal)} hint="Current public price" tone="positive" />
+        <Metric label="Original price" value={amountExact(orig)} hint="Shown crossed out" />
+      </MetricRow>
 
-      <div className="rounded-2xl border bg-card p-6">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-            <IndianRupee className="w-6 h-6" strokeWidth={2.5} />
-          </div>
-          <div>
-            <h2 className="font-semibold text-lg">Lifetime License</h2>
-            <p className="text-sm text-muted-foreground">Adjust the prices shown to new signups.</p>
-          </div>
-        </div>
+      <div className="mt-10 max-w-lg">
+        <Panel title="Update pricing">
+          <div className="p-5 space-y-6">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Deal price (₹)</label>
+                <Input type="number" min={0} value={dealPrice} onChange={e => setDealPrice(e.target.value)} className="rounded-md tabular-nums" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Original price (₹)</label>
+                <Input type="number" min={0} value={originalPrice} onChange={e => setOriginalPrice(e.target.value)} className="rounded-md tabular-nums" />
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-md border p-4 bg-muted/20">
+               <div>
+                 <p className="text-[13px] text-muted-foreground">Landing page will display:</p>
+                 <p className="font-medium mt-1 tabular-nums">
+                   <span className="text-xl font-bold tracking-tight">{amountExact(deal)}</span>
+                   <span className="text-[13px] line-through text-muted-foreground ml-2 mr-2">{amountExact(orig)}</span>
+                 </p>
+               </div>
+               <div className="text-right shrink-0">
+                 <p className="text-[13px] text-muted-foreground">Equivalent to</p>
+                 <p className="font-medium tabular-nums mt-1">~ ₹{perMonth}/mo</p>
+               </div>
+            </div>
 
-        <div className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Deal Price (₹)</label>
-              <Input type="number" min={0} value={dealPrice} onChange={e => setDealPrice(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground line-through decoration-muted-foreground/50">Original Price (₹)</label>
-              <Input type="number" min={0} value={originalPrice} onChange={e => setOriginalPrice(e.target.value)} />
+            <div className="flex justify-end pt-2">
+              <Button onClick={save} disabled={busy || !dealPrice || !originalPrice}>
+                {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Save pricing
+              </Button>
             </div>
           </div>
-
-          <div className="bg-muted/50 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
-            <div>
-              <p className="text-sm text-muted-foreground">The landing page will display:</p>
-              <p className="font-medium mt-1">
-                <span className="text-xl font-bold tracking-tight">₹{deal.toLocaleString('en-IN')}</span>
-                <span className="text-sm line-through text-muted-foreground ml-2 mr-2">₹{(Number(originalPrice) || 0).toLocaleString('en-IN')}</span>
-                <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Lifetime</span>
-              </p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-xs text-muted-foreground">Equivalent to</p>
-              <p className="font-semibold text-primary">~ ₹{perMonth}/month</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 flex justify-end">
-          <Button onClick={save} disabled={busy || !dealPrice || !originalPrice}>
-            {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Save Pricing
-          </Button>
-        </div>
+        </Panel>
       </div>
     </div>
   );

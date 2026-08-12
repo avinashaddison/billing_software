@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useAdminOverview } from "./api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, MoreHorizontal, CheckCircle2, AlertTriangle, Building2, Store, X } from "lucide-react";
+import { Search, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -16,11 +16,12 @@ import {
   BulkActionDialog, ResetPasswordDialog, ToggleActiveDialog, ForceSignOutDialog, ViewAsDialog,
   type BulkAction, type Shop,
 } from "./ShopActions";
+import {
+  PageHeader, Toolbar, FilterChip, Panel, Tag, LoadError, count, rupees, Tone,
+} from "./ui";
 
 const FILTERS = ["all", "active", "suspended", "expired"] as const;
 type Filter = (typeof FILTERS)[number];
-
-const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
 export default function ShopsList() {
   const { data, isLoading, error } = useAdminOverview();
@@ -56,8 +57,6 @@ export default function ShopsList() {
     return list;
   }, [data, search, filter]);
 
-  /* A selection must survive filtering — suspending 8 shops then typing in the
-   * search box should not silently drop them from the bulk action. */
   const selectedShops = useMemo<Shop[]>(
     () => (data?.shops ?? []).filter((s) => selectedIds.has(s.id)),
     [data, selectedIds],
@@ -79,98 +78,96 @@ export default function ShopsList() {
     setSelectedIds(next);
   };
 
-  if (isLoading) return <Skeleton className="h-96 w-full rounded-2xl" />;
-
-  if (error) {
+  if (isLoading || (!data && !error)) {
     return (
-      <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center">
-        <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-destructive" />
-        <p className="font-medium">Could not load shops</p>
-        <p className="mt-1 text-sm text-muted-foreground">{(error as Error).message}</p>
+      <div>
+        <PageHeader title="Shops" />
+        <Skeleton className="h-[400px] w-full rounded-lg" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div>
+        <PageHeader title="Shops" />
+        <LoadError message={(error as Error)?.message} />
       </div>
     );
   }
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6 duration-500">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Shops</h1>
-          <p className="mt-1 text-muted-foreground">
-            {data?.totals.shops ?? 0} on the platform &middot; {data?.totals.tradingShops ?? 0} trading
-          </p>
-        </div>
-        <Button className="shrink-0" onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> New shop
-        </Button>
-      </div>
+    <div className="animate-in fade-in duration-300">
+      <PageHeader
+        title="Shops"
+        meta={`${count(data.totals.shops)} ${data.totals.shops === 1 ? "shop" : "shops"} on the platform · ${count(data.totals.tradingShops)} trading`}
+        actions={
+          <Button size="sm" className="h-8" onClick={() => setCreateOpen(true)}>
+            New shop
+          </Button>
+        }
+      />
 
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-        <div className="relative w-full max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Toolbar>
+        <div className="relative w-full max-w-sm flex-1 sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
           <Input
             placeholder="Search by name, ID, or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="h-8 w-full rounded-md pl-9 text-[13px]"
           />
         </div>
-        <div className="flex shrink-0 gap-2 rounded-lg bg-muted/50 p-1">
+        <div className="ml-auto flex items-center gap-1">
           {FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                filter === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
+            <FilterChip key={f} active={filter === f} onClick={() => setFilter(f)}>
               {f}
-            </button>
+            </FilterChip>
           ))}
         </div>
-      </div>
+      </Toolbar>
 
       {selectedIds.size > 0 && (
-        <div className="animate-in fade-in slide-in-from-top-2 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 duration-200">
-          <span className="mr-1 text-sm font-medium">
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-2">
+          <span className="mr-2 text-[13px] font-medium text-muted-foreground">
             {selectedIds.size} selected
           </span>
-          <Button variant="secondary" size="sm" onClick={() => setBulkAction("extend")}>Extend access</Button>
-          <Button variant="secondary" size="sm" onClick={() => setBulkAction("activate")}>Reactivate</Button>
-          <Button variant="destructive" size="sm" onClick={() => setBulkAction("suspend")}>Suspend</Button>
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelectedIds(new Set())}>
-            <X className="mr-1 h-3.5 w-3.5" /> Clear
-          </Button>
+          <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={() => setBulkAction("extend")}>Extend access</Button>
+          <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={() => setBulkAction("activate")}>Reactivate</Button>
+          <Button variant="secondary" size="sm" className="h-7 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setBulkAction("suspend")}>Suspend</Button>
+          <div className="ml-auto">
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+          </div>
         </div>
       )}
 
-      {/* desktop table */}
-      <div className="hidden overflow-hidden rounded-2xl border bg-card md:block">
+      <Panel>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b bg-muted/50 font-medium text-muted-foreground">
+          <table className="w-full text-left text-[13px] whitespace-nowrap">
+            <thead className="border-b text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
               <tr>
-                <th className="w-10 px-4 py-3">
+                <th className="w-10 px-4 py-3 font-medium">
                   <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAll} aria-label="Select all shops" />
                 </th>
-                <th className="px-4 py-3">Shop</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Activity</th>
-                <th className="px-4 py-3 text-right">Revenue</th>
-                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 font-medium">Shop</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Activity</th>
+                <th className="px-4 py-3 font-medium text-right">Revenue</th>
+                <th className="w-10 px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {shops.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
-                    <Store className="mx-auto mb-3 h-12 w-12 opacity-20" />
                     No shops match this search.
                   </td>
                 </tr>
               ) : (
                 shops.map((shop) => (
-                  <tr key={shop.id} className="transition-colors hover:bg-muted/30">
+                  <tr key={shop.id} className="transition-colors hover:bg-muted/40">
                     <td className="px-4 py-3">
                       <Checkbox
                         checked={selectedIds.has(shop.id)}
@@ -179,23 +176,18 @@ export default function ShopsList() {
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <button className="flex items-center gap-3 text-left" onClick={() => setDetailShopId(shop.id)}>
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                          <Building2 className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-foreground hover:underline">{shop.name}</p>
-                          <p className="font-mono text-xs text-muted-foreground">
-                            {shop.id} &middot; {shop.ownerEmail || "No email"}
-                          </p>
-                        </div>
+                      <button className="text-left" onClick={() => setDetailShopId(shop.id)}>
+                        <p className="font-medium text-foreground hover:underline">{shop.name}</p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {shop.id} · {shop.ownerEmail || "No email"}
+                        </p>
                       </button>
                     </td>
                     <td className="px-4 py-3"><StatusBadge shop={shop} /></td>
                     <td className="px-4 py-3"><ActivityLabel shop={shop} /></td>
                     <td className="px-4 py-3 text-right">
-                      <p className="font-semibold">{inr(shop.revenueAllTime)}</p>
-                      <p className="text-[10px] text-muted-foreground">{inr(shop.revenue30d)} (30d)</p>
+                      <p className="font-medium tabular-nums">{rupees(shop.revenueAllTime)}</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">{rupees(shop.revenue30d)} (30d)</p>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <RowMenu
@@ -206,8 +198,8 @@ export default function ShopsList() {
                         onUsers={setUsersTenantId}
                         onPassword={setPwdShop}
                         onToggle={setToggleShop}
-                onViewAs={setViewAsShop}
-                onSignOut={setSignOutShop}
+                        onViewAs={setViewAsShop}
+                        onSignOut={setSignOutShop}
                       />
                     </td>
                   </tr>
@@ -216,56 +208,7 @@ export default function ShopsList() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* mobile cards */}
-      <div className="space-y-3 md:hidden">
-        {shops.length === 0 ? (
-          <div className="rounded-2xl border bg-card px-4 py-12 text-center text-muted-foreground">
-            <Store className="mx-auto mb-3 h-12 w-12 opacity-20" />
-            No shops match this search.
-          </div>
-        ) : (
-          shops.map((shop) => (
-            <div key={shop.id} className="rounded-2xl border bg-card p-4">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  className="mt-1"
-                  checked={selectedIds.has(shop.id)}
-                  onCheckedChange={() => toggleOne(shop.id)}
-                  aria-label={`Select ${shop.name}`}
-                />
-                <button className="min-w-0 flex-1 text-left" onClick={() => setDetailShopId(shop.id)}>
-                  <p className="truncate font-semibold">{shop.name}</p>
-                  <p className="truncate font-mono text-xs text-muted-foreground">{shop.id}</p>
-                </button>
-                <RowMenu
-                  shop={shop}
-                  onDetail={setDetailShopId}
-                  onEdit={setEditTenant}
-                  onExtend={setExtendTenant}
-                  onUsers={setUsersTenantId}
-                  onPassword={setPwdShop}
-                  onToggle={setToggleShop}
-                onViewAs={setViewAsShop}
-                onSignOut={setSignOutShop}
-                />
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <StatusBadge shop={shop} />
-                <ActivityLabel shop={shop} />
-              </div>
-              <div className="mt-3 flex items-baseline justify-between border-t pt-3">
-                <span className="text-xs text-muted-foreground">Revenue</span>
-                <span>
-                  <span className="font-semibold">{inr(shop.revenueAllTime)}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">{inr(shop.revenue30d)} (30d)</span>
-                </span>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+      </Panel>
 
       <CreateTenantDialog open={createOpen} onOpenChange={setCreateOpen} />
       <EditTenantDialog tenant={editTenant} open={!!editTenant} onOpenChange={(o) => !o && setEditTenant(null)} />
@@ -293,45 +236,38 @@ export default function ShopsList() {
 }
 
 function StatusBadge({ shop }: { shop: Shop }) {
-  const base = "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold";
+  let tone: Tone = "neutral";
+  let label = "";
+
+  if (shop.access === "active") { tone = "positive"; label = "Active"; }
+  else if (shop.access === "expiring") { tone = "warn"; label = "Expiring"; }
+  else if (shop.access === "expired") { tone = "danger"; label = "Expired"; }
+  else if (shop.access === "suspended") { tone = "neutral"; label = "Suspended"; }
+
+  const sub = shop.daysLeft === null ? "Lifetime" : shop.daysLeft > 0 ? `${shop.daysLeft}d left` : `expired ${Math.abs(shop.daysLeft)}d ago`;
+
   return (
     <div>
-      {shop.access === "active" && (
-        <span className={`${base} bg-emerald-500/10 text-emerald-600`}><CheckCircle2 className="h-3.5 w-3.5" /> Active</span>
-      )}
-      {shop.access === "expiring" && (
-        <span className={`${base} bg-amber-500/10 text-amber-600`}><AlertTriangle className="h-3.5 w-3.5" /> Expiring</span>
-      )}
-      {shop.access === "expired" && (
-        <span className={`${base} bg-destructive/10 text-destructive`}>Expired</span>
-      )}
-      {shop.access === "suspended" && (
-        <span className={`${base} bg-muted text-muted-foreground`}>Suspended</span>
-      )}
-      <p className="mt-1 text-[10px] text-muted-foreground">
-        {shop.daysLeft === null ? "Lifetime" : shop.daysLeft > 0 ? `${shop.daysLeft}d left` : `expired ${Math.abs(shop.daysLeft)}d ago`}
-      </p>
+      <Tag tone={tone}>{label}</Tag>
+      <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>
     </div>
   );
 }
 
 function ActivityLabel({ shop }: { shop: Shop }) {
-  const tone =
-    shop.activity === "trading" ? "text-emerald-600"
-    : shop.activity === "idle"  ? "text-amber-600"
-    : "text-muted-foreground";
-  const label =
-    shop.activity === "trading" ? "Trading"
-    : shop.activity === "idle"  ? "Idle"
-    : "Never sold";
+  let tone: Tone = "neutral";
+  let label = "";
+
+  if (shop.activity === "trading") { tone = "positive"; label = "Trading"; }
+  else if (shop.activity === "idle") { tone = "warn"; label = "Idle"; }
+  else { tone = "neutral"; label = "Never sold"; }
+
+  const sub = shop.lastSaleAt ? new Date(shop.lastSaleAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "";
+
   return (
     <div>
-      <span className={`text-xs font-medium ${tone}`}>{label}</span>
-      {shop.lastSaleAt && (
-        <p className="text-[10px] text-muted-foreground">
-          {new Date(shop.lastSaleAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-        </p>
-      )}
+      <Tag tone={tone}>{label}</Tag>
+      {sub && <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>}
     </div>
   );
 }
@@ -352,12 +288,12 @@ function RowMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${shop.name}`}>
-          <MoreHorizontal className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Actions for ${shop.name}`}>
+          <MoreHorizontal className="h-4 w-4" strokeWidth={1.75} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-48 text-[13px]">
+        <DropdownMenuLabel className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Actions</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => onDetail(shop.id)}>View details</DropdownMenuItem>
         <DropdownMenuItem onClick={() => onEdit(shop)}>Edit info</DropdownMenuItem>

@@ -4,15 +4,13 @@ import { useAdminNotices, useAdminOverview, adminMutate, adminQueryKeys } from "
 import { NoticeRow, NoticeLevel } from "./types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { Trash2, Search, Loader2 } from "lucide-react";
 import {
-  Megaphone, Info, AlertTriangle, ShieldAlert,
-  Loader2, Trash2, Power, PowerOff,
-  Calendar, Building2, Search
-} from "lucide-react";
+  PageHeader, SectionLabel, Panel, Rows, Tag, EmptyState, LoadError, Notice, type Tone
+} from "./ui";
 
 interface ShopPickerProps {
   shops: Array<{ id: string; name: string }>;
@@ -35,23 +33,22 @@ function ShopPicker({ shops, value, onChange, disabled }: ShopPickerProps) {
   return (
     <div className="relative">
       <div 
-        className={`flex items-center justify-between min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/50 transition-colors"}`}
+        className={`flex items-center justify-between h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/50"}`}
         onClick={() => !disabled && setOpen(!open)}
       >
-        <span className={value === "all" ? "font-bold text-destructive flex items-center gap-2" : "font-medium flex items-center gap-2"}>
-          <Building2 className={`w-4 h-4 ${value === 'all' ? 'text-destructive' : 'text-muted-foreground'}`} />
-          {value === "all" ? "Global Broadcast (All Shops)" : selected?.name || "Select shop..."}
+        <span className={value === "all" ? "font-medium text-destructive" : "truncate"}>
+          {value === "all" ? "Global broadcast (All shops)" : selected?.name || "Select shop..."}
         </span>
-        <Search className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+        <Search className="h-3.5 w-3.5 opacity-50 shrink-0 ml-2" />
       </div>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 w-full z-50 rounded-md border bg-popover text-popover-foreground shadow-md outline-none max-h-80 flex flex-col">
+          <div className="absolute top-full left-0 mt-1 w-full z-50 rounded-md border bg-popover text-popover-foreground outline-none max-h-60 flex flex-col overflow-hidden">
             <div className="flex items-center border-b px-3 shrink-0">
-              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+              <Search className="mr-2 h-3.5 w-3.5 shrink-0 opacity-50" />
               <input 
-                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground" 
+                className="flex h-9 w-full bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground" 
                 placeholder="Search shops..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -60,23 +57,23 @@ function ShopPicker({ shops, value, onChange, disabled }: ShopPickerProps) {
             </div>
             <div className="overflow-y-auto p-1 flex-1">
               <div 
-                className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-2 pl-2 pr-2 text-sm outline-none hover:bg-destructive/10 hover:text-destructive font-bold text-destructive transition-colors mb-1"
+                className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none hover:bg-destructive/10 hover:text-destructive font-medium text-destructive transition-colors mb-1"
                 onClick={() => { onChange("all"); setOpen(false); setSearch(""); }}
               >
-                <Megaphone className="w-4 h-4 mr-2" /> Global Broadcast (All Shops)
+                Global broadcast (All shops)
               </div>
-              <div className="h-px bg-border my-1" />
+              <div className="h-px bg-border my-1 mx-2" />
               {filtered.map(shop => (
                 <div
                   key={shop.id}
-                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-2 pl-2 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground transition-colors"
+                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none hover:bg-muted transition-colors"
                   onClick={() => { onChange(shop.id); setOpen(false); setSearch(""); }}
                 >
                   {shop.name}
                 </div>
               ))}
               {filtered.length === 0 && (
-                <div className="py-6 text-center text-sm text-muted-foreground">No shops found.</div>
+                <div className="py-4 text-center text-xs text-muted-foreground">No shops found</div>
               )}
             </div>
           </div>
@@ -85,30 +82,6 @@ function ShopPicker({ shops, value, onChange, disabled }: ShopPickerProps) {
     </div>
   );
 }
-
-const LEVEL_STYLES: Record<NoticeLevel, { bg: string, border: string, text: string, icon: React.ElementType, badge: string }> = {
-  info: {
-    bg: "bg-blue-500/10",
-    border: "border-blue-500/20",
-    text: "text-blue-700 dark:text-blue-400",
-    icon: Info,
-    badge: "bg-blue-500/10 text-blue-600"
-  },
-  warning: {
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/20",
-    text: "text-amber-700 dark:text-amber-400",
-    icon: AlertTriangle,
-    badge: "bg-amber-500/10 text-amber-600"
-  },
-  critical: {
-    bg: "bg-destructive/10",
-    border: "border-destructive/20",
-    text: "text-destructive",
-    icon: ShieldAlert,
-    badge: "bg-destructive/10 text-destructive"
-  }
-};
 
 const formatDate = (iso: string) => {
   return new Intl.DateTimeFormat("en-IN", {
@@ -224,141 +197,114 @@ export default function Notices() {
     });
   }, [noticesData]);
 
-  return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Notices</h1>
-        <p className="text-muted-foreground mt-1">Broadcast system messages to shop consoles</p>
+  if (noticesLoading || overviewLoading) {
+    return (
+      <div className="animate-in fade-in duration-300">
+        <PageHeader title="Notices" meta="Broadcast system messages to shop consoles" />
+        <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-5">
+          <Skeleton className="h-64 rounded-lg lg:col-span-3" />
+          <Skeleton className="h-64 rounded-lg lg:col-span-2" />
+        </div>
       </div>
+    );
+  }
 
-      <div className="grid lg:grid-cols-3 gap-8 items-start">
-        {/* Left Column: List */}
-        <div className="lg:col-span-2 space-y-4">
-          {noticesError ? (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center">
-              <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-destructive" />
-              <p className="font-medium">Could not load notices</p>
-              <p className="mt-1 text-sm text-muted-foreground">{(noticesError as Error)?.message ?? "Unknown error"}</p>
-            </div>
-          ) : noticesLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map(i => <Skeleton key={i} className="h-40 rounded-xl w-full" />)}
-            </div>
-          ) : sortedNotices.length === 0 ? (
-            <Card className="border-dashed bg-muted/20">
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <Megaphone className="w-6 h-6 text-primary" />
-                </div>
-                <p className="font-semibold text-lg">No notices found</p>
-                <p className="text-sm text-muted-foreground max-w-[300px] mt-2">
-                  Broadcast messages to all shops, or send a specific message to a single shop. They will appear as banners in their console.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {sortedNotices.map(notice => {
-                const Icon = LEVEL_STYLES[notice.level].icon;
-                const isGlobal = !notice.tenantId;
-                
-                const isFuture = notice.startsAt && new Date(notice.startsAt) > new Date();
-                const statusNode = !notice.isActive ? (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-muted text-muted-foreground uppercase tracking-wider border border-border">
-                    Inactive
-                  </span>
-                ) : notice.isLive ? (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 uppercase tracking-wider flex items-center gap-1 border border-emerald-500/20">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Now
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 uppercase tracking-wider border border-amber-500/20">
-                    {isFuture ? "Scheduled" : "Window Passed"}
-                  </span>
-                );
+  if (noticesError) {
+    return (
+      <div className="animate-in fade-in duration-300">
+        <PageHeader title="Notices" meta="Broadcast system messages to shop consoles" />
+        <LoadError message={(noticesError as Error)?.message} />
+      </div>
+    );
+  }
 
-                return (
-                  <Card key={notice.id} className={`overflow-hidden transition-colors ${!notice.isActive ? 'opacity-70' : ''}`}>
-                    <div className={`h-1.5 w-full ${notice.level === 'critical' ? 'bg-destructive' : notice.level === 'warning' ? 'bg-amber-500' : 'bg-blue-500'}`} />
-                    <CardContent className="p-5">
+  return (
+    <div className="animate-in fade-in duration-300 pb-12">
+      <PageHeader title="Notices" meta="Broadcast system messages to shop consoles" />
+
+      <div className="mt-10 grid lg:grid-cols-5 gap-8 items-start">
+        <div className="lg:col-span-3">
+          <SectionLabel>Notice history</SectionLabel>
+          <Panel>
+            {sortedNotices.length === 0 ? (
+              <EmptyState title="No notices" hint="Broadcast messages to all shops, or send a specific message to a single shop." />
+            ) : (
+              <Rows>
+                {sortedNotices.map(notice => {
+                  const isGlobal = !notice.tenantId;
+                  const isFuture = notice.startsAt && new Date(notice.startsAt) > new Date();
+
+                  let statusTone: Tone = "neutral";
+                  let statusLabel = "Inactive";
+                  if (!notice.isActive) { statusTone = "neutral"; statusLabel = "Inactive"; }
+                  else if (notice.isLive) { statusTone = "positive"; statusLabel = "Live now"; }
+                  else { statusTone = "warn"; statusLabel = isFuture ? "Scheduled" : "Passed"; }
+
+                  let levelTone: Tone = "neutral";
+                  if (notice.level === "warning") levelTone = "warn";
+                  if (notice.level === "critical") levelTone = "danger";
+
+                  return (
+                    <div key={notice.id} className={`p-4 transition-colors ${!notice.isActive ? 'opacity-50' : ''}`}>
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${notice.level === 'critical' ? 'text-destructive' : notice.level === 'warning' ? 'text-amber-500' : 'text-blue-500'}`} />
-                          <div className="space-y-1 flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold truncate">{notice.title}</h3>
-                              {statusNode}
-                            </div>
-                            <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">{notice.body}</p>
-                            
-                            <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mt-4 text-xs text-muted-foreground font-medium">
-                              <span className={`flex items-center gap-1.5 ${isGlobal ? 'text-destructive font-bold' : ''}`}>
-                                <Building2 className="w-3.5 h-3.5" />
-                                {isGlobal ? "Global Broadcast (All Shops)" : notice.shopName}
-                              </span>
-                              
-                              {(notice.startsAt || notice.endsAt) && (
-                                <span className="flex items-center gap-1.5">
-                                  <Calendar className="w-3.5 h-3.5" />
-                                  {notice.startsAt ? formatDate(notice.startsAt) : 'Now'} 
-                                  <span className="text-muted-foreground/50">→</span>
-                                  {notice.endsAt ? formatDate(notice.endsAt) : 'Forever'}
-                                </span>
-                              )}
-                              
-                              {notice.createdBy && (
-                                <span className="text-muted-foreground/60">&middot; by {notice.createdBy}</span>
-                              )}
-                            </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[13px] font-medium">{notice.title}</span>
+                            <Tag tone={statusTone}>{statusLabel}</Tag>
+                            <Tag tone={levelTone}>{notice.level}</Tag>
+                          </div>
+                          <p className="mt-1.5 text-sm text-muted-foreground whitespace-pre-wrap break-words">{notice.body}</p>
+                          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            <span>{isGlobal ? "Global broadcast" : notice.shopName}</span>
+                            {(notice.startsAt || notice.endsAt) && (
+                              <>
+                                <span>·</span>
+                                <span>{notice.startsAt ? formatDate(notice.startsAt) : 'Now'} → {notice.endsAt ? formatDate(notice.endsAt) : 'Forever'}</span>
+                              </>
+                            )}
+                            {notice.createdBy && (
+                              <>
+                                <span>·</span>
+                                <span className="normal-case tracking-normal">by {notice.createdBy}</span>
+                              </>
+                            )}
                           </div>
                         </div>
-                        
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex shrink-0 items-center gap-2 pt-0.5">
                           <Button
-                            variant={notice.isActive ? "outline" : "default"}
+                            variant="outline"
                             size="sm"
+                            className="h-7 text-[11px] px-2"
                             onClick={() => handleToggle(notice)}
                             disabled={!!processingId}
                           >
-                            {processingId === notice.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : notice.isActive ? (
-                              <><PowerOff className="w-4 h-4 mr-2" /> Turn Off</>
-                            ) : (
-                              <><Power className="w-4 h-4 mr-2" /> Turn On</>
-                            )}
+                            {notice.isActive ? "Turn off" : "Turn on"}
                           </Button>
                           <Button
                             variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                             onClick={() => setDeleteTarget(notice)}
                             disabled={!!processingId}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                           </Button>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+                    </div>
+                  );
+                })}
+              </Rows>
+            )}
+          </Panel>
         </div>
 
-        {/* Right Column: Create Form */}
-        <div className="lg:col-span-1 sticky top-6">
-          <Card className="border-border/50 shadow-sm">
-            <CardHeader className="bg-muted/20 border-b pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Megaphone className="w-5 h-5 text-primary" /> Create Notice
-              </CardTitle>
-              <CardDescription>Compose a new message</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-5">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Target Audience</label>
+        <div className="lg:col-span-2">
+          <SectionLabel>Compose notice</SectionLabel>
+          <Panel>
+            <div className="p-4 space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Target audience</label>
                 <ShopPicker 
                   shops={shops} 
                   value={tenantId} 
@@ -366,48 +312,44 @@ export default function Notices() {
                   disabled={isSubmitting || overviewLoading} 
                 />
                 {tenantId === "all" && (
-                  <div className="mt-2 bg-destructive/10 text-destructive p-2.5 rounded-md border border-destructive/20 text-xs font-semibold flex items-start gap-2">
-                    <ShieldAlert className="w-4 h-4 shrink-0" />
-                    <p>Global broadcasts interrupt every active user on the platform. Use cautiously.</p>
+                  <div className="mt-2">
+                    <Notice tone="danger">Global broadcasts interrupt every active user. Use cautiously.</Notice>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Urgency Level</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['info', 'warning', 'critical'] as NoticeLevel[]).map(l => {
-                    const active = level === l;
-                    const S = LEVEL_STYLES[l];
-                    const Icon = S.icon;
-                    return (
-                      <div
-                        key={l}
-                        onClick={() => !isSubmitting && setLevel(l)}
-                        className={`cursor-pointer rounded-md border p-2.5 flex flex-col items-center justify-center gap-1.5 transition-all ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'} ${active ? `${S.border} ${S.bg} ring-1 ring-ring` : 'border-input'}`}
-                      >
-                        <Icon className={`w-4 h-4 ${active ? S.text : 'text-muted-foreground'}`} />
-                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${active ? S.text : 'text-muted-foreground'}`}>{l}</span>
-                      </div>
-                    );
-                  })}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Urgency level</label>
+                <div className="flex flex-wrap gap-2">
+                  {(['info', 'warning', 'critical'] as NoticeLevel[]).map(l => (
+                    <button
+                      key={l}
+                      onClick={() => !isSubmitting && setLevel(l)}
+                      className={`h-8 rounded-md px-3 text-[11px] font-medium uppercase tracking-[0.14em] border transition-colors ${
+                        level === l ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {l}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Title</label>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Title</label>
                 <Input 
-                  placeholder="e.g. Scheduled Maintenance" 
+                  placeholder="e.g. Scheduled maintenance" 
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   disabled={isSubmitting}
+                  className="rounded-md"
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Message Body</label>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Message</label>
                 <textarea 
-                  className="flex min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                  className="flex min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y"
                   value={body}
                   onChange={e => setBody(e.target.value)}
                   placeholder="The message that will appear in their console..."
@@ -415,76 +357,66 @@ export default function Notices() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium">Starts At (Optional)</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    <span>Starts at</span>
+                    <span className="font-normal opacity-70 tracking-normal capitalize">Optional</span>
+                  </label>
                   <Input 
                     type="datetime-local" 
                     value={startsAt} 
                     onChange={e => setStartsAt(e.target.value)} 
                     disabled={isSubmitting}
-                    className="text-xs"
+                    className="rounded-md text-[13px]"
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-medium">Ends At (Optional)</label>
+                <div className="space-y-1.5">
+                  <label className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    <span>Ends at</span>
+                    <span className="font-normal opacity-70 tracking-normal capitalize">Optional</span>
+                  </label>
                   <Input 
                     type="datetime-local" 
                     value={endsAt} 
                     onChange={e => setEndsAt(e.target.value)} 
                     disabled={isSubmitting}
-                    className="text-xs"
+                    className="rounded-md text-[13px]"
                   />
                 </div>
               </div>
 
-              <div className="pt-4 border-t space-y-3">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Banner Preview</label>
-                <div className={`p-4 rounded-lg border ${LEVEL_STYLES[level].border} ${LEVEL_STYLES[level].bg}`}>
-                  <div className="flex gap-3">
-                    {React.createElement(LEVEL_STYLES[level].icon, { className: `w-5 h-5 shrink-0 mt-0.5 ${LEVEL_STYLES[level].text}` })}
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <h4 className={`font-semibold text-sm ${LEVEL_STYLES[level].text}`}>{title || "Notice Title"}</h4>
-                      <p className={`text-sm opacity-90 whitespace-pre-wrap break-words min-h-[2.5rem] ${LEVEL_STYLES[level].text}`}>
-                        {body || "The notice body will appear here..."}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <div className="pt-2">
+                <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Publish notice
+                </Button>
               </div>
-
-              <Button className="w-full mt-2" onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Megaphone className="w-4 h-4 mr-2" />}
-                Publish Notice
-              </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
       </div>
 
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <ShieldAlert className="w-5 h-5" /> Confirm Deletion
-            </DialogTitle>
+            <DialogTitle className="text-lg font-medium text-destructive">Confirm deletion</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p>Are you sure you want to delete this notice?</p>
+            <p className="text-sm">Are you sure you want to delete this notice?</p>
             {deleteTarget && (
-              <div className="mt-3 p-3 bg-muted rounded-md text-sm font-medium border">
+              <div className="mt-3 p-3 bg-muted/50 rounded-md text-[13px] border">
                 {deleteTarget.title}
               </div>
             )}
-            <p className="text-sm text-muted-foreground mt-4">
+            <p className="text-[13px] text-muted-foreground mt-4">
               This action cannot be undone. If the notice is currently live, it will immediately disappear from shop consoles.
             </p>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>Cancel</Button>
             <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
-              {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
-              Delete Notice
+              {isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Delete notice
             </Button>
           </DialogFooter>
         </DialogContent>

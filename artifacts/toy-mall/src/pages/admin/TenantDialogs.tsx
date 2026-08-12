@@ -4,11 +4,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ACCESS_PRESETS, AccessKey, OverviewData } from "./types";
+import { ACCESS_PRESETS, type AccessKey } from "./types";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, Copy } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { adminQueryKeys } from "./api";
+import { Rows, Row, Notice } from "./ui";
 
 const BASE = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
 const API = `${BASE}/api`;
@@ -68,21 +69,23 @@ export function CreateTenantDialog({ open, onOpenChange }: { open: boolean; onOp
     return (
       <Dialog open={open} onOpenChange={() => { setCreated(null); onOpenChange(false); }}>
         <DialogContent className="sm:max-w-md">
-          <div className="flex flex-col items-center justify-center text-center py-6 space-y-4">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-600">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-            <DialogTitle className="text-2xl">Shop Created</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>Shop created</DialogTitle>
             <DialogDescription>Share these credentials securely with the client.</DialogDescription>
-            
-            <div className="w-full bg-muted rounded-xl p-4 space-y-3 text-left">
-              <div><p className="text-xs text-muted-foreground">Shop Name</p><p className="font-semibold">{created.name}</p></div>
-              <div><p className="text-xs text-muted-foreground">Owner Email</p><p className="font-mono">{created.email}</p></div>
-              <div><p className="text-xs text-muted-foreground">Password</p><p className="font-mono">{created.password}</p></div>
-              {created.pin && <div><p className="text-xs text-muted-foreground">Staff PIN</p><p className="font-mono text-lg tracking-widest">{created.pin}</p></div>}
+          </DialogHeader>
+          <div className="py-2">
+            <div className="overflow-hidden rounded-lg border">
+              <Rows>
+                <Row label="Shop name" value={<span className="font-medium">{created.name}</span>} />
+                <Row label="Owner email" value={<span className="font-mono text-muted-foreground">{created.email}</span>} />
+                <Row label="Password" value={<span className="font-mono text-muted-foreground">{created.password}</span>} />
+                {created.pin && <Row label="Staff PIN" value={<span className="font-mono tracking-widest text-muted-foreground">{created.pin}</span>} />}
+              </Rows>
             </div>
-            <Button className="w-full" onClick={() => { setCreated(null); onOpenChange(false); }}>Done</Button>
           </div>
+          <DialogFooter>
+            <Button className="w-full" onClick={() => { setCreated(null); onOpenChange(false); }}>Done</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     );
@@ -93,28 +96,28 @@ export function CreateTenantDialog({ open, onOpenChange }: { open: boolean; onOp
       <DialogContent className="sm:max-w-md">
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>New Shop</DialogTitle>
+            <DialogTitle>New shop</DialogTitle>
             <DialogDescription>Create a new tenant workspace.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Shop Name</Label>
+              <Label>Shop name</Label>
               <Input required autoFocus value={name} onChange={e => onNameChange(e.target.value)} placeholder="Hira & Sons" />
             </div>
             <div className="space-y-2">
-              <Label>URL Slug / ID</Label>
+              <Label>URL slug / ID</Label>
               <Input required value={id} onChange={e => { setId(e.target.value); setIdTouched(true); }} placeholder="hira-sons" />
             </div>
             <div className="space-y-2">
-              <Label>Owner Email</Label>
+              <Label>Owner email</Label>
               <Input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="owner@shop.com" />
             </div>
             <div className="space-y-2">
-              <Label>Owner Password</Label>
+              <Label>Owner password</Label>
               <Input required value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 chars" minLength={8} />
             </div>
             <div className="space-y-2">
-              <Label>Access Duration</Label>
+              <Label>Access duration</Label>
               <Select value={duration} onValueChange={(v: AccessKey) => setDuration(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -126,8 +129,8 @@ export function CreateTenantDialog({ open, onOpenChange }: { open: boolean; onOp
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={busy || !name || !id || !email || password.length < 8}>
-              {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Create Shop
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} /> : null}
+              Create shop
             </Button>
           </DialogFooter>
         </form>
@@ -199,38 +202,40 @@ export function EditTenantDialog({ tenant, open, onOpenChange }: { tenant: any; 
       <DialogContent className="sm:max-w-md">
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>Edit Shop Info</DialogTitle>
+            <DialogTitle>Edit shop info</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Shop Name</Label>
+              <Label>Shop name</Label>
               <Input required autoFocus value={name} onChange={e => setName(e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Staff limit</Label>
-                <Input type="number" min={1} inputMode="numeric" placeholder="No limit"
-                       value={maxStaff} onChange={e => setMaxStaff(e.target.value)} />
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Staff limit</Label>
+                  <Input type="number" min={1} inputMode="numeric" placeholder="No limit"
+                         value={maxStaff} onChange={e => setMaxStaff(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Product limit</Label>
+                  <Input type="number" min={1} inputMode="numeric" placeholder="No limit"
+                         value={maxProducts} onChange={e => setMaxProducts(e.target.value)} />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Product limit</Label>
-                <Input type="number" min={1} inputMode="numeric" placeholder="No limit"
-                       value={maxProducts} onChange={e => setMaxProducts(e.target.value)} />
-              </div>
+              <Notice tone="neutral">
+                Leave blank for no limit. The shop is told to contact you when it reaches a limit; nothing it has already added is removed.
+              </Notice>
             </div>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Leave blank for no limit. The shop is told to contact you when it reaches a limit; nothing it has already added is removed.
-            </p>
             <div className="space-y-2">
-              <Label>Owner Email</Label>
+              <Label>Owner email</Label>
               <Input required type="email" value={email} onChange={e => setEmail(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={busy}>
-              {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Save Changes
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} /> : null}
+              Save changes
             </Button>
           </DialogFooter>
         </form>
@@ -279,16 +284,19 @@ export function ExtendTenantDialog({ tenant, open, onOpenChange }: { tenant: any
       <DialogContent className="sm:max-w-sm">
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>Extend Access</DialogTitle>
+            <DialogTitle>Extend access</DialogTitle>
             <DialogDescription>Add time to {tenant?.name}'s subscription.</DialogDescription>
           </DialogHeader>
           <div className="py-6">
-            <Select value={duration} onValueChange={(v: AccessKey) => setDuration(v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ACCESS_PRESETS.map(p => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Label>Duration</Label>
+              <Select value={duration} onValueChange={(v: AccessKey) => setDuration(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ACCESS_PRESETS.map(p => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>

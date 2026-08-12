@@ -79,31 +79,15 @@
 .lp-animate-glow-pulse   { animation: lp-glow-pulse 2.5s ease-in-out infinite; }
 .lp-animate-blink        { animation: lp-blink-cursor 1s steps(2,start) infinite; }
 
-/* ─── /admin panel — aurora-glass theme (adm- prefix) ─── */
-@keyframes adm-orb-drift {
-  0%,100% { transform: translate(0,0) scale(1); }
-  33%     { transform: translate(60px,-40px) scale(1.12); }
-  66%     { transform: translate(-50px,35px) scale(0.92); }
+/* ─── /admin panel — ledger console ───────────────────────────────
+   The console opts out of the storefront's rounded Hind face on purpose: it is
+   read rather than browsed, so it takes a tighter grotesque and tabular figures
+   so columns of rupees line up. Scoped to .admin-console; nothing else moves. */
+.admin-console {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.011em;
+  font-feature-settings: "tnum" 1;
 }
-.adm-orb { animation: adm-orb-drift 22s ease-in-out infinite; }
-
-@keyframes adm-shimmer-sweep {
-  from { transform: translateX(-160%) skewX(-18deg); }
-  to   { transform: translateX(320%)  skewX(-18deg); }
-}
-.adm-shimmer {
-  position: absolute; top: 0; bottom: 0; width: 45%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
-  transform: translateX(-160%) skewX(-18deg);
-  pointer-events: none;
-}
-.adm-card:hover .adm-shimmer { animation: adm-shimmer-sweep 0.9s ease; }
-
-@keyframes adm-glow-pulse {
-  0%,100% { opacity: 0.5; }
-  50%     { opacity: 1; }
-}
-.adm-glow-pulse { animation: adm-glow-pulse 3s ease-in-out infinite; }
 .lp-marquee              { display: flex; width: max-content; animation: lp-marquee-x 40s linear infinite; }
 
 .lp-gradient-saffron {

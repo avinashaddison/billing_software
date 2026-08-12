@@ -6,48 +6,16 @@ import {
   adminMutate,
   adminQueryKeys
 } from "./api";
-import {
-  Wallet, CreditCard, Banknote, Building2, Calendar, CheckCircle2,
-  History, TrendingUp, Search, Plus, Trash2, AlertTriangle, Loader2
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Plus, Trash2, Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { MoneyData, OverviewData } from "./types";
-
-const TONES = {
-  blue:    "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  purple:  "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-  amber:   "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-} as const;
-
-function Stat({
-  label, value, icon: Icon, tone, subtitle,
-}: {
-  label: string; value: string; icon: React.ElementType;
-  tone: keyof typeof TONES; subtitle?: string;
-}) {
-  return (
-    <Card className="border-border/60">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${TONES[tone]}`}>
-            <Icon className="h-[18px] w-[18px]" />
-          </div>
-        </div>
-        <p className="mt-3 break-words text-3xl font-bold tracking-tight tabular-nums">{value}</p>
-        {subtitle && <p className="mt-1.5 text-xs font-medium text-muted-foreground">{subtitle}</p>}
-      </CardContent>
-    </Card>
-  );
-}
-
-const rupees = (amount: string | number) => `₹${Math.round(Number(amount)).toLocaleString("en-IN")}`;
+import {
+  PageHeader, SectionLabel, MetricRow, Metric, Panel, Rows, Row,
+  Tag, EmptyState, LoadError, rupees, count, type Tone
+} from "./ui";
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN", {
   day: "numeric", month: "short", year: "numeric"
@@ -63,43 +31,6 @@ const daysFromNow = (iso: string | null) => {
   const ms = new Date(iso).getTime() - Date.now();
   return Math.ceil(ms / 86400000);
 };
-
-function RenewalBadge({ days, isActive, paid }: { days: number, isActive: boolean, paid: boolean }) {
-  if (!isActive) return <span className="bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wide">Suspended</span>;
-  if (days === Infinity) return <span className="bg-blue-500/10 text-blue-600 text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wide">Lifetime</span>;
-  if (days < 0) {
-    return <span className="bg-destructive/10 text-destructive text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wide">Expired {Math.abs(days)}d ago</span>;
-  }
-  return <span className="bg-amber-500/10 text-amber-600 dark:text-amber-500 text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wide">Expiring in {days}d</span>;
-}
-
-function RenewalRow({ r, onPay }: { r: any, onPay: (id: string) => void }) {
-  return (
-    <div className="p-4 flex flex-col gap-3 hover:bg-muted/30 transition-colors">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-semibold text-sm truncate">{r.name}</div>
-          <div className="text-xs text-muted-foreground mt-0.5 truncate">
-            {r.lastPaidAt ? `Last paid ${formatDate(r.lastPaidAt)}` : "Never paid"}
-            <span className="mx-1.5">&middot;</span>
-            {rupees(r.paidTotal)} LTV
-          </div>
-        </div>
-        <div className="shrink-0 pt-0.5">
-          <RenewalBadge days={daysFromNow(r.expiresAt)} isActive={r.isActive} paid={Number(r.paidTotal) > 0} />
-        </div>
-      </div>
-      <div className="flex items-center justify-between mt-1">
-         <div className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
-           ID: {r.id.split("-")[0]}
-         </div>
-         <Button size="sm" variant="secondary" className="h-7 text-xs px-2 shadow-sm" onClick={() => onPay(r.id)}>
-           <Plus className="w-3 h-3 mr-1" /> Log Payment
-         </Button>
-      </div>
-    </div>
-  );
-}
 
 export default function Money() {
   const { data, isLoading, error } = useAdminMoney();
@@ -118,11 +49,6 @@ export default function Money() {
 
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [busyDelete, setBusyDelete] = useState(false);
-
-  const maxMonthVal = useMemo(() => {
-    if (!data?.byMonth.length) return 1;
-    return Math.max(...data.byMonth.map(m => Number(m.total)));
-  }, [data?.byMonth]);
 
   const sortedRenewals = useMemo(() => {
     if (!data?.renewals) return [];
@@ -201,19 +127,12 @@ export default function Money() {
 
   if (isLoading || (!data && !error)) {
     return (
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Income Book</h1>
-          <p className="mt-1 text-muted-foreground">Track vendor revenue and manage renewals</p>
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
-        </div>
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Skeleton className="h-96 rounded-xl" />
-          </div>
-          <Skeleton className="h-96 rounded-xl" />
+      <div className="animate-in fade-in duration-300">
+        <PageHeader title="Income book" meta="Track vendor revenue and manage renewals" />
+        <Skeleton className="h-[122px] rounded-lg mt-8" />
+        <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-5">
+          <Skeleton className="h-64 rounded-lg lg:col-span-3" />
+          <Skeleton className="h-64 rounded-lg lg:col-span-2" />
         </div>
       </div>
     );
@@ -221,10 +140,9 @@ export default function Money() {
 
   if (error || !data) {
     return (
-      <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center">
-        <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-destructive" />
-        <p className="font-medium">Could not load the income book</p>
-        <p className="mt-1 text-sm text-muted-foreground">{(error as Error)?.message ?? "Unknown error"}</p>
+      <div className="animate-in fade-in duration-300">
+        <PageHeader title="Income book" meta="Track vendor revenue and manage renewals" />
+        <LoadError message={(error as Error)?.message} />
       </div>
     );
   }
@@ -232,173 +150,177 @@ export default function Money() {
   const { summary, payments, byMonth } = data;
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 space-y-8 duration-500 pb-12">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Income Book</h1>
-        <p className="mt-1 text-muted-foreground">Track vendor revenue and manage renewals</p>
-      </div>
+    <div className="animate-in fade-in duration-300 pb-12">
+      <PageHeader title="Income book" meta="Track vendor revenue and manage renewals" />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Stat label="This Month" value={rupees(summary.thisMonth)} icon={TrendingUp} tone="emerald" subtitle={`${rupees(summary.lastMonth)} last month`} />
-        <Stat label="All Time" value={rupees(summary.allTime)} icon={Banknote} tone="blue" subtitle="Lifetime platform revenue" />
-        <Stat label="Paying Shops" value={summary.payingShops.toString()} icon={Building2} tone="purple" subtitle="Have made at least one payment" />
-        <Stat label="Total Volume" value={summary.count.toString()} icon={History} tone="amber" subtitle="Recorded transactions" />
-      </div>
+      <MetricRow>
+        <Metric label="This month" value={rupees(Number(summary.thisMonth))} hint={`${rupees(Number(summary.lastMonth))} last month`} tone="positive" />
+        <Metric label="All time" value={rupees(Number(summary.allTime))} hint="Lifetime platform revenue" />
+        <Metric label="Paying shops" value={count(summary.payingShops)} hint="Have made at least one payment" />
+        <Metric label="Total volume" value={count(summary.count)} hint="Recorded transactions" />
+      </MetricRow>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="border-border/60">
-            <CardHeader className="pb-3 border-b bg-muted/20 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2"><History className="w-5 h-5 text-primary" /> Recent Payments</CardTitle>
-                <CardDescription>Latest vendor income</CardDescription>
-              </div>
-              <Button onClick={() => openRecord()}>
-                <Plus className="w-4 h-4 mr-2" /> Record Payment
+      <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-5">
+        <div className="lg:col-span-3 space-y-8">
+          <div>
+            <SectionLabel action={
+              <Button variant="ghost" size="sm" className="-mr-2 h-7 gap-1 text-[13px] font-normal text-muted-foreground" onClick={() => openRecord()}>
+                <Plus className="h-3.5 w-3.5" strokeWidth={1.75} /> Record payment
               </Button>
-            </CardHeader>
-            <CardContent className="p-0">
+            }>
+              Recent payments
+            </SectionLabel>
+            <Panel>
               {payments.length === 0 ? (
-                <div className="p-12 flex flex-col items-center justify-center text-center text-muted-foreground">
-                  <CheckCircle2 className="w-8 h-8 mb-3 opacity-20" />
-                  <p>No payments recorded yet</p>
-                </div>
+                <EmptyState title="No payments" hint="No payments recorded yet" />
               ) : (
-                <div className="divide-y">
+                <Rows>
                   {payments.map(p => (
-                    <div key={p.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                          {p.method === "cash" ? <Banknote className="w-5 h-5"/> : 
-                           p.method === "card" ? <CreditCard className="w-5 h-5"/> :
-                           <Wallet className="w-5 h-5"/>}
+                    <Row
+                      key={p.id}
+                      label={p.shopName || "Unknown shop"}
+                      sub={
+                        <>
+                          {formatDate(p.paidAt)} · {p.method.toUpperCase()}
+                          {p.coversUntil && ` · Extended to ${formatDate(p.coversUntil)}`}
+                          {p.note && ` · "${p.note}"`}
+                        </>
+                      }
+                      value={
+                        <div className="flex items-center gap-4">
+                          <span>{rupees(Number(p.amount))}</span>
+                          <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(p.id); }} className="text-muted-foreground hover:text-destructive transition-colors">
+                            <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                          </button>
                         </div>
-                        <div>
-                          <div className="font-semibold">{p.shopName || "Unknown Shop"}</div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
-                            <span>{formatDate(p.paidAt)}</span>
-                            <span>&middot;</span>
-                            <span className="uppercase text-[10px] tracking-wider font-bold bg-muted px-1.5 py-0.5 rounded">{p.method}</span>
-                            {p.note && (
-                              <>
-                                <span>&middot;</span>
-                                <span className="italic">"{p.note}"</span>
-                              </>
-                            )}
-                          </div>
-                          {p.coversUntil && (
-                            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1.5 font-medium flex items-center gap-1">
-                              <Calendar className="w-3 h-3" /> Extended to {formatDate(p.coversUntil)}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="font-bold text-lg tabular-nums">{rupees(p.amount)}</div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteConfirm(p.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+                      }
+                    />
                   ))}
-                </div>
+                </Rows>
               )}
-            </CardContent>
-          </Card>
+            </Panel>
+          </div>
 
-          <Card className="border-border/60">
-            <CardHeader className="pb-4 border-b bg-muted/20">
-              <CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="w-5 h-5 text-emerald-500"/> Revenue by Month</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4">
+          <div>
+            <SectionLabel>Revenue by month</SectionLabel>
+            <Panel>
               {byMonth.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground text-sm">No revenue data available.</div>
+                <EmptyState title="No revenue data" hint="No revenue data available" />
               ) : (
-                <div className="space-y-3">
+                <Rows>
                   {byMonth.map(m => (
-                    <div key={m.month} className="flex items-center gap-4">
-                      <div className="w-20 text-sm font-medium">{formatMonth(m.month)}</div>
-                      <div className="flex-1 flex items-center h-6 relative group">
-                        <div className="h-full bg-emerald-500/20 border border-emerald-500/30 rounded-sm transition-all group-hover:bg-emerald-500/30" style={{ width: `${Math.max((Number(m.total)/maxMonthVal)*100, 1)}%` }} />
-                      </div>
-                      <div className="w-28 text-right tabular-nums">
-                        <div className="text-sm font-bold">{rupees(m.total)}</div>
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{m.count} payments</div>
-                      </div>
-                    </div>
+                    <Row
+                      key={m.month}
+                      label={formatMonth(m.month)}
+                      sub={`${count(m.count)} payments`}
+                      value={rupees(Number(m.total))}
+                    />
                   ))}
-                </div>
+                </Rows>
               )}
-            </CardContent>
-          </Card>
+            </Panel>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <Card className="border-border/60">
-            <CardHeader className="pb-3 border-b bg-muted/20">
-              <CardTitle className="text-lg flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-500" /> Needs Attention</CardTitle>
-              <CardDescription>Renewals and chase list</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {loyal.length === 0 && trials.length === 0 && (
-                <div className="p-12 text-center text-muted-foreground">
-                  <CheckCircle2 className="w-8 h-8 mb-3 opacity-20 mx-auto" />
-                  <p className="font-medium">All Clear</p>
-                  <p className="text-sm mt-1">No shops are expiring soon.</p>
+        <div className="lg:col-span-2 space-y-8">
+          <div>
+            <SectionLabel>Needs attention</SectionLabel>
+            <Panel>
+              {loyal.length === 0 && trials.length === 0 ? (
+                <EmptyState title="All clear" hint="No shops are expiring soon." />
+              ) : (
+                <div className="flex flex-col">
+                  {loyal.length > 0 && (
+                    <div>
+                      <div className="bg-muted/30 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground border-b">
+                        Loyal customers lapsing
+                      </div>
+                      <Rows>
+                        {loyal.map(r => {
+                          const days = daysFromNow(r.expiresAt);
+                          let tone: Tone = "neutral";
+                          let label = "";
+                          if (!r.isActive) { tone = "neutral"; label = "Suspended"; }
+                          else if (days === Infinity) { tone = "neutral"; label = "Lifetime"; }
+                          else if (days < 0) { tone = "danger"; label = `Expired ${Math.abs(days)}d ago`; }
+                          else { tone = "warn"; label = `Expiring in ${days}d`; }
+
+                          return (
+                            <Row
+                              key={r.id}
+                              label={r.name}
+                              sub={`${r.lastPaidAt ? `Last paid ${formatDate(r.lastPaidAt)}` : "Never paid"} · ${rupees(Number(r.paidTotal))} LTV`}
+                              value={<Tag tone={tone}>{label}</Tag>}
+                              onClick={() => openRecord(r.id)}
+                            />
+                          );
+                        })}
+                      </Rows>
+                    </div>
+                  )}
+                  
+                  {trials.length > 0 && (
+                    <div className={loyal.length > 0 ? "border-t" : ""}>
+                      <div className="bg-muted/30 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground border-b">
+                        Trial churn
+                      </div>
+                      <Rows>
+                        {trials.map(r => {
+                          const days = daysFromNow(r.expiresAt);
+                          let tone: Tone = "neutral";
+                          let label = "";
+                          if (!r.isActive) { tone = "neutral"; label = "Suspended"; }
+                          else if (days === Infinity) { tone = "neutral"; label = "Lifetime"; }
+                          else if (days < 0) { tone = "danger"; label = `Expired ${Math.abs(days)}d ago`; }
+                          else { tone = "warn"; label = `Expiring in ${days}d`; }
+
+                          return (
+                            <Row
+                              key={r.id}
+                              label={r.name}
+                              sub={`${r.lastPaidAt ? `Last paid ${formatDate(r.lastPaidAt)}` : "Never paid"} · ${rupees(Number(r.paidTotal))} LTV`}
+                              value={<Tag tone={tone}>{label}</Tag>}
+                              onClick={() => openRecord(r.id)}
+                            />
+                          );
+                        })}
+                      </Rows>
+                    </div>
+                  )}
                 </div>
               )}
-              
-              {loyal.length > 0 && (
-                <>
-                  <div className="bg-muted/50 px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b">
-                    Loyal Customers Lapsing
-                  </div>
-                  <div className="divide-y border-b last:border-b-0">
-                    {loyal.map(r => <RenewalRow key={r.id} r={r} onPay={openRecord} />)}
-                  </div>
-                </>
-              )}
-              
-              {trials.length > 0 && (
-                <>
-                  <div className="bg-muted/50 px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-t-0">
-                    Trial Churn (Never Paid)
-                  </div>
-                  <div className="divide-y last:border-b-0">
-                    {trials.map(r => <RenewalRow key={r.id} r={r} onPay={openRecord} />)}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+            </Panel>
+          </div>
         </div>
       </div>
 
       <Dialog open={recordOpen} onOpenChange={setRecordOpen}>
-        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>Log an offline or direct payment from a shop.</DialogDescription>
+            <DialogTitle className="text-lg font-medium">Record payment</DialogTitle>
+            <DialogDescription className="text-sm">
+              Log an offline or direct payment from a shop.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto min-h-0 space-y-4 py-4 pr-1">
+          <div className="space-y-4 py-2">
             {!selectedShopId ? (
               <div className="space-y-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-2.5 flex h-full items-center text-muted-foreground w-4 h-4" />
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" strokeWidth={1.75} />
                   <Input 
                     placeholder="Search shops..." 
                     value={shopSearch} 
                     onChange={e => setShopSearch(e.target.value)}
-                    className="pl-9"
+                    className="pl-9 rounded-md"
                     autoFocus
                   />
                 </div>
                 
                 {overviewLoading ? (
-                  <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+                  <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
                 ) : (
-                  <div className="border rounded-md divide-y max-h-60 overflow-y-auto">
+                  <div className="border rounded-md divide-y max-h-[40vh] overflow-y-auto">
                     {filteredShops.length === 0 ? (
                       <div className="p-4 text-center text-sm text-muted-foreground">No shops found</div>
                     ) : (
@@ -406,11 +328,11 @@ export default function Money() {
                         <button 
                           key={s.id} 
                           type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-muted/50 text-sm flex justify-between items-center transition-colors"
+                          className="w-full text-left px-3 py-2.5 hover:bg-muted/50 text-[13px] flex justify-between items-center transition-colors"
                           onClick={() => setSelectedShopId(s.id)}
                         >
                           <span className="font-medium truncate mr-2">{s.name}</span>
-                          {s.expiresAt && <span className="text-xs text-muted-foreground shrink-0 tabular-nums">Expires {formatDate(s.expiresAt)}</span>}
+                          {s.expiresAt && <span className="text-muted-foreground shrink-0 tabular-nums">Expires {formatDate(s.expiresAt)}</span>}
                         </button>
                       ))
                     )}
@@ -418,32 +340,32 @@ export default function Money() {
                 )}
               </div>
             ) : (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+              <div className="space-y-5 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between p-3 rounded-md border bg-muted/30">
                   <div className="min-w-0 pr-4">
-                    <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">Selected Shop</div>
-                    <div className="font-semibold text-sm truncate">{overview?.shops.find(s => s.id === selectedShopId)?.name || selectedShopId}</div>
+                    <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground mb-0.5">Selected shop</div>
+                    <div className="font-medium text-[13px] truncate">{overview?.shops.find(s => s.id === selectedShopId)?.name || selectedShopId}</div>
                   </div>
-                  <Button variant="outline" size="sm" className="shrink-0" onClick={() => setSelectedShopId(null)}>Change</Button>
+                  <Button variant="outline" size="sm" className="shrink-0 h-7 text-xs" onClick={() => setSelectedShopId(null)}>Change</Button>
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Amount (₹)</label>
-                  <Input type="number" min={1} step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" autoFocus />
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Amount (₹)</label>
+                  <Input type="number" min={1} step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" autoFocus className="rounded-md tabular-nums" />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Payment Method</label>
-                  <div className="grid grid-cols-5 gap-2">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Payment method</label>
+                  <div className="flex flex-wrap gap-2">
                     {(["cash", "upi", "bank", "card", "other"] as const).map(m => (
                       <button
                         key={m}
                         type="button"
                         onClick={() => setMethod(m)}
-                        className={`h-9 rounded-md text-xs font-bold uppercase tracking-wider border transition-colors ${
+                        className={`h-8 rounded-md px-3 text-[11px] font-medium uppercase tracking-[0.14em] border transition-colors ${
                           method === m 
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm" 
-                            : "bg-background text-muted-foreground hover:bg-muted"
+                            ? "bg-foreground text-background border-foreground" 
+                            : "bg-transparent text-muted-foreground hover:bg-muted"
                         }`}
                       >
                         {m}
@@ -453,42 +375,39 @@ export default function Money() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Paid Date</label>
-                    <Input type="date" max={new Date().toISOString().split("T")[0]} value={paidAt} onChange={e => setPaidAt(e.target.value)} />
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Paid date</label>
+                    <Input type="date" max={new Date().toISOString().split("T")[0]} value={paidAt} onChange={e => setPaidAt(e.target.value)} className="rounded-md" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center justify-between">
-                      <span>Add Time</span>
-                      <span className="text-[10px] text-muted-foreground uppercase">Days</span>
-                    </label>
-                    <Input type="number" min={0} value={coversDays} onChange={e => setCoversDays(e.target.value)} placeholder="e.g. 365" />
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Add time (days)</label>
+                    <Input type="number" min={0} value={coversDays} onChange={e => setCoversDays(e.target.value)} placeholder="e.g. 365" className="rounded-md tabular-nums" />
                   </div>
                 </div>
 
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => setCoversDays("30")}>+30d</Button>
-                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => setCoversDays("90")}>+90d</Button>
-                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => setCoversDays("365")}>+1y</Button>
-                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => setCoversDays("36500")}>Lifetime</Button>
+                  <Button type="button" variant="outline" className="h-7 text-[11px] flex-1 rounded-md" onClick={() => setCoversDays("30")}>+30d</Button>
+                  <Button type="button" variant="outline" className="h-7 text-[11px] flex-1 rounded-md" onClick={() => setCoversDays("90")}>+90d</Button>
+                  <Button type="button" variant="outline" className="h-7 text-[11px] flex-1 rounded-md" onClick={() => setCoversDays("365")}>+1y</Button>
+                  <Button type="button" variant="outline" className="h-7 text-[11px] flex-1 rounded-md" onClick={() => setCoversDays("36500")}>Lifetime</Button>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center justify-between">
+                <div className="space-y-1.5">
+                  <label className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                     <span>Note</span>
-                    <span className="text-xs text-muted-foreground font-normal">Optional</span>
+                    <span className="font-normal opacity-70 tracking-normal capitalize">Optional</span>
                   </label>
-                  <Input value={note} onChange={e => setNote(e.target.value)} placeholder="Reference number or comment..." />
+                  <Input value={note} onChange={e => setNote(e.target.value)} placeholder="Reference number or comment..." className="rounded-md" />
                 </div>
               </div>
             )}
           </div>
 
-          <DialogFooter className="mt-2 pt-4 border-t">
+          <DialogFooter>
             <Button variant="ghost" onClick={() => setRecordOpen(false)}>Cancel</Button>
             <Button disabled={!selectedShopId || !amount || isNaN(Number(amount)) || Number(amount) <= 0 || busy} onClick={submitPayment}>
               {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Payment
+              Save payment
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -497,12 +416,10 @@ export default function Money() {
       <Dialog open={!!deleteConfirm} onOpenChange={o => !o && setDeleteConfirm(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-destructive flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" /> Delete Payment
-            </DialogTitle>
+            <DialogTitle className="text-lg font-medium text-destructive">Delete payment</DialogTitle>
           </DialogHeader>
           <div className="py-2 text-sm text-muted-foreground">
-            Are you sure you want to delete this payment? This will remove the revenue from your records. If this payment granted license time, deleting it will <strong>not</strong> revoke that time.
+            Are you sure you want to delete this payment? This will remove the revenue from your records. If this payment granted license time, deleting it will not revoke that time.
           </div>
           <DialogFooter className="mt-4">
             <Button variant="ghost" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
