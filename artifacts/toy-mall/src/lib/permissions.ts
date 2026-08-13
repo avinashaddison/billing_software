@@ -76,6 +76,7 @@ export const PATH_RESOURCE: Record<string, ResourceKey> = {
   "/labels":     "labels",
   "/suppliers":  "suppliers",
   "/suppliers/report": "suppliers",
+  "/suppliers/stock-check": "suppliers",
   "/deals":      "deals",
   "/staff":      "staff",
 };

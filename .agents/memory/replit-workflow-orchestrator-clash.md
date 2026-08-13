@@ -39,3 +39,6 @@ Pick ONE owner of the ports and make the config agree:
 
 Do not leave both running. Before debugging any "preview is blank" report on a repo that
 has its own dev orchestrator, check the workflow list for duplicates first.
+
+### Killing stray API processes safely
+`pkill -f 'api-server/dist/index.mjs'` matched the killing shell's OWN command line (the real API cmdline is relative `./dist/index.mjs`) — it killed my shell while the API survived. Use the bracket trick so the pattern can't match itself: `kill $(pgrep -f 'dist/index[.]mjs')`, then verify with `pgrep`, then restart only "Start application".

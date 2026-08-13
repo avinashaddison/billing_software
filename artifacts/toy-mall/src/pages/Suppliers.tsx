@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
-import { Truck, Plus, X, Edit3, Check, Phone, Mail, MapPin, FileText, Loader2, Search, Package, ChevronDown, AlertTriangle, Wallet, Trash2, CalendarDays } from "lucide-react";
+import { Truck, Plus, X, Edit3, Check, Phone, Mail, MapPin, FileText, Loader2, Search, Package, ChevronDown, AlertTriangle, Wallet, Trash2, CalendarDays, ClipboardList } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -204,12 +204,18 @@ export default function Suppliers() {
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">{suppliers.length} supplier{suppliers.length !== 1 ? "s" : ""} on record</p>
           </div>
-          {isAdmin && (
-            <button onClick={() => { resetForm(); setShowForm(true); }}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-full font-bold text-sm hover:opacity-90 active:scale-95 transition-all shadow-md">
-              <Plus className="w-4 h-4" /> Add
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <Link href="/suppliers/stock-check"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm border bg-card hover:bg-muted active:scale-95 transition-all">
+              <ClipboardList className="w-4 h-4" /> Stock Check
+            </Link>
+            {isAdmin && (
+              <button onClick={() => { resetForm(); setShowForm(true); }}
+                className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-full font-bold text-sm hover:opacity-90 active:scale-95 transition-all shadow-md">
+                <Plus className="w-4 h-4" /> Add
+              </button>
+            )}
+          </div>
         </div>
         <div className="relative mt-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

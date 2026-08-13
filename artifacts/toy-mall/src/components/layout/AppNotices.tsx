@@ -100,7 +100,7 @@ export function AppNotices() {
   if (!data?.viewAs && visible.length === 0) return null;
 
   return (
-    <div className="z-50">
+    <div className="no-print z-50">
       {data?.viewAs && (
         <div className="flex items-center justify-center gap-3 bg-violet-600 px-4 py-2 text-center text-xs font-bold text-white">
           <Eye className="h-3.5 w-3.5 shrink-0" />

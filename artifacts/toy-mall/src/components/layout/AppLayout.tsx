@@ -19,7 +19,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* ── Offline banner ── */}
         {!isOnline && (
-          <div className="flex items-center justify-center gap-2 bg-red-600 text-white text-xs font-bold py-2 px-4 text-center z-50">
+          <div className="no-print flex items-center justify-center gap-2 bg-red-600 text-white text-xs font-bold py-2 px-4 text-center z-50">
             <WifiOff className="w-3.5 h-3.5 shrink-0" />
             No internet connection — billing data may not sync
           </div>
