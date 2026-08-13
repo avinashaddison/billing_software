@@ -40,3 +40,5 @@ as the obviously-correct choice at every call site.
 - Concurrent agents editing sibling files each run typecheck against the others'
   half-finished state, so their green typecheck means little. Re-run it yourself at
   the end.
+
+**Update (Aug 2026, admin 10X polish):** With hard guardrails in the brief (numbered, "violations = failed task"), three parallel design subagents preserved every handler and flow. Fast review recipe for large restyle diffs: (1) per-file handler-count balance — `git diff | grep -cE '^-.*\b(onClick|onSubmit|mutate|fetch\(|toast|disabled=)'` vs the `^+` count; equal counts = moved not dropped; (2) removals-only scan — `git diff -U0 | grep '^-'` filtered of className/markup noise, then grep the current file for anything suspicious that was removed (state inits, branch conditions, menu items). Residual failure mode even on success: they silently drop *explanatory comments* that guard known regressions (dialog-reuse resets, popup-blocker flows) — grep for removed comment fragments and restore the why-comments.

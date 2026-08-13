@@ -6,8 +6,7 @@ import { UploadCloud, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { PageHeader, SectionLabel, Panel, Rows, EmptyState, LoadError } from "./ui";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader, SectionLabel, Panel, Rows, Row, EmptyState, LoadError, PanelSkeleton, formatDateTime } from "./ui";
 
 const BASE = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
 const API = `${BASE}/api`;
@@ -132,9 +131,21 @@ export default function Backups() {
       <div className="animate-in fade-in duration-300">
         <PageHeader title="Database backups" meta="Manage automated and manual backups" />
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <Skeleton className="h-40 rounded-lg" />
-          <Skeleton className="h-40 rounded-lg" />
+          <PanelSkeleton rows={1} header={true} />
+          <PanelSkeleton rows={1} header={true} />
         </div>
+        <div className="mt-10">
+          <PanelSkeleton rows={5} header={true} />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="animate-in fade-in duration-300">
+        <PageHeader title="Database backups" meta="Manage automated and manual backups" />
+        <LoadError message={(error as Error).message} onRetry={refresh} />
       </div>
     );
   }
@@ -147,18 +158,18 @@ export default function Backups() {
         <div>
           <SectionLabel>Schedule</SectionLabel>
           <Panel>
-            <div className="p-4">
-              <label className="text-[13px] font-medium">Backup time (0-23 UTC)</label>
-              <div className="mt-2 flex items-center gap-3">
+            <div className="p-5">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">Backup time (0-23 UTC)</label>
+              <div className="mt-2.5 flex items-center gap-3">
                 <Input
                   type="number" min={0} max={23}
                   value={hour ?? ""}
                   placeholder={isLoading ? "Loading…" : "—"}
                   disabled={isLoading || !!error}
                   onChange={(e) => setHour(e.target.value === "" ? null : Number(e.target.value))}
-                  className="h-9 w-24 rounded-md"
+                  className="h-9 w-24 rounded-lg tabular-nums border-gray-200 focus-visible:ring-violet-500"
                 />
-                <Button variant="secondary" size="sm" onClick={saveHour} disabled={savingHour || hour === null} className="h-9">
+                <Button variant="secondary" size="sm" onClick={saveHour} disabled={savingHour || hour === null} className="h-9 bg-violet-50 text-violet-700 hover:bg-violet-100 focus-visible:ring-violet-500">
                   Save
                 </Button>
               </div>
@@ -169,12 +180,12 @@ export default function Backups() {
         <div>
           <SectionLabel>Manual backup</SectionLabel>
           <Panel>
-            <div className="p-4">
-              <Button onClick={backupNow} disabled={backingUp} variant="secondary" className="h-9 w-full">
+            <div className="p-5">
+              <Button onClick={backupNow} disabled={backingUp} variant="secondary" className="h-9 w-full bg-violet-50 text-violet-700 hover:bg-violet-100 font-semibold focus-visible:ring-violet-500">
                 {backingUp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} /> : null}
                 Backup now
               </Button>
-              <p className="mt-3 text-center text-[13px] text-muted-foreground">
+              <p className="mt-3.5 text-center text-[12px] text-gray-400">
                 Backups are saved to Cloudflare R2 and Telegram.
               </p>
             </div>
@@ -182,12 +193,12 @@ export default function Backups() {
         </div>
       </div>
 
-      <div className="mt-10">
+      <div className="mt-10 pb-12">
         <SectionLabel
           action={
             <>
               <input type="file" accept=".gz,.json.gz,application/gzip" className="hidden" ref={fileInputRef} onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
-              <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="-mr-2 h-7 gap-1 text-[13px] font-normal text-muted-foreground">
+              <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="-mr-2 h-7 gap-1 text-[13px] font-normal text-violet-600 hover:text-violet-700 focus-visible:ring-violet-500">
                 <UploadCloud className="h-3.5 w-3.5" strokeWidth={1.75} />
                 Upload snapshot
               </Button>
@@ -198,31 +209,28 @@ export default function Backups() {
         </SectionLabel>
         
         <Panel>
-          {error ? (
-            <LoadError message={(error as Error).message} />
-          ) : data?.listError ? (
-            <LoadError message={data.listError} />
+          {data?.listError ? (
+            <div className="p-5"><LoadError message={data.listError} onRetry={refresh} /></div>
           ) : !data?.files?.length ? (
-            <EmptyState title="No recent backups found in R2" />
+            <EmptyState icon={UploadCloud} title="No recent backups found in R2" hint="Manual or scheduled backups will appear here." />
           ) : (
             <Rows>
               {data.files.map((f: any) => (
-                <div key={f.key} className="flex items-center justify-between gap-4 px-4 py-3">
-                   <div className="min-w-0">
-                     <div className="truncate text-sm font-medium">{f.filename}</div>
-                     <div className="mt-0.5 truncate text-[13px] text-muted-foreground">
-                       {((f.sizeBytes ?? 0) / 1024 / 1024).toFixed(2)} MB · {f.lastModified ? new Date(f.lastModified).toLocaleString() : "Unknown date"}
-                     </div>
-                   </div>
-                   <div className="flex shrink-0 items-center gap-2">
-                     <Button variant="ghost" size="sm" onClick={() => download(f)} className="h-8 text-[13px]">
-                       Download
-                     </Button>
-                     <Button variant="ghost" size="sm" onClick={() => setRestoreTarget(f)} className="h-8 text-[13px] text-destructive hover:bg-destructive/10 hover:text-destructive">
-                       Restore
-                     </Button>
-                   </div>
-                </div>
+                <Row
+                  key={f.key}
+                  label={<div className="truncate font-mono text-[12px] text-gray-800 max-w-[200px] sm:max-w-md" title={f.filename}>{f.filename}</div>}
+                  sub={`${((f.sizeBytes ?? 0) / 1024 / 1024).toFixed(2)} MB · ${f.lastModified ? formatDateTime(f.lastModified) : "Unknown date"}`}
+                  value={
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <Button variant="ghost" size="sm" onClick={() => download(f)} className="h-7 px-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-violet-600 hover:bg-violet-50 hover:text-violet-700 focus-visible:ring-violet-500">
+                        Download
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setRestoreTarget(f)} className="h-7 px-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-red-600 hover:bg-red-50 hover:text-red-700 focus-visible:ring-red-500">
+                        Restore
+                      </Button>
+                    </div>
+                  }
+                />
               ))}
             </Rows>
           )}
@@ -230,26 +238,26 @@ export default function Backups() {
       </div>
 
       <Dialog open={!!restoreTarget} onOpenChange={(o) => !o && setRestoreTarget(null)}>
-        <DialogContent className="sm:max-w-md rounded-lg">
+        <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Danger: Database Restore</DialogTitle>
+            <DialogTitle className="text-red-600">Danger: Database Restore</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="border-l-2 border-destructive py-1.5 pl-3.5 text-[13px] leading-relaxed text-muted-foreground">
+          <div className="space-y-5 py-2">
+            <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 text-[13px] leading-relaxed text-red-800">
               You are about to overwrite the ENTIRE platform database with the snapshot:
               <br/><br/>
-              <span className="font-mono text-foreground">{restoreTarget?.filename}</span>
+              <span className="font-mono font-bold">{restoreTarget?.filename}</span>
               <br/><br/>
               All changes since this snapshot will be permanently lost. This affects all tenants.
             </div>
-            <div className="space-y-2">
-              <label className="text-[13px] font-medium">Type RESTORE to confirm</label>
-              <Input value={restoreConfirm} onChange={(e) => setRestoreConfirm(e.target.value)} placeholder="RESTORE" className="h-9 rounded-md font-mono" />
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">Type RESTORE to confirm</label>
+              <Input value={restoreConfirm} onChange={(e) => setRestoreConfirm(e.target.value)} placeholder="RESTORE" className="h-10 rounded-lg font-mono tracking-wider border-gray-200 focus-visible:ring-red-500" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRestoreTarget(null)} className="h-9 text-[13px]">Cancel</Button>
-            <Button variant="destructive" onClick={doRestore} disabled={restoreConfirm !== "RESTORE" || restoring} className="h-9 text-[13px]">
+            <Button variant="ghost" onClick={() => setRestoreTarget(null)} className="text-gray-600 hover:text-gray-900 focus-visible:ring-gray-500">Cancel</Button>
+            <Button variant="destructive" onClick={doRestore} disabled={restoreConfirm !== "RESTORE" || restoring} className="focus-visible:ring-red-500">
               {restoring && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
               Restore database
             </Button>
@@ -258,26 +266,26 @@ export default function Backups() {
       </Dialog>
 
       <Dialog open={!!uploadFile} onOpenChange={(o) => !o && setUploadFile(null)}>
-        <DialogContent className="sm:max-w-md rounded-lg">
+        <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Danger: Upload Restore</DialogTitle>
+            <DialogTitle className="text-red-600">Danger: Upload Restore</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="border-l-2 border-destructive py-1.5 pl-3.5 text-[13px] leading-relaxed text-muted-foreground">
+          <div className="space-y-5 py-2">
+            <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 text-[13px] leading-relaxed text-red-800">
               You are about to overwrite the ENTIRE platform database with the uploaded file:
               <br/><br/>
-              <span className="font-mono text-foreground">{uploadFile?.name}</span>
-              <br/><br/>
+              <span className="font-mono font-bold truncate block" title={uploadFile?.name}>{uploadFile?.name}</span>
+              <br/>
               All changes since this snapshot will be permanently lost. This affects all tenants.
             </div>
-            <div className="space-y-2">
-              <label className="text-[13px] font-medium">Type RESTORE to confirm</label>
-              <Input value={uploadConfirm} onChange={(e) => setUploadConfirm(e.target.value)} placeholder="RESTORE" className="h-9 rounded-md font-mono" />
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">Type RESTORE to confirm</label>
+              <Input value={uploadConfirm} onChange={(e) => setUploadConfirm(e.target.value)} placeholder="RESTORE" className="h-10 rounded-lg font-mono tracking-wider border-gray-200 focus-visible:ring-red-500" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => { setUploadFile(null); if(fileInputRef.current) fileInputRef.current.value=""; }} className="h-9 text-[13px]">Cancel</Button>
-            <Button variant="destructive" onClick={doUploadRestore} disabled={uploadConfirm !== "RESTORE" || uploadRestoring} className="h-9 text-[13px]">
+            <Button variant="ghost" onClick={() => { setUploadFile(null); if(fileInputRef.current) fileInputRef.current.value=""; }} className="text-gray-600 hover:text-gray-900 focus-visible:ring-gray-500">Cancel</Button>
+            <Button variant="destructive" onClick={doUploadRestore} disabled={uploadConfirm !== "RESTORE" || uploadRestoring} className="focus-visible:ring-red-500">
               {uploadRestoring && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
               Restore database
             </Button>

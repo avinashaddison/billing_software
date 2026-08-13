@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { SectionLabel, Panel, Rows, Tag, Notice, LoadError } from "./ui";
+import { SectionLabel, Panel, Rows, Tag, Notice, LoadError, EmptyState, PanelSkeleton, formatDateTime } from "./ui";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const BASE = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
 const API = `${BASE}/api`;
@@ -21,8 +22,9 @@ function minutesLeft(until: string | null): number {
 export function PeopleDialog({
   tenantId, shopName, open, onOpenChange,
 }: { tenantId: string | null; shopName?: string; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { data, isLoading, error } = useAdminTenantUsers(tenantId || "");
   const queryClient = useQueryClient();
+  const query = useAdminTenantUsers(tenantId || "");
+  const { data, isLoading, error } = query;
 
   const [busy, setBusy] = useState<string | null>(null);
   const [pinFor, setPinFor] = useState<string | null>(null);
@@ -117,11 +119,11 @@ export function PeopleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-2xl rounded-lg">
-        <DialogHeader className="px-6 py-5 border-b sticky top-0 bg-background z-10">
-          <DialogTitle className="text-[22px] font-medium leading-tight tracking-tight text-foreground">People &amp; access</DialogTitle>
-          <DialogDescription className="mt-1.5 text-[13px] text-muted-foreground">
-            Everyone who can sign in{shopName ? ` to ${shopName}` : ""}. You can set a new PIN or password here, but you
+      <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-2xl rounded-2xl bg-[#F9F9FB] border-gray-100 shadow-xl">
+        <DialogHeader className="px-6 py-5 border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+          <DialogTitle className="text-[22px] font-bold leading-tight tracking-tight text-gray-900">People &amp; access</DialogTitle>
+          <DialogDescription className="mt-1.5 text-[13px] font-medium leading-relaxed text-gray-500">
+            Everyone who can sign in{shopName ? ` to ` : ""}{shopName && <span className="font-semibold text-gray-700">{shopName}</span>}. You can set a new PIN or password here, but you
             cannot read the current one.
           </DialogDescription>
         </DialogHeader>
@@ -130,168 +132,181 @@ export function PeopleDialog({
           {issuedPin && (
             <div className="mb-8">
               <Notice tone="positive">
-                <p className="text-[13px] font-medium text-foreground">New PIN for {issuedPin.name}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-4">
-                  <span className="font-mono text-[26px] font-medium tracking-[0.2em] tabular-nums leading-none text-foreground">{issuedPin.pin}</span>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => copy(issuedPin.pin)}>Copy</Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setIssuedPin(null)}>Done</Button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-bold text-emerald-900">New PIN for {issuedPin.name}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-4">
+                    <span className="font-mono text-[28px] font-bold tracking-[0.2em] tabular-nums leading-none text-emerald-950 bg-white/50 px-3 py-2 rounded-lg border border-emerald-200/50 shadow-sm">{issuedPin.pin}</span>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="h-9 px-4 text-[13px] font-semibold border-emerald-200 text-emerald-700 bg-white hover:bg-emerald-50 hover:border-emerald-300 shadow-sm transition-colors" onClick={() => copy(issuedPin.pin)}>Copy</Button>
+                      <Button size="sm" variant="ghost" className="h-9 px-4 text-[13px] font-medium text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 transition-colors" onClick={() => setIssuedPin(null)}>Done</Button>
+                    </div>
                   </div>
+                  <p className="mt-3 text-[12px] font-medium text-emerald-700/80">Write it down or tell them now — once you close this, it cannot be shown again.</p>
                 </div>
-                <p className="mt-2.5 text-xs text-muted-foreground">Write it down or tell them now — once you close this, it cannot be shown again.</p>
               </Notice>
             </div>
           )}
 
           {isLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.75} /></div>
+            <div className="space-y-10">
+              <div>
+                <Skeleton className="h-5 w-32 mb-4" />
+                <PanelSkeleton rows={2} header={false} />
+              </div>
+              <div>
+                <Skeleton className="h-5 w-32 mb-4" />
+                <PanelSkeleton rows={3} header={false} />
+              </div>
+            </div>
           ) : error ? (
-            <LoadError message={(error as Error).message} />
+            <LoadError message={(error as Error).message} onRetry={refresh} />
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-10">
               <div>
                 <SectionLabel>Email logins</SectionLabel>
                 <Panel>
-                  <Rows>
-                    {(data?.users ?? []).map((u) => {
-                      const row: RowDef = { kind: "user", id: u.id, label: u.email };
-                      return (
-                        <div key={u.id} className="p-4">
-                          <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-medium text-foreground truncate">{u.email}</p>
-                                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{u.role}</span>
-                                {!u.isActive && <Tag tone="danger">Off</Tag>}
+                  {(data?.users ?? []).length === 0 ? (
+                    <EmptyState title="No email logins" hint="This shop has no owner or admin accounts with email access." />
+                  ) : (
+                    <Rows>
+                      {(data?.users ?? []).map((u) => {
+                        const row: RowDef = { kind: "user", id: u.id, label: u.email };
+                        return (
+                          <div key={u.id} className="p-5 transition-colors hover:bg-gray-50/50">
+                            <div className="flex flex-wrap items-center justify-between gap-4">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                  <p className="text-[14px] font-bold text-gray-900 truncate max-w-[200px]" title={u.email}>{u.email}</p>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{u.role}</span>
+                                  {!u.isActive && <Tag tone="danger">Off</Tag>}
+                                </div>
+                                <p className="mt-1 text-[12px] font-medium text-gray-500">
+                                  {u.lastLoginAt ? `Last in ${formatDateTime(u.lastLoginAt)}` : "Never signed in"}
+                                </p>
                               </div>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {u.lastLoginAt ? `Last in ${new Date(u.lastLoginAt).toLocaleString("en-IN")}` : "Never signed in"}
-                              </p>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                              <Button
-                                size="sm" variant="outline" className="h-7 text-xs"
-                                disabled={!!busy}
-                                onClick={() => { setPwdFor(pwdFor === u.id ? null : u.id); setPwdValue(""); setShowPwd(false); }}
-                              >
-                                Password
-                              </Button>
-                              <ToggleButton
-                                active={u.isActive}
-                                busy={busy === `toggle-${u.id}`} anyBusy={!!busy}
-                                onOn={() => toggle(row, true)}
-                                onOff={() => setConfirmOff(row)}
-                              />
-                            </div>
-                          </div>
-
-                          {pwdFor === u.id && (
-                            <div className="mt-4 rounded-md bg-muted/40 p-3">
-                              <label className="text-xs font-medium text-foreground">New password for {u.email}</label>
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <Input
-                                  type={showPwd ? "text" : "password"}
-                                  value={pwdValue}
-                                  onChange={(e) => setPwdValue(e.target.value)}
-                                  placeholder="At least 8 characters"
-                                  autoComplete="new-password"
-                                  className="h-8 text-[13px] w-full max-w-[200px]"
+                              <div className="flex shrink-0 items-center gap-2">
+                                <Button
+                                  size="sm" variant="outline" className="h-8 text-[12px] font-medium bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-gray-200 transition-colors"
+                                  disabled={!!busy}
+                                  onClick={() => { setPwdFor(pwdFor === u.id ? null : u.id); setPwdValue(""); setShowPwd(false); }}
+                                >
+                                  Password
+                                </Button>
+                                <ToggleButton
+                                  active={u.isActive}
+                                  busy={busy === `toggle-${u.id}`} anyBusy={!!busy}
+                                  onOn={() => toggle(row, true)}
+                                  onOff={() => setConfirmOff(row)}
                                 />
-                                <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" onClick={() => setShowPwd((v) => !v)}>
-                                  {showPwd ? "Hide" : "Show"}
-                                </Button>
-                                <Button size="sm" className="h-8 text-xs" onClick={() => resetPassword(u.id)} disabled={!!busy || pwdValue.length < 8}>
-                                  {busy === `pwd-${u.id}` ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.75} /> : "Set"}
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setPwdFor(null); setPwdValue(""); }}>Cancel</Button>
                               </div>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {(data?.users ?? []).length === 0 && (
-                      <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">This shop has no email logins</div>
-                    )}
-                  </Rows>
+
+                            {pwdFor === u.id && (
+                              <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/80 p-4 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+                                <label className="text-[12px] font-semibold text-gray-700">New password for {u.email}</label>
+                                <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+                                  <Input
+                                    type={showPwd ? "text" : "password"}
+                                    value={pwdValue}
+                                    onChange={(e) => setPwdValue(e.target.value)}
+                                    placeholder="At least 8 characters"
+                                    autoComplete="new-password"
+                                    className="h-9 text-[13px] w-full max-w-[240px] bg-white border-gray-200 focus-visible:ring-violet-500 shadow-sm"
+                                  />
+                                  <Button size="sm" variant="outline" className="h-9 px-3 text-[12px] font-medium bg-white border-gray-200 text-gray-600 hover:text-gray-900 transition-colors" onClick={() => setShowPwd((v) => !v)}>
+                                    {showPwd ? "Hide" : "Show"}
+                                  </Button>
+                                  <Button size="sm" className="h-9 px-4 text-[12px] bg-violet-600 hover:bg-violet-700 text-white font-semibold shadow-sm transition-colors" onClick={() => resetPassword(u.id)} disabled={!!busy || pwdValue.length < 8}>
+                                    {busy === `pwd-${u.id}` ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : "Set password"}
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-9 px-3 text-[12px] font-medium text-gray-500 hover:text-gray-900 transition-colors" onClick={() => { setPwdFor(null); setPwdValue(""); }}>Cancel</Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </Rows>
+                  )}
                 </Panel>
               </div>
 
               <div>
                 <SectionLabel>Staff (PIN)</SectionLabel>
                 <Panel>
-                  <Rows>
-                    {(data?.staff ?? []).map((s) => {
-                      const row: RowDef = { kind: "staff", id: s.id, label: s.name };
-                      const locked = minutesLeft(s.lockedUntil);
-                      return (
-                        <div key={s.id} className="p-4">
-                          <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-medium text-foreground truncate">{s.name}</p>
-                                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.role}</span>
-                                {!s.isActive && <Tag tone="danger">Off</Tag>}
-                                {locked > 0 && <Tag tone="warn">Locked {locked}m</Tag>}
+                  {(data?.staff ?? []).length === 0 ? (
+                    <EmptyState title="No staff accounts" hint="This shop has no staff members using PINs." />
+                  ) : (
+                    <Rows>
+                      {(data?.staff ?? []).map((s) => {
+                        const row: RowDef = { kind: "staff", id: s.id, label: s.name };
+                        const locked = minutesLeft(s.lockedUntil);
+                        return (
+                          <div key={s.id} className="p-5 transition-colors hover:bg-gray-50/50">
+                            <div className="flex flex-wrap items-center justify-between gap-4">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                  <p className="text-[14px] font-bold text-gray-900 truncate max-w-[200px]" title={s.name}>{s.name}</p>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{s.role}</span>
+                                  {!s.isActive && <Tag tone="danger">Off</Tag>}
+                                  {locked > 0 && <Tag tone="warn">Locked {locked}m</Tag>}
+                                </div>
+                                <p className="mt-1 text-[12px] font-medium text-gray-500">
+                                  {locked > 0
+                                    ? `Too many wrong PINs — blocked for ${locked}m`
+                                    : s.failedAttempts > 0
+                                      ? `${s.failedAttempts} wrong PIN ${s.failedAttempts === 1 ? "try" : "tries"} so far`
+                                      : "No sign-in problems"}
+                                </p>
                               </div>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {locked > 0
-                                  ? `Too many wrong PINs — blocked for ${locked}m`
-                                  : s.failedAttempts > 0
-                                    ? `${s.failedAttempts} wrong PIN ${s.failedAttempts === 1 ? "try" : "tries"} so far`
-                                    : "No sign-in problems"}
-                              </p>
-                            </div>
-                            <div className="flex shrink-0 flex-wrap items-center gap-2">
-                              {locked > 0 && (
-                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => unlock(s.id)} disabled={!!busy}>
-                                  {busy === `unlock-${s.id}` ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" strokeWidth={1.75} /> : null}
-                                  Unlock
+                              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                {locked > 0 && (
+                                  <Button size="sm" variant="outline" className="h-8 text-[12px] font-medium border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 transition-colors" onClick={() => unlock(s.id)} disabled={!!busy}>
+                                    {busy === `unlock-${s.id}` ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" strokeWidth={1.75} /> : null}
+                                    Unlock
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm" variant="outline" className="h-8 text-[12px] font-medium bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-gray-200 transition-colors"
+                                  disabled={!!busy}
+                                  onClick={() => { setPinFor(pinFor === s.id ? null : s.id); setPinValue(""); }}
+                                >
+                                  New PIN
                                 </Button>
-                              )}
-                              <Button
-                                size="sm" variant="outline" className="h-7 text-xs"
-                                disabled={!!busy}
-                                onClick={() => { setPinFor(pinFor === s.id ? null : s.id); setPinValue(""); }}
-                              >
-                                New PIN
-                              </Button>
-                              <ToggleButton
-                                active={s.isActive}
-                                busy={busy === `toggle-${s.id}`} anyBusy={!!busy}
-                                onOn={() => toggle(row, true)}
-                                onOff={() => setConfirmOff(row)}
-                              />
-                            </div>
-                          </div>
-
-                          {pinFor === s.id && (
-                            <div className="mt-4 rounded-md bg-muted/40 p-3">
-                              <label className="text-xs font-medium text-foreground">New PIN for {s.name}</label>
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <Input
-                                  inputMode="numeric"
-                                  maxLength={4}
-                                  value={pinValue}
-                                  onChange={(e) => setPinValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                                  placeholder="4 digits"
-                                  className="h-8 w-24 font-mono tracking-[0.2em] text-[13px]"
+                                <ToggleButton
+                                  active={s.isActive}
+                                  busy={busy === `toggle-${s.id}`} anyBusy={!!busy}
+                                  onOn={() => toggle(row, true)}
+                                  onOff={() => setConfirmOff(row)}
                                 />
-                                <Button size="sm" className="h-8 text-xs" onClick={() => setNewPin(s.id)} disabled={!!busy}>
-                                  {busy === `pin-${s.id}` ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.75} /> : pinValue ? "Set this PIN" : "Generate random"}
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setPinFor(null); setPinValue(""); }}>Cancel</Button>
                               </div>
-                              <p className="mt-2 text-[11px] text-muted-foreground">Clears any lockout. Old PIN stops working immediately.</p>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {(data?.staff ?? []).length === 0 && (
-                      <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">This shop has no staff accounts</div>
-                    )}
-                  </Rows>
+
+                            {pinFor === s.id && (
+                              <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/80 p-4 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+                                <label className="text-[12px] font-semibold text-gray-700">New PIN for {s.name}</label>
+                                <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+                                  <Input
+                                    inputMode="numeric"
+                                    maxLength={4}
+                                    value={pinValue}
+                                    onChange={(e) => setPinValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                                    placeholder="4 digits"
+                                    className="h-9 w-28 bg-white border-gray-200 font-mono font-bold tracking-[0.25em] text-[15px] text-center focus-visible:ring-violet-500 shadow-sm"
+                                  />
+                                  <Button size="sm" className="h-9 px-4 text-[12px] bg-violet-600 hover:bg-violet-700 text-white font-semibold shadow-sm transition-colors" onClick={() => setNewPin(s.id)} disabled={!!busy}>
+                                    {busy === `pin-${s.id}` ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : pinValue ? "Set this PIN" : "Generate random"}
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-9 px-3 text-[12px] font-medium text-gray-500 hover:text-gray-900 transition-colors" onClick={() => { setPinFor(null); setPinValue(""); }}>Cancel</Button>
+                                </div>
+                                <p className="mt-2.5 text-[11px] font-medium text-gray-400">Clears any lockout. Old PIN stops working immediately.</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </Rows>
+                  )}
                 </Panel>
               </div>
             </div>
@@ -300,14 +315,16 @@ export function PeopleDialog({
           {confirmOff && (
             <div className="mt-8">
               <Notice tone="warn">
-                <p className="text-[13px] font-medium text-foreground">Stop {confirmOff.label} from signing in?</p>
-                <p className="mt-1 text-xs text-muted-foreground">They will be refused at the login screen until switched back on. Data is not deleted.</p>
-                <div className="mt-3 flex items-center gap-2">
-                  <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => toggle(confirmOff, false)} disabled={!!busy}>
-                    {busy === `toggle-${confirmOff.id}` ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" strokeWidth={1.75} /> : null}
-                    Yes, switch off
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setConfirmOff(null)}>Cancel</Button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-bold text-amber-900">Stop {confirmOff.label} from signing in?</p>
+                  <p className="mt-1 text-[12px] font-medium text-amber-700/80">They will be refused at the login screen until switched back on. Data is not deleted.</p>
+                  <div className="mt-3.5 flex items-center gap-2.5">
+                    <Button size="sm" className="h-9 px-4 text-[13px] font-semibold bg-red-600 text-white hover:bg-red-700 shadow-sm transition-colors" onClick={() => toggle(confirmOff, false)} disabled={!!busy}>
+                      {busy === `toggle-${confirmOff.id}` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={2} /> : null}
+                      Yes, switch off
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-9 px-4 text-[13px] font-medium text-amber-700 hover:bg-amber-100 hover:text-amber-900 transition-colors" onClick={() => setConfirmOff(null)}>Cancel</Button>
+                  </div>
                 </div>
               </Notice>
             </div>
@@ -324,12 +341,16 @@ function ToggleButton({
   return (
     <Button
       size="sm"
-      variant="ghost"
-      className={`h-7 text-xs ${active ? "text-destructive hover:bg-destructive/10 hover:text-destructive" : "text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-600"}`}
+      variant="outline"
+      className={`h-8 text-[12px] font-medium transition-colors ${
+        active 
+          ? "border-red-200 text-red-600 bg-white hover:bg-red-50 hover:border-red-300 hover:text-red-700" 
+          : "border-emerald-200 text-emerald-700 bg-white hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800"
+      }`}
       onClick={active ? onOff : onOn}
       disabled={anyBusy}
     >
-      {busy ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.75} /> : active ? "Switch off" : "Switch on"}
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} /> : active ? "Switch off" : "Switch on"}
     </Button>
   );
 }

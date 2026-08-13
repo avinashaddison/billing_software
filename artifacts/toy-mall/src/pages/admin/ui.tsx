@@ -6,7 +6,7 @@
  * screen builds from these primitives so the whole console reads as one surface.
  */
 import { useId } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
 import type { LucideIcon } from "lucide-react";
 
 /* ── Tone is a meaning, not a colour ─────────────────────────────── */
@@ -39,6 +39,19 @@ export const count  = (n: number) => n.toLocaleString("en-IN");
 
 export const amountExact = (n: number) =>
   `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+
+/* Dates are always displayed on the Asia/Kolkata calendar — the same day
+   boundary every report and the shops' own dashboards use. One format
+   per shape, so no page invents its own. */
+const DAY_FMT = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
+});
+const DATETIME_FMT = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric", month: "short", year: "numeric",
+  hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata",
+});
+export const formatDay = (d: string | number | Date) => DAY_FMT.format(new Date(d));
+export const formatDateTime = (d: string | number | Date) => DATETIME_FMT.format(new Date(d));
 
 /* ── Sparkline ─────────────────────────────────────────────────────
    Lightweight SVG mini-chart — no external library needed.
@@ -178,7 +191,7 @@ export function Metric({
   sparkLabel?: string;
 }) {
   return (
-    <div className="flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <div className="flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
       <div className="flex items-start justify-between">
         <div>
           {Icon && (
@@ -237,8 +250,22 @@ export function Row({
   const body = (
     <>
       <div className="min-w-0">
-        <div className="truncate text-[13px] font-medium text-gray-900">{label}</div>
-        {sub && <div className="mt-0.5 truncate text-[12px] text-gray-400">{sub}</div>}
+        {/* Plain-string labels get a hover title automatically, so truncation
+            never hides text (e.g. an R2 error detail) with no way to read it. */}
+        <div
+          className="truncate text-[13px] font-medium text-gray-900"
+          title={typeof label === "string" ? label : undefined}
+        >
+          {label}
+        </div>
+        {sub && (
+          <div
+            className="mt-0.5 truncate text-[12px] text-gray-400"
+            title={typeof sub === "string" ? sub : undefined}
+          >
+            {sub}
+          </div>
+        )}
       </div>
       {value !== undefined && (
         <div className={`shrink-0 text-[13px] font-semibold tabular-nums ${tone === "neutral" ? "text-gray-700" : TONE_TEXT[tone]}`}>
@@ -254,10 +281,47 @@ export function Row({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center justify-between gap-4 px-5 py-3.5 text-left transition-colors hover:bg-violet-50/50"
+      className="flex w-full items-center justify-between gap-4 px-5 py-3.5 text-left transition-colors hover:bg-violet-50/50 active:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-500/40"
     >
       {body}
     </button>
+  );
+}
+
+/* ── Tables ───────────────────────────────────────────────────────
+   Thin presentational pieces so dense tables read like the rest of
+   the console. Compose inside a <Panel>. */
+export function DataTable({ children }: { children: ReactNode }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-left">{children}</table>
+    </div>
+  );
+}
+
+export function Th({
+  children, className = "", ...rest
+}: { children?: ReactNode; className?: string } & ThHTMLAttributes<HTMLTableCellElement>) {
+  return (
+    <th
+      {...rest}
+      className={`whitespace-nowrap border-b border-gray-100 bg-gray-50/60 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400 first:pl-5 last:pr-5 ${className}`}
+    >
+      {children}
+    </th>
+  );
+}
+
+export function Td({
+  children, className = "", ...rest
+}: { children?: ReactNode; className?: string } & TdHTMLAttributes<HTMLTableCellElement>) {
+  return (
+    <td
+      {...rest}
+      className={`px-4 py-3 text-[13px] text-gray-700 first:pl-5 last:pr-5 ${className}`}
+    >
+      {children}
+    </td>
   );
 }
 
@@ -312,11 +376,41 @@ export function EmptyState({
   );
 }
 
-export function LoadError({ message }: { message?: string }) {
+export function LoadError({ message, onRetry }: { message?: string; onRetry?: () => void }) {
   return (
     <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-6">
       <p className="text-[13px] font-semibold text-red-700">Could not load this section</p>
       <p className="mt-1 text-[12px] text-red-500">{message ?? "Unknown error"}</p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="mt-3 rounded-lg bg-white px-3 py-1.5 text-[12px] font-semibold text-red-700 ring-1 ring-red-200 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40"
+        >
+          Try again
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Loading placeholder shaped like a Panel of Rows, so pages don't each
+ *  invent their own spinner. Purely visual. */
+export function PanelSkeleton({ rows = 4, header = true }: { rows?: number; header?: boolean }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      {header && (
+        <div className="border-b border-gray-100 px-5 py-4">
+          <div className="h-4 w-40 animate-pulse rounded-md bg-gray-100" />
+        </div>
+      )}
+      <div className="divide-y divide-gray-50">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between gap-4 px-5 py-3.5">
+            <div className="h-3.5 w-1/3 animate-pulse rounded bg-gray-100" />
+            <div className="h-3.5 w-16 animate-pulse rounded bg-gray-100" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -331,10 +425,10 @@ export function FilterChip({
   return (
     <button
       onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
+      className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${
         active
-          ? "bg-violet-600 text-white shadow-sm"
-          : "bg-white border border-gray-200 text-gray-500 hover:border-violet-300 hover:text-violet-700"
+          ? "bg-violet-600 text-white shadow-md shadow-violet-600/25"
+          : "bg-white border border-gray-200 text-gray-500 hover:border-violet-300 hover:text-violet-700 hover:shadow-sm"
       }`}
     >
       {children}

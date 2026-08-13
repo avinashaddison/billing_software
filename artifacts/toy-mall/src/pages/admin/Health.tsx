@@ -1,9 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useAdminHealth, useAdminBackups, adminQueryKeys } from "./api";
 import { Button } from "@/components/ui/button";
+import { RefreshCw, Database, Activity } from "lucide-react";
+import { PageHeader, SectionLabel, Panel, Rows, Row, MetricRow, Metric, Tag, Notice, LoadError, count, PanelSkeleton, EmptyState } from "./ui";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw } from "lucide-react";
-import { PageHeader, SectionLabel, Panel, Rows, Row, MetricRow, Metric, Tag, Notice, LoadError, count } from "./ui";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return bytes + " B";
@@ -47,16 +47,25 @@ export default function Health() {
       <div className="animate-in fade-in duration-300">
         <PageHeader title="Platform health" meta="Real-time system diagnostics" />
         <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <Skeleton className="h-64 rounded-lg" />
-          <Skeleton className="h-64 rounded-lg" />
+          <div className="space-y-8">
+            <PanelSkeleton rows={4} header={true} />
+            <PanelSkeleton rows={3} header={true} />
+          </div>
+          <div className="space-y-8">
+            <MetricRow cols={3}>
+              <Skeleton className="h-[122px] rounded-2xl" />
+              <Skeleton className="h-[122px] rounded-2xl" />
+              <Skeleton className="h-[122px] rounded-2xl" />
+            </MetricRow>
+            <PanelSkeleton rows={5} header={true} />
+            <PanelSkeleton rows={5} header={true} />
+          </div>
         </div>
       </div>
     );
   }
 
   if (error || !data) {
-    /* The header's Refresh only renders on success, so without a retry here a
-       transient health failure would strand the operator with no way back. */
     return (
       <div className="animate-in fade-in duration-300">
         <PageHeader
@@ -64,7 +73,7 @@ export default function Health() {
           actions={
             <Button
               variant="outline" size="sm"
-              className="h-8 gap-1.5 text-[13px]"
+              className="h-8 gap-1.5 text-[13px] bg-white border-gray-200 text-gray-700 hover:bg-gray-50 focus-visible:ring-violet-500"
               onClick={handleRefresh}
               disabled={isFetching}
             >
@@ -76,7 +85,7 @@ export default function Health() {
             </Button>
           }
         />
-        <LoadError message={(error as Error)?.message} />
+        <LoadError message={(error as Error)?.message} onRetry={handleRefresh} />
       </div>
     );
   }
@@ -127,12 +136,12 @@ export default function Health() {
   }
 
   return (
-    <div className="animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-300 pb-12">
       <PageHeader
         title="Platform health"
         meta={`Checked ${formatTimeAgo(data.checkedAt)}`}
         actions={
-          <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isFetching || isBackupsLoading} className="-mr-2 h-7 gap-1 text-[13px] font-normal text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isFetching || isBackupsLoading} className="-mr-2 h-7 gap-1 text-[13px] font-medium text-violet-600 hover:text-violet-700 hover:bg-violet-50 focus-visible:ring-violet-500">
             <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} strokeWidth={1.75} />
             Refresh
           </Button>
@@ -142,14 +151,14 @@ export default function Health() {
       {backupTone === "danger" && (
         <div className="mb-8">
           <Notice tone="danger">
-            <span className="font-medium text-foreground">{backupTitle}:</span> {backupStatusMsg} If the database fails now, data will be permanently lost.
+            <span className="font-semibold text-red-800">{backupTitle}:</span> {backupStatusMsg} If the database fails now, data will be permanently lost.
           </Notice>
         </div>
       )}
       {backupTone === "warn" && (
         <div className="mb-8">
           <Notice tone="warn">
-            <span className="font-medium text-foreground">{backupTitle}:</span> {backupStatusMsg}
+            <span className="font-semibold text-amber-800">{backupTitle}:</span> {backupStatusMsg}
           </Notice>
         </div>
       )}
@@ -161,7 +170,7 @@ export default function Health() {
             <Rows>
               <Row label="Disk usage" value={data.database.sizePretty} sub={data.database.name} />
               <Row label="Active connections" value={`${data.database.connections.active} / ${data.database.connections.total}`} />
-              <Row label="Migrations applied" value={count(data.database.migrations.applied)} sub={data.database.migrations.latest || "No migrations"} />
+              <Row label="Migrations applied" value={count(data.database.migrations.applied)} sub={<span className="block truncate max-w-[200px]" title={data.database.migrations.latest || undefined}>{data.database.migrations.latest || "No migrations"}</span>} />
               <Row 
                 label="Backup status" 
                 value={<Tag tone={backupTone}>{backupTitle}</Tag>} 
@@ -173,19 +182,20 @@ export default function Health() {
           <div className="mt-8">
             <SectionLabel>Largest tables</SectionLabel>
             <Panel>
-              <Rows>
-                {data.database.biggestTables.map((t) => (
-                  <Row 
-                    key={t.name} 
-                    label={<span className="font-mono text-[13px]">{t.name}</span>} 
-                    sub={`~${count(t.rowEstimate)} planner est. rows`} 
-                    value={t.sizePretty} 
-                  />
-                ))}
-                {data.database.biggestTables.length === 0 && (
-                   <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">No table data available</div>
-                )}
-              </Rows>
+              {data.database.biggestTables.length === 0 ? (
+                <EmptyState icon={Database} title="No tables found" hint="The database appears empty." />
+              ) : (
+                <Rows>
+                  {data.database.biggestTables.map((t) => (
+                    <Row 
+                      key={t.name} 
+                      label={<span className="font-mono text-[12px] text-gray-800 truncate block max-w-[150px]" title={t.name}>{t.name}</span>} 
+                      sub={`~${count(t.rowEstimate)} planner est. rows`} 
+                      value={t.sizePretty} 
+                    />
+                  ))}
+                </Rows>
+              )}
             </Panel>
           </div>
         </div>
@@ -193,7 +203,7 @@ export default function Health() {
         <div>
           <SectionLabel>Traffic & sessions</SectionLabel>
           <MetricRow cols={3}>
-             <Metric label="Live now" value={count(data.sessions.live)} />
+             <Metric label="Live now" value={count(data.sessions.live)} tone="positive" />
              <Metric label="24h active" value={count(data.sessions.activeDay)} />
              <Metric label="Revoked" value={count(data.sessions.revoked)} tone="neutral" />
           </MetricRow>

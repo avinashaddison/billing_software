@@ -5,11 +5,10 @@ import { NoticeRow, NoticeLevel } from "./types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Trash2, Search, Loader2 } from "lucide-react";
 import {
-  PageHeader, SectionLabel, Panel, Rows, Tag, EmptyState, LoadError, Notice, type Tone
+  PageHeader, SectionLabel, Panel, Rows, Tag, EmptyState, LoadError, Notice, type Tone, PanelSkeleton, formatDateTime
 } from "./ui";
 
 interface ShopPickerProps {
@@ -32,48 +31,51 @@ function ShopPicker({ shops, value, onChange, disabled }: ShopPickerProps) {
 
   return (
     <div className="relative">
-      <div 
-        className={`flex items-center justify-between h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/50"}`}
+      <button 
+        type="button"
+        className={`flex w-full items-center justify-between h-10 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${disabled ? "opacity-50 cursor-not-allowed" : "hover:border-gray-300"}`}
         onClick={() => !disabled && setOpen(!open)}
       >
-        <span className={value === "all" ? "font-medium text-destructive" : "truncate"}>
+        <span className={value === "all" ? "font-bold text-red-600" : "truncate text-gray-900 font-semibold"}>
           {value === "all" ? "Global broadcast (All shops)" : selected?.name || "Select shop..."}
         </span>
-        <Search className="h-3.5 w-3.5 opacity-50 shrink-0 ml-2" />
-      </div>
+        <Search className="h-4 w-4 text-gray-400 shrink-0 ml-2" />
+      </button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 w-full z-50 rounded-md border bg-popover text-popover-foreground outline-none max-h-60 flex flex-col overflow-hidden">
-            <div className="flex items-center border-b px-3 shrink-0">
-              <Search className="mr-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+          <div className="absolute top-full left-0 mt-1.5 w-full z-50 rounded-xl border border-gray-100 bg-white shadow-lg outline-none max-h-64 flex flex-col overflow-hidden">
+            <div className="flex items-center border-b border-gray-100 px-3 shrink-0 bg-gray-50/80">
+              <Search className="mr-2 h-4 w-4 shrink-0 text-gray-400" />
               <input 
-                className="flex h-9 w-full bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground" 
+                className="flex h-10 w-full bg-transparent py-2 text-[13px] text-gray-900 outline-none placeholder:text-gray-400 font-medium" 
                 placeholder="Search shops..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 autoFocus
               />
             </div>
-            <div className="overflow-y-auto p-1 flex-1">
-              <div 
-                className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none hover:bg-destructive/10 hover:text-destructive font-medium text-destructive transition-colors mb-1"
+            <div className="overflow-y-auto p-1.5 flex-1">
+              <button 
+                type="button"
+                className="relative flex w-full cursor-pointer select-none items-center rounded-lg py-2 px-2.5 text-[13px] outline-none hover:bg-red-50 hover:text-red-700 font-bold text-red-600 transition-colors mb-1 text-left"
                 onClick={() => { onChange("all"); setOpen(false); setSearch(""); }}
               >
                 Global broadcast (All shops)
-              </div>
-              <div className="h-px bg-border my-1 mx-2" />
+              </button>
+              <div className="h-px bg-gray-100 my-1 mx-2" />
               {filtered.map(shop => (
-                <div
+                <button
                   key={shop.id}
-                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none hover:bg-muted transition-colors"
+                  type="button"
+                  className="relative flex w-full cursor-pointer select-none items-center rounded-lg py-2 px-2.5 text-[13px] font-semibold text-gray-700 outline-none hover:bg-gray-50 hover:text-gray-900 transition-colors text-left"
                   onClick={() => { onChange(shop.id); setOpen(false); setSearch(""); }}
                 >
                   {shop.name}
-                </div>
+                </button>
               ))}
               {filtered.length === 0 && (
-                <div className="py-4 text-center text-xs text-muted-foreground">No shops found</div>
+                <div className="py-4 text-center text-[12px] text-gray-400 font-medium">No shops found</div>
               )}
             </div>
           </div>
@@ -82,13 +84,6 @@ function ShopPicker({ shops, value, onChange, disabled }: ShopPickerProps) {
     </div>
   );
 }
-
-const formatDate = (iso: string) => {
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(iso));
-};
 
 export default function Notices() {
   const queryClient = useQueryClient();
@@ -199,21 +194,30 @@ export default function Notices() {
 
   if (noticesLoading || overviewLoading) {
     return (
-      <div className="animate-in fade-in duration-300">
+      <div className="animate-in fade-in duration-300 pb-12">
         <PageHeader title="Notices" meta="Broadcast system messages to shop consoles" />
         <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-5">
-          <Skeleton className="h-64 rounded-lg lg:col-span-3" />
-          <Skeleton className="h-64 rounded-lg lg:col-span-2" />
+          <div className="lg:col-span-3">
+            <SectionLabel>Notice history</SectionLabel>
+            <PanelSkeleton rows={4} />
+          </div>
+          <div className="lg:col-span-2">
+            <SectionLabel>Compose notice</SectionLabel>
+            <PanelSkeleton rows={6} />
+          </div>
         </div>
       </div>
     );
   }
 
-  if (noticesError) {
+  if (noticesError || (!noticesData && !noticesLoading)) {
     return (
-      <div className="animate-in fade-in duration-300">
+      <div className="animate-in fade-in duration-300 pb-12">
         <PageHeader title="Notices" meta="Broadcast system messages to shop consoles" />
-        <LoadError message={(noticesError as Error)?.message} />
+        <LoadError 
+          message={(noticesError as Error)?.message || "Failed to load notices"} 
+          onRetry={() => queryClient.invalidateQueries({ queryKey: adminQueryKeys.notices })} 
+        />
       </div>
     );
   }
@@ -245,36 +249,38 @@ export default function Notices() {
                   if (notice.level === "critical") levelTone = "danger";
 
                   return (
-                    <div key={notice.id} className={`p-4 transition-colors ${!notice.isActive ? 'opacity-50' : ''}`}>
+                    <div key={notice.id} className={`p-5 transition-colors ${!notice.isActive ? 'opacity-60 bg-gray-50/50' : 'bg-white hover:bg-gray-50/30'}`}>
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[13px] font-medium">{notice.title}</span>
+                            <span className="text-[14px] font-bold text-gray-900">{notice.title}</span>
                             <Tag tone={statusTone}>{statusLabel}</Tag>
                             <Tag tone={levelTone}>{notice.level}</Tag>
                           </div>
-                          <p className="mt-1.5 text-sm text-muted-foreground whitespace-pre-wrap break-words">{notice.body}</p>
-                          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                            <span>{isGlobal ? "Global broadcast" : notice.shopName}</span>
+                          <p className="mt-2 text-[13px] leading-relaxed text-gray-600 whitespace-pre-wrap break-words">{notice.body}</p>
+                          <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">
+                            <span className={isGlobal ? "text-violet-600 font-bold" : ""}>{isGlobal ? "Global broadcast" : notice.shopName}</span>
                             {(notice.startsAt || notice.endsAt) && (
                               <>
-                                <span>·</span>
-                                <span>{notice.startsAt ? formatDate(notice.startsAt) : 'Now'} → {notice.endsAt ? formatDate(notice.endsAt) : 'Forever'}</span>
+                                <span className="opacity-50">·</span>
+                                <span>{notice.startsAt ? formatDateTime(notice.startsAt) : 'Now'} → {notice.endsAt ? formatDateTime(notice.endsAt) : 'Forever'}</span>
                               </>
                             )}
                             {notice.createdBy && (
                               <>
-                                <span>·</span>
-                                <span className="normal-case tracking-normal">by {notice.createdBy}</span>
+                                <span className="opacity-50">·</span>
+                                <span className="normal-case tracking-normal font-medium text-gray-500" title={notice.createdBy}>
+                                  by <span className="truncate max-w-[150px] inline-block align-bottom">{notice.createdBy}</span>
+                                </span>
                               </>
                             )}
                           </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-2 pt-0.5">
                           <Button
-                            variant="outline"
+                            variant={notice.isActive ? "outline" : "default"}
                             size="sm"
-                            className="h-7 text-[11px] px-2"
+                            className={`h-8 text-[11px] px-3 font-semibold ${notice.isActive ? 'text-gray-600 hover:text-gray-900 focus-visible:ring-violet-500/40' : 'bg-gray-900 text-white hover:bg-gray-800 focus-visible:ring-violet-500/40'}`}
                             onClick={() => handleToggle(notice)}
                             disabled={!!processingId}
                           >
@@ -283,11 +289,11 @@ export default function Notices() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                            className="h-8 w-8 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors rounded-lg focus-visible:ring-violet-500/40"
                             onClick={() => setDeleteTarget(notice)}
                             disabled={!!processingId}
                           >
-                            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                            <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                           </Button>
                         </div>
                       </div>
@@ -302,9 +308,9 @@ export default function Notices() {
         <div className="lg:col-span-2">
           <SectionLabel>Compose notice</SectionLabel>
           <Panel>
-            <div className="p-4 space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Target audience</label>
+            <div className="p-5 space-y-5">
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400">Target audience</label>
                 <ShopPicker 
                   shops={shops} 
                   value={tenantId} 
@@ -312,21 +318,24 @@ export default function Notices() {
                   disabled={isSubmitting || overviewLoading} 
                 />
                 {tenantId === "all" && (
-                  <div className="mt-2">
+                  <div className="mt-3">
                     <Notice tone="danger">Global broadcasts interrupt every active user. Use cautiously.</Notice>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Urgency level</label>
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400">Urgency level</label>
                 <div className="flex flex-wrap gap-2">
                   {(['info', 'warning', 'critical'] as NoticeLevel[]).map(l => (
                     <button
                       key={l}
+                      type="button"
                       onClick={() => !isSubmitting && setLevel(l)}
-                      className={`h-8 rounded-md px-3 text-[11px] font-medium uppercase tracking-[0.14em] border transition-colors ${
-                        level === l ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'
+                      className={`h-9 rounded-lg px-4 text-[11px] font-bold uppercase tracking-[0.14em] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 focus-visible:ring-offset-1 ${
+                        level === l 
+                          ? 'bg-gray-900 text-white shadow-sm ring-1 ring-gray-900' 
+                          : 'bg-white text-gray-500 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 hover:ring-gray-300'
                       }`}
                     >
                       {l}
@@ -335,21 +344,21 @@ export default function Notices() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Title</label>
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400">Title</label>
                 <Input 
                   placeholder="e.g. Scheduled maintenance" 
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   disabled={isSubmitting}
-                  className="rounded-md"
+                  className="h-10 rounded-lg text-[13px] focus-visible:ring-violet-500/40"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Message</label>
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400">Message</label>
                 <textarea 
-                  className="flex min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                  className="flex min-h-[120px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-[13px] text-gray-900 placeholder:text-gray-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-50 resize-y shadow-sm"
                   value={body}
                   onChange={e => setBody(e.target.value)}
                   placeholder="The message that will appear in their console..."
@@ -358,36 +367,36 @@ export default function Notices() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400">
                     <span>Starts at</span>
-                    <span className="font-normal opacity-70 tracking-normal capitalize">Optional</span>
+                    <span className="font-semibold opacity-70 tracking-normal capitalize">Optional</span>
                   </label>
                   <Input 
                     type="datetime-local" 
                     value={startsAt} 
                     onChange={e => setStartsAt(e.target.value)} 
                     disabled={isSubmitting}
-                    className="rounded-md text-[13px]"
+                    className="h-10 rounded-lg text-[13px] focus-visible:ring-violet-500/40"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400">
                     <span>Ends at</span>
-                    <span className="font-normal opacity-70 tracking-normal capitalize">Optional</span>
+                    <span className="font-semibold opacity-70 tracking-normal capitalize">Optional</span>
                   </label>
                   <Input 
                     type="datetime-local" 
                     value={endsAt} 
                     onChange={e => setEndsAt(e.target.value)} 
                     disabled={isSubmitting}
-                    className="rounded-md text-[13px]"
+                    className="h-10 rounded-lg text-[13px] focus-visible:ring-violet-500/40"
                   />
                 </div>
               </div>
 
-              <div className="pt-2">
-                <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting}>
+              <div className="pt-3">
+                <Button className="w-full font-semibold rounded-lg h-10" onClick={handleSubmit} disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Publish notice
                 </Button>
@@ -398,24 +407,24 @@ export default function Notices() {
       </div>
 
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md sm:rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-medium text-destructive">Confirm deletion</DialogTitle>
+            <DialogTitle className="text-[18px] font-bold text-red-600">Confirm deletion</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm">Are you sure you want to delete this notice?</p>
+            <p className="text-[13px] text-gray-700">Are you sure you want to delete this notice?</p>
             {deleteTarget && (
-              <div className="mt-3 p-3 bg-muted/50 rounded-md text-[13px] border">
+              <div className="mt-3 p-3 bg-red-50/50 rounded-xl text-[13px] font-medium border border-red-100 text-gray-900">
                 {deleteTarget.title}
               </div>
             )}
-            <p className="text-[13px] text-muted-foreground mt-4">
+            <p className="text-[12px] text-gray-500 mt-4 leading-relaxed">
               This action cannot be undone. If the notice is currently live, it will immediately disappear from shop consoles.
             </p>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>Cancel</Button>
-            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="font-semibold">Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting} className="font-semibold rounded-lg">
               {isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Delete notice
             </Button>
           </DialogFooter>

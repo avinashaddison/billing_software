@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { adminQueryKeys } from "./api";
 import { ACCESS_PRESETS, type AccessKey, type OverviewData } from "./types";
-import { Notice, Rows, Row } from "./ui";
+import { Notice, Rows, Row, formatDay } from "./ui";
 
 const BASE = (typeof window !== "undefined" && import.meta.env.BASE_URL?.replace(/\/$/, "")) || "";
 const API = `${BASE}/api`;
@@ -63,12 +63,12 @@ export function ToggleActiveDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent className="sm:rounded-2xl">
         <AlertDialogHeader>
-          <AlertDialogTitle>
+          <AlertDialogTitle className="text-[18px] font-bold text-gray-900">
             {suspending ? `Suspend ${shop?.name}?` : `Reactivate ${shop?.name}?`}
           </AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogDescription className="text-[13px] text-gray-500 leading-relaxed">
             {suspending
               ? "Everyone at this shop will be locked out at their next sign-in and cannot bill until you reactivate them. Their data is left untouched."
               : "Staff and owners at this shop will be able to sign in and bill again straight away."}
@@ -77,13 +77,13 @@ export function ToggleActiveDialog({
         {suspending && shop?.activity === "trading" && (
           <div className="my-2">
             <Notice tone="danger">
-              This shop is actively trading — it last billed {shop.lastSaleAt ? new Date(shop.lastSaleAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "recently"}.
+              This shop is actively trading — it last billed {shop.lastSaleAt ? formatDay(shop.lastSaleAt) : "recently"}.
             </Notice>
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-          <Button variant={suspending ? "destructive" : "default"} disabled={busy} onClick={run}>
+          <AlertDialogCancel disabled={busy} className="font-semibold rounded-lg">Cancel</AlertDialogCancel>
+          <Button variant={suspending ? "destructive" : "default"} disabled={busy} onClick={run} className="font-semibold rounded-lg">
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
             {suspending ? "Suspend shop" : "Reactivate shop"}
           </Button>
@@ -134,11 +134,11 @@ export function ResetPasswordDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md sm:rounded-2xl">
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>Reset owner password</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-[18px] font-bold text-gray-900">Reset owner password</DialogTitle>
+            <DialogDescription className="text-[13px] text-gray-500 leading-relaxed">
               Sets a new sign-in password for the owner of {shop?.name}
               {shop?.ownerEmail ? ` (${shop.ownerEmail})` : ""}. Their current password stops working immediately, so make sure you can pass this on to them.
             </DialogDescription>
@@ -146,7 +146,7 @@ export function ResetPasswordDialog({
 
           <div className="space-y-4 py-5">
             <div className="space-y-2">
-              <Label htmlFor="new-owner-pwd">New password</Label>
+              <Label htmlFor="new-owner-pwd" className="text-[12px] font-bold uppercase tracking-wider text-gray-500">New password</Label>
               <div className="relative">
                 <Input
                   id="new-owner-pwd"
@@ -155,22 +155,22 @@ export function ResetPasswordDialog({
                   onChange={(e) => setPwd(e.target.value)}
                   placeholder="At least 8 characters"
                   autoComplete="new-password"
-                  className="pr-10"
+                  className="pr-10 rounded-lg focus-visible:ring-violet-500/40"
                 />
                 <button
                   type="button"
                   onClick={() => setShow((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
                   aria-label={show ? "Hide password" : "Show password"}
                 >
                   {show ? <EyeOff className="h-4 w-4" strokeWidth={1.75} /> : <Eye className="h-4 w-4" strokeWidth={1.75} />}
                 </button>
               </div>
-              {tooShort && <p className="text-[13px] text-destructive">Use at least 8 characters.</p>}
+              {tooShort && <p className="text-[12px] font-medium text-red-600">Use at least 8 characters.</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirm-owner-pwd">Confirm password</Label>
+              <Label htmlFor="confirm-owner-pwd" className="text-[12px] font-bold uppercase tracking-wider text-gray-500">Confirm password</Label>
               <Input
                 id="confirm-owner-pwd"
                 type={show ? "text" : "password"}
@@ -178,14 +178,15 @@ export function ResetPasswordDialog({
                 onChange={(e) => setConfirmPwd(e.target.value)}
                 placeholder="Type it again"
                 autoComplete="new-password"
+                className="rounded-lg focus-visible:ring-violet-500/40"
               />
-              {mismatch && <p className="text-[13px] text-destructive">The two passwords do not match.</p>}
+              {mismatch && <p className="text-[12px] font-medium text-red-600">The two passwords do not match.</p>}
             </div>
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-            <Button type="submit" disabled={!valid || busy}>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy} className="font-semibold">Cancel</Button>
+            <Button type="submit" disabled={!valid || busy} className="font-semibold rounded-lg">
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
               Set password
             </Button>
@@ -272,12 +273,12 @@ export function BulkActionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md sm:rounded-2xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-[18px] font-bold text-gray-900">
             {action ? VERB[action] : ""} {count} {count === 1 ? "shop" : "shops"}?
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-[13px] text-gray-500 leading-relaxed">
             {action === "suspend" && "Everyone at these shops will be locked out at their next sign-in and cannot bill until you reactivate them. Their data is left untouched."}
             {action === "activate" && "These shops will be able to sign in and bill again straight away."}
             {action === "extend" && "Adds the same amount of time to every selected shop, counted from whichever is later: today or their current expiry."}
@@ -286,28 +287,28 @@ export function BulkActionDialog({
 
         {failures ? (
           <div className="space-y-3 py-4">
-            <p className="text-[13px] font-medium">These shops were not changed:</p>
-            <div className="max-h-56 overflow-y-auto rounded-lg border">
+            <p className="text-[13px] font-semibold text-gray-900">These shops were not changed:</p>
+            <div className="max-h-56 overflow-y-auto rounded-xl border border-red-100 bg-red-50/50 shadow-sm">
               <Rows>
                 {failures.map((f) => (
                   <Row 
                     key={f.id} 
-                    label={nameOf(f.id)} 
-                    sub={f.error || "Unknown error"} 
+                    label={<span className="font-semibold text-gray-900">{nameOf(f.id)}</span>} 
+                    sub={<span className="text-red-600 font-medium">{f.error || "Unknown error"}</span>} 
                   />
                 ))}
               </Rows>
             </div>
           </div>
         ) : (
-          <div className="space-y-4 py-4">
+          <div className="space-y-5 py-4">
             {action === "extend" && (
               <div className="space-y-2">
-                <Label>Add</Label>
+                <Label className="text-[12px] font-bold uppercase tracking-wider text-gray-500">Add</Label>
                 <Select value={duration} onValueChange={(v) => setDuration(v as AccessKey)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ACCESS_PRESETS.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
+                  <SelectTrigger className="rounded-lg focus-visible:ring-violet-500/40"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {ACCESS_PRESETS.map((p) => <SelectItem key={p.key} value={p.key} className="rounded-lg">{p.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -321,13 +322,13 @@ export function BulkActionDialog({
               </Notice>
             )}
 
-            <div className="max-h-40 overflow-y-auto rounded-lg border">
+            <div className="max-h-48 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50/50 shadow-sm">
               <Rows>
                 {shops.map((s) => (
                   <Row 
                     key={s.id} 
-                    label={s.name} 
-                    value={<span className="font-mono text-muted-foreground">{s.id}</span>} 
+                    label={<span className="font-semibold text-gray-900">{s.name}</span>} 
+                    value={<span className="font-mono text-gray-500 bg-white border border-gray-100 px-1.5 py-0.5 rounded text-[11px] truncate max-w-[120px]" title={s.id}>{s.id}</span>} 
                   />
                 ))}
               </Rows>
@@ -337,14 +338,15 @@ export function BulkActionDialog({
 
         <DialogFooter>
           {failures ? (
-            <Button onClick={() => { onDone(); onOpenChange(false); }}>Close</Button>
+            <Button onClick={() => { onDone(); onOpenChange(false); }} className="font-semibold rounded-lg w-full sm:w-auto">Close</Button>
           ) : (
             <>
-              <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+              <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy} className="font-semibold">Cancel</Button>
               <Button
                 variant={action === "suspend" ? "destructive" : "default"}
                 onClick={run}
                 disabled={busy || count === 0}
+                className="font-semibold rounded-lg"
               >
                 {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
                 {action ? VERB[action] : ""} {count}
@@ -359,9 +361,6 @@ export function BulkActionDialog({
 
 /* ─────────────── kick every device off ─────────────── */
 
-/* Suspending a shop only stops the NEXT sign-in. A phone that is already
- * signed in keeps working off a long-lived cookie, which for a stolen phone or
- * a sacked manager is exactly the wrong behaviour. This ends those sessions. */
 export function ForceSignOutDialog({
   shop, open, onOpenChange,
 }: { shop: Shop | null; open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -392,10 +391,10 @@ export function ForceSignOutDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent className="sm:rounded-2xl">
         <AlertDialogHeader>
-          <AlertDialogTitle>Sign every device out of {shop?.name}?</AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogTitle className="text-[18px] font-bold text-gray-900">Sign every device out of {shop?.name}?</AlertDialogTitle>
+          <AlertDialogDescription className="text-[13px] text-gray-500 leading-relaxed">
             Every phone, tablet and computer currently signed in at this shop is signed out
             straight away, including any half-finished bill on screen. Nobody is locked out —
             they can sign back in with their usual PIN or password. Use this when a device is
@@ -410,8 +409,8 @@ export function ForceSignOutDialog({
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-          <Button variant="destructive" disabled={busy} onClick={run}>
+          <AlertDialogCancel disabled={busy} className="font-semibold rounded-lg">Cancel</AlertDialogCancel>
+          <Button variant="destructive" disabled={busy} onClick={run} className="font-semibold rounded-lg">
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} /> : <LogOut className="mr-2 h-4 w-4" strokeWidth={1.75} />}
             Sign out all devices
           </Button>
@@ -429,8 +428,7 @@ export function ViewAsDialog({
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState<{ as: string; minutes: number } | null>(null);
 
-  /* Permanently mounted and reused for every shop, so this has to be cleared
-     on open or the previous shop's session is offered for this one. */
+  /* Reset on open or the previous shop's ready session is offered for this one. */
   useEffect(() => { if (open) { setReady(null); setBusy(false); } }, [open, shop?.id]);
 
   const start = async () => {
@@ -450,8 +448,8 @@ export function ViewAsDialog({
     }
   };
 
-  /* Opened from a direct click rather than after the await, so the browser
-     does not treat it as a pop-up. */
+  /* Two-step flow: the session is created first, then the tab opens from a
+   * direct click so the browser does not treat it as a pop-up. */
   const openShop = () => {
     window.open(`${BASE}/`, "_blank", "noopener");
     onOpenChange(false);
@@ -459,10 +457,10 @@ export function ViewAsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md sm:rounded-2xl">
         <DialogHeader>
-          <DialogTitle>Open {shop?.name} read-only</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-[18px] font-bold text-gray-900">Open {shop?.name} read-only</DialogTitle>
+          <DialogDescription className="text-[13px] text-gray-500 leading-relaxed">
             Opens the shop&apos;s own app exactly as their staff see it, so you can follow a
             problem through their screens instead of asking them to describe it.
           </DialogDescription>
@@ -470,9 +468,9 @@ export function ViewAsDialog({
 
         <div className="space-y-4 py-4">
           <Notice tone="neutral">
-            <div className="space-y-1 text-foreground">
-              <p className="font-medium text-[13px]">While the session is open:</p>
-              <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
+            <div className="space-y-1.5 text-gray-900">
+              <p className="font-bold text-[13px]">While the session is open:</p>
+              <ul className="list-disc pl-4 space-y-1 text-gray-600 text-[13px]">
                 <li>You can look at everything. You cannot change anything — saving, billing and deleting are all refused.</li>
                 <li>It ends by itself after an hour.</li>
                 <li>The shop can see it in their own device list, listed as vendor support.</li>
@@ -480,30 +478,30 @@ export function ViewAsDialog({
             </div>
           </Notice>
 
-          <p className="text-[13px] leading-relaxed text-muted-foreground">
-            This signs this browser into {shop?.name}. If you were signed into another shop in
+          <p className="text-[13px] leading-relaxed text-gray-500">
+            This signs this browser into <span className="font-semibold text-gray-900">{shop?.name}</span>. If you were signed into another shop in
             this browser, that session is replaced. Your admin console stays signed in.
           </p>
 
           {ready && (
             <Notice tone="positive">
-              <div className="text-foreground">
-                <p className="font-medium">Ready{ready.as ? ` — viewing as ${ready.as}` : ""}</p>
-                <p className="mt-0.5 text-muted-foreground">Expires in {ready.minutes} minutes.</p>
+              <div className="text-gray-900">
+                <p className="font-bold">Ready{ready.as ? ` — viewing as ${ready.as}` : ""}</p>
+                <p className="mt-1 text-[13px] text-emerald-700">Expires in {ready.minutes} minutes.</p>
               </div>
             </Notice>
           )}
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy} className="font-semibold">Cancel</Button>
           {ready ? (
-            <Button onClick={openShop}>
+            <Button onClick={openShop} className="font-semibold rounded-lg">
               <ExternalLink className="mr-2 h-4 w-4" strokeWidth={1.75} />
               Open shop app
             </Button>
           ) : (
-            <Button onClick={start} disabled={busy}>
+            <Button onClick={start} disabled={busy} className="font-semibold rounded-lg">
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />}
               Start read-only session
             </Button>

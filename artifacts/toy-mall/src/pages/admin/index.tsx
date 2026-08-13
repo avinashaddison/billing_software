@@ -4,11 +4,15 @@ import { LoginScreen } from "./LoginScreen";
 import {
   Loader2, LayoutDashboard, Building2, IndianRupee, DatabaseBackup,
   ScrollText, LogOut, Menu, Wallet, Megaphone, Activity, Bell,
-  ChevronDown, Star, SlidersHorizontal,
+  ChevronDown, Star,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import Dashboard from "./Dashboard";
 import ShopsList from "./ShopsList";
 import Pricing from "./Pricing";
@@ -123,7 +127,7 @@ export default function AdminConsole() {
                         setSection(item.key);
                         setNavOpen(false);
                       }}
-                      className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-150 ${
+                      className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60 ${
                         active
                           ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-900/30"
                           : "text-violet-200/70 hover:bg-white/5 hover:text-violet-100"
@@ -213,34 +217,50 @@ export default function AdminConsole() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Filter */}
-            <button className="hidden items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-gray-600 shadow-sm transition-colors hover:border-violet-300 hover:text-violet-700 sm:flex">
-              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Filter
-            </button>
-
-            {/* Bell */}
-            <button className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white shadow-sm transition-colors hover:border-violet-300">
+            {/* Bell — opens notices */}
+            <button
+              onClick={() => setSection("notices")}
+              title="Notices"
+              className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white shadow-sm transition-colors hover:border-violet-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+            >
               <Bell className="h-4 w-4 text-gray-500" strokeWidth={1.75} />
               <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-violet-600" />
             </button>
 
-            {/* Avatar chip */}
-            <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white py-1 pl-1 pr-2 shadow-sm">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-[11px] font-bold text-white">
-                {name.charAt(0).toUpperCase()}
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-[12px] font-semibold leading-tight text-gray-900">{name}</p>
-                <p className="text-[10px] capitalize leading-tight text-gray-400">{me.role}</p>
-              </div>
-              <ChevronDown className="h-3 w-3 text-gray-400" strokeWidth={2} />
-            </div>
+            {/* Account menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white py-1 pl-1 pr-2 shadow-sm transition-colors hover:border-violet-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 data-[state=open]:border-violet-300">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-[11px] font-bold text-white">
+                    {name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="hidden text-left sm:block">
+                    <p className="text-[12px] font-semibold leading-tight text-gray-900">{name}</p>
+                    <p className="text-[10px] capitalize leading-tight text-gray-400">{me.role}</p>
+                  </div>
+                  <ChevronDown className="h-3 w-3 text-gray-400" strokeWidth={2} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                <DropdownMenuLabel className="text-[12px]">
+                  <span className="block truncate font-medium text-gray-900">{me.email}</span>
+                  <span className="block text-[11px] font-normal capitalize text-gray-400">{me.role}</span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="gap-2 text-[13px]">
+                  <LogOut className="h-4 w-4" strokeWidth={1.75} />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
         <ScrollArea className="flex-1">
-          <div className="mx-auto w-full max-w-6xl px-5 py-7 md:px-8">
+          <div
+            key={section}
+            className="mx-auto w-full max-w-6xl px-5 py-7 animate-in fade-in slide-in-from-bottom-1 duration-300 md:px-8"
+          >
             {section === "dashboard" && <Dashboard onNavigate={setSection} />}
             {section === "shops"     && <ShopsList />}
             {section === "money"     && <Money />}
