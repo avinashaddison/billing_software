@@ -88,6 +88,36 @@
   letter-spacing: -0.011em;
   font-feature-settings: "tnum" 1;
 }
+
+/* ─── /admin login — cyber security terminal ─────────────────────
+   Scoped sec-* helpers used only by the console LoginScreen. */
+.sec-grid-bg {
+  background-image:
+    linear-gradient(rgba(124, 58, 237, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+@keyframes sec-scan {
+  0%   { top: 0%;   opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.sec-scan-line { animation: sec-scan 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes sec-pulse {
+  0%, 100% { box-shadow: 0 0 22px rgba(139, 92, 246, 0.35), 0 0 60px rgba(139, 92, 246, 0.12); }
+  50%      { box-shadow: 0 0 36px rgba(139, 92, 246, 0.6),  0 0 90px rgba(139, 92, 246, 0.22); }
+}
+.sec-pulse { animation: sec-pulse 2.6s ease-in-out infinite; }
+@keyframes sec-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+.sec-blink { animation: sec-blink 1.1s steps(1) infinite; }
+.sec-input:-webkit-autofill,
+.sec-input:-webkit-autofill:hover,
+.sec-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #13102a inset;
+  -webkit-text-fill-color: #fff;
+  caret-color: #fff;
+}
 .lp-marquee              { display: flex; width: max-content; animation: lp-marquee-x 40s linear infinite; }
 
 .lp-gradient-saffron {

@@ -25,6 +25,8 @@ export interface OverviewData {
     maxStaff: number | null; maxProducts: number | null;
   }>;
   unassigned: { bills: number; revenue: number } | null;
+  /** Platform-wide daily billing for the last 14 IST days, oldest first. */
+  series: Array<{ day: string; revenue: number; bills: number }>;
 }
 
 export interface TenantDetailData {

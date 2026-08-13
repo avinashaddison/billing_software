@@ -21,3 +21,4 @@
 - [Filter-change request races](filter-change-request-race.md) — newest-request-wins token on any filtered list, and never leave the previous filter's totals sitting under the new filter's label.
 - [Rounding breaks inferred figures](rounding-breaks-inferred-figures.md) — changing a stored total's precision corrupts anything derived by algebra from it (receipt discount, refund ratios); read the line rows instead.
 - [Restyle delegation regressions](restyle-delegation-regressions.md) — "purely visual" subagent restyles drop retry actions from error branches and round editable previews; diff-review, don't trust their summaries.
+- [Decorative chart data hazard](decorative-data-hazard.md) — seeded/fake sparklines & padded totals beside real money fail review; plot real series (overview has 14d series) or render nothing; `|| 1` only in geometry.

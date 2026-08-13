@@ -5,6 +5,7 @@
  * icon badges, subtle shadows, and a violet/indigo accent palette. Every admin
  * screen builds from these primitives so the whole console reads as one surface.
  */
+import { useId } from "react";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
@@ -40,38 +41,36 @@ export const amountExact = (n: number) =>
   `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
 /* ── Sparkline ─────────────────────────────────────────────────────
-   Lightweight SVG mini-chart — no external library needed. */
-function seededValues(seed: number, length = 8): number[] {
-  let s = (Math.abs(Math.round(seed)) % 9999) + 1;
-  const out: number[] = [];
-  for (let i = 0; i < length; i++) {
-    s = ((s * 1103515245) + 12345) & 0x7fffffff;
-    out.push(30 + (s % 60));   // values in [30, 90]
-  }
-  // make the last point slightly higher to show growth
-  out[length - 1] = Math.min(95, out[length - 1]! + 12);
-  return out;
-}
-
+   Lightweight SVG mini-chart — no external library needed.
+   Plots only real data points supplied by the caller; if there is
+   nothing meaningful to plot it renders nothing rather than inventing
+   a shape. */
 export function Sparkline({
-  seed,
+  data,
   color = "#7C3AED",
   width = 84,
   height = 36,
+  label,
 }: {
-  seed: number;
+  /** Real observations, oldest first (e.g. daily revenue). */
+  data: number[];
   color?: string;
   width?: number;
   height?: number;
+  /** What the points measure — surfaced as tooltip + accessible name. */
+  label?: string;
 }) {
-  const values = seededValues(seed);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
+  const gradId = useId();
+  if (data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
   const pad = 3;
-  const pts = values.map((v, i) => {
-    const x = pad + (i / (values.length - 1)) * (width - pad * 2);
-    const y = height - pad - ((v - min) / range) * (height - pad * 2);
+  const pts = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (width - pad * 2);
+    // A flat series (all equal) draws a centred line, not a bottom-hugging one.
+    const y = max === min
+      ? height / 2
+      : height - pad - ((v - min) / (max - min)) * (height - pad * 2);
     return [x, y] as [number, number];
   });
 
@@ -91,15 +90,16 @@ export function Sparkline({
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      aria-hidden
+      {...(label ? { role: "img", "aria-label": label } : { "aria-hidden": true })}
     >
+      {label && <title>{label}</title>}
       <defs>
-        <linearGradient id={`sg-${seed}`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />
           <stop offset="100%" stopColor={color} stopOpacity="0.02" />
         </linearGradient>
       </defs>
-      <path d={fill} fill={`url(#sg-${seed})`} />
+      <path d={fill} fill={`url(#${gradId})`} />
       <path d={curve} fill="none" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -160,8 +160,9 @@ export function Metric({
   icon: Icon,
   iconBg = "bg-violet-100",
   iconColor = "text-violet-600",
-  sparkSeed,
+  spark,
   sparkColor = "#7C3AED",
+  sparkLabel,
 }: {
   label: string;
   value: ReactNode;
@@ -170,9 +171,11 @@ export function Metric({
   icon?: LucideIcon;
   iconBg?: string;
   iconColor?: string;
-  /** Seed for the decorative sparkline. Omit to hide it. */
-  sparkSeed?: number;
+  /** Real data points, oldest first (e.g. daily revenue). Omit to hide the trend. */
+  spark?: number[];
   sparkColor?: string;
+  /** What the points measure, e.g. "Daily revenue, last 14 days". */
+  sparkLabel?: string;
 }) {
   return (
     <div className="flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
@@ -191,9 +194,9 @@ export function Metric({
           </p>
           {hint && <p className="mt-1.5 text-[12px] leading-snug text-gray-400">{hint}</p>}
         </div>
-        {sparkSeed !== undefined && (
+        {spark && spark.length >= 2 && (
           <div className="shrink-0 pt-0.5">
-            <Sparkline seed={sparkSeed} color={sparkColor} />
+            <Sparkline data={spark} color={sparkColor} label={sparkLabel} />
           </div>
         )}
       </div>

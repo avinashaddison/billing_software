@@ -27,11 +27,9 @@ function ShopAvatar({ name }: { name: string }) {
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
-  // Deterministic hue from the name
+  // Deterministic colour from the name
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  const hues = [258, 199, 142, 24, 330, 168, 38]; // violet, teal, green, amber, pink, emerald, orange
-  const hue = hues[Math.abs(hash) % hues.length]!;
   const bgColors = [
     "bg-violet-100 text-violet-700",
     "bg-teal-100 text-teal-700",
@@ -42,7 +40,6 @@ function ShopAvatar({ name }: { name: string }) {
     "bg-orange-100 text-orange-700",
   ];
   const cls = bgColors[Math.abs(hash) % bgColors.length]!;
-  void hue; // used for color selection above
   return (
     <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold ${cls}`}>
       {initials || "?"}
@@ -50,14 +47,16 @@ function ShopAvatar({ name }: { name: string }) {
   );
 }
 
-/** Mini SVG donut for top-shops panel. */
+/** Mini SVG donut for top-shops panel. The centre shows the REAL total —
+ *  the nonzero denominator exists only to keep the geometry finite. */
 function DonutChart({ slices }: { slices: { label: string; value: number; color: string }[] }) {
-  const total = slices.reduce((s, x) => s + x.value, 0) || 1;
+  const total = slices.reduce((s, x) => s + x.value, 0);
+  const denom = total || 1;
   const r = 52, cx = 60, cy = 60, stroke = 20;
   const circumference = 2 * Math.PI * r;
   let offset = 0;
   const segments = slices.map((s) => {
-    const pct = s.value / total;
+    const pct = s.value / denom;
     const dash = pct * circumference;
     const gap = circumference - dash;
     const seg = { ...s, dash, gap, offset };
@@ -67,6 +66,8 @@ function DonutChart({ slices }: { slices: { label: string; value: number; color:
   return (
     <div className="flex items-center gap-5">
       <svg width={120} height={120} viewBox="0 0 120 120">
+        {/* background track keeps the ring visible even with tiny slices */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F3F4F6" strokeWidth={stroke} />
         {segments.map((seg, i) => (
           <circle
             key={i}
@@ -95,7 +96,7 @@ function DonutChart({ slices }: { slices: { label: string; value: number; color:
               <span className="truncate text-[12px] text-gray-600">{s.label}</span>
             </div>
             <span className="shrink-0 text-[12px] font-semibold text-gray-700">
-              {Math.round((s.value / total) * 100)}%
+              {Math.round((s.value / denom) * 100)}%
             </span>
           </div>
         ))}
@@ -134,6 +135,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (section: Sectio
   }
 
   const { totals, shops, unassigned } = data;
+  const series = data.series ?? [];
   const idle = shops.filter((s) => s.activity === "idle").length;
 
   const attention = shops
@@ -142,8 +144,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (section: Sectio
     .sort((a, b) => Number(b.reason.urgent) - Number(a.reason.urgent))
     .slice(0, 6);
 
-  // Top shops by all-time revenue for donut
-  const topShops = [...shops]
+  // Top shops by all-time revenue for donut — zero-revenue shops carry no share
+  const topShops = shops
+    .filter((s) => s.revenueAllTime > 0)
     .sort((a, b) => b.revenueAllTime - a.revenueAllTime)
     .slice(0, 4);
   const topShopsRevenue = topShops.reduce((s, x) => s + x.revenueAllTime, 0);
@@ -171,8 +174,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (section: Sectio
           icon={Building2}
           iconBg="bg-violet-100"
           iconColor="text-violet-600"
-          sparkSeed={totals.shops}
-          sparkColor="#7C3AED"
         />
         <Metric
           label="Revenue"
@@ -186,8 +187,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (section: Sectio
           icon={IndianRupee}
           iconBg="bg-emerald-100"
           iconColor="text-emerald-600"
-          sparkSeed={Math.round(totals.revenueAllTime / 1000)}
+          spark={series.map((d) => d.revenue)}
           sparkColor="#10B981"
+          sparkLabel="Daily billed revenue, last 14 days"
         />
         <Metric
           label="Bills"
@@ -196,8 +198,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (section: Sectio
           icon={Receipt}
           iconBg="bg-blue-100"
           iconColor="text-blue-600"
-          sparkSeed={totals.billsAllTime}
+          spark={series.map((d) => d.bills)}
           sparkColor="#3B82F6"
+          sparkLabel="Bills per day, last 14 days"
         />
         <Metric
           label="Products"
@@ -206,8 +209,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (section: Sectio
           icon={Package}
           iconBg="bg-orange-100"
           iconColor="text-orange-500"
-          sparkSeed={totals.products}
-          sparkColor="#F59E0B"
         />
       </MetricRow>
 
@@ -333,8 +334,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (section: Sectio
       </div>
 
       {/* Bottom row: Revenue + Top shops */}
-      {donutSlices.length > 0 && (
-        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-5">
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-5">
           {/* Revenue summary card */}
           <div className="lg:col-span-3">
             <SectionLabel>Revenue summary</SectionLabel>
@@ -372,13 +372,20 @@ export default function Dashboard({ onNavigate }: { onNavigate: (section: Sectio
           <div className="lg:col-span-2">
             <SectionLabel>Top performing shops</SectionLabel>
             <Panel>
-              <div className="flex items-center justify-center p-5">
-                <DonutChart slices={donutSlices} />
-              </div>
+              {donutSlices.length > 0 ? (
+                <div className="flex items-center justify-center p-5">
+                  <DonutChart slices={donutSlices} />
+                </div>
+              ) : (
+                <EmptyState
+                  icon={TrendingUp}
+                  title="No revenue yet"
+                  hint="Shop revenue share will appear here once bills are recorded."
+                />
+              )}
             </Panel>
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

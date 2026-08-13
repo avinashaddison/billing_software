@@ -24,7 +24,7 @@
  * a shop that may not have earned them.
  */
 import { Router, type IRouter } from "express";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import {
   db,
   tenantsTable,
@@ -79,6 +79,7 @@ router.get("/platform/overview", requirePlatformAdmin, async (_req, res): Promis
   try {
     const today  = istToday();
     const from7  = istShiftDay(today, -6);   // 7 IST days, inclusive of today
+    const from14 = istShiftDay(today, -13);  // 14 IST days, for the daily trend line
     const from30 = istShiftDay(today, -29);  // 30 IST days, inclusive of today
 
     /* Refunds shrink what a customer still owes, so receivables must subtract
@@ -94,7 +95,7 @@ router.get("/platform/overview", requirePlatformAdmin, async (_req, res): Promis
 
     const outstandingPerBill = sql<string>`GREATEST(0, ${billsTable.totalAmount} - ${billsTable.amountPaid} - COALESCE(${refundsSq.refunded}, 0))`;
 
-    const [tenants, money, dues, products, staff, users, owners] = await Promise.all([
+    const [tenants, money, dues, products, staff, users, owners, daily] = await Promise.all([
       db
         .select({
           id:        tenantsTable.id,
@@ -146,6 +147,20 @@ router.get("/platform/overview", requirePlatformAdmin, async (_req, res): Promis
         })
         .from(authUsersTable)
         .where(eq(authUsersTable.role, "owner")),
+
+      /* Platform-wide daily pulse, last 14 IST days. NULL-tenant bills are
+         excluded so the trend agrees with the totals beside it, which also
+         exclude unassigned rows. */
+      db
+        .select({
+          day:     sql<string>`to_char(${billDay}, 'YYYY-MM-DD')`,
+          revenue: sql<string>`coalesce(sum(${billsTable.totalAmount}), 0)`,
+          bills:   sql<number>`(count(*))::int`,
+        })
+        .from(billsTable)
+        .where(and(sql`${billDay} >= ${from14}::date`, isNotNull(billsTable.tenantId)))
+        .groupBy(billDay)
+        .orderBy(billDay),
     ]);
 
     const moneyBy = new Map(money.map((m) => [m.tenantId, m]));
@@ -219,9 +234,20 @@ router.get("/platform/overview", requirePlatformAdmin, async (_req, res): Promis
       ? { bills: orphan.billsAllTime, revenue: num(orphan.revenueAllTime) }
       : null;
 
+    /* Fill calendar gaps so a quiet day reads as zero rather than vanishing
+       and letting the trend line lie about which days had trade. */
+    const dailyBy = new Map(daily.map((d) => [d.day, d]));
+    const series: { day: string; revenue: number; bills: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = istShiftDay(today, -i);
+      const hit = dailyBy.get(d);
+      series.push({ day: d, revenue: num(hit?.revenue), bills: hit?.bills ?? 0 });
+    }
+
     res.json({
       generatedAt: new Date().toISOString(),
       day: today,
+      series,
       totals: {
         shops:          shops.length,
         activeShops:    shops.filter((s) => s.access === "active" || s.access === "expiring").length,
