@@ -50,3 +50,6 @@ Say what failed and that it does not imply absence. Also surface *soft* errors
 the server reports in a 200 body (e.g. a `listError` field when an upstream
 bucket is unreachable) — those never reach react-query's `error`. Reserve the
 empty state for a successful response that genuinely contained nothing.
+
+### "My data got deleted" complaints are usually this bug
+A raw fetch that resolves `[]` on `!r.ok` makes the page render its EMPTY state ("No suppliers yet") after a network blip or expired/revoked session — shopkeepers report it as "data automatically deleted". Fix pattern: throw on !ok → dedicated error branch with retry + "your data is safe" copy; on a failed REFRESH keep showing the stale list and toast instead (full error screen only when there is nothing to show). Checkout/Labels still swallow supplier-list errors this way (low stakes, dropdowns only).

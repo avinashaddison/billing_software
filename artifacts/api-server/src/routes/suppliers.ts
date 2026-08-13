@@ -4,6 +4,7 @@ import { db, suppliersTable, supplierPaymentsTable, productsTable, stockLogsTabl
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { requireAdmin, requireWrite } from "../middlewares/auth";
+import { recordAudit, tenantActor } from "../lib/audit";
 
 const router: IRouter = Router();
 
@@ -104,20 +105,77 @@ router.patch("/suppliers/:id", requireWrite("suppliers"), async (req, res): Prom
   if (phone != null) updates.phone = phone;
   if (address != null) updates.address = address;
   if (notes != null) updates.notes = notes;
-  const [row] = await db
-    .update(suppliersTable)
-    .set(updates)
-    .where(and(
-      eq(suppliersTable.id, id),
-      tenantWhereWrite(suppliersTable.tenantId, req.tenantId),
-    ))
-    .returning();
-  if (!row) { res.status(404).json({ error: "Supplier not found" }); return; }
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "nothing to update" });
+    return;
+  }
+
+  /* Snapshot + update atomically with the row locked, so the audit diff
+     records the EXACT value this request overwrote. A tenant reported
+     supplier fields "disappearing"; the prime suspect is a stale tab saving
+     an old, blank phone over a newly entered one — which is a race by
+     definition, so an unlocked snapshot could log a misleading `from`. */
+  const result = await db.transaction(async (tx) => {
+    const [before] = await tx
+      .select()
+      .from(suppliersTable)
+      .where(and(
+        eq(suppliersTable.id, id),
+        tenantWhereWrite(suppliersTable.tenantId, req.tenantId),
+      ))
+      .for("update");
+    if (!before) return null;
+    const [row] = await tx
+      .update(suppliersTable)
+      .set(updates)
+      .where(and(
+        eq(suppliersTable.id, id),
+        tenantWhereWrite(suppliersTable.tenantId, req.tenantId),
+      ))
+      .returning();
+    if (!row) return null;
+    return { before, row };
+  });
+  if (!result) { res.status(404).json({ error: "Supplier not found" }); return; }
+  const { before, row } = result;
+
+  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  for (const key of Object.keys(updates)) {
+    const fromV = (before as Record<string, unknown>)[key];
+    const toV   = (row    as Record<string, unknown>)[key];
+    if (fromV !== toV) changes[key] = { from: fromV, to: toV };
+  }
+  if (Object.keys(changes).length > 0) {
+    void (async () => {
+      await recordAudit({
+        action: "tenant.supplier.update",
+        ...(await tenantActor(req)),
+        targetTenant: req.tenantId ?? before.tenantId ?? null,
+        metadata: { supplierId: id, supplierName: before.name, changes },
+        ip: req.ip,
+      });
+    })();
+  }
+
   res.json(row);
 });
 
 router.delete("/suppliers/:id", requireWrite("suppliers"), async (req, res): Promise<void> => {
   const id = String(req.params.id);
+  /* Count payments BEFORE the delete — the FK cascade wipes them together
+     with the supplier, and the audit row is the only trace left of how much
+     history went with it.
+
+     DELIBERATELY not tenant-scoped: the cascade deletes every row with this
+     supplier_id regardless of its tenant column (legacy rows have NULL
+     tenant_id), so a scoped count would under-report what was destroyed.
+     No cross-tenant leak is possible — the count is only recorded after the
+     tenant-scoped delete below actually removed the supplier. */
+  const [payments] = await db
+    .select({ n: sql<number>`COUNT(*)::int` })
+    .from(supplierPaymentsTable)
+    .where(eq(supplierPaymentsTable.supplierId, id));
+
   const [row] = await db
     .delete(suppliersTable)
     .where(and(
@@ -126,6 +184,22 @@ router.delete("/suppliers/:id", requireWrite("suppliers"), async (req, res): Pro
     ))
     .returning();
   if (!row) { res.status(404).json({ error: "Supplier not found" }); return; }
+
+  void (async () => {
+    await recordAudit({
+      action: "tenant.supplier.delete",
+      ...(await tenantActor(req)),
+      targetTenant: req.tenantId ?? row.tenantId ?? null,
+      metadata: {
+        supplierId: id,
+        supplierName: row.name,
+        phone: row.phone,
+        paymentsAlsoDeleted: payments?.n ?? 0,
+      },
+      ip: req.ip,
+    });
+  })();
+
   res.sendStatus(204);
 });
 

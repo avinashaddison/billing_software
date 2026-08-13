@@ -271,7 +271,15 @@ export default function ProductDetail() {
       const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, price, salePrice, salePriceUntil, purchasePrice, category, lowStockThreshold: threshold, supplierId: editForm.supplierId || null, barcode: barcode || null }),
+        body: JSON.stringify({
+          name, price, salePrice, salePriceUntil, purchasePrice, category, lowStockThreshold: threshold,
+          /* Only send supplierId when the loaded product actually carried the
+             field (or the user explicitly picked one). If it's blindly sent as
+             "" the server nulls the link — the supplier silently disappears
+             from the product. */
+          ...("supplierId" in product || editForm.supplierId ? { supplierId: editForm.supplierId || null } : {}),
+          barcode: barcode || null,
+        }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       toast.success("Product updated");

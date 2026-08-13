@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
-import { Truck, Plus, X, Edit3, Check, Phone, Mail, MapPin, FileText, Loader2, Search, Package, ChevronDown, AlertTriangle, Wallet, Trash2, CalendarDays, ClipboardList } from "lucide-react";
+import { Truck, Plus, X, Edit3, Check, Phone, Mail, MapPin, FileText, Loader2, Search, Package, ChevronDown, AlertTriangle, Wallet, Trash2, CalendarDays, ClipboardList, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -42,23 +42,26 @@ const fmtDate = (iso: string) =>
 
 const methodLabel = (m: string) => PAYMENT_METHODS.find((x) => x.value === m)?.label ?? m;
 
+/* A failed load must THROW, never resolve to []. Resolving to an empty list
+   makes the page render "No suppliers yet" after a network blip or expired
+   session — which the shopkeeper reads as "my data got deleted". */
 async function fetchSuppliers(): Promise<Supplier[]> {
   const r = await fetch(`${BASE_URL}/api/suppliers`);
-  if (!r.ok) return [];
+  if (!r.ok) throw new Error("suppliers load failed");
   const data = await r.json();
   return Array.isArray(data) ? data : [];
 }
 
 async function fetchProducts(): Promise<ProductLite[]> {
   const r = await fetch(`${BASE_URL}/api/products`);
-  if (!r.ok) return [];
+  if (!r.ok) throw new Error("products load failed");
   const data = await r.json();
   return Array.isArray(data) ? data : [];
 }
 
 async function fetchPayments(supplierId: string): Promise<Payment[]> {
   const r = await fetch(`${BASE_URL}/api/suppliers/${supplierId}/payments`);
-  if (!r.ok) return [];
+  if (!r.ok) throw new Error("payments load failed");
   return r.json();
 }
 
@@ -68,6 +71,7 @@ export default function Suppliers() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts]   = useState<ProductLite[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch]       = useState("");
   const [showForm, setShowForm]   = useState(false);
   const [editId, setEditId]       = useState<string | null>(null);
@@ -83,9 +87,18 @@ export default function Suppliers() {
   const [payForm, setPayForm]         = useState({ amount: "", method: "cash", paidAt: "", note: "" });
   const [paySaving, setPaySaving]     = useState(false);
 
-  const load = () => Promise.all([fetchSuppliers(), fetchProducts()])
-    .then(([s, p]) => { setSuppliers(s); setProducts(p); })
-    .finally(() => setLoading(false));
+  const load = () => {
+    setLoadError(false);
+    return Promise.all([fetchSuppliers(), fetchProducts()])
+      .then(([s, p]) => { setSuppliers(s); setProducts(p); })
+      .catch(() => {
+        setLoadError(true);
+        // A failed REFRESH (after a save) keeps the old list on screen — only
+        // tell the user; the full error screen is for when we have nothing.
+        toast.error("Couldn't refresh suppliers — check your connection");
+      })
+      .finally(() => setLoading(false));
+  };
   useEffect(() => { load(); }, []);
 
   const productsBySupplier = useMemo(() => {
@@ -109,9 +122,14 @@ export default function Suppliers() {
 
   const loadPayments = async (id: string) => {
     setPayLoading((s) => new Set(s).add(id));
-    const list = await fetchPayments(id);
-    setPaymentsMap((m) => ({ ...m, [id]: list }));
-    setPayLoading((s) => { const n = new Set(s); n.delete(id); return n; });
+    try {
+      const list = await fetchPayments(id);
+      setPaymentsMap((m) => ({ ...m, [id]: list }));
+    } catch {
+      toast.error("Couldn't load payment history — try again");
+    } finally {
+      setPayLoading((s) => { const n = new Set(s); n.delete(id); return n; });
+    }
   };
 
   const togglePayments = (id: string) => {
@@ -268,6 +286,16 @@ export default function Suppliers() {
       <div className="flex-1 overflow-y-auto pb-24 md:pb-6">
         {loading ? (
           <div className="flex items-center justify-center h-32"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        ) : loadError && suppliers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-center px-6">
+            <AlertTriangle className="w-12 h-12 opacity-30 mb-3" />
+            <p className="font-bold">Couldn't load suppliers</p>
+            <p className="text-xs mt-1">Your data is safe — this is a connection problem, not a deletion.</p>
+            <button onClick={() => { setLoading(true); load(); }}
+              className="mt-4 flex items-center gap-2 px-4 py-2 rounded-full border font-bold text-sm text-foreground hover:bg-muted active:scale-95 transition-all">
+              <RefreshCw className="w-4 h-4" /> Try again
+            </button>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-center px-6">
             <Truck className="w-12 h-12 opacity-30 mb-3" />
