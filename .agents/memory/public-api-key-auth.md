@@ -3,6 +3,10 @@ name: Public API keys (tenant-scoped programmatic access)
 description: Design decisions and gotchas for the /api/v1 key-auth surface — key storage, tenant scoping, creation caps, and how to test it.
 ---
 
+# Issuing is vendor-only
+- Key create/revoke lives ONLY on platform-admin routes (`/platform/tenants/:id/api-keys`, requirePlatformAdmin); the shop-owner surface (tenant router + Settings page) was deleted at the user's explicit request ("for now"). Don't reintroduce an owner-facing surface without being asked.
+- Admin issuing UI: bind the tenant into the MUTATION VARIABLES and show the shop name inside the reveal-once dialog. Reading the shop picker's current state in onSuccess misattributes a cross-tenant credential when the admin switches shops while a create is in flight.
+
 # Key handling
 - Keys are `adb_` + 48 hex; stored ONLY as a sha256 hex hash (unique) plus a 12-char display prefix. The raw key appears exactly once, in the create response. No un-revoke — mint a new key instead.
 - sha256 (not bcrypt) is fine because keys are high-entropy random strings, not human passwords.

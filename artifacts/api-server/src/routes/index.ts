@@ -18,7 +18,7 @@ import uploadRouter      from "./upload";
 import sharedCartRouter  from "./shared-cart";
 import telegramRouter    from "./telegram";
 import settingsRouter    from "./settings";
-import apiKeysRouter     from "./api-keys";
+import platformApiKeysRouter from "./platform-api-keys";
 import platformRouter    from "./platform";
 import platformInsightsRouter from "./platform-insights";
 import platformPeopleRouter from "./platform-people";
@@ -87,6 +87,7 @@ router.use(platformPeopleRouter);
 router.use(platformMoneyRouter);
 router.use(platformNoticesRouter);
 router.use(platformHealthRouter);
+router.use(platformApiKeysRouter);
 
 // Per-tenant suspend gate (the cloud equivalent of the old license gate).
 router.use(tenantActiveGate);
@@ -124,7 +125,6 @@ router.use(uploadRouter);
 router.use(sharedCartRouter);
 router.use(telegramRouter);
 router.use(settingsRouter);
-router.use(apiKeysRouter);
 router.use(appNoticesRouter);
 
 export default router;

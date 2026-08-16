@@ -2,8 +2,8 @@
  * /developers — public API reference for the Addison Bill public API (v1).
  *
  * Static page, no fetches, rendered outside the app shell (public branch of
- * the router, like /terms). Shop owners create keys under
- * Settings → API Access; this page is what they hand to their developer.
+ * the router, like /terms). API keys are issued per shop by the vendor from
+ * the /admin console; this page is what a shop hands to their developer.
  */
 import { Link } from "wouter";
 import { ArrowLeft, KeyRound, Gauge, AlertCircle, Layers } from "lucide-react";
@@ -90,9 +90,9 @@ export default function Developers() {
         {/* ── Authentication ── */}
         <H2 icon={KeyRound}>Authentication</H2>
         <p className="text-sm">
-          The shop owner creates a key under <span className="font-bold">Settings → API Access</span>{" "}
-          (it looks like <code className="font-mono text-xs">adb_…</code> and is shown only once).
-          Send it on every request:
+          API keys are issued by <span className="font-bold">Addison Bill</span> — ask us to
+          create one for your shop (it looks like <code className="font-mono text-xs">adb_…</code>{" "}
+          and is shown only once). Send it on every request:
         </p>
         <Code>{`curl ${BASE}/api/v1/me \\
   -H "Authorization: Bearer adb_YOUR_KEY_HERE"`}</Code>

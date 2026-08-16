@@ -29,6 +29,8 @@ export const adminQueryKeys = {
   money: ["admin", "money"],
   notices: ["admin", "notices"],
   health: ["admin", "health"],
+  tenants: ["admin", "tenants"],
+  apiKeys: (id: string) => ["admin", "tenant", id, "api-keys"],
 };
 
 export function useAdminMe() {
@@ -102,6 +104,14 @@ export function useAdminHealth() {
     queryKey: adminQueryKeys.health,
     queryFn: () => adminFetch(`${API}/platform/health`),
     refetchInterval: 30_000,
+  });
+}
+
+/** Lean tenant list for pickers (id + name + status). */
+export function useAdminTenantsLite() {
+  return useQuery<{ tenants: { id: string; name: string; isActive: boolean }[] }>({
+    queryKey: adminQueryKeys.tenants,
+    queryFn: () => adminFetch(`${API}/platform/tenants`),
   });
 }
 

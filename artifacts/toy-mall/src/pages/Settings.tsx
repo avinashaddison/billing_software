@@ -912,9 +912,6 @@ export default function SettingsPage() {
         {/* ── Devices & Sessions (owner-only) ── */}
         {role === "owner" && <DevicesSection />}
 
-        {/* ── API Access (owner-only) ── */}
-        {role === "owner" && <ApiAccessSection />}
-
         {isDirty && (
           <div className="fixed bottom-24 md:bottom-6 left-4 right-4 md:left-auto md:right-8 md:w-72 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-lg z-20">
             <p className="text-xs font-bold text-amber-700 dark:text-amber-400">You have unsaved changes</p>
@@ -1195,28 +1192,6 @@ function RecentScanEvents() {
         </div>
       )}
     </div>
-  );
-}
-
-/** ── API Access (owner-only): link to the key management page ── */
-function ApiAccessSection() {
-  const [, navigate] = useLocation();
-  return (
-    <Section icon={KeyRound} title="API Access" color="bg-violet-500/15 text-violet-600">
-      <p className="text-sm text-muted-foreground">
-        Connect other software to your shop — API keys let outside tools read
-        or update your products, stock, suppliers and bills.
-      </p>
-      <button
-        type="button"
-        onClick={() => navigate("/settings/api-access")}
-        data-testid="button-manage-api-keys"
-        className="w-full border rounded-xl px-4 py-2.5 text-sm font-bold flex items-center justify-center gap-2 hover:bg-muted/50 transition-colors"
-      >
-        <KeyRound className="w-4 h-4" />
-        Manage API keys
-      </button>
-    </Section>
   );
 }
 

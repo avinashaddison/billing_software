@@ -4,7 +4,7 @@ import { LoginScreen } from "./LoginScreen";
 import {
   Loader2, LayoutDashboard, Building2, IndianRupee, DatabaseBackup,
   ScrollText, LogOut, Menu, Wallet, Megaphone, Activity, Bell,
-  ChevronDown, Star,
+  ChevronDown, Star, KeyRound,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,8 +21,9 @@ import AuditLog from "./AuditLog";
 import Money from "./Money";
 import Notices from "./Notices";
 import Health from "./Health";
+import ApiKeys from "./ApiKeys";
 
-type Section = "dashboard" | "shops" | "money" | "notices" | "pricing" | "backups" | "health" | "audit";
+type Section = "dashboard" | "shops" | "money" | "notices" | "pricing" | "apikeys" | "backups" | "health" | "audit";
 
 type NavItem = { key: Section; label: string; icon: LucideIcon };
 
@@ -40,6 +41,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { key: "money",   label: "Money",   icon: Wallet },
       { key: "notices", label: "Notices", icon: Megaphone },
       { key: "pricing", label: "Pricing", icon: IndianRupee },
+      { key: "apikeys", label: "API keys", icon: KeyRound },
     ],
   },
   {
@@ -267,6 +269,7 @@ export default function AdminConsole() {
             {section === "notices"   && <Notices />}
             {section === "health"    && <Health />}
             {section === "pricing"   && <Pricing />}
+            {section === "apikeys"   && <ApiKeys />}
             {section === "backups"   && <Backups />}
             {section === "audit"     && <AuditLog />}
           </div>
