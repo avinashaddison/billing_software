@@ -18,3 +18,4 @@ export * from "./platform_settings";
 export * from "./tenant_telegram";
 export * from "./tenant_payments";
 export * from "./announcements";
+export * from "./api_keys";

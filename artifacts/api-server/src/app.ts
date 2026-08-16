@@ -10,6 +10,8 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { tenantContext } from "./middlewares/tenant";
 import { apiNotFound, errorHandler } from "./middlewares/error";
+import { apiKeyAuth, apiKeyRateLimit } from "./middlewares/api-key";
+import v1Router from "./routes/v1";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -139,6 +141,12 @@ app.use("/api/auth/login",        loginLimiter);
 app.use("/api/auth/login-email",  loginLimiter);
 app.use("/api/platform/login",    loginLimiter);
 app.use("/api",                   apiLimiter);
+
+/* Public API v1 — bearer-key auth, fully separate from the cookie-session
+   router below. Auth first (attaches req.apiKey), then the per-key rate
+   limit. Mounted before the session router so /api/v1 never falls through
+   to session auth; v1 ends with its own JSON 404 catch-all. */
+app.use("/api/v1", apiKeyAuth, apiKeyRateLimit, v1Router);
 
 app.use("/api", router);
 

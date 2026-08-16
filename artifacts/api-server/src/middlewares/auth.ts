@@ -232,6 +232,15 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
         res.status(403).json({ error: "Admin access required" });
         return;
       }
+      /* Defense-in-depth: the cookie's tenant claim must match the tenant the
+         account actually belongs to. The cookie is signed, so a mismatch can
+         only mean a stale session (e.g. the account was reassigned to another
+         shop after login). Never authorize admin actions in the cookie's
+         tenant on the strength of a role held in a different one. */
+      if ((me.tenantId ?? null) !== (req.tenantId ?? null)) {
+        res.status(403).json({ error: "Your session no longer matches this shop. Please log in again." });
+        return;
+      }
       next();
       return;
     }
@@ -243,6 +252,11 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
       if (!me || !me.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
       if (me.role !== "owner") {
         res.status(403).json({ error: "Owner access required" });
+        return;
+      }
+      /* Same tenant-binding rule as the email branch above. */
+      if ((me.tenantId ?? null) !== (req.tenantId ?? null)) {
+        res.status(403).json({ error: "Your session no longer matches this shop. Please log in again." });
         return;
       }
       next();

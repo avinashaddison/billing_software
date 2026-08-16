@@ -23,3 +23,4 @@
 - [Restyle delegation regressions](restyle-delegation-regressions.md) — "purely visual" subagent restyles drop retry actions from error branches and round editable previews; diff-review, don't trust their summaries.
 - [Decorative chart data hazard](decorative-data-hazard.md) — seeded/fake sparklines & padded totals beside real money fail review; plot real series (overview has 14d series) or render nothing; `|| 1` only in geometry.
 - [Printable sheets in app shell](printable-sheets.md) — shell banners print above the sheet unless no-print (audit AppLayout siblings); dangling parent ids must fallback-group or rows silently vanish.
+- [Public API keys](public-api-key-auth.md) — hash-only + reveal-once; keys need an ACTIVE tenants row; requireAdmin binds cookie↔record tenant; INSERT caps need advisory locks (FOR UPDATE can't see rival inserts).

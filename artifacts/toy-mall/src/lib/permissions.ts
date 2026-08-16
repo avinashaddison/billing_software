@@ -58,6 +58,7 @@ export function hasAccess(
 /** Map page path → resource key */
 export const PATH_RESOURCE: Record<string, ResourceKey> = {
   "/settings":   "settings",
+  "/settings/api-access": "settings",
   "/dashboard":  "dashboard",
   "/products":   "products",
   "/products/new": "products",

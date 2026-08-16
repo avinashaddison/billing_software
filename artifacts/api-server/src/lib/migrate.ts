@@ -64,6 +64,7 @@ const MIGRATION_FILES = [
   "0015_platform_settings.sql",
   "0016_tenant_telegram.sql",
   "0017_admin_control.sql",
+  "0018_api_keys.sql",
 ];
 
 function findMigration(name: string): string | null {

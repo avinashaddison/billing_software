@@ -42,6 +42,8 @@ import SettingsPage    from "@/pages/Settings";
 import AdminPage       from "@/pages/admin/index";
 import Landing         from "@/pages/Landing";
 import Legal           from "@/pages/Legal";
+import ApiAccess       from "@/pages/ApiAccess";
+import Developers      from "@/pages/Developers";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -189,6 +191,9 @@ function Router() {
   if (location === "/privacy") return <Legal doc="privacy" />;
   if (location === "/refund")  return <Legal doc="refund" />;
 
+  /* Public API reference — linked from Settings → API Access. */
+  if (location === "/developers") return <Developers />;
+
   /* Everything below requires auth. */
   if (!isLoggedIn) return <Redirect to="/login" />;
 
@@ -222,6 +227,7 @@ function Router() {
             <Route path="/staff"        component={() => <Protected resource="staff"><StaffManagement /></Protected>} />
             <Route path="/checkout"     component={() => <Protected resource="scan"><Checkout /></Protected>} />
             <Route path="/settings"     component={() => <Protected resource="settings"><SettingsPage /></Protected>} />
+            <Route path="/settings/api-access" component={() => <Protected resource="settings"><ApiAccess /></Protected>} />
             <Route                      component={NotFound} />
           </Switch>
         </AppLayout>

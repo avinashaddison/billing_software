@@ -16,6 +16,11 @@ Auth has two independent halves, and a working session needs **both**:
 
 **How to apply:** use a **real** staff row's id. `requireAuth` validates the staff/session row against the DB, so a fabricated id is rejected with 401 even though the HMAC is valid — that check is a useful confirmation that isolation works, not a bug to route around. Write the cookie + localStorage values to a file and have the test agent read it, rather than pasting a live session credential into a prompt. Keep such sessions read-only.
 
+# Curl-only variant (API-route testing without a browser)
+For server-route tests skip the localStorage half: mint just the cookie with node (HMAC over the base64url payload, same shape the middleware signs) and send `Cookie: tenant_session=...`. A cookie with `sid:null` takes the legacy path through session validation, so no auth_sessions row is needed — but requests may lazily CREATE session rows; delete them in cleanup.
+- bash gotcha: `$UID` is a readonly shell builtin (always your uid) — `UID=$(...)` silently keeps 1000 and every DB lookup 500s on the uuid cast. Use another variable name.
+- psql capture gotcha: without `-q`, a `-tA -c "INSERT ... RETURNING id"` capture also grabs the `INSERT 0 1` command tag; the polluted value later aborts the whole cleanup batch. Capture with `-qtA ... | head -1 | tr -d '[:space:]'`.
+
 # Watch out
 - A `ReferenceError` for a symbol you just deleted (e.g. a removed date-fns import) can be a **stale HMR module**, not a real fault. If typecheck and a fresh production build pass and the identifier is gone from the source, hard-refresh and re-check before "fixing" it.
 - A UI test that runs while a query is still in flight can report a false failure. Distinguish "empty" from "loading" in the UI itself, then re-verify.

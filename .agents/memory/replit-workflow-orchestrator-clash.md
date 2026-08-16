@@ -42,3 +42,8 @@ has its own dev orchestrator, check the workflow list for duplicates first.
 
 ### Killing stray API processes safely
 `pkill -f 'api-server/dist/index.mjs'` matched the killing shell's OWN command line (the real API cmdline is relative `./dist/index.mjs`) — it killed my shell while the API survived. Use the bracket trick so the pattern can't match itself: `kill $(pgrep -f 'dist/index[.]mjs')`, then verify with `pgrep`, then restart only "Start application".
+
+### Winning the port race (the artifact workflow revives)
+- The artifact api-server workflow can REVIVE by itself after a WorkflowsRestart of "Start application" and win the 8080 race with a STALE process (it served an old dist bundle: freshly-mounted routes 404'd/misrouted and boot migrations never ran). "Not authenticated" from a route you just mounted usually means you are talking to the old process, not that auth is broken.
+- Reliable sequence: free the port (`fuser -k 8080/tcp` — port-keyed, so it cannot self-match), then restart "Start application" while a short background guard kills any 8080 binder whose /proc ancestry does NOT contain `@workspace/scripts` — the orchestrator's child is the only legitimate owner.
+- The orchestrator's API child does NOT hot-reload middleware/route edits: restart "Start application" after server-code changes before re-testing, or you will "verify" the old code.

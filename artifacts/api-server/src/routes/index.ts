@@ -18,6 +18,7 @@ import uploadRouter      from "./upload";
 import sharedCartRouter  from "./shared-cart";
 import telegramRouter    from "./telegram";
 import settingsRouter    from "./settings";
+import apiKeysRouter     from "./api-keys";
 import platformRouter    from "./platform";
 import platformInsightsRouter from "./platform-insights";
 import platformPeopleRouter from "./platform-people";
@@ -123,6 +124,7 @@ router.use(uploadRouter);
 router.use(sharedCartRouter);
 router.use(telegramRouter);
 router.use(settingsRouter);
+router.use(apiKeysRouter);
 router.use(appNoticesRouter);
 
 export default router;
