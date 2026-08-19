@@ -55,6 +55,6 @@ localPort = 20238
 externalPort = 3000
 
 [deployment]
-deploymentTarget = "vm"
-run = ["bash", "-c", "NODE_ENV=production node artifacts/api-server/dist/index.mjs"]
+deploymentTarget = "autoscale"
+run = ["node", "artifacts/api-server/dist/index.mjs"]
 build = ["pnpm", "run", "build:prod"]
