@@ -14,17 +14,36 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { playScanBeep, playCameraDetect, playError, playCheckoutSuccess, playTick, playStockIn, isSoundMuted, toggleSoundMute } from "@/lib/sounds";
-import { useCart } from "@/contexts/cart-context";
+import { useCart, effectivePrice, type CartItem, type LineDiscountType } from "@/contexts/cart-context";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useOnline }       from "@/hooks/use-online";
-import { WifiOff, RefreshCw } from "lucide-react";
+import { WifiOff, RefreshCw, Clock, PauseCircle } from "lucide-react";
 import { useStoreSettings } from "@/lib/store-info";
+import {
+  HeldBillRequestError,
+  useHeldBills,
+  useHoldBill,
+  useResumeHeldBill,
+  useDiscardHeldBill,
+} from "@/hooks/use-held-bills";
+import { HoldBillModal, HeldBillsModal } from "@/components/billing/held-bills-modals";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 type PageMode    = "billing" | "stockin";
 type PaymentMode = "cash" | "upi";
+type ScanCheckoutItem =
+  | {
+      productId: string;
+      quantity: number;
+      price: number;
+      mrp?: number;
+      preDiscountPrice?: number;
+      discountType?: LineDiscountType;
+      discountValue?: number;
+    }
+  | { name: string; quantity: number; price: number };
 
 interface ScannedProduct {
   id: string; name: string; sku: string; price: number; salePrice?: number | null; stock: number; lowStockThreshold: number;
@@ -38,7 +57,7 @@ async function lookupBySku(sku: string): Promise<ScannedProduct> {
 }
 
 async function postCheckout(payload: {
-  items: { productId: string; quantity: number; price: number }[];
+  items: ScanCheckoutItem[];
   paymentMode: PaymentMode;
   customerName?: string;
   customerPhone?: string;
@@ -51,6 +70,28 @@ async function postCheckout(payload: {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Checkout failed");
   return data;
+}
+
+function toCheckoutItem(item: CartItem): ScanCheckoutItem {
+  if (item.isManual) {
+    return { name: item.name, quantity: item.quantity, price: item.price };
+  }
+  const price = effectivePrice(item);
+  const discountType = item.discountType ?? "percent";
+  const discountValue = discountType === "amount"
+    ? (item.discountAmount ?? 0)
+    : (item.discountPercent ?? 0);
+  return {
+    productId: item.productId,
+    quantity: item.quantity,
+    price,
+    mrp: item.mrp ?? (price < item.price - 0.001 ? item.price : undefined),
+    ...(price < item.price - 0.001 && discountValue > 0 ? {
+      preDiscountPrice: item.price,
+      discountType,
+      discountValue,
+    } : {}),
+  };
 }
 
 async function postStockIn(productId: string, quantity: number) {
@@ -550,7 +591,7 @@ function useScanner(
 
 /* ── Memoized cart item row — only re-renders when its own props change ── */
 interface CartItemRowProps {
-  item: { productId: string; name: string; sku: string; price: number; quantity: number };
+  item: CartItem;
   isNew: boolean;
   stock?: number;
   lowStockThreshold?: number;
@@ -564,6 +605,8 @@ const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThre
   const isLow          = hasStockInfo && stock <= lowStockThreshold!;
   const showRed        = willBeZero;
   const showAmber      = !showRed && isLow;
+  const unitPrice      = effectivePrice(item);
+  const hasDiscount    = unitPrice < item.price - 0.001;
 
   return (
     <div
@@ -586,12 +629,17 @@ const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThre
               ⚠ Low stock
             </span>
           )}
+          {hasDiscount && (
+            <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-black text-indigo-600 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-400">
+              Discounted
+            </span>
+          )}
         </div>
         <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
         <p className="text-xs text-muted-foreground mt-0.5">
-          ₹{item.price.toLocaleString("en-IN")} × {item.quantity} ={" "}
+          ₹{unitPrice.toLocaleString("en-IN")} × {item.quantity} ={" "}
           <span className={`font-bold ${isNew ? "text-green-600 dark:text-green-400" : "text-foreground"}`}>
-            ₹{(item.price * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            ₹{(unitPrice * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </span>
         </p>
       </div>
@@ -619,7 +667,65 @@ const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThre
 ══════════════════════════════════════════════════════════════════════ */
 export default function Scan() {
   const [, setLocation] = useLocation();
-  const { items, count, total, addItem, removeItem, updateQty, clearCart } = useCart();
+  const { items, count, total, addItem, removeItem, updateQty, clearCart, prepareCart, replaceCart } = useCart();
+
+  const [showHoldModal, setShowHoldModal] = useState(false);
+  const [showHeldBillsModal, setShowHeldBillsModal] = useState(false);
+  const [cartSwapPending, setCartSwapPending] = useState(false);
+  const { data: heldBills = [], isLoading: isLoadingHeldBills, error: heldBillsError, refetch: refetchHeldBills } = useHeldBills();
+  const holdBill = useHoldBill();
+  const resumeHeldBill = useResumeHeldBill();
+  const discardHeldBill = useDiscardHeldBill();
+
+  const applyHeldBillError = (error: unknown) => {
+    if (error instanceof HeldBillRequestError && error.cart) {
+      replaceCart(error.cart.items, error.cart.revision);
+    }
+    toast.error(error instanceof Error ? error.message : "Held bill action failed");
+  };
+
+  const handleHoldBill = async (name: string, note: string) => {
+    if (cartSwapPending) return;
+    setCartSwapPending(true);
+    try {
+      const expectedRevision = await prepareCart();
+      const data = await holdBill.mutateAsync({
+        customerName: name || undefined,
+        note: note || undefined,
+        expectedRevision,
+      });
+      replaceCart([], data.revision);
+      setShowHoldModal(false);
+      toast.success("Bill put on hold");
+    } catch (error) {
+      applyHeldBillError(error);
+    } finally {
+      setCartSwapPending(false);
+    }
+  };
+
+  const handleResumeBill = async (id: string) => {
+    if (cartSwapPending) return;
+    setCartSwapPending(true);
+    try {
+      const expectedRevision = await prepareCart();
+      const data = await resumeHeldBill.mutateAsync({ id, expectedRevision });
+      replaceCart(data.items, data.revision);
+      setShowHeldBillsModal(false);
+      toast.success("Bill resumed");
+    } catch (error) {
+      applyHeldBillError(error);
+    } finally {
+      setCartSwapPending(false);
+    }
+  };
+
+  const handleDiscardBill = (id: string) => {
+    discardHeldBill.mutate(id, {
+      onSuccess: () => toast.success("Held bill discarded"),
+      onError: (err) => toast.error(err.message),
+    });
+  };
 
   const isOnline = useOnline();
   const { pendingCount, enqueue, syncAll } = useOfflineQueue();
@@ -670,6 +776,7 @@ export default function Scan() {
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [successBillId, setSuccessBillId] = useState<string | null>(null);
   const [showModal, setShowModal]     = useState(false);
+  const isCartDialogOpen = showModal || showHoldModal || showHeldBillsModal;
 
   const [stockProduct, setStockProduct]   = useState<ScannedProduct | null>(null);
   const [stockAdding, setStockAdding]     = useState(false);
@@ -706,7 +813,7 @@ export default function Scan() {
   }, [handleScan]);
 
   const handleCameraError = useCallback((msg: string) => { setCameraError(msg); }, []);
-  useScanner(showScanner, videoRef, handleCameraScan, handleCameraError);
+  useScanner(showScanner && !isCartDialogOpen, videoRef, handleCameraScan, handleCameraError);
 
   /* USB scanner: parse URL-format QR values the same way the camera does,
      then forward the clean SKU. The flash is triggered inside handleScan so
@@ -724,6 +831,7 @@ export default function Scan() {
     handleScan(sku);
   }, [handleScan]);
   useUsbScanner(handleUsbScan, {
+    enabled: !isCartDialogOpen,
     allowedInput: { ref: manualInputRef, onClear: () => setManualSku("") },
   });
 
@@ -782,7 +890,7 @@ export default function Scan() {
     const handleKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-      if (e.key === "Enter" && isBilling && items.length > 0 && !showModal) { e.preventDefault(); setShowModal(true); return; }
+      if (e.key === "Enter" && isBilling && items.length > 0 && !isCartDialogOpen) { e.preventDefault(); setShowModal(true); return; }
       if (e.key === "Escape" && showModal) { setShowModal(false); return; }
       if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setMode((m) => m === "billing" ? "stockin" : "billing"); return; }
       if (e.key === "b" || e.key === "B") { setMode("billing"); return; }
@@ -790,7 +898,7 @@ export default function Scan() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isBilling, items.length, showModal]);
+  }, [isBilling, items.length, showModal, isCartDialogOpen]);
 
   /* ── Product-name search ──
      Barcode stickers get torn, swapped or stolen — staff must still be able
@@ -862,7 +970,7 @@ export default function Scan() {
     /* ── Offline: queue the bill locally, sync later ── */
     if (!isOnline) {
       enqueue({
-        items:         items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+        items:         items.map(toCheckoutItem),
         paymentMode,
         customerName:  customerName || undefined,
         customerPhone: customerPhone || undefined,
@@ -881,7 +989,7 @@ export default function Scan() {
     setChecking(true);
     try {
       const result = await postCheckout({
-        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+        items: items.map(toCheckoutItem),
         paymentMode, customerPhone: customerPhone || undefined,
         customerName: customerName || undefined,
       });
@@ -937,6 +1045,29 @@ export default function Scan() {
           stockDataLoaded={allProducts !== undefined}
         />
       )}
+      {showHoldModal && (
+        <HoldBillModal
+          onClose={() => setShowHoldModal(false)}
+          onConfirm={handleHoldBill}
+          isPending={cartSwapPending || holdBill.isPending}
+          isOnline={isOnline}
+        />
+      )}
+      {showHeldBillsModal && (
+        <HeldBillsModal
+          onClose={() => setShowHeldBillsModal(false)}
+          bills={heldBills}
+          onResume={handleResumeBill}
+          onDiscard={handleDiscardBill}
+          isLoading={isLoadingHeldBills}
+          isResuming={cartSwapPending || resumeHeldBill.isPending}
+          isDiscarding={discardHeldBill.isPending}
+          activeCartCount={count}
+          error={heldBillsError as Error | null}
+          onRetry={refetchHeldBills}
+          isOnline={isOnline}
+        />
+      )}
 
       {/* ── Offline / pending sync banner ── */}
       {(!isOnline || pendingCount > 0) && (
@@ -970,6 +1101,20 @@ export default function Scan() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isBilling && (
+            <button
+              onClick={() => setShowHeldBillsModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 font-bold text-xs transition-all active:scale-95 border border-indigo-100 dark:border-indigo-900 relative"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Held Bills</span>
+              {heldBills.length > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-black text-white">
+                  {heldBills.length}
+                </span>
+              )}
+            </button>
+          )}
           {isBilling && hasItems && (
             <div className="flex items-center gap-1.5 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-3 py-1.5 rounded-full text-sm font-bold border border-green-200 dark:border-green-800">
               <ShoppingCart className="w-3.5 h-3.5" />
@@ -1237,7 +1382,18 @@ export default function Scan() {
                   <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Grand Total</p>
                   <AnimatedTotal value={total} />
                 </div>
-                <div className="text-right">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (!isOnline) { toast.error("Cannot hold bill while offline"); return; }
+                      setShowHoldModal(true);
+                    }}
+                    className={`flex items-center gap-1 text-xs font-semibold transition-colors ${!isOnline ? "text-muted-foreground cursor-not-allowed opacity-50" : "text-indigo-500 hover:text-indigo-600"}`}
+                    disabled={!isOnline}
+                    title={!isOnline ? "Unavailable offline" : ""}
+                  >
+                    <PauseCircle className="w-3 h-3" /> Hold bill
+                  </button>
                   <button onClick={clearCart}
                     className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-semibold transition-colors">
                     <Trash2 className="w-3 h-3" /> Clear cart

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 
 export type LineDiscountType = "percent" | "amount";
 
@@ -38,7 +39,9 @@ interface CartContextType {
   updateQty:        (productId: string, qty: number) => void;
   setLineDiscount:  (productId: string, type: LineDiscountType, value: number) => void;
   clearCart:        () => void;
-  syncFromServer:   (items: CartItem[]) => void;
+  prepareCart:      () => Promise<number>;
+  replaceCart:      (items: CartItem[], revision: number) => void;
+  syncFromServer:   (items: CartItem[], revision: number) => void;
 }
 
 /** Effective per-unit price after applying any line discount (% or flat ₹). */
@@ -100,17 +103,102 @@ function saveToStorage(items: CartItem[]) {
   }
 }
 
-/** Fire-and-forget server sync — never blocks the UI */
-function serverSync(method: string, path: string, body?: unknown) {
-  fetch(`${BASE_URL}/api/shared-cart${path}`, {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  }).catch(() => { /* server sync is best-effort */ });
+interface CartSummary {
+  items: CartItem[];
+  revision: number;
+  count: number;
+  total: number;
+}
+
+async function readCartResponse(response: Response): Promise<CartSummary> {
+  const raw = await response.text();
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error(response.ok ? "Server returned an invalid cart response" : (raw || response.statusText));
+  }
+  if (!response.ok) {
+    const errorData = data as { error?: unknown; cart?: CartSummary };
+    const error = new Error(
+      typeof errorData.error === "string" ? errorData.error : "Cart sync failed",
+    ) as Error & { cart?: CartSummary };
+    if (errorData.cart) error.cart = errorData.cart;
+    throw error;
+  }
+  return data as CartSummary;
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(() => loadFromStorage());
+  const initialItemsRef = useRef<CartItem[] | null>(null);
+  if (initialItemsRef.current === null) initialItemsRef.current = loadFromStorage();
+  const [items, setItems] = useState<CartItem[]>(initialItemsRef.current);
+  const itemsRef = useRef(items);
+  const revisionRef = useRef(0);
+  const serverItemsRef = useRef<CartItem[]>([]);
+  const syncTailRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingSyncsRef = useRef(0);
+  const syncFailureRef = useRef(false);
+  const serverChangedWhileSyncingRef = useRef(false);
+
+  const setLocalItems = useCallback((next: CartItem[]) => {
+    itemsRef.current = next;
+    setItems(next);
+  }, []);
+
+  const acceptServerCart = useCallback((summary: CartSummary, updateVisible: boolean) => {
+    revisionRef.current = summary.revision;
+    serverItemsRef.current = summary.items;
+    if (updateVisible) setLocalItems(summary.items);
+  }, [setLocalItems]);
+
+  const queueServerMutation = useCallback((
+    method: string,
+    path: string,
+    body: object = {},
+  ) => {
+    pendingSyncsRef.current += 1;
+    const run = async () => {
+      let shouldReconcile = false;
+      try {
+        const response = await fetch(`${BASE_URL}/api/shared-cart${path}`, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...body, expectedRevision: revisionRef.current }),
+        });
+        const summary = await readCartResponse(response);
+        acceptServerCart(summary, false);
+        serverChangedWhileSyncingRef.current = false;
+        shouldReconcile = true;
+      } catch (error) {
+        const conflict = (error as Error & { cart?: CartSummary }).cart;
+        if (conflict) {
+          acceptServerCart(conflict, true);
+          serverChangedWhileSyncingRef.current = false;
+          toast.warning("Cart changed on another device. Latest cart loaded; repeat your action.");
+          shouldReconcile = true;
+        } else {
+          syncFailureRef.current = true;
+        }
+      } finally {
+        pendingSyncsRef.current -= 1;
+        if (pendingSyncsRef.current === 0) {
+          if (syncFailureRef.current) {
+            if (serverChangedWhileSyncingRef.current) {
+              setLocalItems(serverItemsRef.current);
+              toast.warning("Some cart changes could not sync. Latest shared cart loaded.");
+            }
+          } else if (shouldReconcile) {
+            setLocalItems(serverItemsRef.current);
+          }
+          serverChangedWhileSyncingRef.current = false;
+        }
+      }
+    };
+    const queued = syncTailRef.current.then(run);
+    syncTailRef.current = queued.catch(() => {});
+    return queued;
+  }, [acceptServerCart, setLocalItems]);
 
   /* ── Persist to localStorage whenever items change ─────────────── */
   useEffect(() => {
@@ -125,100 +213,65 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const isLoggedIn = useAuth((s) => s.isLoggedIn);
   const prevLoggedIn = useRef(isLoggedIn);
   useEffect(() => {
-    if (prevLoggedIn.current && !isLoggedIn) setItems([]);
+    if (prevLoggedIn.current && !isLoggedIn) {
+      setLocalItems([]);
+      revisionRef.current = 0;
+      serverItemsRef.current = [];
+      syncFailureRef.current = false;
+      serverChangedWhileSyncingRef.current = false;
+    }
     prevLoggedIn.current = isLoggedIn;
-  }, [isLoggedIn]);
+  }, [isLoggedIn, setLocalItems]);
 
-  /* ── On mount: load any in-progress cart from the server ───────────
+  /* ── On sign-in: load any in-progress cart from the server ─────────
      This lets a PC open the Ongoing Checkout page and see what mobile
-     has already scanned, even before any SSE event fires.
-     localStorage is the primary source; server fills in if empty.
+     has already scanned. The server wins when it has items; a local
+     persisted cart only repopulates a freshly restarted empty server.
   ─────────────────────────────────────────────────────────────────── */
   useEffect(() => {
+    if (!isLoggedIn) return;
     fetch(`${BASE_URL}/api/shared-cart`)
-      .then((r) => (r.ok ? r.json() : { items: [] }))
-      .then((data: { items?: CartItem[] }) => {
-        const incoming = data?.items;
-        if (Array.isArray(incoming) && incoming.length > 0) {
-          setItems((prev) => {
-            // If we already have local items (localStorage or already scanned),
-            // keep local state and let it remain authoritative.
-            if (prev.length > 0) return prev;
-            return incoming;
-          });
+      .then(readCartResponse)
+      .then((summary) => {
+        if (summary.items.length > 0 || itemsRef.current.length === 0) {
+          acceptServerCart(summary, true);
+        } else {
+          // The in-memory server cart was likely reset. Restore this device's
+          // persisted cart only if the revision still matches.
+          acceptServerCart(summary, false);
+          void queueServerMutation("PUT", "", { items: itemsRef.current });
         }
       })
       .catch(() => { /* server may not be ready yet — ignore */ });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, acceptServerCart, queueServerMutation]);
 
-  /* ── syncFromServer ────────────────────────────────────────────────
-     Called by use-realtime.ts when a cart_updated SSE event arrives.
-     Compares count + total to avoid re-renders when we're the source
-     of the event (echo-loop prevention).
-
-     Manual / non-inventory lines (productId starts with "manual-") are
-     preserved across server syncs — they're device-local by design and
-     wouldn't be present in the shared cart payload, so we re-attach
-     them on top of whatever the server sent.
-
-     Important: we treat local state as authoritative when the server
-     has FEWER (but non-zero) items than us.  This avoids two problems:
-
-     1. Fast-scanning race: items A and B are scanned in quick succession.
-        The SSE echo for item A arrives before item B's serverSync request
-        reaches the server.  Server broadcasts [A], but local already has
-        [A, B].  Without this guard, B would be silently dropped.
-
-     2. Server-restart data loss (common on Render free tier): the server's
-        in-memory shared-cart is wiped on restart.  The next scan only
-        puts that ONE item in the server, which would otherwise overwrite
-        the full local cart that localStorage preserved.
-
-     srvCount === 0 still clears local (someone else completed checkout).
-  ─────────────────────────────────────────────────────────────────── */
-  const syncFromServer = useCallback((serverItems: CartItem[]) => {
-    setItems((prev) => {
-      const localManual = prev.filter((i) => i.productId.startsWith("manual-"));
-      // Compare ONLY the catalogue portion against the server payload.
-      const prevCatalogue  = prev.filter((i) => !i.productId.startsWith("manual-"));
-      const prevCount  = prevCatalogue.reduce((s, i) => s + i.quantity, 0);
-      const srvCount   = serverItems.reduce((s, i) => s + i.quantity, 0);
-      const prevTotal  = prevCatalogue.reduce((s, i) => s + i.price * i.quantity, 0);
-      const srvTotal   = serverItems.reduce((s, i) => s + i.price * i.quantity, 0);
-      // Skip if state is already identical (avoids echo from own SSE broadcast)
-      if (prevCount === srvCount && Math.abs(prevTotal - srvTotal) < 0.01) return prev;
-      // Server is non-empty but behind local → server hasn't caught up yet
-      // (fast-scan race or post-restart stale state).  Keep local so we don't
-      // lose items that were already committed to localStorage.
-      if (srvCount > 0 && srvCount < prevCount) return prev;
-      // srvCount === 0 → explicit checkout/clear on another tab or device.
-      // srvCount > prevCount → another device added items (cross-device add).
-      // In both cases, server is authoritative; catalogue lines are replaced.
-      return [...serverItems, ...localManual];
-    });
-  }, []);
+  /* SSE carries the complete cart, including manual lines and discounts.
+     While local mutations are queued, remember the newest server snapshot
+     without overwriting optimistic UI; the queue response reconciles it. */
+  const syncFromServer = useCallback((serverItems: CartItem[], revision: number) => {
+    if (!Number.isInteger(revision) || revision < revisionRef.current) return;
+    if (pendingSyncsRef.current > 0) serverChangedWhileSyncingRef.current = true;
+    acceptServerCart(
+      { items: serverItems, revision, count: 0, total: 0 },
+      pendingSyncsRef.current === 0,
+    );
+  }, [acceptServerCart]);
 
 
   /* ── Cart mutations — optimistic local update + server sync ─────── */
 
   const addItem = useCallback((incoming: Omit<CartItem, "quantity">) => {
-    setItems((prev) => {
-      const existing = prev.find((i) => i.productId === incoming.productId);
-      if (existing) {
-        return prev.map((i) =>
-          i.productId === incoming.productId ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prev, { ...incoming, quantity: 1 }];
-    });
-    serverSync("POST", "/add", {
-      productId: incoming.productId,
-      name:      incoming.name,
-      sku:       incoming.sku,
-      price:     incoming.price,
-      mrp:       incoming.mrp,
-    });
-  }, []);
+    const existing = itemsRef.current.find((item) => item.productId === incoming.productId);
+    const next = existing
+      ? itemsRef.current.map((item) =>
+          item.productId === incoming.productId
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      : [...itemsRef.current, { ...incoming, quantity: 1 }];
+    setLocalItems(next);
+    void queueServerMutation("POST", "/add", incoming);
+  }, [queueServerMutation, setLocalItems]);
 
   const addCustomItem = useCallback(
     ({ name, price, quantity = 1 }: { name: string; price: number; quantity?: number }) => {
@@ -234,77 +287,111 @@ export function CartProvider({ children }: { children: ReactNode }) {
           ? crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
       }`;
-      setItems((prev) => [
-        ...prev,
-        {
-          productId: id,
-          sku:       "—",
-          name:      trimmed,
-          quantity:  safeQty,
-          price:     safePrice,
-          isManual:  true,
-        },
-      ]);
-      // Manual lines stay LOCAL to this device. The shared-cart endpoint
-      // is keyed by productId and assumes a real catalogue row; pushing
-      // a "manual-…" id there would either be rejected or echo back to
-      // other devices that can't render it. Keep it on-device.
+      const item: CartItem = {
+        productId: id,
+        sku: "—",
+        name: trimmed,
+        quantity: safeQty,
+        price: safePrice,
+        isManual: true,
+      };
+      setLocalItems([...itemsRef.current, item]);
+      void queueServerMutation("POST", "/add", item);
     },
-    [],
+    [queueServerMutation, setLocalItems],
   );
 
   const removeItem = useCallback((productId: string) => {
-    setItems((prev) => prev.filter((i) => i.productId !== productId));
-    // Manual lines are device-local — no shared-cart row to delete.
-    if (!productId.startsWith("manual-")) {
-      serverSync("DELETE", `/${encodeURIComponent(productId)}`);
-    }
-  }, []);
+    setLocalItems(itemsRef.current.filter((item) => item.productId !== productId));
+    void queueServerMutation("DELETE", `/${encodeURIComponent(productId)}`);
+  }, [queueServerMutation, setLocalItems]);
 
   const updateQty = useCallback((productId: string, qty: number) => {
-    const isManual = productId.startsWith("manual-");
     if (qty <= 0) {
-      setItems((prev) => prev.filter((i) => i.productId !== productId));
-      if (!isManual) serverSync("DELETE", `/${encodeURIComponent(productId)}`);
+      setLocalItems(itemsRef.current.filter((item) => item.productId !== productId));
+      void queueServerMutation("DELETE", `/${encodeURIComponent(productId)}`);
     } else {
-      setItems((prev) =>
-        prev.map((i) => (i.productId === productId ? { ...i, quantity: qty } : i))
-      );
-      if (!isManual) serverSync("PATCH", `/${encodeURIComponent(productId)}`, { quantity: qty });
+      setLocalItems(itemsRef.current.map((item) =>
+        item.productId === productId ? { ...item, quantity: qty } : item
+      ));
+      void queueServerMutation("PATCH", `/${encodeURIComponent(productId)}`, { quantity: qty });
     }
-  }, []);
+  }, [queueServerMutation, setLocalItems]);
 
   const setLineDiscount = useCallback((productId: string, type: LineDiscountType, value: number) => {
     const v = Number.isFinite(value) ? value : 0;
-    setItems((prev) =>
-      prev.map((i) => {
-        if (i.productId !== productId) return i;
-        if (type === "amount") {
-          const amt = Math.max(0, Math.min(i.price, v));
-          return {
-            ...i,
-            discountType:    "amount",
-            discountAmount:  amt > 0 ? amt : undefined,
-            discountPercent: undefined,
-          };
+    const current = itemsRef.current.find((item) => item.productId === productId);
+    if (!current) return;
+    const patch = type === "amount"
+      ? {
+          discountType: "amount" as const,
+          discountAmount: Math.max(0, Math.min(current.price, v)),
+          discountPercent: 0,
         }
-        const pct = Math.max(0, Math.min(100, v));
-        return {
-          ...i,
-          discountType:    "percent",
-          discountPercent: pct > 0 ? pct : undefined,
-          discountAmount:  undefined,
+      : {
+          discountType: "percent" as const,
+          discountPercent: Math.max(0, Math.min(100, v)),
+          discountAmount: 0,
         };
-      })
-    );
-    /* Line discount is local-only for now; not synced to shared cart since other
-       devices wouldn't know to render it consistently. Bills capture it on checkout. */
-  }, []);
+    setLocalItems(itemsRef.current.map((item) =>
+      item.productId === productId
+        ? {
+            ...item,
+            ...patch,
+            discountAmount: patch.discountAmount || undefined,
+            discountPercent: patch.discountPercent || undefined,
+          }
+        : item
+    ));
+    void queueServerMutation("PATCH", `/${encodeURIComponent(productId)}`, patch);
+  }, [queueServerMutation, setLocalItems]);
 
   const clearCart = useCallback(() => {
-    setItems([]);
-    serverSync("DELETE", "");
-  }, []);
+    setLocalItems([]);
+    void queueServerMutation("DELETE", "");
+  }, [queueServerMutation, setLocalItems]);
+
+  const prepareCart = useCallback(async () => {
+    await syncTailRef.current;
+    const response = await fetch(`${BASE_URL}/api/shared-cart`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: itemsRef.current,
+        expectedRevision: revisionRef.current,
+      }),
+    });
+    try {
+      const summary = await readCartResponse(response);
+      acceptServerCart(summary, true);
+      syncFailureRef.current = false;
+      serverChangedWhileSyncingRef.current = false;
+      return summary.revision;
+    } catch (error) {
+      const conflict = (error as Error & { cart?: CartSummary }).cart;
+      if (conflict) {
+        acceptServerCart(conflict, true);
+        syncFailureRef.current = false;
+        serverChangedWhileSyncingRef.current = false;
+      }
+      throw error;
+    }
+  }, [acceptServerCart]);
+
+  const replaceCart = useCallback((newItems: CartItem[], revision: number) => {
+    acceptServerCart(
+      {
+        items: newItems,
+        revision,
+        count: newItems.reduce((sum, item) => sum + item.quantity, 0),
+        total: newItems.reduce(
+          (sum, item) => sum + effectivePrice(item) * item.quantity,
+          0,
+        ),
+      },
+      true,
+    );
+  }, [acceptServerCart]);
 
   const count = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
   const total = useMemo(
@@ -313,8 +400,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ items, count, total, addItem, addCustomItem, removeItem, updateQty, setLineDiscount, clearCart, syncFromServer }),
-    [items, count, total, addItem, addCustomItem, removeItem, updateQty, setLineDiscount, clearCart, syncFromServer]
+    () => ({ items, count, total, addItem, addCustomItem, removeItem, updateQty, setLineDiscount, clearCart, prepareCart, replaceCart, syncFromServer }),
+    [items, count, total, addItem, addCustomItem, removeItem, updateQty, setLineDiscount, clearCart, prepareCart, replaceCart, syncFromServer]
   );
 
   return (

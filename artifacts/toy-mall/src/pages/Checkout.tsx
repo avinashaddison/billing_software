@@ -4,7 +4,7 @@ import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
   Phone, User, Wallet, Banknote, Smartphone, Minus, Plus,
   Trash2, ScanLine, WifiOff, RefreshCw, QrCode, BadgeCheck, Tag,
-  HandCoins, PencilLine, Truck,
+  HandCoins, PencilLine, Truck, PauseCircle, Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -13,6 +13,14 @@ import { useCart, effectivePrice, type LineDiscountType } from "@/contexts/cart-
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useOnline } from "@/hooks/use-online";
 import { useStoreSettings } from "@/lib/store-info";
+import {
+  HeldBillRequestError,
+  useHeldBills,
+  useHoldBill,
+  useResumeHeldBill,
+  useDiscardHeldBill,
+} from "@/hooks/use-held-bills";
+import { HoldBillModal, HeldBillsModal } from "@/components/billing/held-bills-modals";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -455,8 +463,66 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
 ═══════════════════════════════════════════════════════════════════ */
 export default function Checkout() {
   const [, setLocation] = useLocation();
-  const { items, count, total, removeItem, updateQty, setLineDiscount, addCustomItem, clearCart } = useCart();
+  const { items, count, total, removeItem, updateQty, setLineDiscount, addCustomItem, clearCart, prepareCart, replaceCart } = useCart();
   const [showManualModal, setShowManualModal] = useState(false);
+  const [showHoldModal, setShowHoldModal] = useState(false);
+  const [showHeldBillsModal, setShowHeldBillsModal] = useState(false);
+  const [cartSwapPending, setCartSwapPending] = useState(false);
+
+  const { data: heldBills = [], isLoading: isLoadingHeldBills, error: heldBillsError, refetch: refetchHeldBills } = useHeldBills();
+  const holdBill = useHoldBill();
+  const resumeHeldBill = useResumeHeldBill();
+  const discardHeldBill = useDiscardHeldBill();
+
+  const applyHeldBillError = (error: unknown) => {
+    if (error instanceof HeldBillRequestError && error.cart) {
+      replaceCart(error.cart.items, error.cart.revision);
+    }
+    toast.error(error instanceof Error ? error.message : "Held bill action failed");
+  };
+
+  const handleHoldBill = async (name: string, note: string) => {
+    if (cartSwapPending) return;
+    setCartSwapPending(true);
+    try {
+      const expectedRevision = await prepareCart();
+      const data = await holdBill.mutateAsync({
+        customerName: name || undefined,
+        note: note || undefined,
+        expectedRevision,
+      });
+      replaceCart([], data.revision);
+      setShowHoldModal(false);
+      toast.success("Bill put on hold");
+    } catch (error) {
+      applyHeldBillError(error);
+    } finally {
+      setCartSwapPending(false);
+    }
+  };
+
+  const handleResumeBill = async (id: string) => {
+    if (cartSwapPending) return;
+    setCartSwapPending(true);
+    try {
+      const expectedRevision = await prepareCart();
+      const data = await resumeHeldBill.mutateAsync({ id, expectedRevision });
+      replaceCart(data.items, data.revision);
+      setShowHeldBillsModal(false);
+      toast.success("Bill resumed");
+    } catch (error) {
+      applyHeldBillError(error);
+    } finally {
+      setCartSwapPending(false);
+    }
+  };
+
+  const handleDiscardBill = (id: string) => {
+    discardHeldBill.mutate(id, {
+      onSuccess: () => toast.success("Held bill discarded"),
+      onError: (err) => toast.error(err.message),
+    });
+  };
 
   /* ── Deep-link: open Manual Item dialog from the nav ──
      The "Manual Bill" entry in BottomNav / SideNav both navigates to
@@ -762,6 +828,29 @@ export default function Checkout() {
           }}
         />
       )}
+      {showHoldModal && (
+        <HoldBillModal
+          onClose={() => setShowHoldModal(false)}
+          onConfirm={handleHoldBill}
+          isPending={cartSwapPending || holdBill.isPending}
+          isOnline={isOnline}
+        />
+      )}
+      {showHeldBillsModal && (
+        <HeldBillsModal
+          onClose={() => setShowHeldBillsModal(false)}
+          bills={heldBills}
+          onResume={handleResumeBill}
+          onDiscard={handleDiscardBill}
+          isLoading={isLoadingHeldBills}
+          isResuming={cartSwapPending || resumeHeldBill.isPending}
+          isDiscarding={discardHeldBill.isPending}
+          activeCartCount={count}
+          error={heldBillsError as Error | null}
+          onRetry={refetchHeldBills}
+          isOnline={isOnline}
+        />
+      )}
 
       {/* ── Offline / pending sync banner ── */}
       {(!isOnline || pendingCount > 0) && (
@@ -799,13 +888,27 @@ export default function Checkout() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setLocation("/scan")}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 font-bold text-xs transition-all active:scale-95"
-        >
-          <ScanLine className="w-3.5 h-3.5" />
-          Scan More
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowHeldBillsModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 font-bold text-xs transition-all active:scale-95 relative"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Held Bills</span>
+            {heldBills.length > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-black text-white">
+                {heldBills.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setLocation("/scan")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 font-bold text-xs transition-all active:scale-95"
+          >
+            <ScanLine className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Scan</span>
+          </button>
+        </div>
       </div>
 
       {/* ── Empty state ── */}
@@ -850,6 +953,17 @@ export default function Checkout() {
                   Cart · {count} item{count !== 1 ? "s" : ""}
                 </p>
                 <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (!isOnline) { toast.error("Cannot hold bill while offline"); return; }
+                      setShowHoldModal(true);
+                    }}
+                    className={`flex items-center gap-1 text-xs font-semibold transition-colors ${!isOnline ? "text-muted-foreground cursor-not-allowed opacity-50" : "text-indigo-500 hover:text-indigo-600"}`}
+                    disabled={!isOnline}
+                    title={!isOnline ? "Unavailable offline" : ""}
+                  >
+                    <PauseCircle className="w-3 h-3" /> Hold bill
+                  </button>
                   <button
                     onClick={() => setShowManualModal(true)}
                     className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 font-semibold transition-colors"

@@ -18,7 +18,8 @@ export type SseEventType =
   | "product_created"
   | "product_updated"
   | "low_stock_alert"
-  | "cart_updated";
+  | "cart_updated"
+  | "held_bills_updated";
 
 /** Notify plain-fetch pages (Billing, Customers) that server data changed.
  *  Those pages don't use React Query, so cache invalidation can't reach them;
@@ -139,8 +140,12 @@ export function useRealtime() {
 
       /* ── shared cart updated (cross-device sync) ── */
       es.addEventListener("cart_updated", (e) => {
-        const d = JSON.parse(e.data) as { items: CartItem[]; count: number; total: number };
-        syncRef.current(d.items);
+        const d = JSON.parse(e.data) as { items: CartItem[]; count: number; total: number; revision: number };
+        syncRef.current(d.items, d.revision);
+      });
+
+      es.addEventListener("held_bills_updated", () => {
+        void qc.invalidateQueries({ queryKey: ["held-bills"] });
       });
 
       /* ── low stock alert ── */
