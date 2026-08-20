@@ -178,6 +178,8 @@ function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; st
           <div className="space-y-1.5 py-2">
             {RESOURCES.filter((r) => r.key !== "staff").map((res) => {
               const current = (perms[res.key] ?? "none") as AccessLevel;
+              const levels: readonly AccessLevel[] =
+                res.key === "productReports" ? ["none", "read"] : ["none", "read", "write"];
               return (
                 <div key={res.key} className="rounded-xl border bg-card p-3">
                   <div className="flex items-start justify-between gap-3 mb-2">
@@ -190,7 +192,7 @@ function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; st
                     </span>
                   </div>
                   <div className="flex gap-1.5">
-                    {(["none", "read", "write"] as const).map((level) => (
+                    {levels.map((level) => (
                       <button
                         key={level}
                         onClick={() => setLevel(res.key as ResourceKey, level)}

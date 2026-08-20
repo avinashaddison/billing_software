@@ -318,3 +318,97 @@ export function requireWrite(resource: string) {
     }
   };
 }
+
+export type ResourceReadView = "owner" | "manager";
+
+export function resolveResourceReadView(
+  authKind: "email" | "pin",
+  role: string,
+  permissionLevel?: string | null,
+): ResourceReadView | null {
+  if (authKind === "email") {
+    return role === "owner" || role === "admin" ? "owner" : null;
+  }
+  if (role === "owner") return "owner";
+  return permissionLevel === "read" || permissionLevel === "write" ? "manager" : null;
+}
+
+/**
+ * Per-resource READ gate for sensitive reporting surfaces.
+ *
+ * Owners/admins receive the owner view. PIN staff must have either read or
+ * write permission for the requested resource, but always receive the
+ * manager-safe view — granting "write" must never turn into access to cost or
+ * profit data. Email manager/cashier accounts do not have a per-resource map,
+ * so they are denied in the same way requireWrite denies them.
+ */
+export function requireRead(resource: string) {
+  return async function (req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (req.authKind === "email" && req.userId) {
+        const [me] = await db
+          .select({
+            role: authUsersTable.role,
+            isActive: authUsersTable.isActive,
+            tenantId: authUsersTable.tenantId,
+          })
+          .from(authUsersTable)
+          .where(eq(authUsersTable.id, req.userId));
+        if (!me || !me.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
+        if ((me.tenantId ?? null) !== (req.tenantId ?? null)) {
+          res.status(403).json({ error: "Your session no longer matches this shop. Please log in again." });
+          return;
+        }
+        const view = resolveResourceReadView("email", me.role);
+        if (view) {
+          res.locals.resourceReadView = view;
+          next();
+          return;
+        }
+        res.status(403).json({ error: `No permission to view ${resource}` });
+        return;
+      }
+
+      if (req.staffId) {
+        const [me] = await db
+          .select({
+            role: staffProfilesTable.role,
+            isActive: staffProfilesTable.isActive,
+            tenantId: staffProfilesTable.tenantId,
+          })
+          .from(staffProfilesTable)
+          .where(eq(staffProfilesTable.id, req.staffId));
+        if (!me || !me.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
+        if ((me.tenantId ?? null) !== (req.tenantId ?? null)) {
+          res.status(403).json({ error: "Your session no longer matches this shop. Please log in again." });
+          return;
+        }
+        const ownerView = resolveResourceReadView("pin", me.role);
+        if (ownerView) {
+          res.locals.resourceReadView = ownerView;
+          next();
+          return;
+        }
+        const [perm] = await db
+          .select({ level: staffPermissionsTable.level })
+          .from(staffPermissionsTable)
+          .where(and(
+            eq(staffPermissionsTable.staffId, req.staffId),
+            eq(staffPermissionsTable.resource, resource),
+          ));
+        const staffView = resolveResourceReadView("pin", me.role, perm?.level);
+        if (staffView) {
+          res.locals.resourceReadView = staffView;
+          next();
+          return;
+        }
+        res.status(403).json({ error: `No permission to view ${resource}` });
+        return;
+      }
+
+      res.status(401).json({ error: "Not authenticated" });
+    } catch {
+      res.status(500).json({ error: "Authorization check failed" });
+    }
+  };
+}

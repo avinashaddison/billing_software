@@ -25,3 +25,8 @@ description: How duesCollected / profit / net-of-returns figures are computed an
 - API fields are **additive** (old fields kept); frontend uses `??` fallbacks so stale payloads render.
 - Telegram nightly summary stays global/unscoped (legacy single-store report). Its quiet-day branch must check **both** `billCount === 0` and `refundsTotal <= 0` — a return-only day must render the full layout (negative net), not "No sales recorded".
 - **How to apply:** any new revenue/profit report must subtract refunds the same way (returns-table tenant scope, IST processing-day bucketing, covered-only profit adjustment) or figures will disagree across pages.
+
+# Product-level revenue allocation (decision)
+- A product report must allocate the bill's actual final total across all sale lines in proportion to their line subtotals before attributing revenue. Then subtract product returns processed inside the same IST window, including returned quantity and covered COGS.
+- **Why:** sale-line subtotals do not include whole-bill discounts or rounding. Summing them directly overstates product revenue, profit, and margin; ignoring returns makes returned units look permanently sold.
+- **How to apply:** use a closed IST-day window with an exclusive next-day upper bound, include every bill line in the allocation denominator (including manual lines), and never reverse returned cost when the original bill-product cost is not fully known.

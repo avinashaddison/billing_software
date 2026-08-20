@@ -24,6 +24,7 @@ import Logs           from "@/pages/Logs";
 import TodayOut       from "@/pages/TodayOut";
 import StockAlert     from "@/pages/StockAlert";
 import Analytics      from "@/pages/Analytics";
+import ProductReport  from "@/pages/ProductReport";
 import Profile        from "@/pages/Profile";
 import Bill           from "@/pages/Bill";
 import Billing        from "@/pages/Billing";
@@ -212,6 +213,7 @@ function Router() {
             <Route path="/today-out"    component={() => <Protected resource="logs"><TodayOut /></Protected>} />
             <Route path="/stock-alert"  component={() => <Protected resource="stockAlert"><StockAlert /></Protected>} />
             <Route path="/analytics"    component={() => <Protected resource="analytics"><Analytics /></Protected>} />
+            <Route path="/product-report" component={() => <Protected resource="productReports"><ProductReport /></Protected>} />
             <Route path="/profile"      component={Profile} />
             <Route path="/billing"      component={() => <Protected resource="billing"><Billing /></Protected>} />
             <Route path="/bill/:id"     component={() => <Protected resource="billing"><Bill /></Protected>} />

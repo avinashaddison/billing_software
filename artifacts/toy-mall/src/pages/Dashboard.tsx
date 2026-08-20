@@ -18,6 +18,7 @@ import {
 } from "recharts";
 import { getCategoryStyle, getCategoryEmoji } from "@/lib/category-colors";
 import { useStoreSettings } from "@/lib/store-info";
+import { useAuth } from "@/hooks/use-auth";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -362,17 +363,22 @@ function ReceivablesCard() {
 
 /* ── Quick-tile ──────────────────────────────────────────────────── */
 const quickTiles = [
-  { href: "/stock-alert", icon: AlertTriangle, label: "Stock Alert", desc: "Low stock & movement", iconBg: "bg-amber-500",   gradient: "from-amber-500/8"  },
-  { href: "/analytics",   icon: TrendingUp,    label: "Analytics",   desc: "Trends & SKU stats",   iconBg: "bg-indigo-500",  gradient: "from-indigo-500/8" },
-  { href: "/report",    icon: FileText, label: "Reports",   desc: "EOD & trends",     iconBg: "bg-blue-500",    gradient: "from-blue-500/8"   },
-  { href: "/customers", icon: Users,    label: "Customers", desc: "Purchase history", iconBg: "bg-purple-500",  gradient: "from-purple-500/8" },
-  { href: "/labels",    icon: Tag,      label: "Labels",    desc: "Barcode shelf labels",    iconBg: "bg-amber-500",   gradient: "from-amber-500/8"  },
-  { href: "/suppliers", icon: Truck,    label: "Suppliers", desc: "Manage vendors",   iconBg: "bg-emerald-500", gradient: "from-emerald-500/8" },
+  { href: "/stock-alert",    icon: AlertTriangle, label: "Stock Alert",    desc: "Low stock & movement", iconBg: "bg-amber-500",   gradient: "from-amber-500/8",   resource: "stockAlert" },
+  { href: "/product-report", icon: Package,       label: "Product Report", desc: "Sales & stock by item", iconBg: "bg-cyan-600",    gradient: "from-cyan-500/8",    resource: "productReports" },
+  { href: "/analytics",      icon: TrendingUp,    label: "Analytics",      desc: "Trends & SKU stats",    iconBg: "bg-indigo-500",  gradient: "from-indigo-500/8",  resource: "analytics" },
+  { href: "/report",         icon: FileText,      label: "Reports",        desc: "EOD & trends",          iconBg: "bg-blue-500",    gradient: "from-blue-500/8",    resource: "reports" },
+  { href: "/customers",      icon: Users,         label: "Customers",      desc: "Purchase history",      iconBg: "bg-purple-500",  gradient: "from-purple-500/8",  resource: "customers" },
+  { href: "/labels",         icon: Tag,           label: "Labels",         desc: "Barcode shelf labels",  iconBg: "bg-amber-500",   gradient: "from-amber-500/8",   resource: "labels" },
+  { href: "/suppliers",      icon: Truck,         label: "Suppliers",      desc: "Manage vendors",        iconBg: "bg-emerald-500", gradient: "from-emerald-500/8", resource: "suppliers" },
 ] as const;
 
 /* ── Main ────────────────────────────────────────────────────────── */
 export default function Dashboard() {
   const store = useStoreSettings();
+  const { role, permissions } = useAuth();
+  const visibleQuickTiles = quickTiles.filter(({ resource }) =>
+    role === "owner" || permissions[resource] === "read" || permissions[resource] === "write"
+  );
   const { data: summary, isLoading: loadingSummary }       = useGetDashboardSummary({ query: { queryKey: getGetDashboardSummaryQueryKey() } });
   const { data: activity, isLoading: loadingActivity }     = useGetTodayActivity({ query: { queryKey: getGetTodayActivityQueryKey() } });
   const { data: lowStock, isLoading: loadingLowStock }     = useGetLowStockProducts({ query: { queryKey: getGetLowStockProductsQueryKey() } });
@@ -423,7 +429,7 @@ export default function Dashboard() {
 
       {/* ── Quick-access tiles ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {quickTiles.map(({ href, icon: Icon, label, desc, iconBg, gradient }) => (
+        {visibleQuickTiles.map(({ href, icon: Icon, label, desc, iconBg, gradient }) => (
           <Link key={href} href={href}
             className={`relative bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-md active:scale-[0.97] transition-all group`}>
             <div className={`absolute inset-0 bg-gradient-to-br ${gradient} via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none`} />

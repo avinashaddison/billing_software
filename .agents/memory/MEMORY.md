@@ -1,6 +1,6 @@
 - [DB migrations, tenancy & which DB the app uses](db-tenancy-migrations.md) — app hits NEON, not the executeSql `heliumdb`; idempotent boot SQL only (never drizzle push); migrations are additive-only so they can't bootstrap an empty DB.
 - [Dev orchestrator vs per-artifact workflows](replit-workflow-orchestrator-clash.md) — repo owns its own API 8080 / web 5000 orchestrator; auto-added per-artifact workflows steal the ports and blank the preview.
-- [EOD money math & net-of-returns](eod-reporting.md) — duesCollected from ledger 'collection' rows; profit over coveredRevenue; refunds hit processing day, profit adj only covered lines (fan-out-safe CTE).
+- [EOD & product-report money math](eod-reporting.md) — ledger collections; covered profit; refunds hit processing day; product revenue allocates actual bill total before netting returns.
 - [Defensive fetch handling](defensive-fetch.md) — check r.ok before r.json() (non-JSON error pages crash); never fall back to defaults on a failed load that feeds a Save-able form (overwrites real data).
 - [API error-handling contract](api-error-handling.md) — centralized 4-arg errorHandler (Express 5 auto-forwards rejections); apiNotFound after router/before SPA; 5xx never leaks err.message; structural ZodError detection (no zod import).
 - [Verifying authenticated UI](verifying-authenticated-ui.md) — no known passwords + live data; mint a signed session cookie AND seed the Zustand localStorage store, or the SPA redirects before any call.

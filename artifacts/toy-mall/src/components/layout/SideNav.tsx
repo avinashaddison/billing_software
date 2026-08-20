@@ -60,6 +60,7 @@ export function SideNav() {
   const extraItems = [
     { name: "Today's Deals", href: "/deals",       icon: Sparkles,      resource: "deals"      },
     { name: "Stock Alert",   href: "/stock-alert", icon: AlertTriangle, resource: "stockAlert" },
+    { name: "Product Report", href: "/product-report", icon: Package,    resource: "productReports" },
     { name: "Analytics",     href: "/analytics",   icon: BarChart3,     resource: "analytics"  },
     { name: "Reports",       href: "/report",     icon: FileText,  resource: "reports"   },
     { name: "Customers",     href: "/customers",  icon: Users,     resource: "customers" },

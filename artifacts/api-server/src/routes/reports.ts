@@ -1,8 +1,10 @@
 import { Router, type IRouter } from "express";
-import { desc, sql, and, eq } from "drizzle-orm";
+import { asc, desc, sql, and, eq } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable, billPaymentsTable } from "@workspace/db";
 import { tenantWhere } from "../lib/tenant";
 import { istToday, istShiftDay } from "../lib/ist";
+import { requireRead, type ResourceReadView } from "../middlewares/auth";
+import { buildProductReport } from "../lib/product-report";
 
 const router: IRouter = Router();
 
@@ -164,6 +166,138 @@ router.get("/reports/sku-performance", async (req, res): Promise<void> => {
       margin,
     };
   }));
+});
+
+/**
+ * GET /api/reports/products?days=30
+ *
+ * Dedicated product report. Unlike sku-performance, this includes the full
+ * catalogue (including unsold products) so managers can see current and
+ * low-stock state beside sales performance.
+ *
+ * The read gate sets one of two views:
+ * - manager: operational sales + stock fields only
+ * - owner: manager fields plus purchase cost, stock value and profitability
+ *
+ * The response builder uses separate allow-listed shapes, so sensitive fields
+ * are absent — not merely null — from a manager response.
+ */
+router.get("/reports/products", requireRead("productReports"), async (req, res): Promise<void> => {
+  const rawDays = Number(req.query.days ?? 30);
+  if (!Number.isInteger(rawDays) || ![7, 30, 90].includes(rawDays)) {
+    res.status(400).json({ error: "days must be one of 7, 30, or 90" });
+    return;
+  }
+
+  const days = rawDays;
+  const toDay = istToday();
+  const fromDay = istShiftDay(toDay, -(days - 1));
+  const toDayExclusive = istShiftDay(toDay, 1);
+  const tenantId = req.tenantId;
+  const lineCost = sql`COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice})`;
+  const lineCosts = lineCostsCte();
+
+  /* Allocate the amount the customer actually paid back onto each line.
+     sale_items.subtotal is after line discounts but before the whole-bill
+     discount; using it directly would overstate every product's revenue and
+     profit whenever checkout applied a bill-level discount or rounding. */
+  const billLineTotals = db.$with("product_report_bill_totals").as(
+    db.select({
+        billId: saleItemsTable.saleId,
+        lineSubtotal: sql<string>`SUM(${saleItemsTable.subtotal})`.as("line_subtotal"),
+      })
+      .from(saleItemsTable)
+      .where(tenantWhere(saleItemsTable.tenantId, tenantId))
+      .groupBy(saleItemsTable.saleId),
+  );
+  const allocatedLineRevenue = sql`
+    CASE
+      WHEN ${billLineTotals.lineSubtotal}::numeric <> 0
+      THEN ${saleItemsTable.subtotal} * ${billsTable.totalAmount} / ${billLineTotals.lineSubtotal}
+      ELSE 0
+    END
+  `;
+
+  const productSales = db.$with("product_report_sales").as(
+    db.select({
+        productId: saleItemsTable.productId,
+        totalQty: sql<number>`SUM(${saleItemsTable.quantity})::int`.as("total_qty"),
+        totalRevenue: sql<string>`SUM(${allocatedLineRevenue})`.as("total_revenue"),
+        billCount: sql<number>`COUNT(DISTINCT ${saleItemsTable.saleId})::int`.as("bill_count"),
+        totalCost: sql<string>`COALESCE(SUM(${lineCost} * ${saleItemsTable.quantity}) FILTER (WHERE ${lineCost} IS NOT NULL), 0)`.as("total_cost"),
+        costedQty: sql<number>`COALESCE(SUM(${saleItemsTable.quantity}) FILTER (WHERE ${lineCost} IS NOT NULL), 0)::int`.as("costed_qty"),
+        coveredRevenue: sql<string>`COALESCE(SUM(${allocatedLineRevenue}) FILTER (WHERE ${lineCost} IS NOT NULL), 0)`.as("covered_revenue"),
+      })
+      .from(saleItemsTable)
+      .innerJoin(billsTable, eq(saleItemsTable.saleId, billsTable.id))
+      .innerJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
+      .innerJoin(billLineTotals, eq(saleItemsTable.saleId, billLineTotals.billId))
+      .where(and(
+        sql`${billsTable.createdAt} >= ${istDayStart(fromDay)}`,
+        sql`${billsTable.createdAt} < ${istDayStart(toDayExclusive)}`,
+        tenantWhere(billsTable.tenantId, tenantId),
+        tenantWhere(productsTable.tenantId, tenantId),
+      ))
+      .groupBy(saleItemsTable.productId),
+  );
+
+  /* Returns are reported on the IST day they are processed, matching the
+     existing EOD/net-sales convention. Revenue loses the refund; cost comes
+     back into stock. If any original bill-product line has unknown cost, its
+     returned cost remains uncovered rather than being invented. */
+  const productReturns = db.$with("product_report_returns").as(
+    db.select({
+        productId: returnsTable.productId,
+        returnedQty: sql<number>`SUM(${returnsTable.quantity})::int`.as("returned_qty"),
+        refunds: sql<string>`SUM(${returnsTable.refundAmount})`.as("refunds"),
+        returnedCost: sql<string>`COALESCE(SUM(
+          (${lineCosts.totalCost} / NULLIF(${lineCosts.soldQty}, 0)) * ${returnsTable.quantity}
+        ) FILTER (WHERE ${lineCosts.unknownLines} = 0), 0)`.as("returned_cost"),
+        costedReturnQty: sql<number>`COALESCE(SUM(${returnsTable.quantity}) FILTER (WHERE ${lineCosts.unknownLines} = 0), 0)::int`.as("costed_return_qty"),
+        coveredRefunds: sql<string>`COALESCE(SUM(${returnsTable.refundAmount}) FILTER (WHERE ${lineCosts.unknownLines} = 0), 0)`.as("covered_refunds"),
+      })
+      .from(returnsTable)
+      .innerJoin(lineCosts, and(
+        eq(lineCosts.billId, returnsTable.billId),
+        eq(lineCosts.productId, returnsTable.productId),
+      ))
+      .where(and(
+        sql`${returnsTable.createdAt} >= ${istDayStart(fromDay)}`,
+        sql`${returnsTable.createdAt} < ${istDayStart(toDayExclusive)}`,
+        tenantWhere(returnsTable.tenantId, tenantId),
+      ))
+      .groupBy(returnsTable.productId),
+  );
+
+  const rows = await db
+    .with(billLineTotals, lineCosts, productSales, productReturns)
+    .select({
+      productId: productsTable.id,
+      productName: productsTable.name,
+      productSku: productsTable.sku,
+      category: productsTable.category,
+      currentStock: productsTable.stock,
+      lowStockThreshold: productsTable.lowStockThreshold,
+      purchasePrice: productsTable.purchasePrice,
+      totalQty: sql<number>`(COALESCE(${productSales.totalQty}, 0) - COALESCE(${productReturns.returnedQty}, 0))::int`,
+      totalRevenue: sql<string>`COALESCE(${productSales.totalRevenue}, 0) - COALESCE(${productReturns.refunds}, 0)`,
+      billCount: productSales.billCount,
+      totalCost: sql<string>`COALESCE(${productSales.totalCost}, 0) - COALESCE(${productReturns.returnedCost}, 0)`,
+      costedQty: sql<number>`(COALESCE(${productSales.costedQty}, 0) - COALESCE(${productReturns.costedReturnQty}, 0))::int`,
+      coveredRevenue: sql<string>`COALESCE(${productSales.coveredRevenue}, 0) - COALESCE(${productReturns.coveredRefunds}, 0)`,
+    })
+    .from(productsTable)
+    .leftJoin(productSales, eq(productsTable.id, productSales.productId))
+    .leftJoin(productReturns, eq(productsTable.id, productReturns.productId))
+    .where(tenantWhere(productsTable.tenantId, tenantId))
+    .orderBy(
+      desc(sql`COALESCE(${productSales.totalRevenue}, 0) - COALESCE(${productReturns.refunds}, 0)`),
+      asc(productsTable.name),
+    );
+
+  const view: ResourceReadView =
+    res.locals.resourceReadView === "owner" ? "owner" : "manager";
+  res.json(buildProductReport(rows, view, days, fromDay, toDay));
 });
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
