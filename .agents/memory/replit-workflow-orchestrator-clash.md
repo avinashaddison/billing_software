@@ -47,3 +47,6 @@ has its own dev orchestrator, check the workflow list for duplicates first.
 - The artifact api-server workflow can REVIVE by itself after a WorkflowsRestart of "Start application" and win the 8080 race with a STALE process (it served an old dist bundle: freshly-mounted routes 404'd/misrouted and boot migrations never ran). "Not authenticated" from a route you just mounted usually means you are talking to the old process, not that auth is broken.
 - Reliable sequence: free the port (`fuser -k 8080/tcp` — port-keyed, so it cannot self-match), then restart "Start application" while a short background guard kills any 8080 binder whose /proc ancestry does NOT contain `@workspace/scripts` — the orchestrator's child is the only legitimate owner.
 - The orchestrator's API child does NOT hot-reload middleware/route edits: restart "Start application" after server-code changes before re-testing, or you will "verify" the old code.
+
+### When the Replit development URL alone is a 502
+- If the workflow is running, Vite reports `0.0.0.0:5000`, and both the local web route and API route return 200, a 502 from the `.replit.dev` URL is a platform forwarding fault. Reapplying the 5000 webview workflow configuration and restarting once is safe; if the URL remains 502, do not rewrite ports or application code.
