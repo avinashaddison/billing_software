@@ -37,8 +37,17 @@ const exactDateTime = (iso: string) =>
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    second: "2-digit",
     hour12: true,
   });
+
+const money = (value: number) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 
 interface StockBatchHistoryProps {
   history?: ProductStockHistory;
@@ -175,6 +184,35 @@ export function StockBatchHistory({
                   </p>
                 </div>
               </div>
+
+              <dl className="mt-3 grid gap-x-3 gap-y-2 border-t pt-3 text-xs sm:grid-cols-2">
+                <div>
+                  <dt className="text-muted-foreground">Purchase price</dt>
+                  <dd className="mt-0.5 font-medium text-foreground">
+                    {batch.purchasePrice != null
+                      ? `${money(batch.purchasePrice)} / unit`
+                      : "Not recorded"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Supplier</dt>
+                  <dd className="mt-0.5 font-medium text-foreground">
+                    {batch.supplierName || "Not recorded"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Invoice / reference</dt>
+                  <dd className="mt-0.5 break-words font-medium text-foreground">
+                    {batch.invoiceNumber || "Not recorded"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Note</dt>
+                  <dd className="mt-0.5 break-words font-medium text-foreground">
+                    {batch.note || "Not recorded"}
+                  </dd>
+                </div>
+              </dl>
 
               {batch.adjustedQuantity > 0 && (
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">

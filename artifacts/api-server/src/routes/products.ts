@@ -1,6 +1,14 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, and, lte, gte, inArray, sql, desc, isNull } from "drizzle-orm";
-import { db, productsTable, stockLogsTable, salesTable, saleItemsTable, returnsTable } from "@workspace/db";
+import {
+  db,
+  productsTable,
+  stockLogsTable,
+  salesTable,
+  saleItemsTable,
+  returnsTable,
+  suppliersTable,
+} from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { requireWrite } from "../middlewares/auth";
@@ -494,7 +502,15 @@ router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promi
     return;
   }
 
-  const { type, quantity, userId } = parsed.data;
+  const {
+    type,
+    quantity,
+    userId,
+    purchasePrice,
+    supplierId,
+    invoiceNumber,
+    note,
+  } = parsed.data;
 
   /* Harden the quantity: the generated zod validator is only `z.number()`
      (no int / sign / range bound), so without this a crafted request could
@@ -516,6 +532,16 @@ router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promi
     return;
   }
 
+  const hasRestockMetadata =
+    purchasePrice !== undefined ||
+    supplierId !== undefined ||
+    invoiceNumber !== undefined ||
+    note !== undefined;
+  if (type !== "IN" && hasRestockMetadata) {
+    res.status(400).json({ error: "Purchase, supplier, invoice, and note details are only valid for stock IN" });
+    return;
+  }
+
   /* All reads + writes run inside one transaction so the stock change, the
      stock-log row and any sale row commit (or roll back) together. OUT uses
      an atomic GUARDED decrement so two concurrent OUTs can't oversell. */
@@ -529,6 +555,53 @@ router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promi
       ));
 
     if (!product) return { status: "not_found" as const };
+
+    let restockMetadata: {
+      purchasePrice: string | null;
+      supplierId: string | null;
+      supplierName: string | null;
+      invoiceNumber: string | null;
+      note: string | null;
+    } = {
+      purchasePrice: null,
+      supplierId: null,
+      supplierName: null,
+      invoiceNumber: null,
+      note: null,
+    };
+
+    if (type === "IN") {
+      const resolvedPurchasePrice =
+        purchasePrice !== undefined
+          ? purchasePrice
+          : product.purchasePrice != null
+            ? Number(product.purchasePrice)
+            : null;
+      const resolvedSupplierId =
+        supplierId !== undefined ? supplierId : product.supplierId;
+
+      let supplierName: string | null = null;
+      if (resolvedSupplierId) {
+        const [supplier] = await tx
+          .select({ id: suppliersTable.id, name: suppliersTable.name })
+          .from(suppliersTable)
+          .where(and(
+            eq(suppliersTable.id, resolvedSupplierId),
+            tenantWhere(suppliersTable.tenantId, req.tenantId),
+          ));
+        if (!supplier) return { status: "supplier_not_found" as const };
+        supplierName = supplier.name;
+      }
+
+      restockMetadata = {
+        purchasePrice:
+          resolvedPurchasePrice != null ? String(resolvedPurchasePrice) : null,
+        supplierId: resolvedSupplierId ?? null,
+        supplierName,
+        invoiceNumber: invoiceNumber?.trim() || null,
+        note: note?.trim() || null,
+      };
+    }
 
     /* Each stock write repeats the tenant predicate rather than relying solely
        on the ownership SELECT above — same reasoning as the delete route: the
@@ -575,6 +648,7 @@ router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promi
         productId: params.data.id,
         type,
         quantity,
+        ...restockMetadata,
         userId: userId ?? null,
       })
       .returning();
@@ -611,6 +685,10 @@ router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promi
     res.status(400).json({ error: "Insufficient stock" });
     return;
   }
+  if (outcome.status === "supplier_not_found") {
+    res.status(400).json({ error: "Supplier not found for this shop" });
+    return;
+  }
 
   const { product, updatedProduct, log, sale } = outcome;
   const newStock = updatedProduct.stock;
@@ -639,6 +717,7 @@ router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promi
     product: mapProduct(updatedProduct),
     log: {
       ...log,
+      purchasePrice: log.purchasePrice != null ? Number(log.purchasePrice) : null,
       productName: product.name,
       productSku:  product.sku,
     },

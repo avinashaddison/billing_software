@@ -21,6 +21,11 @@ describe("buildStockBatchHistory", () => {
       soldQuantity: 2,
       adjustedQuantity: 0,
       remainingQuantity: 18,
+      purchasePrice: null,
+      supplierId: null,
+      supplierName: null,
+      invoiceNumber: null,
+      note: null,
     });
     expect(result.summary).toMatchObject({
       stockedQuantity: 20,
@@ -40,6 +45,31 @@ describe("buildStockBatchHistory", () => {
       expect.objectContaining({ id: "2", soldQuantity: 2, remainingQuantity: 18 }),
       expect.objectContaining({ id: "1", soldQuantity: 10, remainingQuantity: 0 }),
     ]);
+  });
+
+  it("keeps the original purchase, supplier, invoice, and note on each restock", () => {
+    const result = buildStockBatchHistory("p1", 3, [
+      {
+        ...movement("1", "IN", 5),
+        purchasePrice: "42.50",
+        supplierId: "supplier-1",
+        supplierName: "Classic Toys",
+        invoiceNumber: "INV-2048",
+        note: "Festival shipment",
+      },
+      movement("2", "OUT", 2),
+    ]);
+
+    expect(result.batches[0]).toMatchObject({
+      addedQuantity: 5,
+      soldQuantity: 2,
+      remainingQuantity: 3,
+      purchasePrice: 42.5,
+      supplierId: "supplier-1",
+      supplierName: "Classic Toys",
+      invoiceNumber: "INV-2048",
+      note: "Festival shipment",
+    });
   });
 
   it("consumes unattributed opening stock before dated restocks", () => {

@@ -632,6 +632,9 @@ components:
           type: integer
         lowStockThreshold:
           type: integer
+        supplierId:
+          type: ["string", "null"]
+          format: uuid
         createdAt:
           type: string
       required:
@@ -642,6 +645,7 @@ components:
         - price
         - stock
         - lowStockThreshold
+        - supplierId
         - createdAt
 
     CreateProductInput:
@@ -717,6 +721,23 @@ components:
           type: integer
         userId:
           type: string
+        purchasePrice:
+          type: ["number", "null"]
+          minimum: 0
+          maximum: 100000000
+          description: Purchase price per unit captured for this IN restock
+        supplierId:
+          type: ["string", "null"]
+          format: uuid
+          description: Supplier selected for this IN restock
+        invoiceNumber:
+          type: ["string", "null"]
+          maxLength: 100
+          description: Supplier invoice or reference number for this IN restock
+        note:
+          type: ["string", "null"]
+          maxLength: 500
+          description: Optional note for this IN restock
       required:
         - type
         - quantity
@@ -764,6 +785,17 @@ components:
           enum: [IN, OUT, ADJUSTMENT, RETURN]
         quantity:
           type: integer
+        purchasePrice:
+          type: ["number", "null"]
+        supplierId:
+          type: ["string", "null"]
+          format: uuid
+        supplierName:
+          type: ["string", "null"]
+        invoiceNumber:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
         userId:
           type: ["string", "null"]
         createdAt:
@@ -775,6 +807,11 @@ components:
         - productSku
         - type
         - quantity
+        - purchasePrice
+        - supplierId
+        - supplierName
+        - invoiceNumber
+        - note
         - createdAt
 
     StockBatch:
@@ -789,6 +826,19 @@ components:
         adjustedQuantity:
           type: integer
           description: Units whose batch attribution was reset by an absolute stock correction, not counted as sales
+        purchasePrice:
+          type: ["number", "null"]
+          description: Purchase price per unit recorded when this stock was added
+        supplierId:
+          type: ["string", "null"]
+          format: uuid
+        supplierName:
+          type: ["string", "null"]
+          description: Supplier name snapshot recorded when this stock was added
+        invoiceNumber:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
         remainingQuantity:
           type: integer
         addedAt:
@@ -799,6 +849,11 @@ components:
         - addedQuantity
         - soldQuantity
         - adjustedQuantity
+        - purchasePrice
+        - supplierId
+        - supplierName
+        - invoiceNumber
+        - note
         - remainingQuantity
         - addedAt
 

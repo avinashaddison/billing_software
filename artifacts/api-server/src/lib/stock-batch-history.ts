@@ -5,6 +5,11 @@ export interface StockMovement {
   type: StockMovementType;
   quantity: number;
   userId?: string | null;
+  purchasePrice?: number | string | null;
+  supplierId?: string | null;
+  supplierName?: string | null;
+  invoiceNumber?: string | null;
+  note?: string | null;
   createdAt: Date | string;
 }
 
@@ -14,6 +19,11 @@ export interface StockBatch {
   soldQuantity: number;
   adjustedQuantity: number;
   remainingQuantity: number;
+  purchasePrice: number | null;
+  supplierId: string | null;
+  supplierName: string | null;
+  invoiceNumber: string | null;
+  note: string | null;
   addedAt: string;
 }
 
@@ -133,6 +143,12 @@ export function buildStockBatchHistory(
         soldQuantity: 0,
         adjustedQuantity: 0,
         remainingQuantity: quantity,
+        purchasePrice:
+          movement.purchasePrice != null ? Number(movement.purchasePrice) : null,
+        supplierId: movement.supplierId ?? null,
+        supplierName: movement.supplierName ?? null,
+        invoiceNumber: movement.invoiceNumber ?? null,
+        note: movement.note ?? null,
         addedAt: new Date(movement.createdAt).toISOString(),
       };
       batches.push(batch);

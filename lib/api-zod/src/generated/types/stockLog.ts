@@ -15,6 +15,16 @@ export interface StockLog {
   type: StockLogType;
   quantity: number;
   /** @nullable */
+  purchasePrice: number | null;
+  /** @nullable */
+  supplierId: string | null;
+  /** @nullable */
+  supplierName: string | null;
+  /** @nullable */
+  invoiceNumber: string | null;
+  /** @nullable */
+  note: string | null;
+  /** @nullable */
   userId?: string | null;
   createdAt: string;
 }

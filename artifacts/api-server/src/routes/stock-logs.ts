@@ -68,6 +68,11 @@ router.get("/products/:id/stock-history", async (req, res): Promise<void> => {
         type: stockLogsTable.type,
         quantity: stockLogsTable.quantity,
         userId: stockLogsTable.userId,
+        purchasePrice: stockLogsTable.purchasePrice,
+        supplierId: stockLogsTable.supplierId,
+        supplierName: stockLogsTable.supplierName,
+        invoiceNumber: stockLogsTable.invoiceNumber,
+        note: stockLogsTable.note,
         createdAt: stockLogsTable.createdAt,
       })
       .from(stockLogsTable)
@@ -128,6 +133,11 @@ router.get("/stock-logs", async (req, res): Promise<void> => {
       productSku: productsTable.sku,
       type: stockLogsTable.type,
       quantity: stockLogsTable.quantity,
+      purchasePrice: stockLogsTable.purchasePrice,
+      supplierId: stockLogsTable.supplierId,
+      supplierName: stockLogsTable.supplierName,
+      invoiceNumber: stockLogsTable.invoiceNumber,
+      note: stockLogsTable.note,
       userId: stockLogsTable.userId,
       createdAt: stockLogsTable.createdAt,
     })
@@ -138,7 +148,10 @@ router.get("/stock-logs", async (req, res): Promise<void> => {
     .limit(limit)
     .offset(offset);
 
-  res.json(rows);
+  res.json(rows.map((row) => ({
+    ...row,
+    purchasePrice: row.purchasePrice != null ? Number(row.purchasePrice) : null,
+  })));
 });
 
 /**

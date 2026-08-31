@@ -17,10 +17,19 @@ import {
   PackagePlus, ScanLine, Camera, CameraOff, Loader2, Search, X,
   Volume2, VolumeX, Plus, Minus, Boxes, AlertTriangle, Keyboard,
   CheckCircle2, Clock, Barcode, Layers, PackageSearch, TrendingUp, Info,
+  Truck, ReceiptText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import { useCameraScanner } from "@/hooks/use-camera-scanner";
 import { useScanFlash, ScanFlash } from "@/components/ui/ScanFlash";
@@ -28,7 +37,7 @@ import {
   playScanBeep, playCameraDetect, playError, playStockIn,
   isSoundMuted, toggleSoundMute,
 } from "@/lib/sounds";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getGetProductStockHistoryQueryKey,
   getListProductsQueryKey,
@@ -54,6 +63,12 @@ interface EntryProduct {
   stock:             number;
   lowStockThreshold: number;
   imageUrl?:         string | null;
+  supplierId?:       string | null;
+}
+
+interface ApiSupplier {
+  id: string;
+  name: string;
 }
 
 interface StockLog {
@@ -63,6 +78,11 @@ interface StockLog {
   productSku:  string;
   type:        "IN" | "OUT" | "ADJUSTMENT" | "RETURN";
   quantity:    number;
+  purchasePrice: number | null;
+  supplierId: string | null;
+  supplierName: string | null;
+  invoiceNumber: string | null;
+  note: string | null;
   userId:      string | null;
   createdAt:   string;
 }
@@ -110,11 +130,28 @@ async function fetchStockLogs(params: Record<string, string>): Promise<StockLog[
    guessing the new level client-side. */
 interface StockInResponse { error?: string; product?: EntryProduct }
 
-async function postStockIn(productId: string, quantity: number, userId?: string): Promise<StockInResponse> {
+interface RestockMetadata {
+  purchasePrice: number | null;
+  supplierId: string | null;
+  invoiceNumber: string | null;
+  note: string | null;
+}
+
+async function postStockIn(
+  productId: string,
+  quantity: number,
+  metadata: RestockMetadata,
+  userId?: string,
+): Promise<StockInResponse> {
   const res = await fetch(`${BASE_URL}/api/products/${productId}/stock`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ type: "IN", quantity, ...(userId ? { userId } : {}) }),
+    body: JSON.stringify({
+      type: "IN",
+      quantity,
+      ...metadata,
+      ...(userId ? { userId } : {}),
+    }),
   });
   let data: StockInResponse = {};
   try { data = await res.json(); } catch { /* empty or non-JSON body */ }
@@ -135,7 +172,13 @@ const shiftDay = (day: string, deltaDays: number): string => {
 const monthStart = (day: string) => `${day.slice(0, 7)}-01`;
 
 const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("en-IN", { timeZone: IST, hour: "numeric", minute: "2-digit", hour12: true });
+  new Date(iso).toLocaleTimeString("en-IN", {
+    timeZone: IST,
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-IN", { timeZone: IST, day: "numeric", month: "short", year: "numeric" });
@@ -180,6 +223,10 @@ export default function ProductsEntry() {
 
   const [product, setProduct]     = useState<EntryProduct | null>(null);
   const [qty, setQty]             = useState(1);
+  const [purchasePrice, setPurchasePrice] = useState("");
+  const [supplierId, setSupplierId] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [restockNote, setRestockNote] = useState("");
   const [adding, setAdding]       = useState(false);
   const [justAdded, setJustAdded] = useState<{ added: number; newStock: number } | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
@@ -198,6 +245,16 @@ export default function ProductsEntry() {
   const recentReqRef   = useRef(0);       // newest feed request wins
 
   const { flash, triggerFlash } = useScanFlash();
+
+  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<ApiSupplier[]>({
+    queryKey: ["suppliers"],
+    queryFn: async () => {
+      const response = await fetch(`${BASE_URL}/api/suppliers`);
+      if (!response.ok) throw new Error("Could not load suppliers");
+      return response.json();
+    },
+    staleTime: 1000 * 60,
+  });
 
   /* ── Product list, preloaded for instant manual search ── */
   const { data: allProducts } = useListProducts(
@@ -322,6 +379,10 @@ export default function ProductsEntry() {
         playScanBeep();
         setProduct(p);
         setQty(1);
+        setPurchasePrice(p.purchasePrice != null ? String(p.purchasePrice) : "");
+        setSupplierId(p.supplierId ?? "");
+        setInvoiceNumber("");
+        setRestockNote("");
         /* History loads in its own effect below, keyed on the product, so
            expanding to the full record and refreshing after a write both
            reuse one path instead of each duplicating this fetch. */
@@ -391,6 +452,15 @@ export default function ProductsEntry() {
       toast.error("Enter a whole quantity of 1 or more");
       return;
     }
+    const parsedPurchasePrice =
+      purchasePrice.trim() === "" ? null : Number(purchasePrice);
+    if (
+      parsedPurchasePrice != null &&
+      (!Number.isFinite(parsedPurchasePrice) || parsedPurchasePrice < 0)
+    ) {
+      toast.error("Enter a valid purchase price of 0 or more");
+      return;
+    }
     addingRef.current = true;
     setAdding(true);
     /* If the operator scans the next item before this write comes back, the
@@ -399,7 +469,17 @@ export default function ProductsEntry() {
        button for it — back on screen over the one now being looked up. */
     const gen = selectionRef.current;
     try {
-      const result = await postStockIn(product.id, qty, userId);
+      const result = await postStockIn(
+        product.id,
+        qty,
+        {
+          purchasePrice: parsedPurchasePrice,
+          supplierId: supplierId || null,
+          invoiceNumber: invoiceNumber.trim() || null,
+          note: restockNote.trim() || null,
+        },
+        userId,
+      );
       playStockIn();
       /* Trust the row the server wrote over local arithmetic: a sale at the
          till, or an entry from another device, between the lookup and this
@@ -410,6 +490,12 @@ export default function ProductsEntry() {
         setProduct(fresh ? { ...product, ...fresh } : { ...product, stock: newStock });
         setJustAdded({ added: qty, newStock });
         setQty(1);
+        setPurchasePrice(
+          product.purchasePrice != null ? String(product.purchasePrice) : "",
+        );
+        setSupplierId(product.supplierId ?? "");
+        setInvoiceNumber("");
+        setRestockNote("");
         void queryClient.invalidateQueries({
           queryKey: getGetProductStockHistoryQueryKey(product.id),
         });
@@ -436,7 +522,18 @@ export default function ProductsEntry() {
       addingRef.current = false;
       setAdding(false);
     }
-  }, [product, qty, userId, loadRecent, mode, queryClient]);
+  }, [
+    product,
+    qty,
+    purchasePrice,
+    supplierId,
+    invoiceNumber,
+    restockNote,
+    userId,
+    loadRecent,
+    mode,
+    queryClient,
+  ]);
 
   /* With no range picked the feed means "latest activity", and the number the
      operator is accountable for is today's. Once they choose a range, the
@@ -764,8 +861,79 @@ export default function ProductsEntry() {
                       Ask the owner to give you write access.
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                      <div className="flex-1">
+                    <div className="space-y-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1.5 block text-sm font-medium">
+                            Purchase price per unit
+                          </label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            inputMode="decimal"
+                            value={purchasePrice}
+                            onChange={(event) => setPurchasePrice(event.target.value)}
+                            placeholder="Not recorded"
+                            className="h-11"
+                            data-testid="input-restock-purchase-price"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
+                            <Truck className="h-4 w-4 text-muted-foreground" />
+                            Supplier
+                          </label>
+                          <Select
+                            value={supplierId || "__none__"}
+                            onValueChange={(value) =>
+                              setSupplierId(value === "__none__" ? "" : value)
+                            }
+                          >
+                            <SelectTrigger className="h-11" data-testid="select-restock-supplier">
+                              <SelectValue
+                                placeholder={suppliersLoading ? "Loading…" : "Select supplier"}
+                              />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60">
+                              <SelectItem value="__none__">Not recorded</SelectItem>
+                              {suppliers.map((supplier) => (
+                                <SelectItem key={supplier.id} value={supplier.id}>
+                                  {supplier.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
+                            <ReceiptText className="h-4 w-4 text-muted-foreground" />
+                            Invoice / reference
+                          </label>
+                          <Input
+                            value={invoiceNumber}
+                            onChange={(event) => setInvoiceNumber(event.target.value)}
+                            maxLength={100}
+                            placeholder="e.g. INV-2048"
+                            className="h-11"
+                            data-testid="input-restock-invoice"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-sm font-medium">Note</label>
+                          <Textarea
+                            value={restockNote}
+                            onChange={(event) => setRestockNote(event.target.value)}
+                            maxLength={500}
+                            placeholder="Optional restock note"
+                            className="min-h-11 resize-y"
+                            data-testid="input-restock-note"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div className="flex-1">
                         <label className="mb-1.5 block text-sm font-medium">Quantity to add</label>
                         <div className="flex items-center gap-2">
                           <Button
@@ -802,17 +970,18 @@ export default function ProductsEntry() {
                             ))}
                           </div>
                         </div>
-                      </div>
+                        </div>
 
-                      <Button
-                        onClick={() => void addStock()}
-                        disabled={adding}
-                        className="h-12 gap-2 bg-emerald-600 px-6 text-base hover:bg-emerald-700 sm:min-w-[190px]"
-                      >
-                        {adding
-                          ? <><Loader2 className="h-5 w-5 animate-spin" /> Adding…</>
-                          : <><PackagePlus className="h-5 w-5" /> Add {qty} to stock</>}
-                      </Button>
+                        <Button
+                          onClick={() => void addStock()}
+                          disabled={adding}
+                          className="h-12 gap-2 bg-emerald-600 px-6 text-base hover:bg-emerald-700 sm:min-w-[190px]"
+                        >
+                          {adding
+                            ? <><Loader2 className="h-5 w-5 animate-spin" /> Adding…</>
+                            : <><PackagePlus className="h-5 w-5" /> Add {qty} to stock</>}
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>

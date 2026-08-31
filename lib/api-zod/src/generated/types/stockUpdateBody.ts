@@ -11,4 +11,28 @@ export interface StockUpdateBody {
   type: StockUpdateBodyType;
   quantity: number;
   userId?: string;
+  /**
+   * Purchase price per unit captured for this IN restock
+   * @minimum 0
+   * @maximum 100000000
+   * @nullable
+   */
+  purchasePrice?: number | null;
+  /**
+   * Supplier selected for this IN restock
+   * @nullable
+   */
+  supplierId?: string | null;
+  /**
+   * Supplier invoice or reference number for this IN restock
+   * @maxLength 100
+   * @nullable
+   */
+  invoiceNumber?: string | null;
+  /**
+   * Optional note for this IN restock
+   * @maxLength 500
+   * @nullable
+   */
+  note?: string | null;
 }

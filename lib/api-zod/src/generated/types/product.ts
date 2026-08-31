@@ -25,5 +25,7 @@ export interface Product {
   salePriceUntil?: string | null;
   stock: number;
   lowStockThreshold: number;
+  /** @nullable */
+  supplierId: string | null;
   createdAt: string;
 }

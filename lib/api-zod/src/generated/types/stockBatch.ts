@@ -12,6 +12,22 @@ export interface StockBatch {
   soldQuantity: number;
   /** Units whose batch attribution was reset by an absolute stock correction, not counted as sales */
   adjustedQuantity: number;
+  /**
+   * Purchase price per unit recorded when this stock was added
+   * @nullable
+   */
+  purchasePrice: number | null;
+  /** @nullable */
+  supplierId: string | null;
+  /**
+   * Supplier name snapshot recorded when this stock was added
+   * @nullable
+   */
+  supplierName: string | null;
+  /** @nullable */
+  invoiceNumber: string | null;
+  /** @nullable */
+  note: string | null;
   remainingQuantity: number;
   /** ISO timestamp of the stock-in event */
   addedAt: string;

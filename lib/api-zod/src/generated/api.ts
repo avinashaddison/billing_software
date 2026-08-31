@@ -44,6 +44,7 @@ export const ListProductsResponseItem = zod.object({
     ),
   stock: zod.number().int(),
   lowStockThreshold: zod.number().int(),
+  supplierId: zod.string().uuid().nullable(),
   createdAt: zod.string(),
 });
 export const ListProductsResponse = zod.array(ListProductsResponseItem);
@@ -88,6 +89,7 @@ export const CreateProductResponse = zod.object({
     ),
   stock: zod.number().int(),
   lowStockThreshold: zod.number().int(),
+  supplierId: zod.string().uuid().nullable(),
   createdAt: zod.string(),
 });
 
@@ -115,6 +117,7 @@ export const GetProductBySkuResponse = zod.object({
     ),
   stock: zod.number().int(),
   lowStockThreshold: zod.number().int(),
+  supplierId: zod.string().uuid().nullable(),
   createdAt: zod.string(),
 });
 
@@ -142,6 +145,7 @@ export const GetProductResponse = zod.object({
     ),
   stock: zod.number().int(),
   lowStockThreshold: zod.number().int(),
+  supplierId: zod.string().uuid().nullable(),
   createdAt: zod.string(),
 });
 
@@ -189,6 +193,7 @@ export const UpdateProductResponse = zod.object({
     ),
   stock: zod.number().int(),
   lowStockThreshold: zod.number().int(),
+  supplierId: zod.string().uuid().nullable(),
   createdAt: zod.string(),
 });
 
@@ -208,10 +213,38 @@ export const UpdateStockParams = zod.object({
   id: zod.coerce.string(),
 });
 
+export const updateStockBodyPurchasePriceMin = 0;
+export const updateStockBodyPurchasePriceMax = 100000000;
+
+export const updateStockBodyInvoiceNumberMax = 100;
+
+export const updateStockBodyNoteMax = 500;
+
 export const UpdateStockBody = zod.object({
   type: zod.enum(["IN", "OUT", "ADJUSTMENT"]),
   quantity: zod.number().int(),
   userId: zod.string().optional(),
+  purchasePrice: zod
+    .number()
+    .min(updateStockBodyPurchasePriceMin)
+    .max(updateStockBodyPurchasePriceMax)
+    .nullish()
+    .describe("Purchase price per unit captured for this IN restock"),
+  supplierId: zod
+    .string()
+    .uuid()
+    .nullish()
+    .describe("Supplier selected for this IN restock"),
+  invoiceNumber: zod
+    .string()
+    .max(updateStockBodyInvoiceNumberMax)
+    .nullish()
+    .describe("Supplier invoice or reference number for this IN restock"),
+  note: zod
+    .string()
+    .max(updateStockBodyNoteMax)
+    .nullish()
+    .describe("Optional note for this IN restock"),
 });
 
 export const UpdateStockResponse = zod.object({
@@ -232,6 +265,7 @@ export const UpdateStockResponse = zod.object({
       ),
     stock: zod.number().int(),
     lowStockThreshold: zod.number().int(),
+    supplierId: zod.string().uuid().nullable(),
     createdAt: zod.string(),
   }),
   log: zod.object({
@@ -241,6 +275,11 @@ export const UpdateStockResponse = zod.object({
     productSku: zod.string(),
     type: zod.enum(["IN", "OUT", "ADJUSTMENT", "RETURN"]),
     quantity: zod.number().int(),
+    purchasePrice: zod.number().nullable(),
+    supplierId: zod.string().uuid().nullable(),
+    supplierName: zod.string().nullable(),
+    invoiceNumber: zod.string().nullable(),
+    note: zod.string().nullable(),
     userId: zod.string().nullish(),
     createdAt: zod.string(),
   }),
@@ -300,6 +339,17 @@ export const GetProductStockHistoryResponse = zod.object({
         .describe(
           "Units whose batch attribution was reset by an absolute stock correction, not counted as sales",
         ),
+      purchasePrice: zod
+        .number()
+        .nullable()
+        .describe("Purchase price per unit recorded when this stock was added"),
+      supplierId: zod.string().uuid().nullable(),
+      supplierName: zod
+        .string()
+        .nullable()
+        .describe("Supplier name snapshot recorded when this stock was added"),
+      invoiceNumber: zod.string().nullable(),
+      note: zod.string().nullable(),
       remainingQuantity: zod.number().int(),
       addedAt: zod.string().describe("ISO timestamp of the stock-in event"),
     }),
@@ -368,6 +418,11 @@ export const ListStockLogsResponseItem = zod.object({
   productSku: zod.string(),
   type: zod.enum(["IN", "OUT", "ADJUSTMENT", "RETURN"]),
   quantity: zod.number().int(),
+  purchasePrice: zod.number().nullable(),
+  supplierId: zod.string().uuid().nullable(),
+  supplierName: zod.string().nullable(),
+  invoiceNumber: zod.string().nullable(),
+  note: zod.string().nullable(),
   userId: zod.string().nullish(),
   createdAt: zod.string(),
 });
@@ -515,6 +570,7 @@ export const GetLowStockProductsResponseItem = zod.object({
     ),
   stock: zod.number().int(),
   lowStockThreshold: zod.number().int(),
+  supplierId: zod.string().uuid().nullable(),
   createdAt: zod.string(),
 });
 export const GetLowStockProductsResponse = zod.array(
