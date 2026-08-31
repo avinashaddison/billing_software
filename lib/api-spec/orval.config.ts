@@ -57,6 +57,10 @@ export default defineConfig({
       prettier: true,
       override: {
         zod: {
+          // This workspace intentionally exposes Zod 3 from the shared
+          // catalogue. Orval's auto-detection cannot see that declaration from
+          // the generated output folder and otherwise emits Zod 4-only helpers.
+          version: 3,
           coerce: {
             query: ['boolean', 'number', 'string'],
             param: ['boolean', 'number', 'string'],

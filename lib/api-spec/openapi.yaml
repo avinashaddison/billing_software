@@ -225,6 +225,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /products/{id}/stock-history:
+    get:
+      operationId: getProductStockHistory
+      tags: [products, stock-logs]
+      summary: Get FIFO stock-batch history for a product
+      description: >
+        Replays the product's complete stock ledger and shows, for every stock-in
+        event, how many units were added, sold, adjusted away, and remain.
+        Opening stock, returns, and upward adjustments remain unattributed rather
+        than being assigned to a dated supplier restock.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product stock-batch history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductStockHistory"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /products/{id}/qr:
     get:
       operationId: getProductQr
@@ -746,6 +776,71 @@ components:
         - type
         - quantity
         - createdAt
+
+    StockBatch:
+      type: object
+      properties:
+        id:
+          type: string
+        addedQuantity:
+          type: integer
+        soldQuantity:
+          type: integer
+        adjustedQuantity:
+          type: integer
+          description: Units whose batch attribution was reset by an absolute stock correction, not counted as sales
+        remainingQuantity:
+          type: integer
+        addedAt:
+          type: string
+          description: ISO timestamp of the stock-in event
+      required:
+        - id
+        - addedQuantity
+        - soldQuantity
+        - adjustedQuantity
+        - remainingQuantity
+        - addedAt
+
+    ProductStockHistory:
+      type: object
+      properties:
+        productId:
+          type: string
+        currentStock:
+          type: integer
+        summary:
+          type: object
+          properties:
+            stockedQuantity:
+              type: integer
+              description: Total units recorded by stock-in events
+            soldQuantity:
+              type: integer
+              description: Total units recorded by stock-out events
+            returnedQuantity:
+              type: integer
+              description: Total customer-return units put back into stock
+            unattributedRemaining:
+              type: integer
+              description: Current opening, returned, or adjusted stock not tied to a dated restock
+            batchCount:
+              type: integer
+          required:
+            - stockedQuantity
+            - soldQuantity
+            - returnedQuantity
+            - unattributedRemaining
+            - batchCount
+        batches:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockBatch"
+      required:
+        - productId
+        - currentStock
+        - summary
+        - batches
 
     ProductEntrySummary:
       type: object

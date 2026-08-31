@@ -1,9 +1,14 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, or, ilike, sql, type SQL } from "drizzle-orm";
+import { eq, desc, asc, and, or, ilike, sql, type SQL } from "drizzle-orm";
 import { db, stockLogsTable, productsTable } from "@workspace/db";
-import { ListStockLogsQueryParams, ListStockEntrySummaryQueryParams } from "@workspace/api-zod";
+import {
+  GetProductStockHistoryParams,
+  ListStockLogsQueryParams,
+  ListStockEntrySummaryQueryParams,
+} from "@workspace/api-zod";
 import { tenantWhere } from "../lib/tenant";
 import { istToday } from "../lib/ist";
+import { buildStockBatchHistory } from "../lib/stock-batch-history";
 
 const router: IRouter = Router();
 
@@ -35,6 +40,60 @@ const istDayAtLeast = (day: string): SQL =>
 
 const istDayAtMost = (day: string): SQL =>
   sql`DATE(${stockLogsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') <= ${day}::date`;
+
+router.get("/products/:id/stock-history", async (req, res): Promise<void> => {
+  const parsed = GetProductStockHistoryParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const snapshot = await db.transaction(async (tx) => {
+    const [product] = await tx
+      .select({
+        id: productsTable.id,
+        stock: productsTable.stock,
+      })
+      .from(productsTable)
+      .where(and(
+        eq(productsTable.id, parsed.data.id),
+        tenantWhere(productsTable.tenantId, req.tenantId),
+      ));
+
+    if (!product) return null;
+
+    const movements = await tx
+      .select({
+        id: stockLogsTable.id,
+        type: stockLogsTable.type,
+        quantity: stockLogsTable.quantity,
+        userId: stockLogsTable.userId,
+        createdAt: stockLogsTable.createdAt,
+      })
+      .from(stockLogsTable)
+      .where(and(
+        eq(stockLogsTable.productId, product.id),
+        tenantWhere(stockLogsTable.tenantId, req.tenantId),
+      ))
+      .orderBy(asc(stockLogsTable.createdAt), asc(stockLogsTable.id));
+
+    return { product, movements };
+  }, {
+    isolationLevel: "repeatable read",
+    accessMode: "read only",
+  });
+
+  if (!snapshot) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  res.json(buildStockBatchHistory(
+    snapshot.product.id,
+    snapshot.product.stock,
+    snapshot.movements,
+  ));
+});
 
 router.get("/stock-logs", async (req, res): Promise<void> => {
   const parsed = ListStockLogsQueryParams.safeParse(req.query);

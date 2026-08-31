@@ -326,14 +326,17 @@ router.post("/products/:id/stock", requireWriteScope, async (req, res): Promise<
     const [row] = await tx.update(productsTable).set({ stock: newStock })
       .where(eq(productsTable.id, before.id))
       .returning(productColumns);
-    /* Signed ADJUSTMENT keeps API corrections distinct from in-app IN/OUT
-       movements, so purchase/sales reports are never polluted by syncs. */
+    /* Store the resulting absolute level, matching the in-app ADJUSTMENT
+       contract. Older v1 rows used signed deltas and carry an `apikey:` userId;
+       the distinct marker below lets history replay those legacy rows without
+       making new adjustments ambiguous. ADJUSTMENT remains separate from
+       IN/OUT so purchase/sales reports are never polluted by syncs. */
     await tx.insert(stockLogsTable).values({
       tenantId:  req.tenantId,
       productId: before.id,
       type:      "ADJUSTMENT",
-      quantity:  body.change,
-      userId:    `apikey:${req.apiKey?.name ?? "unknown"}`,
+      quantity:  newStock,
+      userId:    `apikey-absolute:${req.apiKey?.name ?? "unknown"}`,
     });
     return { kind: "ok" as const, row, from: before.stock, to: newStock };
   });

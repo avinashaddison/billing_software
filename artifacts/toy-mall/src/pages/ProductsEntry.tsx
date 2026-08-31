@@ -29,8 +29,14 @@ import {
   isSoundMuted, toggleSoundMute,
 } from "@/lib/sounds";
 import { useQueryClient } from "@tanstack/react-query";
-import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
+import {
+  getGetProductStockHistoryQueryKey,
+  getListProductsQueryKey,
+  useGetProductStockHistory,
+  useListProducts,
+} from "@workspace/api-client-react";
 import { useAuth, usePermission } from "@/hooks/use-auth";
+import { StockBatchHistory } from "@/components/stock/StockBatchHistory";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const IST = "Asia/Kolkata";
@@ -83,7 +89,6 @@ const RECENT_LIMIT = 500;
 /* A product's own entry history: a short preview by default, expandable to the
    full record in place so "when did we last stock this" never needs a page. */
 const HISTORY_PREVIEW = 6;
-const HISTORY_FULL    = 200;
 
 /* ── API helpers ────────────────────────────────────────────────── */
 /* Every helper checks res.ok BEFORE res.json(): an HTML error page thrown by
@@ -146,20 +151,6 @@ const fmtDayLabel = (day: string) => {
   });
 };
 
-/** "3 days ago" — reads faster than a date when judging if stock is stale. */
-function relativeDays(iso: string): string {
-  const then = istDay(iso);
-  const today = todayIst();
-  if (then === today) return "today";
-  const diff = Math.round(
-    (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${then}T00:00:00Z`)) / 86_400_000,
-  );
-  if (diff === 1) return "yesterday";
-  if (diff < 30) return `${diff} days ago`;
-  if (diff < 60) return "last month";
-  return `${Math.floor(diff / 30)} months ago`;
-}
-
 const money = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -188,12 +179,10 @@ export default function ProductsEntry() {
   const [looking, setLooking]     = useState(false);
 
   const [product, setProduct]     = useState<EntryProduct | null>(null);
-  const [history, setHistory]     = useState<StockLog[] | null>(null);
   const [qty, setQty]             = useState(1);
   const [adding, setAdding]       = useState(false);
   const [justAdded, setJustAdded] = useState<{ added: number; newStock: number } | null>(null);
-  const [historyLimit, setHistoryLimit] = useState(HISTORY_PREVIEW);
-  const [historyNonce, setHistoryNonce] = useState(0);   // bumped to force a refetch
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const [recent, setRecent]         = useState<StockLog[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
@@ -285,9 +274,8 @@ export default function ProductsEntry() {
   const beginLookup = useCallback((code: string) => {
     selectionRef.current += 1;   // invalidates any in-flight write's panel updates
     setProduct(null);
-    setHistory(null);
     setJustAdded(null);
-    setHistoryLimit(HISTORY_PREVIEW);   // a newly picked product starts collapsed
+    setHistoryExpanded(false);   // a newly picked product starts collapsed
     setLookupCode(code);
   }, []);
 
@@ -360,16 +348,19 @@ export default function ProductsEntry() {
     return () => { cancelled = true; };
   }, [lookupCode, mode]);
 
-  /* ── That product's own entry history ─────────────────────────── */
-  const productId = product?.id ?? null;
-  useEffect(() => {
-    if (!productId) return;
-    let cancelled = false;
-    fetchStockLogs({ productId, type: "IN", limit: String(historyLimit) })
-      .then((logs) => { if (!cancelled) setHistory(logs); })
-      .catch(() => { if (!cancelled) setHistory([]); });   // history is optional context
-    return () => { cancelled = true; };
-  }, [productId, historyLimit, historyNonce]);
+  /* ── That product's own FIFO batch history ───────────────────── */
+  const productId = product?.id ?? "";
+  const {
+    data: history,
+    isLoading: historyLoading,
+    isError: historyError,
+    refetch: refetchHistory,
+  } = useGetProductStockHistory(productId, {
+    query: {
+      queryKey: getGetProductStockHistoryQueryKey(productId),
+      enabled: !!productId,
+    },
+  });
 
   /* Deep link from a product page's "full stock history" link: open with that
      product already loaded. Fires once — re-running would fight the operator
@@ -419,7 +410,9 @@ export default function ProductsEntry() {
         setProduct(fresh ? { ...product, ...fresh } : { ...product, stock: newStock });
         setJustAdded({ added: qty, newStock });
         setQty(1);
-        setHistoryNonce((n) => n + 1);
+        void queryClient.invalidateQueries({
+          queryKey: getGetProductStockHistoryQueryKey(product.id),
+        });
       }
       /* Named, so it still reads correctly if the panel has moved on. */
       toast.success(`+${qty} added to ${product.name}`, { description: `Now ${newStock} in stock` });
@@ -444,9 +437,6 @@ export default function ProductsEntry() {
       setAdding(false);
     }
   }, [product, qty, userId, loadRecent, mode, queryClient]);
-
-  /* ── Derived: this product's last entry + recent-feed rollups ─── */
-  const lastEntry = history?.[0] ?? null;
 
   /* With no range picked the feed means "latest activity", and the number the
      operator is accountable for is today's. Once they choose a range, the
@@ -729,90 +719,32 @@ export default function ProductsEntry() {
                   </div>
                 </div>
 
-                {/* Last stock — the reason this page exists */}
+                {/* Batch history — the reason this page exists */}
                 <div className="border-b p-4 sm:p-5">
                   <div className="mb-3 flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold">Last stock entries</h3>
+                    <h3 className="text-sm font-semibold">Stock batch history</h3>
                   </div>
 
-                  {history === null ? (
-                    <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Loading history…
-                    </div>
-                  ) : history.length === 0 ? (
-                    <div className="rounded-xl border border-dashed px-4 py-5 text-center text-sm text-muted-foreground">
-                      Never stocked before — this will be its first entry.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl bg-emerald-50 px-4 py-3">
-                        <div>
-                          <div className="text-xs font-medium text-emerald-800">Last stocked</div>
-                          <div className="text-base font-semibold text-emerald-900">
-                            {lastEntry && relativeDays(lastEntry.createdAt)}
-                            <span className="ml-1.5 text-sm font-normal text-emerald-700">
-                              ({lastEntry && fmtDate(lastEntry.createdAt)})
-                            </span>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-emerald-800">Quantity added</div>
-                          <div className="text-base font-semibold text-emerald-900">
-                            +{lastEntry?.quantity}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-emerald-800">
-                            {historyLimit === HISTORY_PREVIEW
-                              ? `Last ${history.length} entries`
-                              : history.length >= HISTORY_FULL
-                                ? `Latest ${history.length} entries`
-                                : `All ${history.length} entries`}
-                          </div>
-                          <div className="text-base font-semibold text-emerald-900">
-                            +{history.reduce((s, h) => s + h.quantity, 0)} total
-                          </div>
-                        </div>
-                      </div>
+                  <StockBatchHistory
+                    history={history}
+                    isLoading={historyLoading}
+                    isError={historyError}
+                    onRetry={() => { void refetchHistory(); }}
+                    limit={historyExpanded ? undefined : HISTORY_PREVIEW}
+                  />
 
-                      <ul className={`divide-y rounded-xl border ${
-                        historyLimit === HISTORY_PREVIEW ? "" : "max-h-[320px] overflow-y-auto"
-                      }`}>
-                        {history.map((h) => (
-                          <li key={h.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium">{fmtDate(h.createdAt)}</div>
-                              <div className="text-xs text-muted-foreground">{fmtTime(h.createdAt)}</div>
-                            </div>
-                            <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-sm font-semibold tabular-nums text-emerald-800">
-                              +{h.quantity}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-
-                      {/* A full page of entries came back, so there may be more
-                          behind it — offer the whole record rather than implying
-                          the preview is all there is. */}
-                      {historyLimit === HISTORY_PREVIEW ? (
-                        history.length >= HISTORY_PREVIEW && (
-                          <button
-                            onClick={() => setHistoryLimit(HISTORY_FULL)}
-                            className="mt-2 w-full rounded-xl border border-dashed py-2 text-sm font-medium text-primary hover:bg-muted/50"
-                          >
-                            View full stock history
-                          </button>
-                        )
-                      ) : (
-                        <button
-                          onClick={() => setHistoryLimit(HISTORY_PREVIEW)}
-                          className="mt-2 w-full rounded-xl border border-dashed py-2 text-sm font-medium text-muted-foreground hover:bg-muted/50"
-                        >
-                          Show less
-                        </button>
-                      )}
-                    </>
+                  {history && history.batches.length > HISTORY_PREVIEW && (
+                    <button
+                      type="button"
+                      onClick={() => setHistoryExpanded((current) => !current)}
+                      className="mt-2 w-full rounded-xl border border-dashed py-2 text-sm font-medium text-primary hover:bg-muted/50"
+                      data-testid="button-toggle-stock-history"
+                    >
+                      {!historyExpanded
+                        ? `View all ${history.batches.length} restocks`
+                        : "Show recent restocks"}
+                    </button>
                   )}
                 </div>
 

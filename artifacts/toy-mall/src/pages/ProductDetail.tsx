@@ -4,10 +4,11 @@ import { useSearch, useLocation, Link } from "wouter";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import { useScanFlash, ScanFlash } from "@/components/ui/ScanFlash";
 import {
-  useGetProductBySku, useUpdateStock, useListStockLogs,
+  useGetProductBySku, useUpdateStock, useGetProductStockHistory,
   getGetProductBySkuQueryKey, getGetDashboardSummaryQueryKey,
   getGetTodayActivityQueryKey, getListProductsQueryKey,
   getGetLowStockProductsQueryKey, getListStockLogsQueryKey,
+  getGetProductStockHistoryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useCart } from "@/contexts/cart-context";
@@ -27,6 +28,7 @@ import { playTick, playStockIn, playStockOut, playError } from "@/lib/sounds";
 import { getCategoryStyle, getCategoryEmoji, getCategoryHex } from "@/lib/category-colors";
 import { useStoreSettings } from "@/lib/store-info";
 import { MM_TO_PX, loadLabelSize } from "@/lib/label-size";
+import { StockBatchHistory } from "@/components/stock/StockBatchHistory";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -94,27 +96,18 @@ export default function ProductDetail() {
 
   const updateStock = useUpdateStock();
 
-  /* Recent stock entries (IN) for this product. Answers "when did we last take
-     this in, and how much?" on the product page itself, instead of making the
-     owner scan the shop-wide activity log for it. */
-  const entryParams = { productId: product?.id ?? "", type: "IN" as const, limit: 5 };
-  const { data: entryLogs, isPending: entriesPending } = useListStockLogs(entryParams, {
-    query: { queryKey: getListStockLogsQueryKey(entryParams), enabled: !!product?.id },
+  const stockHistoryId = product?.id ?? "";
+  const {
+    data: stockHistory,
+    isLoading: stockHistoryLoading,
+    isError: stockHistoryError,
+    refetch: refetchStockHistory,
+  } = useGetProductStockHistory(stockHistoryId, {
+    query: {
+      queryKey: getGetProductStockHistoryQueryKey(stockHistoryId),
+      enabled: !!product?.id,
+    },
   });
-  const lastEntry = entryLogs?.[0];
-
-  /* Stock history is filtered on IST calendar days, so it must be displayed in
-     IST too — on a device set to another timezone the local-time date would
-     disagree with the date the entry is actually filed under. */
-  const istDate = (iso: string) =>
-    new Date(iso).toLocaleDateString("en-IN", {
-      timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric",
-    });
-  const istDateTime = (iso: string) =>
-    new Date(iso).toLocaleString("en-IN", {
-      timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric",
-      hour: "numeric", minute: "2-digit", hour12: true,
-    });
 
   useEffect(() => {
     if (isError) {
@@ -192,6 +185,7 @@ export default function ProductDetail() {
       queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetLowStockProductsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListStockLogsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetProductStockHistoryQueryKey(product.id) });
       setQuantity(1);
     } catch (error: any) {
       playError();
@@ -666,47 +660,25 @@ export default function ProductDetail() {
 
               {/* Stock entry history */}
               <div className="mt-4 pt-4 border-t">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Stock Entry
-                  </p>
-                  {lastEntry && (
-                    <span className="text-xs font-bold">
-                      Last: {istDate(lastEntry.createdAt)}
-                    </span>
-                  )}
-                </div>
-
-                {entriesPending ? (
-                  <div className="space-y-1.5 mb-3">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-4/5" />
-                  </div>
-                ) : entryLogs && entryLogs.length > 0 ? (
-                  <ul className="space-y-1.5 mb-3">
-                    {entryLogs.map((l) => (
-                      <li key={l.id} className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground font-medium">
-                          {istDateTime(l.createdAt)}
-                        </span>
-                        <span className="font-bold text-green-600 dark:text-green-400">
-                          +{l.quantity}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-muted-foreground mb-3">
-                    No stock entry recorded yet.
-                  </p>
-                )}
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Stock batches
+                </p>
+                <StockBatchHistory
+                  history={stockHistory}
+                  isLoading={stockHistoryLoading}
+                  isError={stockHistoryError}
+                  onRetry={() => { void refetchStockHistory(); }}
+                  limit={3}
+                  compact
+                />
 
                 {/* The entry page is the one screen that shows this product's
                     complete entry record AND lets you add to it. Staff without
                     `scan` write can't open it, so send them to the read-only log. */}
                 <Link
                   href={canEnterStock ? `/stock-entry?sku=${encodeURIComponent(sku)}` : "/logs"}
-                  className="flex items-center justify-between gap-2 text-sm font-semibold text-primary hover:underline"
+                  className="mt-3 flex items-center justify-between gap-2 text-sm font-semibold text-primary hover:underline"
+                  data-testid="link-full-stock-history"
                 >
                   {canEnterStock ? "Full stock history & add stock" : "View full stock history"}
                   <ChevronRight className="w-4 h-4 shrink-0" />

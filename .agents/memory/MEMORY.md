@@ -25,3 +25,4 @@
 - [Printable sheets in app shell](printable-sheets.md) — shell banners print above the sheet unless no-print (audit AppLayout siblings); dangling parent ids must fallback-group or rows silently vanish.
 - [Public API keys](public-api-key-auth.md) — issuing is vendor-only (/admin), no owner surface; hash-only + reveal-once; keys need an ACTIVE tenants row; INSERT caps need advisory locks.
 - [Atomic active/held cart swaps](atomic-active-held-cart-swaps.md) — active and parked snapshots must share one durable transaction; CAS plus a tenant row lock prevents cross-device loss.
+- [Stock-batch provenance](stock-batch-provenance.md) — FIFO may attribute sales only when provenance is defensible; absolute-adjustment gaps stay unattributed instead of rewriting batch history.
