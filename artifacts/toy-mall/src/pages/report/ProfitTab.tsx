@@ -729,7 +729,7 @@ export default function ProfitTab() {
 
           <p className="text-[10px] text-muted-foreground px-1">
             Investment = purchase cost of the goods actually sold in this period (sale-time cost snapshot when available).
-            Manual bill lines use the purchase price typed at billing time; lines entered without one show "—" and are left out of profit, not counted as pure profit.
+            Manual bill lines use the purchase price typed at billing time (now required); older lines billed without one show "—" and are left out of profit, not counted as pure profit.
             Stock-purchase value is estimated at each product's current purchase price.
           </p>
         </>

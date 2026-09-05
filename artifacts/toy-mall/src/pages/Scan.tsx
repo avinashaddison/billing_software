@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { playScanBeep, playCameraDetect, playError, playCheckoutSuccess, playTick, playStockIn, isSoundMuted, toggleSoundMute } from "@/lib/sounds";
 import { useCart, effectivePrice, type CartItem, type LineDiscountType } from "@/contexts/cart-context";
+import { findUncostedManualLine, uncostedManualLineMessage } from "@/lib/manual-cost";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useOnline }       from "@/hooks/use-online";
@@ -971,6 +972,14 @@ export default function Scan() {
 
   const handleConfirmCheckout = async (paymentMode: PaymentMode, customerPhone: string, customerName: string) => {
     if (!items.length) return;
+    /* Same rule as the Checkout page: a manual line without a purchase price
+       is refused by the server, and offline it would sit in the queue as a
+       bill that can never sync — so refuse it here, before anything is sent. */
+    const uncosted = findUncostedManualLine(items);
+    if (uncosted) {
+      toast.error(uncostedManualLineMessage(uncosted.name));
+      return;
+    }
     if (submittingRef.current) return;
     submittingRef.current = true;
 

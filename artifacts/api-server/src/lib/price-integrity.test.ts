@@ -12,6 +12,9 @@ import {
   DEFAULT_MAX_DISCOUNT_PCT,
   MAX_MANUAL_COST,
   normalizeManualCost,
+  isValidManualCost,
+  findManualLineWithoutCost,
+  manualCostRequiredMessage,
 } from "./price-integrity";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z");
@@ -51,6 +54,48 @@ describe("normalizeManualCost", () => {
   it("caps at what the purchase_price column can hold", () => {
     expect(MAX_MANUAL_COST).toBe(99_999_999.99);
     expect(normalizeManualCost(MAX_MANUAL_COST)).toBe(MAX_MANUAL_COST);
+  });
+});
+
+describe("isValidManualCost", () => {
+  it("accepts 0, -0, paise values and the column ceiling", () => {
+    for (const v of [0, -0, 0.01, 40.5, MAX_MANUAL_COST]) expect(isValidManualCost(v)).toBe(true);
+  });
+
+  it("rejects blanks, negatives, non-numbers and anything over the ceiling", () => {
+    for (const v of [undefined, null, "", "40", -1, NaN, Infinity, MAX_MANUAL_COST + 0.01, 1e12]) {
+      expect(isValidManualCost(v)).toBe(false);
+    }
+  });
+});
+
+describe("findManualLineWithoutCost", () => {
+  it("passes when every manual line carries a storable cost (0 included)", () => {
+    expect(findManualLineWithoutCost([
+      { productId: "p1" },
+      { name: "Gift wrap", purchasePrice: 40 },
+      { name: "Service charge", purchasePrice: 0 },
+    ])).toBeNull();
+  });
+
+  it("names the first manual line whose cost is missing, null or unusable", () => {
+    expect(findManualLineWithoutCost([
+      { name: "Costed", purchasePrice: 5 },
+      { name: "  Customer's toy  " },
+      { name: "Also missing", purchasePrice: null },
+    ])).toBe("Customer's toy");
+    expect(findManualLineWithoutCost([{ name: "Nulled", purchasePrice: null }])).toBe("Nulled");
+    expect(findManualLineWithoutCost([{ name: "Negative", purchasePrice: -5 }])).toBe("Negative");
+  });
+
+  it("ignores catalogue lines even when they carry no cost", () => {
+    expect(findManualLineWithoutCost([{ productId: "p1", purchasePrice: null }])).toBeNull();
+    expect(findManualLineWithoutCost([])).toBeNull();
+  });
+
+  it("tells the cashier which item to re-add", () => {
+    expect(manualCostRequiredMessage("Gift wrap")).toContain('"Gift wrap"');
+    expect(manualCostRequiredMessage("Gift wrap")).toMatch(/purchase price/i);
   });
 });
 

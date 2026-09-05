@@ -40,7 +40,7 @@ interface CartContextType {
    *  ad-hoc service). Each call creates a NEW line — manual items are
    *  never deduplicated, since two "Custom" entries with the same name
    *  may legitimately represent two different things at the same price. */
-  addCustomItem:    (input: { name: string; price: number; quantity?: number }) => void;
+  addCustomItem:    (input: { name: string; price: number; quantity?: number; purchasePrice: number }) => void;
   removeItem:       (productId: string) => void;
   updateQty:        (productId: string, qty: number) => void;
   setLineDiscount:  (productId: string, type: LineDiscountType, value: number) => void;
@@ -280,14 +280,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [queueServerMutation, setLocalItems]);
 
   const addCustomItem = useCallback(
-    ({ name, price, quantity = 1, purchasePrice }: { name: string; price: number; quantity?: number; purchasePrice?: number | null }) => {
+    ({ name, price, quantity = 1, purchasePrice }: { name: string; price: number; quantity?: number; purchasePrice: number }) => {
       const trimmed = name.trim();
       if (!trimmed) return;
       const safePrice = Math.max(0, Number.isFinite(price) ? price : 0);
       const safeQty   = Math.max(1, Math.floor(Number.isFinite(quantity) ? quantity : 1));
-      // null/undefined/garbage → "not recorded"; an explicit 0 is kept (a
-      // service charge genuinely costs nothing). `|| 0` folds -0 into 0 so
-      // the snapshot never carries a "-0".
+      // The dialog only submits a valid cost, so this is a last-line guard:
+      // garbage is dropped rather than stored, and the line then shows
+      // COST MISSING and blocks checkout instead of silently billing an
+      // uncosted item. An explicit 0 is kept (a service charge genuinely
+      // costs nothing); `|| 0` folds -0 into 0 so the snapshot never
+      // carries a "-0".
       const safeCost  = isValidManualCost(purchasePrice) ? purchasePrice || 0 : undefined;
       // Stable client-side ID — prefixed with "manual-" so we can detect it
       // anywhere in the cart pipeline. crypto.randomUUID is available in

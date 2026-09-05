@@ -4,13 +4,13 @@ import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
   Phone, User, Wallet, Banknote, Smartphone, Minus, Plus,
   Trash2, ScanLine, WifiOff, RefreshCw, QrCode, BadgeCheck, Tag,
-  HandCoins, PencilLine, Truck, PauseCircle, Clock,
+  HandCoins, PencilLine, Truck, PauseCircle, Clock, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { playCheckoutSuccess, playError, playTick } from "@/lib/sounds";
 import { useCart, effectivePrice, type LineDiscountType } from "@/contexts/cart-context";
-import { MAX_MANUAL_COST, isValidManualCost } from "@/lib/manual-cost";
+import { MAX_MANUAL_COST, isValidManualCost, findUncostedManualLine, uncostedManualLineMessage } from "@/lib/manual-cost";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useOnline } from "@/hooks/use-online";
 import { useStoreSettings } from "@/lib/store-info";
@@ -176,25 +176,20 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
                 <PencilLine className="w-2.5 h-2.5" /> MANUAL
               </span>
             )}
-            {/* Cost status only — the amount itself stays off the cashier
-                screen, same as catalogue lines never show their cost here. */}
-            {isManual && (item.purchasePrice != null ? (
+            {/* The purchase price is mandatory in the Manual Item dialog, so a
+                line without one can only be a leftover from before the rule
+                (resumed held bill, shared cart from an older tab). Checkout is
+                blocked until it is re-added; the amount itself never shows
+                here, same as catalogue lines never show their cost. */}
+            {isManual && !isValidManualCost(item.purchasePrice) && (
               <span
-                className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 leading-none"
-                title="Purchase price recorded — profit will be worked out for this line"
-                data-testid="badge-manual-cost-recorded"
-              >
-                COST ✓
-              </span>
-            ) : (
-              <span
-                className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground leading-none"
-                title="No purchase price entered — this line is left out of profit reports"
+                className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 leading-none"
+                title="No purchase price — remove this line and add it again with the purchase price"
                 data-testid="badge-manual-cost-missing"
               >
-                NO COST
+                COST MISSING
               </span>
-            ))}
+            )}
             {onSale && (
               <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 leading-none">
                 SALE
@@ -328,36 +323,39 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
 ─────────────────────────────────────────────────────────────────── */
 interface ManualItemModalProps {
   onClose: () => void;
-  onAdd:   (input: { name: string; price: number; quantity: number; purchasePrice: number | null }) => void;
+  onAdd:   (input: { name: string; price: number; quantity: number; purchasePrice: number }) => void;
 }
 const inr2 = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
   const [name, setName]         = useState("");
-  const [priceStr, setPriceStr] = useState("");
   const [costStr, setCostStr]   = useState("");
+  const [priceStr, setPriceStr] = useState("");
   const [qty, setQty]           = useState(1);
   const nameRef                 = useRef<HTMLInputElement>(null);
   useEffect(() => { nameRef.current?.focus(); }, []);
 
-  const price       = parseFloat(priceStr);
-  const validPrice  = Number.isFinite(price) && price >= 0;
   const validName   = name.trim().length > 0 && name.trim().length <= 80;
-  /* Purchase price is optional: blank = "not recorded" (the line is then left
-     OUT of profit reports rather than counted as pure profit). A typed value
-     must be a real non-negative number; 0 is fine (a service costs nothing). */
+  /* Every field is required. The purchase price comes first because it is
+     what the cashier knows before deciding the selling price, and it is what
+     makes the line's profit computable: a blank cost is not "unknown, skip
+     it" any more — the item simply cannot be added. 0 is a real answer (a
+     service costs nothing); the red border only appears for a typed value
+     that is not a storable non-negative number, never for an empty field. */
   const costBlank   = costStr.trim() === "";
   const cost        = parseFloat(costStr);
-  const validCost   = costBlank || isValidManualCost(cost);
-  const hasCost     = !costBlank && validCost;
-  const canSubmit   = validPrice && validName && validCost && qty > 0;
+  const validCost   = isValidManualCost(cost);
+  const costError   = !costBlank && !validCost;
+  const price       = parseFloat(priceStr);
+  const validPrice  = Number.isFinite(price) && price >= 0;
+  const canSubmit   = validName && validCost && validPrice && qty > 0;
 
-  const unitProfit  = hasCost && validPrice ? price - cost : null;
+  const unitProfit  = validCost && validPrice ? price - cost : null;
   const belowCost   = unitProfit != null && unitProfit < 0;
 
   const submit = () => {
     if (!canSubmit) return;
-    onAdd({ name: name.trim(), price, quantity: qty, purchasePrice: hasCost ? cost : null });
+    onAdd({ name: name.trim(), price, quantity: qty, purchasePrice: cost });
     onClose();
   };
 
@@ -404,33 +402,10 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
             />
           </div>
 
-          {/* Price */}
+          {/* Purchase price (cost) — required, feeds profit reports only */}
           <div>
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
-              Price (₹) per unit
-            </label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground select-none">₹</span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                inputMode="decimal"
-                value={priceStr}
-                onChange={(e) => setPriceStr(e.target.value)}
-                onWheel={(e) => e.currentTarget.blur()}
-                placeholder="0.00"
-                className="w-full h-11 pl-8 pr-3 rounded-xl bg-muted border border-border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition-all"
-                onKeyDown={(e) => e.key === "Enter" && submit()}
-              />
-            </div>
-          </div>
-
-          {/* Purchase price (cost) — optional, feeds profit reports only */}
-          <div>
-            <label htmlFor="manual-item-cost" className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center justify-between">
-              <span>Purchase price (₹) per unit</span>
-              <span className="normal-case tracking-normal font-semibold text-[10px] text-muted-foreground/80">Optional</span>
+            <label htmlFor="manual-item-cost" className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
+              Purchase price (₹) per unit
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground select-none">₹</span>
@@ -441,20 +416,45 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
                 max={MAX_MANUAL_COST}
                 step="0.01"
                 inputMode="decimal"
+                required
                 value={costStr}
                 onChange={(e) => setCostStr(e.target.value)}
                 onWheel={(e) => e.currentTarget.blur()}
                 placeholder="What it cost you"
-                aria-invalid={!validCost}
+                aria-invalid={costError}
                 data-testid="input-manual-purchase-price"
-                className={`w-full h-11 pl-8 pr-3 rounded-xl bg-muted border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition-all ${validCost ? "border-border" : "border-rose-400"}`}
+                className={`w-full h-11 pl-8 pr-3 rounded-xl bg-muted border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition-all ${costError ? "border-rose-400" : "border-border"}`}
                 onKeyDown={(e) => e.key === "Enter" && submit()}
               />
             </div>
             <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
               Used only to work out profit in your reports — never printed on the customer's bill.
-              Leave blank if you don't know it; the line will then be skipped in profit instead of counted as 100% profit.
             </p>
+          </div>
+
+          {/* Selling price */}
+          <div>
+            <label htmlFor="manual-item-price" className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
+              Selling price (₹) per unit
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground select-none">₹</span>
+              <input
+                id="manual-item-price"
+                type="number"
+                min={0}
+                step="0.01"
+                inputMode="decimal"
+                required
+                value={priceStr}
+                onChange={(e) => setPriceStr(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
+                placeholder="0.00"
+                data-testid="input-manual-price"
+                className="w-full h-11 pl-8 pr-3 rounded-xl bg-muted border border-border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition-all"
+                onKeyDown={(e) => e.key === "Enter" && submit()}
+              />
+            </div>
           </div>
 
           {/* Quantity stepper */}
@@ -509,8 +509,12 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
                   <span className="tabular-nums">{belowCost ? "−" : ""}₹{inr2(Math.abs(unitProfit * qty))}</span>
                 </div>
               ) : (
-                <div className="text-[11px] font-semibold text-amber-700/80 dark:text-amber-300/80" data-testid="text-manual-no-cost">
-                  No purchase price — this line won't count in profit reports
+                <div className="text-[11px] font-semibold text-rose-600 dark:text-rose-400" data-testid="text-manual-cost-required">
+                  {costBlank
+                    ? "Enter the purchase price to add this item"
+                    : cost > MAX_MANUAL_COST
+                      ? "Purchase price is too large"
+                      : "Purchase price must be 0 or more"}
                 </div>
               )}
             </div>
@@ -808,6 +812,10 @@ export default function Checkout() {
       };
     });
 
+  /* Supplier mode only records a payment amount — the lines are not billed,
+     so a stray uncosted manual line must not block that path. */
+  const uncostedManual = partyType === "supplier" ? undefined : findUncostedManualLine(items);
+
   const handleCheckout = async () => {
     /* ── Supplier mode: record a payment to the supplier (money out) ── */
     if (partyType === "supplier") {
@@ -842,6 +850,15 @@ export default function Checkout() {
     const err = validatePhone(phone);
     if (err) { setPhoneError(err); return; }
     if (!items.length) return;
+
+    /* A manual line without a purchase price would be refused by the server
+       (and would land in the offline queue as a bill that can never sync), so
+       stop here with the same message the button already shows. */
+    if (uncostedManual) {
+      toast.error(uncostedManualLineMessage(uncostedManual.name));
+      playError();
+      return;
+    }
 
     // Credit sales need an identifiable debtor. Without a phone, the receivable
     // would never be collectible — block early with a clear toast.
@@ -1378,9 +1395,18 @@ export default function Checkout() {
 
           {/* ── Sticky checkout button ── */}
           <div className="shrink-0 border-t px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3 bg-card">
+            {uncostedManual && (
+              <p
+                className="mb-2 text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-start gap-1.5"
+                data-testid="text-uncosted-manual-block"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                <span>{uncostedManualLineMessage(uncostedManual.name)}</span>
+              </p>
+            )}
             <button
               onClick={handleCheckout}
-              disabled={loading || (partyType === "supplier" ? !supplierId : (!!phone && !!validatePhone(phone)))}
+              disabled={loading || !!uncostedManual || (partyType === "supplier" ? !supplierId : (!!phone && !!validatePhone(phone)))}
               className={`w-full py-4 rounded-2xl font-black text-base text-white flex items-center justify-center gap-2.5 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 ${
                 partyType === "supplier"
                   ? "bg-amber-600 hover:bg-amber-500 shadow-amber-500/20"

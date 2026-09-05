@@ -6,7 +6,7 @@ import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { requireWrite } from "../middlewares/auth";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 import { logger } from "../lib/logger";
-import { round2, checkLinePrice, isAbsurdPrice, exceedsDiscountCeiling, checkBillDiscount, maxDiscountPct, priceGuardMode, isSaneNumber, MAX_MANUAL_COST, normalizeManualCost } from "../lib/price-integrity";
+import { round2, checkLinePrice, isAbsurdPrice, exceedsDiscountCeiling, checkBillDiscount, maxDiscountPct, priceGuardMode, isSaneNumber, isValidManualCost, normalizeManualCost, findManualLineWithoutCost, manualCostRequiredMessage } from "../lib/price-integrity";
 
 const router: IRouter = Router();
 
@@ -65,10 +65,12 @@ type ManualLineItem = {
   quantity: number;
   price:    number;
   /** Per-unit cost typed by the cashier, so the line's profit is
-   *  price − cost instead of the whole price. null/undefined = not
-   *  recorded — reports then leave the line OUT of profit rather than
-   *  pretending it was free to acquire. 0 is a legitimate explicit
-   *  value (service charge, gift-wrapping labour). */
+   *  price − cost instead of the whole price. REQUIRED: checkout refuses a
+   *  manual line without it (see findManualLineWithoutCost) — a blank would
+   *  be a permanent hole in the profit reports. 0 is a legitimate explicit
+   *  value (service charge, gift-wrapping labour). Typed optional only
+   *  because the shape check runs before the cost check, so the missing
+   *  case can get its own, specific 400. */
   purchasePrice?: number | null;
 };
 
@@ -130,8 +132,11 @@ function isValidCheckoutBody(body: unknown): body is {
     if (typeof it.name === "string" && typeof it.productId !== "string") {
       const name = (it.name as string).trim();
       if (name.length === 0 || name.length > 80) return false;
+      /* Presence of the cost is checked separately (findManualLineWithoutCost)
+         so the cashier gets a message naming the item, not a generic 400;
+         here we only refuse a cost that is present but not storable. */
       if (it.purchasePrice !== undefined && it.purchasePrice !== null) {
-        if (!isSaneNumber(it.purchasePrice) || it.purchasePrice < 0 || it.purchasePrice > MAX_MANUAL_COST) return false;
+        if (!isValidManualCost(it.purchasePrice)) return false;
       }
       // Manual lines don't carry MRP, preDiscount, or per-line discounts —
       // the cashier types the final price directly.
@@ -166,6 +171,12 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
 
   const { items, paymentMode, customerName, customerPhone, discount, discountType } = req.body;
   const tenantId = req.tenantId;
+
+  const uncostedManual = findManualLineWithoutCost(items);
+  if (uncostedManual !== null) {
+    res.status(400).json({ error: manualCostRequiredMessage(uncostedManual) });
+    return;
+  }
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -215,7 +226,8 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
             subtotal:    round2(round2(item.price) * item.quantity),
             /* Cost snapshot for the profit reports. Only the cashier knows
                what a one-off item cost, so this is the single place it can
-               be captured; undefined keeps the column NULL (= unknown). */
+               be captured; presence was enforced above, the fallback only
+               satisfies the type. */
             purchasePrice: item.purchasePrice != null ? normalizeManualCost(item.purchasePrice) : undefined,
             // Sentinels well above any realistic threshold so the low-stock
             // filter (newStock <= threshold) never picks up manual lines.

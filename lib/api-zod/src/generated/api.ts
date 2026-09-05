@@ -647,9 +647,9 @@ export const CheckoutBody = zod.object({
           .number()
           .min(checkoutBodyItemsItemPurchasePriceMin)
           .max(checkoutBodyItemsItemPurchasePriceMax)
-          .nullish()
+          .optional()
           .describe(
-            "Manual lines only — per-unit cost typed by the cashier, stored on the sale line so profit reports net it against the price. Omit or null when unknown (the line is then excluded from profit, never treated as pure profit). Ignored on catalogue lines, whose cost is read from the product at checkout.",
+            "Per-unit cost typed by the cashier, stored on the sale line so profit reports net it against the price. REQUIRED on manual lines (no productId): checkout answers 400 naming the item when it is missing. 0 is a valid explicit value. Ignored on catalogue lines, whose cost is read from the product at checkout.",
           ),
       })
       .describe(

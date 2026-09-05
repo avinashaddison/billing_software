@@ -98,6 +98,35 @@ export function normalizeManualCost(n: number): number {
   return round2(n) || 0;
 }
 
+/** True for a storable manual cost: a real, non-negative number within the column bound. */
+export function isValidManualCost(value: unknown): value is number {
+  return isSaneNumber(value) && value >= 0 && value <= MAX_MANUAL_COST;
+}
+
+/**
+ * Manual (non-catalogue) checkout lines MUST carry a purchase price: the
+ * cashier is the only one who knows what a one-off item cost, and without it
+ * the line's profit is unknowable, so the sale is refused rather than recorded
+ * as a permanent blank in the reports. Returns the display name of the first
+ * offending line so the 400 can tell the cashier exactly which item to fix, or
+ * null when every manual line is costed. Catalogue lines (productId) are
+ * ignored — their cost comes from the product at checkout.
+ */
+export function findManualLineWithoutCost(
+  items: ReadonlyArray<{ productId?: unknown; name?: unknown; purchasePrice?: unknown }>,
+): string | null {
+  for (const it of items) {
+    if (typeof it.productId === "string" || typeof it.name !== "string") continue;
+    if (!isValidManualCost(it.purchasePrice)) return it.name.trim();
+  }
+  return null;
+}
+
+/** Cashier-facing message for a manual line billed without a purchase price. */
+export function manualCostRequiredMessage(name: string): string {
+  return `Manual item "${name}" needs a purchase price. Remove it from the cart and add it again with the purchase price.`;
+}
+
 /** A product, as far as pricing is concerned. */
 export interface PricedProduct {
   price: string | number;
