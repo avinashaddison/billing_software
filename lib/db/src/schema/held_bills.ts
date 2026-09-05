@@ -11,6 +11,13 @@ export interface HeldBillItem {
   discountAmount?: number;
   discountType?: "percent" | "amount";
   isManual?: boolean;
+  /**
+   * Per-unit cost the cashier typed for a MANUAL line so profit reports can
+   * net it against the selling price. Undefined = cost not recorded (the line
+   * is then excluded from profit, never assumed to be pure profit). Catalogue
+   * lines never carry this — their cost is read from the product at checkout.
+   */
+  purchasePrice?: number;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { isValidManualCost } from "@/lib/manual-cost";
 
 export type LineDiscountType = "percent" | "amount";
 
@@ -23,6 +24,11 @@ export interface CartItem {
    *  items is a client-generated string prefixed with "manual-" so it
    *  remains a stable React key without colliding with real product UUIDs. */
   isManual?: boolean;
+  /** MANUAL lines only: per-unit cost the cashier typed, so the sale's
+   *  profit is price − cost rather than the whole price. Undefined = cost
+   *  not recorded (the line is left out of profit reports). Catalogue lines
+   *  never carry this — the server reads their cost from the product. */
+  purchasePrice?: number;
 }
 
 interface CartContextType {
@@ -274,11 +280,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [queueServerMutation, setLocalItems]);
 
   const addCustomItem = useCallback(
-    ({ name, price, quantity = 1 }: { name: string; price: number; quantity?: number }) => {
+    ({ name, price, quantity = 1, purchasePrice }: { name: string; price: number; quantity?: number; purchasePrice?: number | null }) => {
       const trimmed = name.trim();
       if (!trimmed) return;
       const safePrice = Math.max(0, Number.isFinite(price) ? price : 0);
       const safeQty   = Math.max(1, Math.floor(Number.isFinite(quantity) ? quantity : 1));
+      // null/undefined/garbage → "not recorded"; an explicit 0 is kept (a
+      // service charge genuinely costs nothing). `|| 0` folds -0 into 0 so
+      // the snapshot never carries a "-0".
+      const safeCost  = isValidManualCost(purchasePrice) ? purchasePrice || 0 : undefined;
       // Stable client-side ID — prefixed with "manual-" so we can detect it
       // anywhere in the cart pipeline. crypto.randomUUID is available in
       // every supported browser (and Node 19+, for the rare SSR case).
@@ -294,6 +304,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         quantity: safeQty,
         price: safePrice,
         isManual: true,
+        ...(safeCost !== undefined ? { purchasePrice: safeCost } : {}),
       };
       setLocalItems([...itemsRef.current, item]);
       void queueServerMutation("POST", "/add", item);

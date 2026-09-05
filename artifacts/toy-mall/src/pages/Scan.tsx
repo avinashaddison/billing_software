@@ -43,7 +43,7 @@ type ScanCheckoutItem =
       discountType?: LineDiscountType;
       discountValue?: number;
     }
-  | { name: string; quantity: number; price: number };
+  | { name: string; quantity: number; price: number; purchasePrice?: number };
 
 interface ScannedProduct {
   id: string; name: string; sku: string; price: number; salePrice?: number | null; stock: number; lowStockThreshold: number;
@@ -74,7 +74,14 @@ async function postCheckout(payload: {
 
 function toCheckoutItem(item: CartItem): ScanCheckoutItem {
   if (item.isManual) {
-    return { name: item.name, quantity: item.quantity, price: item.price };
+    // Carry the cashier-typed cost (if any) so the line's profit is right
+    // even when a manual item added on the checkout page is billed from here.
+    return {
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      ...(item.purchasePrice != null ? { purchasePrice: item.purchasePrice } : {}),
+    };
   }
   const price = effectivePrice(item);
   const discountType = item.discountType ?? "percent";

@@ -5,6 +5,7 @@ import { tenantWhere } from "../lib/tenant";
 import { istToday, istShiftDay } from "../lib/ist";
 import { requireRead, type ResourceReadView } from "../middlewares/auth";
 import { buildProductReport } from "../lib/product-report";
+import { buildProfitRows, summarizeCoveredTotals } from "../lib/profit-rows";
 
 const router: IRouter = Router();
 
@@ -417,17 +418,18 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
       .limit(10),
 
     /* Profit base. LEFT JOIN (not INNER) so MANUAL / non-inventory lines
-       (productId IS NULL) are kept: they have no purchase cost, so their full
-       subtotal is counted as profit (a gift-wrap, service charge, etc.). A
-       line is "covered" — and thus part of the profit base — when it is either
-       a manual line OR a catalogue item whose cost is known: the sale-time
-       snapshot (sale_items.purchase_price) when present, else the product's
-       current purchase price. Catalogue items with no known cost stay
-       excluded so we never overstate margin. */
+       (productId IS NULL) are kept. A line is "covered" — and thus part of
+       the profit base — when its cost is known: the sale-time snapshot
+       (sale_items.purchase_price — for manual lines this is the cost the
+       cashier typed at billing) when present, else the product's current
+       purchase price. Lines with no known cost — unpriced catalogue items AND
+       manual lines billed without a cost — stay excluded so we never overstate
+       margin. (Manual lines used to count as 100% profit here; they no
+       longer do.) */
     db.select({
         totalCost:      sql<string>`COALESCE(SUM(CASE WHEN COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) IS NOT NULL THEN COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) * ${saleItemsTable.quantity} ELSE 0 END), 0)`.as("total_cost"),
-        coveredItems:   sql<number>`COUNT(*) FILTER (WHERE ${saleItemsTable.productId} IS NULL OR COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) IS NOT NULL)::int`.as("covered_items"),
-        coveredRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${saleItemsTable.productId} IS NULL OR COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) IS NOT NULL THEN ${saleItemsTable.subtotal} ELSE 0 END), 0)`.as("covered_revenue"),
+        coveredItems:   sql<number>`COUNT(*) FILTER (WHERE COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) IS NOT NULL)::int`.as("covered_items"),
+        coveredRevenue: sql<string>`COALESCE(SUM(CASE WHEN COALESCE(${saleItemsTable.purchasePrice}, ${productsTable.purchasePrice}) IS NOT NULL THEN ${saleItemsTable.subtotal} ELSE 0 END), 0)`.as("covered_revenue"),
       })
       .from(saleItemsTable)
       .leftJoin(productsTable,  sql`${saleItemsTable.productId} = ${productsTable.id}`)
@@ -654,10 +656,10 @@ router.get("/reports/end-of-day", async (req, res): Promise<void> => {
  *
  * Per-item rows: every catalogue SKU sold in the range (qty, revenue,
  * cost-of-goods = investment, profit, margin) plus manual/non-inventory
- * lines grouped by their custom name (zero cost → full margin, matching the
- * EOD report's treatment). Catalogue items with NO known purchase price are
- * flagged (`costKnown: false`) and excluded from the profit totals so the
- * margin is never overstated.
+ * lines grouped by their custom name, costed from the purchase price the
+ * cashier typed when billing them. Any item — catalogue or manual — with NO
+ * known purchase price is flagged (`costKnown: false`) and excluded from the
+ * profit totals so the margin is never overstated (matching the EOD report).
  *
  * Also returns the period's stock purchases (stock IN) valued at the
  * product's CURRENT purchase price — stock_logs stores no price snapshot,
@@ -706,12 +708,17 @@ router.get("/reports/profit", async (req, res): Promise<void> => {
       .groupBy(saleItemsTable.productId, productsTable.name, productsTable.sku, productsTable.category)
       .orderBy(desc(sql`SUM(${saleItemsTable.subtotal})`)),
 
-    /* Manual / non-inventory lines, grouped by the typed name. */
+    /* Manual / non-inventory lines, grouped by the typed name. Their cost is
+       the per-unit purchase price the cashier typed at billing time — there is
+       no product row to fall back to, so a line billed without one is simply
+       uncosted (see buildProfitRows). */
     db.select({
         customName:   sql<string>`COALESCE(${saleItemsTable.customName}, 'Manual item')`.as("custom_name"),
         totalQty:     sql<number>`SUM(${saleItemsTable.quantity})::int`.as("total_qty"),
         totalRevenue: sql<string>`SUM(${saleItemsTable.subtotal})`.as("total_revenue"),
         billCount:    sql<number>`COUNT(DISTINCT ${saleItemsTable.saleId})::int`.as("bill_count"),
+        totalCost:    sql<string>`COALESCE(SUM(${saleItemsTable.purchasePrice} * ${saleItemsTable.quantity}), 0)`.as("total_cost"),
+        costedQty:    sql<number>`COALESCE(SUM(${saleItemsTable.quantity}) FILTER (WHERE ${saleItemsTable.purchasePrice} IS NOT NULL), 0)::int`.as("costed_qty"),
       })
       .from(saleItemsTable)
       .innerJoin(billsTable, sql`${saleItemsTable.saleId} = ${billsTable.id}`)
@@ -777,53 +784,9 @@ router.get("/reports/profit", async (req, res): Promise<void> => {
       .then((rows) => rows[0] ?? { coveredRefunds: "0", returnedCost: "0" }),
   ]);
 
-  const rows = [
-    ...skuRows.map((p) => {
-      const qty       = Number(p.totalQty);
-      const revenue   = Number(p.totalRevenue);
-      const costKnown = p.costedQty === qty;
-      const cost      = costKnown ? Number(p.totalCost) : null;
-      const profit    = cost != null ? revenue - cost : null;
-      return {
-        kind:      "sku" as const,
-        name:      p.productName,
-        sku:       p.productSku,
-        category:  p.category,
-        qty,
-        revenue,
-        cost,
-        profit,
-        margin:    profit != null && revenue > 0 ? (profit / revenue) * 100 : null,
-        billCount: Number(p.billCount),
-        costKnown,
-      };
-    }),
-    ...manualRows.map((m) => {
-      const revenue = Number(m.totalRevenue);
-      return {
-        kind:      "manual" as const,
-        name:      m.customName,
-        sku:       null,
-        category:  null,
-        qty:       Number(m.totalQty),
-        revenue,
-        cost:      0,
-        profit:    revenue,
-        margin:    revenue > 0 ? 100 : null,
-        billCount: Number(m.billCount),
-        costKnown: true,
-      };
-    }),
-  ].sort((a, b) => b.revenue - a.revenue);
-
-  /* Totals over rows with a KNOWN cost (same "covered" base as EOD). */
-  let coveredRevenue = 0, totalCost = 0, uncostedRevenue = 0, totalQty = 0;
-  for (const r of rows) {
-    totalQty += r.qty;
-    if (r.costKnown && r.cost != null) { coveredRevenue += r.revenue; totalCost += r.cost; }
-    else uncostedRevenue += r.revenue;
-  }
-  const totalProfit = coveredRevenue - totalCost;
+  const rows = buildProfitRows(skuRows, manualRows);
+  const { coveredRevenue, totalCost, uncostedRevenue, totalQty, totalProfit } =
+    summarizeCoveredTotals(rows);
 
   /* Net-of-returns totals — same rules as the EOD report: every refund nets
    * against revenue; profit only adjusts for returns whose original line

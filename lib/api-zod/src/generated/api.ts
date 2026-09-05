@@ -620,14 +620,41 @@ export const GetReceivablesSummaryResponse = zod.object({
 /**
  * @summary Create a new bill at checkout
  */
+export const checkoutBodyItemsItemNameMax = 80;
+
+export const checkoutBodyItemsItemPurchasePriceMin = 0;
+export const checkoutBodyItemsItemPurchasePriceMax = 99999999.99;
+
 export const CheckoutBody = zod.object({
   items: zod.array(
-    zod.object({
-      productId: zod.string(),
-      quantity: zod.number().int(),
-      price: zod.number(),
-      mrp: zod.number().optional(),
-    }),
+    zod
+      .object({
+        productId: zod
+          .string()
+          .optional()
+          .describe("Catalogue product id. Omit on manual lines."),
+        name: zod
+          .string()
+          .max(checkoutBodyItemsItemNameMax)
+          .optional()
+          .describe(
+            "Manual lines only — the description printed on the receipt.",
+          ),
+        quantity: zod.number().int(),
+        price: zod.number().describe("Effective per-unit selling price."),
+        mrp: zod.number().optional().describe("Catalogue lines only."),
+        purchasePrice: zod
+          .number()
+          .min(checkoutBodyItemsItemPurchasePriceMin)
+          .max(checkoutBodyItemsItemPurchasePriceMax)
+          .nullish()
+          .describe(
+            "Manual lines only — per-unit cost typed by the cashier, stored on the sale line so profit reports net it against the price. Omit or null when unknown (the line is then excluded from profit, never treated as pure profit). Ignored on catalogue lines, whose cost is read from the product at checkout.",
+          ),
+      })
+      .describe(
+        "One bill line. Either a catalogue line (`productId`, optional `mrp`) or a manual \/ non-inventory line (`name` instead of `productId`, no stock movement). Exactly one of `productId` or `name` must be present.",
+      ),
   ),
   paymentMode: zod
     .enum(["cash", "upi", "credit"])

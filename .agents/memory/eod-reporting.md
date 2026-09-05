@@ -17,6 +17,12 @@ description: How duesCollected / profit / net-of-returns figures are computed an
 - EOD `grossProfit` / `margin` are computed over **coveredRevenue** = SUM(subtotal) of items whose `purchase_price IS NOT NULL` — NOT full revenue minus partial cost (which overstated profit).
 - **Why:** mixing all-item revenue with cost from only priced items inflates profit. `profitCoverage` (distinct priced-item count) + `coveredRevenue` are returned so the UI can label the figure "based on N priced items". The UI currently still labels it plainly "Profit".
 
+# Manual (non-catalogue) lines and cost (decision, Sep 2026)
+- A manual line is covered **only** when `sale_items.purchase_price` is set — the cost the cashier typed in the Manual Item dialog at billing time (snapshotted on the line; there is no product to fall back to). Blank/NULL = unknown ⇒ uncosted, excluded from covered profit. Explicit 0 = genuinely free ⇒ full margin.
+- **Why:** before this, every manual line counted as 100% profit (`productId IS NULL` ⇒ covered), so a ₹250 outside item inflated the day's profit by ₹250. Legacy manual rows (NULL) deliberately became uncosted rather than pure profit — a smaller, honest number.
+- Per-item rows (Profit tab) use the same "every unit costed" rule as SKUs: if any unit of that manual name in the period lacks a cost, the row shows "—".
+- **How to apply:** any query that decides "is this line's cost known" must use `COALESCE(sale_items.purchase_price, products.purchase_price) IS NOT NULL` and must NOT special-case `product_id IS NULL`. The cost is confidential: cart rows show only a COST ✓ / NO COST chip and the receipt never prints it. One ceiling (`MAX_MANUAL_COST`, = numeric(10,2) max) is shared by checkout validation, held/shared-cart schema, the dialog, and the OpenAPI spec — keep them in step or a cart can accept what checkout refuses.
+
 # Net-of-returns (decision)
 - Bills stay immutable; refunds are subtracted **in the reporting queries**, attributed to the IST day the return was **processed** (net-sales practice), not the sale day.
 - `netRevenue = gross − ALL refunds`. `netProfit = grossProfit − coveredRefunds + returnedCost` — profit adjusts only for returns whose original sale line cost is known (matches the covered philosophy above); returned goods restock, so their cost comes back. `netMargin` over `(coveredRevenue − coveredRefunds)`.

@@ -44,10 +44,13 @@ export const saleItemsTable = pgTable(
     discountValue:   numeric("discount_value", { precision: 15, scale: 2 }),
     subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),
     /**
-     * Cost-price snapshot at sale time (products.purchase_price when the
-     * bill was raised). Profit reports use this so later cost edits don't
-     * rewrite history. NULL on manual lines and on rows sold before the
-     * column existed — reports fall back to the product's current cost.
+     * Cost-price snapshot at sale time. Catalogue lines: products.purchase_price
+     * when the bill was raised, so later cost edits don't rewrite history.
+     * Manual lines (product_id IS NULL): the per-unit cost the cashier typed
+     * in the Manual Item dialog — the only place that cost can be known.
+     * NULL = unknown (rows sold before the column existed, or a manual line
+     * billed without a cost); reports fall back to the product's current cost
+     * for catalogue rows and otherwise leave the line OUT of profit.
      */
     purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -6,7 +6,7 @@ import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { requireWrite } from "../middlewares/auth";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 import { logger } from "../lib/logger";
-import { round2, checkLinePrice, isAbsurdPrice, exceedsDiscountCeiling, checkBillDiscount, maxDiscountPct, priceGuardMode, isSaneNumber } from "../lib/price-integrity";
+import { round2, checkLinePrice, isAbsurdPrice, exceedsDiscountCeiling, checkBillDiscount, maxDiscountPct, priceGuardMode, isSaneNumber, MAX_MANUAL_COST, normalizeManualCost } from "../lib/price-integrity";
 
 const router: IRouter = Router();
 
@@ -64,6 +64,12 @@ type ManualLineItem = {
   name:     string;
   quantity: number;
   price:    number;
+  /** Per-unit cost typed by the cashier, so the line's profit is
+   *  price − cost instead of the whole price. null/undefined = not
+   *  recorded — reports then leave the line OUT of profit rather than
+   *  pretending it was free to acquire. 0 is a legitimate explicit
+   *  value (service charge, gift-wrapping labour). */
+  purchasePrice?: number | null;
 };
 
 type CheckoutLineItem = CatalogLineItem | ManualLineItem;
@@ -124,6 +130,9 @@ function isValidCheckoutBody(body: unknown): body is {
     if (typeof it.name === "string" && typeof it.productId !== "string") {
       const name = (it.name as string).trim();
       if (name.length === 0 || name.length > 80) return false;
+      if (it.purchasePrice !== undefined && it.purchasePrice !== null) {
+        if (!isSaneNumber(it.purchasePrice) || it.purchasePrice < 0 || it.purchasePrice > MAX_MANUAL_COST) return false;
+      }
       // Manual lines don't carry MRP, preDiscount, or per-line discounts —
       // the cashier types the final price directly.
       return true;
@@ -204,6 +213,10 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
             quantity:    item.quantity,
             price:       round2(item.price),
             subtotal:    round2(round2(item.price) * item.quantity),
+            /* Cost snapshot for the profit reports. Only the cashier knows
+               what a one-off item cost, so this is the single place it can
+               be captured; undefined keeps the column NULL (= unknown). */
+            purchasePrice: item.purchasePrice != null ? normalizeManualCost(item.purchasePrice) : undefined,
             // Sentinels well above any realistic threshold so the low-stock
             // filter (newStock <= threshold) never picks up manual lines.
             newStock:    Number.MAX_SAFE_INTEGER,

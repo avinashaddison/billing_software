@@ -1,6 +1,6 @@
 - [DB migrations, tenancy & which DB the app uses](db-tenancy-migrations.md) — app hits NEON, not the executeSql `heliumdb`; idempotent boot SQL only (never drizzle push); migrations are additive-only so they can't bootstrap an empty DB.
-- [Dev orchestrator vs per-artifact workflows](replit-workflow-orchestrator-clash.md) — repo owns its own API 8080 / web 5000 orchestrator; auto-added per-artifact workflows steal the ports and blank the preview.
-- [EOD & product-report money math](eod-reporting.md) — ledger collections; covered profit; refunds hit processing day; product revenue allocates actual bill total before netting returns.
+- [Dev orchestrator vs artifact workflows](replit-workflow-orchestrator-clash.md) — orchestrator owns 8080/5000; after server edits restart "Start application", never the artifact one (EADDRINUSE).
+- [EOD & product-report money math](eod-reporting.md) — ledger collections; covered profit; manual lines costed only via cashier-typed purchase_price, never 100% profit; refunds hit processing day.
 - [Defensive fetch handling](defensive-fetch.md) — check r.ok before r.json() (non-JSON error pages crash); never fall back to defaults on a failed load that feeds a Save-able form (overwrites real data).
 - [API error-handling contract](api-error-handling.md) — centralized 4-arg errorHandler (Express 5 auto-forwards rejections); apiNotFound after router/before SPA; 5xx never leaks err.message; structural ZodError detection (no zod import).
 - [Verifying authenticated UI](verifying-authenticated-ui.md) — no known passwords + live data; mint a signed session cookie AND seed the Zustand localStorage store, or the SPA redirects before any call.
@@ -26,3 +26,4 @@
 - [Public API keys](public-api-key-auth.md) — issuing is vendor-only (/admin), no owner surface; hash-only + reveal-once; keys need an ACTIVE tenants row; INSERT caps need advisory locks.
 - [Atomic active/held cart swaps](atomic-active-held-cart-swaps.md) — active and parked snapshots must share one durable transaction; CAS plus a tenant row lock prevents cross-device loss.
 - [Stock-batch provenance](stock-batch-provenance.md) — FIFO may attribute sales only when provenance is defensible; absolute-adjustment gaps stay unattributed instead of rewriting batch history.
+- [orval codegen gotchas](orval-codegen-gotchas.md) — after regenerating from openapi.yaml, restore lib/api-zod/src/index.ts (barrel collides) and prettier the generated dirs.

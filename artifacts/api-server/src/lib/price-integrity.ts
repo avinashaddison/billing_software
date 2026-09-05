@@ -79,6 +79,25 @@ export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+/**
+ * Upper bound for a cashier-typed manual-line purchase cost. It is the largest
+ * value `sale_items.purchase_price` (numeric(10,2)) can hold, so an absurd
+ * value is refused at validation time — in the checkout body, in held/shared
+ * cart snapshots, and in the Manual Item dialog — instead of aborting the sale
+ * transaction mid-insert. The web app mirrors this number in its Manual Item
+ * dialog; keep the two in step.
+ */
+export const MAX_MANUAL_COST = 99_999_999.99;
+
+/**
+ * Normalise a validated manual cost for storage: round to paise and fold the
+ * sign of negative zero away, so `-0` (which `< 0` does not catch) is stored
+ * and echoed as a plain 0 rather than "-0".
+ */
+export function normalizeManualCost(n: number): number {
+  return round2(n) || 0;
+}
+
 /** A product, as far as pricing is concerned. */
 export interface PricedProduct {
   price: string | number;

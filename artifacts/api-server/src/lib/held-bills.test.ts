@@ -3,6 +3,7 @@ import {
   heldBillItemsSchema,
   summarizeHeldBillItems,
 } from "./held-bills";
+import { MAX_MANUAL_COST } from "./price-integrity";
 
 describe("held bill snapshots", () => {
   it("preserves manual lines and both line-discount modes", () => {
@@ -32,6 +33,7 @@ describe("held bill snapshots", () => {
         quantity: 1,
         price: 25,
         isManual: true,
+        purchasePrice: 10.5,
       },
     ]);
 
@@ -39,7 +41,30 @@ describe("held bill snapshots", () => {
       itemCount: 4,
       total: 1125,
     });
-    expect(items[2]).toMatchObject({ name: "Gift wrap", isManual: true });
+    // The typed cost must survive the hold/resume and shared-cart round trip,
+    // otherwise checkout would bill the line with no cost and it would fall
+    // out of the profit reports.
+    expect(items[2]).toMatchObject({ name: "Gift wrap", isManual: true, purchasePrice: 10.5 });
+  });
+
+  it("refuses a negative or non-finite manual cost", () => {
+    const base = {
+      productId: "manual-1",
+      sku: "—",
+      name: "Gift wrap",
+      quantity: 1,
+      price: 25,
+      isManual: true,
+    };
+    expect(heldBillItemsSchema.safeParse([{ ...base, purchasePrice: -1 }]).success).toBe(false);
+    expect(heldBillItemsSchema.safeParse([{ ...base, purchasePrice: Number.NaN }]).success).toBe(false);
+    expect(heldBillItemsSchema.safeParse([{ ...base, purchasePrice: 0 }]).success).toBe(true);
+  });
+
+  it("caps a manual cost at the same ceiling as checkout", () => {
+    const base = { productId: "manual-1", sku: "—", name: "Gift wrap", quantity: 1, price: 25, isManual: true };
+    expect(heldBillItemsSchema.safeParse([{ ...base, purchasePrice: MAX_MANUAL_COST }]).success).toBe(true);
+    expect(heldBillItemsSchema.safeParse([{ ...base, purchasePrice: MAX_MANUAL_COST + 0.01 }]).success).toBe(false);
   });
 
   it("refuses empty carts and malformed quantities", () => {

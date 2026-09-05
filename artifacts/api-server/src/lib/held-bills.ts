@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { HeldBillItem } from "@workspace/db";
+import { MAX_MANUAL_COST } from "./price-integrity";
 
 export const heldBillItemSchema = z.object({
   productId:       z.string().trim().min(1).max(150),
@@ -12,6 +13,9 @@ export const heldBillItemSchema = z.object({
   discountAmount:  z.number().finite().min(0).max(1_000_000_000).optional(),
   discountType:    z.enum(["percent", "amount"]).optional(),
   isManual:        z.boolean().optional(),
+  // Same ceiling as the checkout body, so a cost a held/shared cart accepts
+  // can never be the reason the eventual checkout is refused.
+  purchasePrice:   z.number().finite().min(0).max(MAX_MANUAL_COST).optional(),
 }).strict();
 
 export const heldBillItemsSchema = z.array(heldBillItemSchema).min(1).max(250);

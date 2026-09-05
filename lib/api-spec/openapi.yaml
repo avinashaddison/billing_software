@@ -1047,17 +1047,38 @@ components:
 
     CheckoutItem:
       type: object
+      description: >-
+        One bill line. Either a catalogue line (`productId`, optional `mrp`)
+        or a manual / non-inventory line (`name` instead of `productId`, no
+        stock movement). Exactly one of `productId` or `name` must be present.
       properties:
         productId:
           type: string
+          description: Catalogue product id. Omit on manual lines.
+        name:
+          type: string
+          maxLength: 80
+          description: Manual lines only — the description printed on the receipt.
         quantity:
           type: integer
         price:
           type: number
+          description: Effective per-unit selling price.
         mrp:
           type: number
+          description: Catalogue lines only.
+        purchasePrice:
+          type: number
+          minimum: 0
+          maximum: 99999999.99
+          nullable: true
+          description: >-
+            Manual lines only — per-unit cost typed by the cashier, stored on
+            the sale line so profit reports net it against the price. Omit or
+            null when unknown (the line is then excluded from profit, never
+            treated as pure profit). Ignored on catalogue lines, whose cost is
+            read from the product at checkout.
       required:
-        - productId
         - quantity
         - price
 

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { playCheckoutSuccess, playError, playTick } from "@/lib/sounds";
 import { useCart, effectivePrice, type LineDiscountType } from "@/contexts/cart-context";
+import { MAX_MANUAL_COST, isValidManualCost } from "@/lib/manual-cost";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useOnline } from "@/hooks/use-online";
 import { useStoreSettings } from "@/lib/store-info";
@@ -43,6 +44,8 @@ type CheckoutPayloadItem =
       name:     string;
       quantity: number;
       price:    number;
+      /** Per-unit cost typed in the Manual Item dialog; omitted = not recorded. */
+      purchasePrice?: number;
     };
 
 async function postCheckout(payload: {
@@ -142,6 +145,7 @@ interface CartItemRowProps {
     discountAmount?:  number;
     discountType?:    LineDiscountType;
     isManual?: boolean;
+    purchasePrice?: number;
   };
   onQtyChange: (productId: string, qty: number) => void;
   onRemove: (productId: string) => void;
@@ -172,6 +176,25 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
                 <PencilLine className="w-2.5 h-2.5" /> MANUAL
               </span>
             )}
+            {/* Cost status only — the amount itself stays off the cashier
+                screen, same as catalogue lines never show their cost here. */}
+            {isManual && (item.purchasePrice != null ? (
+              <span
+                className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 leading-none"
+                title="Purchase price recorded — profit will be worked out for this line"
+                data-testid="badge-manual-cost-recorded"
+              >
+                COST ✓
+              </span>
+            ) : (
+              <span
+                className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground leading-none"
+                title="No purchase price entered — this line is left out of profit reports"
+                data-testid="badge-manual-cost-missing"
+              >
+                NO COST
+              </span>
+            ))}
             {onSale && (
               <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 leading-none">
                 SALE
@@ -305,11 +328,14 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
 ─────────────────────────────────────────────────────────────────── */
 interface ManualItemModalProps {
   onClose: () => void;
-  onAdd:   (input: { name: string; price: number; quantity: number }) => void;
+  onAdd:   (input: { name: string; price: number; quantity: number; purchasePrice: number | null }) => void;
 }
+const inr2 = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
   const [name, setName]         = useState("");
   const [priceStr, setPriceStr] = useState("");
+  const [costStr, setCostStr]   = useState("");
   const [qty, setQty]           = useState(1);
   const nameRef                 = useRef<HTMLInputElement>(null);
   useEffect(() => { nameRef.current?.focus(); }, []);
@@ -317,11 +343,21 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
   const price       = parseFloat(priceStr);
   const validPrice  = Number.isFinite(price) && price >= 0;
   const validName   = name.trim().length > 0 && name.trim().length <= 80;
-  const canSubmit   = validPrice && validName && qty > 0;
+  /* Purchase price is optional: blank = "not recorded" (the line is then left
+     OUT of profit reports rather than counted as pure profit). A typed value
+     must be a real non-negative number; 0 is fine (a service costs nothing). */
+  const costBlank   = costStr.trim() === "";
+  const cost        = parseFloat(costStr);
+  const validCost   = costBlank || isValidManualCost(cost);
+  const hasCost     = !costBlank && validCost;
+  const canSubmit   = validPrice && validName && validCost && qty > 0;
+
+  const unitProfit  = hasCost && validPrice ? price - cost : null;
+  const belowCost   = unitProfit != null && unitProfit < 0;
 
   const submit = () => {
     if (!canSubmit) return;
-    onAdd({ name: name.trim(), price, quantity: qty });
+    onAdd({ name: name.trim(), price, quantity: qty, purchasePrice: hasCost ? cost : null });
     onClose();
   };
 
@@ -390,6 +426,37 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
             </div>
           </div>
 
+          {/* Purchase price (cost) — optional, feeds profit reports only */}
+          <div>
+            <label htmlFor="manual-item-cost" className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center justify-between">
+              <span>Purchase price (₹) per unit</span>
+              <span className="normal-case tracking-normal font-semibold text-[10px] text-muted-foreground/80">Optional</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground select-none">₹</span>
+              <input
+                id="manual-item-cost"
+                type="number"
+                min={0}
+                max={MAX_MANUAL_COST}
+                step="0.01"
+                inputMode="decimal"
+                value={costStr}
+                onChange={(e) => setCostStr(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
+                placeholder="What it cost you"
+                aria-invalid={!validCost}
+                data-testid="input-manual-purchase-price"
+                className={`w-full h-11 pl-8 pr-3 rounded-xl bg-muted border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition-all ${validCost ? "border-border" : "border-rose-400"}`}
+                onKeyDown={(e) => e.key === "Enter" && submit()}
+              />
+            </div>
+            <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+              Used only to work out profit in your reports — never printed on the customer's bill.
+              Leave blank if you don't know it; the line will then be skipped in profit instead of counted as 100% profit.
+            </p>
+          </div>
+
           {/* Quantity stepper */}
           <div>
             <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
@@ -424,13 +491,28 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
             </div>
           </div>
 
-          {/* Live total */}
+          {/* Live total + profit preview */}
           {validPrice && (
-            <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 flex items-center justify-between text-sm">
-              <span className="text-amber-700 dark:text-amber-300 font-bold">Line total</span>
-              <span className="font-black text-amber-700 dark:text-amber-300 tabular-nums">
-                ₹{(price * qty).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
+            <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-sm space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-amber-700 dark:text-amber-300 font-bold">Line total</span>
+                <span className="font-black text-amber-700 dark:text-amber-300 tabular-nums" data-testid="text-manual-line-total">
+                  ₹{inr2(price * qty)}
+                </span>
+              </div>
+              {unitProfit != null ? (
+                <div
+                  className={`flex items-center justify-between text-xs font-semibold ${belowCost ? "text-rose-600 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}`}
+                  data-testid="text-manual-profit-preview"
+                >
+                  <span>{belowCost ? "Selling below cost" : "Profit"} · cost ₹{inr2(cost * qty)}</span>
+                  <span className="tabular-nums">{belowCost ? "−" : ""}₹{inr2(Math.abs(unitProfit * qty))}</span>
+                </div>
+              ) : (
+                <div className="text-[11px] font-semibold text-amber-700/80 dark:text-amber-300/80" data-testid="text-manual-no-cost">
+                  No purchase price — this line won't count in profit reports
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -693,8 +775,9 @@ export default function Checkout() {
      the savings line correctly.
 
      Manual / non-inventory cart lines (`isManual`) are sent as
-     `{ name, price, quantity }` with NO productId — the server skips the
-     stock decrement and writes the typed name as `custom_name`. */
+     `{ name, price, quantity, purchasePrice? }` with NO productId — the
+     server skips the stock decrement, writes the typed name as
+     `custom_name`, and stores the typed cost so profit reports can net it. */
   const buildCheckoutItems = (): CheckoutPayloadItem[] =>
     items.map((i) => {
       if (i.isManual) {
@@ -702,6 +785,7 @@ export default function Checkout() {
           name:     i.name,
           quantity: i.quantity,
           price:    i.price,
+          ...(i.purchasePrice != null ? { purchasePrice: i.purchasePrice } : {}),
         };
       }
       const eff       = effectivePrice(i);

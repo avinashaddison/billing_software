@@ -15,7 +15,7 @@ export interface QueuedBill {
    *  /api/bills/checkout payload. */
   items:        Array<
     | { productId: string; quantity: number; price: number; mrp?: number }
-    | { name:      string; quantity: number; price: number }
+    | { name:      string; quantity: number; price: number; purchasePrice?: number }
   >;
   paymentMode:  string;
   customerName?: string;

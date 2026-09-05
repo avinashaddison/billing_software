@@ -10,6 +10,8 @@ import {
   checkBillDiscount,
   maxDiscountPct,
   DEFAULT_MAX_DISCOUNT_PCT,
+  MAX_MANUAL_COST,
+  normalizeManualCost,
 } from "./price-integrity";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z");
@@ -32,6 +34,23 @@ describe("round2", () => {
   it("leaves already-clean values alone", () => {
     expect(round2(100)).toBe(100);
     expect(round2(0)).toBe(0);
+  });
+});
+
+describe("normalizeManualCost", () => {
+  it("rounds a cashier-typed cost to paise", () => {
+    expect(normalizeManualCost(40.005)).toBe(40.01);
+    expect(normalizeManualCost(65.5)).toBe(65.5);
+  });
+
+  it("stores negative zero as a plain zero, never \"-0\"", () => {
+    expect(Object.is(normalizeManualCost(-0), 0)).toBe(true);
+    expect(String(normalizeManualCost(-0))).toBe("0");
+  });
+
+  it("caps at what the purchase_price column can hold", () => {
+    expect(MAX_MANUAL_COST).toBe(99_999_999.99);
+    expect(normalizeManualCost(MAX_MANUAL_COST)).toBe(MAX_MANUAL_COST);
   });
 });
 

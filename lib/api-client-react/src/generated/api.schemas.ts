@@ -279,11 +279,28 @@ export interface CategoryStat {
   stockValue: number;
 }
 
+/**
+ * One bill line. Either a catalogue line (`productId`, optional `mrp`) or a manual / non-inventory line (`name` instead of `productId`, no stock movement). Exactly one of `productId` or `name` must be present.
+ */
 export interface CheckoutItem {
-  productId: string;
+  /** Catalogue product id. Omit on manual lines. */
+  productId?: string;
+  /**
+   * Manual lines only — the description printed on the receipt.
+   * @maxLength 80
+   */
+  name?: string;
   quantity: number;
+  /** Effective per-unit selling price. */
   price: number;
+  /** Catalogue lines only. */
   mrp?: number;
+  /**
+   * Manual lines only — per-unit cost typed by the cashier, stored on the sale line so profit reports net it against the price. Omit or null when unknown (the line is then excluded from profit, never treated as pure profit). Ignored on catalogue lines, whose cost is read from the product at checkout.
+   * @minimum 0
+   * @maximum 99999999.99
+   */
+  purchasePrice?: number | null;
 }
 
 /**

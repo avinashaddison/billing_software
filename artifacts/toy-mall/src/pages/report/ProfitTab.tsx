@@ -120,7 +120,14 @@ const COLS: Col[] = [
     numeric: (r) => (r.costKnown ? r.cost : null),
     render: (r) => r.costKnown && r.cost != null
       ? <span className="text-muted-foreground">{money2(r.cost)}</span>
-      : <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400" title="Set the purchase price on this product to see profit">—</span>,
+      : (
+        <span
+          className="text-[10px] font-bold text-amber-600 dark:text-amber-400"
+          title={r.kind === "manual"
+            ? "Purchase price wasn't entered when this manual item was billed (for every unit), so its profit can't be worked out"
+            : "Set the purchase price on this product to see profit"}
+        >—</span>
+      ),
   },
   {
     letter: "G", label: "Profit", align: "right", sortKey: "profit",
@@ -722,7 +729,7 @@ export default function ProfitTab() {
 
           <p className="text-[10px] text-muted-foreground px-1">
             Investment = purchase cost of the goods actually sold in this period (sale-time cost snapshot when available).
-            Manual bill lines have no purchase cost, so their full amount counts as profit.
+            Manual bill lines use the purchase price typed at billing time; lines entered without one show "—" and are left out of profit, not counted as pure profit.
             Stock-purchase value is estimated at each product's current purchase price.
           </p>
         </>
