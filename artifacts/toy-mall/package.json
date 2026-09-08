@@ -80,6 +80,8 @@
   "dependencies": {
     "exceljs": "^4.4.0",
     "jsbarcode": "^3.12.3",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "qrcode.react": "^4.2.0"
   }
 }
