@@ -7,7 +7,7 @@
  */
 
 /**
- * Mode of payment. `credit` records the bill as unpaid (receivable); requires `customerPhone` so the debtor is identifiable.
+ * Mode of payment. `credit` records the bill as unpaid (receivable) against the customer identified by `customerPhone`.
  */
 export type CheckoutInputPaymentMode =
   (typeof CheckoutInputPaymentMode)[keyof typeof CheckoutInputPaymentMode];

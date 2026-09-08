@@ -304,7 +304,7 @@ export interface CheckoutItem {
 }
 
 /**
- * Mode of payment. `credit` records the bill as unpaid (receivable); requires `customerPhone` so the debtor is identifiable.
+ * Mode of payment. `credit` records the bill as unpaid (receivable) against the customer identified by `customerPhone`.
  */
 export type CheckoutInputPaymentMode =
   (typeof CheckoutInputPaymentMode)[keyof typeof CheckoutInputPaymentMode];
@@ -328,10 +328,14 @@ export const CheckoutInputDiscountType = {
 
 export interface CheckoutInput {
   items: CheckoutItem[];
-  /** Mode of payment. `credit` records the bill as unpaid (receivable); requires `customerPhone` so the debtor is identifiable. */
+  /** Mode of payment. `credit` records the bill as unpaid (receivable) against the customer identified by `customerPhone`. */
   paymentMode: CheckoutInputPaymentMode;
   customerName?: string;
-  customerPhone?: string;
+  /**
+   * Customer's 10-digit mobile number (bare digits, no +91). REQUIRED on every bill — checkout answers 400 without it. It is the key the customer ledger, credit collection and repeat-customer lookups use.
+   * @pattern ^[0-9]{10}$
+   */
+  customerPhone: string;
   /** Raw discount value (e.g. 10 for 10% or 200 for ₹200) */
   discount?: number;
   /** How to interpret the discount value */

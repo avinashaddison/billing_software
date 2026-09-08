@@ -11,6 +11,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { playCheckoutSuccess, playError, playTick } from "@/lib/sounds";
 import { useCart, effectivePrice, type LineDiscountType } from "@/contexts/cart-context";
 import { MAX_MANUAL_COST, isValidManualCost, findUncostedManualLine, uncostedManualLineMessage } from "@/lib/manual-cost";
+import {
+  isCompleteCustomerPhone, customerPhoneFormatError, customerPhoneSubmitError, CUSTOMER_PHONE_REQUIRED_TOAST,
+} from "@/lib/customer-phone";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useOnline } from "@/hooks/use-online";
 import { useStoreSettings } from "@/lib/store-info";
@@ -657,6 +660,8 @@ export default function Checkout() {
   const [nameAutoFilled, setNameAutoFilled] = useState(false);
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  /* Lets a blank-number submit put the cursor straight into the field. */
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   /* Lookup state — purely cosmetic (spinner + hint). Failures stay silent
    * because this is an auxiliary convenience, not core checkout flow. */
   const [lookingUp, setLookingUp] = useState(false);
@@ -712,8 +717,11 @@ export default function Checkout() {
     ? `upi://pay?pa=${encodeURIComponent(upiId)}&am=${finalTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`${storeName || "Shop"} Sale`)}`
     : "";
 
-  const validatePhone = (v: string) =>
-    !v || /^\d{10}$/.test(v) ? "" : "Enter a valid 10-digit number";
+  /* Every customer bill needs the customer's 10-digit mobile number (the
+     server refuses checkout without it). A blank field is only flagged when
+     the cashier tries to complete the sale; a partially typed number shows
+     its format error straight away. */
+  const validatePhone = customerPhoneFormatError;
 
   /* Auto-fill the customer name as soon as the phone hits 10 digits AND
    * matches a returning customer. Won't clobber a name the cashier already
@@ -847,8 +855,6 @@ export default function Checkout() {
       return;
     }
 
-    const err = validatePhone(phone);
-    if (err) { setPhoneError(err); return; }
     if (!items.length) return;
 
     /* A manual line without a purchase price would be refused by the server
@@ -860,12 +866,16 @@ export default function Checkout() {
       return;
     }
 
-    // Credit sales need an identifiable debtor. Without a phone, the receivable
-    // would never be collectible — block early with a clear toast.
-    if (paymentModeRef.current === "credit" && !/^\d{10}$/.test(phone)) {
-      setPhoneError("Required for credit sale");
-      toast.error("Add the customer's mobile to record a credit sale");
+    /* The customer's mobile number is required on every bill (cash, UPI and
+       credit alike) — the server refuses checkout without it, and offline the
+       bill would sit in the queue unable to sync. Flag the field, put the
+       cursor in it and stop; this runs before the offline branch on purpose. */
+    if (!isCompleteCustomerPhone(phone)) {
+      setPhoneError(customerPhoneSubmitError(phone));
+      toast.error(CUSTOMER_PHONE_REQUIRED_TOAST);
       playError();
+      phoneInputRef.current?.focus();
+      phoneInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
 
@@ -878,7 +888,7 @@ export default function Checkout() {
         items: buildCheckoutItems(),
         paymentMode: paymentModeRef.current,
         customerName: customerName.trim() || undefined,
-        customerPhone: phone || undefined,
+        customerPhone: phone,
         discount:     discountNum > 0 ? discountNum : undefined,
         discountType: discountNum > 0 ? discountType : undefined,
         total: finalTotal,
@@ -899,7 +909,7 @@ export default function Checkout() {
         items: buildCheckoutItems(),
         paymentMode: paymentModeRef.current,
         customerName: customerName.trim() || undefined,
-        customerPhone: phone || undefined,
+        customerPhone: phone,
         discount:     discountNum > 0 ? discountNum : undefined,
         discountType: discountNum > 0 ? discountType : undefined,
       });
@@ -1325,20 +1335,21 @@ export default function Checkout() {
             <div className="px-4 pt-4">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5" /> Customer Mobile
-                {paymentMode === "credit" ? (
-                  <span className="normal-case font-bold text-rose-600 dark:text-rose-400">(required for credit)</span>
-                ) : (
-                  <span className="normal-case font-medium text-muted-foreground/60">(optional)</span>
-                )}
+                <span className="normal-case font-bold text-rose-600 dark:text-rose-400">(required)</span>
               </p>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground select-none">
                   +91
                 </span>
                 <input
+                  ref={phoneInputRef}
                   type="tel"
                   maxLength={10}
                   inputMode="numeric"
+                  required
+                  aria-required="true"
+                  aria-invalid={phoneError ? true : undefined}
+                  data-testid="input-customer-phone"
                   value={phone}
                   onChange={(e) => {
                     const v = e.target.value.replace(/\D/g, "").slice(0, 10);
@@ -1357,7 +1368,7 @@ export default function Checkout() {
                 )}
               </div>
               {phoneError && (
-                <p className="text-xs text-red-500 mt-1.5 font-medium">{phoneError}</p>
+                <p className="text-xs text-red-500 mt-1.5 font-medium" data-testid="text-customer-phone-error">{phoneError}</p>
               )}
             </div>
 

@@ -27,3 +27,4 @@
 - [Atomic active/held cart swaps](atomic-active-held-cart-swaps.md) — active and parked snapshots must share one durable transaction; CAS plus a tenant row lock prevents cross-device loss.
 - [Stock-batch provenance](stock-batch-provenance.md) — FIFO may attribute sales only when provenance is defensible; absolute-adjustment gaps stay unattributed instead of rewriting batch history.
 - [orval codegen gotchas](orval-codegen-gotchas.md) — after regenerating from openapi.yaml, restore lib/api-zod/src/index.ts (barrel collides) and prettier the generated dirs.
+- [Required fields at checkout](checkout-required-fields.md) — customer mobile + manual-line cost are global rules; enforce at server 400, both billing pages, and BEFORE the offline enqueue; blank=enabled-bounce, partial=disabled.

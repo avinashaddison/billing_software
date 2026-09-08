@@ -7,6 +7,7 @@ import { requireWrite } from "../middlewares/auth";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 import { logger } from "../lib/logger";
 import { round2, checkLinePrice, isAbsurdPrice, exceedsDiscountCeiling, checkBillDiscount, maxDiscountPct, priceGuardMode, isSaneNumber, isValidManualCost, normalizeManualCost, findManualLineWithoutCost, manualCostRequiredMessage } from "../lib/price-integrity";
+import { isValidCustomerPhone, CUSTOMER_PHONE_REQUIRED_MESSAGE } from "../lib/customer-phone";
 
 const router: IRouter = Router();
 
@@ -85,7 +86,7 @@ function isValidCheckoutBody(body: unknown): body is {
   items:        CheckoutLineItem[];
   paymentMode:  PaymentMode;
   customerName?: string;
-  customerPhone?: string;
+  customerPhone?: string | null;
   discount?:     number;
   discountType?: "percent" | "amount";
 } {
@@ -93,20 +94,19 @@ function isValidCheckoutBody(body: unknown): body is {
   const b = body as Record<string, unknown>;
   if (!Array.isArray(b.items) || b.items.length === 0) return false;
   if (b.paymentMode !== "cash" && b.paymentMode !== "upi" && b.paymentMode !== "credit") return false;
-  // Credit sales must identify the debtor — otherwise the shop can never
-  // collect. Cash/UPI can still be anonymous walk-in customers.
-  if (b.paymentMode === "credit" && (!b.customerPhone || typeof b.customerPhone !== "string" || !/^\d{10}$/.test(b.customerPhone))) {
-    return false;
-  }
   if (b.customerName !== undefined && b.customerName !== "") {
     if (typeof b.customerName !== "string") return false;
     /* Length cap matches the receipt column width — keeps the printed
        layout from wrapping awkwardly on the 80mm thermal roll. */
     if (b.customerName.trim().length > 80) return false;
   }
-  if (b.customerPhone !== undefined && b.customerPhone !== "") {
+  /* The customer's mobile number is required on every bill, but its ABSENCE
+     is reported separately below (a message the cashier can act on, not the
+     generic payload error). Here we only refuse a number that is present but
+     malformed. */
+  if (b.customerPhone !== undefined && b.customerPhone !== null && b.customerPhone !== "") {
     if (typeof b.customerPhone !== "string") return false;
-    if (!/^\d{10}$/.test(b.customerPhone)) return false;
+    if (!isValidCustomerPhone(b.customerPhone)) return false;
   }
   if (b.discount !== undefined) {
     if (!isSaneNumber(b.discount) || b.discount < 0) return false;
@@ -164,13 +164,22 @@ function isValidCheckoutBody(body: unknown): body is {
 router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<void> => {
   if (!isValidCheckoutBody(req.body)) {
     res.status(400).json({
-      error: "Invalid checkout payload. Requires items[], paymentMode (cash|upi), and optional 10-digit customerPhone.",
+      error: "Invalid checkout payload. Requires items[], paymentMode (cash|upi|credit), and a 10-digit customerPhone.",
     });
     return;
   }
 
   const { items, paymentMode, customerName, customerPhone, discount, discountType } = req.body;
   const tenantId = req.tenantId;
+
+  /* Every bill must carry the customer's mobile number — it is what the
+     customer ledger, credit collection and repeat-customer lookups key on.
+     Enforced here (not only in the UI) so a stale tab or a replayed offline
+     bill cannot slip an anonymous sale through. */
+  if (!customerPhone) {
+    res.status(400).json({ error: CUSTOMER_PHONE_REQUIRED_MESSAGE });
+    return;
+  }
 
   const uncostedManual = findManualLineWithoutCost(items);
   if (uncostedManual !== null) {
@@ -452,7 +461,7 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
           amountPaid:    String(amountPaid),
           paymentStatus,
           customerName:  customerName?.trim() || null,
-          customerPhone: customerPhone || null,
+          customerPhone,
           discount:      discount && discount > 0 ? String(discount) : null,
           discountType:  discount && discount > 0 && discountType ? discountType : null,
           discountAmount: discountAmount > 0 ? discountAmount.toFixed(2) : null,

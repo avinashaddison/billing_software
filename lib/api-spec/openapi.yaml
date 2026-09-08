@@ -1092,12 +1092,17 @@ components:
           type: string
           enum: [cash, upi, credit]
           description: >-
-            Mode of payment. `credit` records the bill as unpaid (receivable);
-            requires `customerPhone` so the debtor is identifiable.
+            Mode of payment. `credit` records the bill as unpaid (receivable)
+            against the customer identified by `customerPhone`.
         customerName:
           type: string
         customerPhone:
           type: string
+          pattern: "^[0-9]{10}$"
+          description: >-
+            Customer's 10-digit mobile number (bare digits, no +91). REQUIRED
+            on every bill — checkout answers 400 without it. It is the key the
+            customer ledger, credit collection and repeat-customer lookups use.
         discount:
           type: number
           description: Raw discount value (e.g. 10 for 10% or 200 for ₹200)
@@ -1108,6 +1113,7 @@ components:
       required:
         - items
         - paymentMode
+        - customerPhone
 
     Bill:
       type: object

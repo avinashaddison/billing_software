@@ -625,6 +625,8 @@ export const checkoutBodyItemsItemNameMax = 80;
 export const checkoutBodyItemsItemPurchasePriceMin = 0;
 export const checkoutBodyItemsItemPurchasePriceMax = 99999999.99;
 
+export const checkoutBodyCustomerPhoneRegExp = new RegExp("^[0-9]{10}$");
+
 export const CheckoutBody = zod.object({
   items: zod.array(
     zod
@@ -659,10 +661,15 @@ export const CheckoutBody = zod.object({
   paymentMode: zod
     .enum(["cash", "upi", "credit"])
     .describe(
-      "Mode of payment. `credit` records the bill as unpaid (receivable); requires `customerPhone` so the debtor is identifiable.",
+      "Mode of payment. `credit` records the bill as unpaid (receivable) against the customer identified by `customerPhone`.",
     ),
   customerName: zod.string().optional(),
-  customerPhone: zod.string().optional(),
+  customerPhone: zod
+    .string()
+    .regex(checkoutBodyCustomerPhoneRegExp)
+    .describe(
+      "Customer's 10-digit mobile number (bare digits, no +91). REQUIRED on every bill — checkout answers 400 without it. It is the key the customer ledger, credit collection and repeat-customer lookups use.",
+    ),
   discount: zod
     .number()
     .optional()

@@ -16,6 +16,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { playScanBeep, playCameraDetect, playError, playCheckoutSuccess, playTick, playStockIn, isSoundMuted, toggleSoundMute } from "@/lib/sounds";
 import { useCart, effectivePrice, type CartItem, type LineDiscountType } from "@/contexts/cart-context";
 import { findUncostedManualLine, uncostedManualLineMessage } from "@/lib/manual-cost";
+import {
+  isCompleteCustomerPhone, customerPhoneFormatError, customerPhoneSubmitError, CUSTOMER_PHONE_REQUIRED_TOAST,
+} from "@/lib/customer-phone";
 import { useListProducts, getListProductsQueryKey } from "@workspace/api-client-react";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useOnline }       from "@/hooks/use-online";
@@ -189,7 +192,9 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading, items, stoc
     ? `upi://pay?pa=${encodeURIComponent(upiId)}&am=${total.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`${storeName || "Shop"} Sale`)}`
     : "";
 
-  const validatePhone = (v: string) => (!v || /^\d{10}$/.test(v)) ? "" : "Enter a valid 10-digit number";
+  /* Required on every bill — blank is flagged on submit, a partial number
+     straight away (same rules as the Checkout page). */
+  const validatePhone = customerPhoneFormatError;
 
   const selectPaymentMode = (pm: PaymentMode) => {
     paymentModeRef.current = pm;   // synchronous — safe to read immediately
@@ -216,8 +221,13 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading, items, stoc
   const stockPending = unknownStockItems.length > 0;
 
   const handleSubmit = () => {
-    const err = validatePhone(phone);
-    if (err) { setPhoneError(err); return; }
+    if (!isCompleteCustomerPhone(phone)) {
+      setPhoneError(customerPhoneSubmitError(phone));
+      toast.error(CUSTOMER_PHONE_REQUIRED_TOAST);
+      playError();
+      phoneRef.current?.focus();
+      return;
+    }
     onConfirm(paymentModeRef.current, phone, customerName.trim());  // use ref, not state
   };
 
@@ -364,17 +374,19 @@ function CheckoutModal({ total, count, onCancel, onConfirm, loading, items, stoc
           <div>
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
               <Phone className="w-3.5 h-3.5" /> Customer Mobile
-              <span className="normal-case text-muted-foreground/60 font-medium">(optional)</span>
+              <span className="normal-case font-bold text-rose-600 dark:text-rose-400">(required)</span>
             </p>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground select-none">+91</span>
               <input ref={phoneRef} type="tel" maxLength={10} inputMode="numeric" value={phone}
+                required aria-required="true" aria-invalid={phoneError ? true : undefined}
+                data-testid="input-scan-customer-phone"
                 onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 10); setPhone(v); setPhoneError(v ? validatePhone(v) : ""); }}
                 placeholder="98765 43210"
                 className={`w-full h-12 pl-12 pr-4 rounded-xl bg-muted border text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-all ${phoneError ? "border-red-500 focus:ring-red-500/30" : "border-border focus:ring-primary/40 focus:border-primary"}`}
               />
             </div>
-            {phoneError && <p className="text-xs text-red-500 mt-1.5 font-medium">{phoneError}</p>}
+            {phoneError && <p className="text-xs text-red-500 mt-1.5 font-medium" data-testid="text-scan-customer-phone-error">{phoneError}</p>}
           </div>
         </div>
 
@@ -980,6 +992,12 @@ export default function Scan() {
       toast.error(uncostedManualLineMessage(uncosted.name));
       return;
     }
+    /* The modal already insists on the number; this is the last line before
+       the bill is sent or queued, so it is checked again here. */
+    if (!isCompleteCustomerPhone(customerPhone)) {
+      toast.error(CUSTOMER_PHONE_REQUIRED_TOAST);
+      return;
+    }
     if (submittingRef.current) return;
     submittingRef.current = true;
 
@@ -989,7 +1007,7 @@ export default function Scan() {
         items:         items.map(toCheckoutItem),
         paymentMode,
         customerName:  customerName || undefined,
-        customerPhone: customerPhone || undefined,
+        customerPhone,
         total,
         itemsCount:    count,
       });
@@ -1006,7 +1024,7 @@ export default function Scan() {
     try {
       const result = await postCheckout({
         items: items.map(toCheckoutItem),
-        paymentMode, customerPhone: customerPhone || undefined,
+        paymentMode, customerPhone,
         customerName: customerName || undefined,
       });
       playCheckoutSuccess(); clearCart(); setShowModal(false);
