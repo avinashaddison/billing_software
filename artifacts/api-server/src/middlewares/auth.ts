@@ -13,7 +13,7 @@
  * staff within the caller's tenant — including the legacy null-tenant owner.
  */
 import type { Request, Response, NextFunction } from "express";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { db, authUsersTable, staffProfilesTable, authSessionsTable, staffPermissionsTable } from "@workspace/db";
 import { clientMeta, createSession } from "../lib/sessions";
 import { logger } from "../lib/logger";
@@ -282,6 +282,24 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
  *   router.post("/products", requireWrite("products"), handler)
  */
 export function requireWrite(resource: string) {
+  return requireAnyWrite(resource);
+}
+
+/**
+ * Same gate as `requireWrite`, but a PIN staff member passes when they hold
+ * `write` on ANY of the listed resources. For the rare action that
+ * legitimately belongs to two permissions at once — creating a product is
+ * both catalog management (`products`) and stock-in (`scan`), because
+ * stocking-in an item the shop has never carried starts by creating it, and
+ * an "entry only" staff member must not need full catalog rights for that.
+ *
+ * The 403 names the FIRST resource so the message stays the familiar
+ * "No permission to modify products" regardless of which grant was missing.
+ * The SPA mirrors this gate in `useCanCreateProducts()` — keep the two lists
+ * identical or buttons and routes will disagree with the server.
+ */
+export function requireAnyWrite(...resources: [string, ...string[]]) {
+  const primary = resources[0];
   return async function (req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (req.authKind === "email" && req.userId) {
@@ -291,7 +309,7 @@ export function requireWrite(resource: string) {
           .where(eq(authUsersTable.id, req.userId));
         if (!me || !me.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
         if (me.role === "owner" || me.role === "admin") { next(); return; }
-        res.status(403).json({ error: `No permission to modify ${resource}` });
+        res.status(403).json({ error: `No permission to modify ${primary}` });
         return;
       }
       if (req.staffId) {
@@ -301,15 +319,15 @@ export function requireWrite(resource: string) {
           .where(eq(staffProfilesTable.id, req.staffId));
         if (!me || !me.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
         if (me.role === "owner") { next(); return; }
-        const [perm] = await db
+        const perms = await db
           .select({ level: staffPermissionsTable.level })
           .from(staffPermissionsTable)
           .where(and(
             eq(staffPermissionsTable.staffId, req.staffId),
-            eq(staffPermissionsTable.resource, resource),
+            inArray(staffPermissionsTable.resource, resources),
           ));
-        if (perm?.level === "write") { next(); return; }
-        res.status(403).json({ error: `No permission to modify ${resource}` });
+        if (perms.some((p) => p.level === "write")) { next(); return; }
+        res.status(403).json({ error: `No permission to modify ${primary}` });
         return;
       }
       res.status(401).json({ error: "Not authenticated" });

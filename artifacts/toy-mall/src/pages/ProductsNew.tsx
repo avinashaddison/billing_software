@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
+import { usePermission } from "@/hooks/use-auth";
 import { useCreateProduct, getListProductsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Package, CheckCircle2, Loader2, Sparkles, Tag, PenLine, FolderOpen, Eye, TrendingUp, AlertTriangle, Truck, Check, ChevronsUpDown } from "lucide-react";
@@ -96,7 +97,19 @@ export default function CreateProduct() {
   const queryClient   = useQueryClient();
   const createProduct = useCreateProduct();
 
-  /* Press Esc to go back to the products list. If a dropdown/menu is open,
+  /* Entry Data hands over here for a barcode it couldn't find
+     (`?barcode=…&from=entry`). Read once at mount: the params seed the form
+     and decide where Back / Save return to. Entry-only staff (scan: write,
+     products: none) cannot open the catalog or the product page at all, so
+     they are routed back to Entry Data even without the `from` flag. */
+  const searchParams   = new URLSearchParams(useSearch());
+  const initialBarcode = (searchParams.get("barcode") ?? "").trim();
+  const cameFromEntry  = searchParams.get("from") === "entry";
+  const productsLevel  = usePermission("products");
+  const returnToEntry  = cameFromEntry || productsLevel === "none";
+  const backHref       = returnToEntry ? "/stock-entry" : "/products";
+
+  /* Press Esc to go back to where we came from. If a dropdown/menu is open,
      let it handle its own Escape first (don't navigate away). */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -104,11 +117,11 @@ export default function CreateProduct() {
       if (document.querySelector('[data-state="open"]')) return;
       const el = document.activeElement;
       if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
-      setLocation("/products");
+      setLocation(backHref);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [setLocation]);
+  }, [setLocation, backHref]);
 
   /* Load categories from the database only */
   const { data: dbCategories = [], isLoading: catsLoading } = useQuery<ApiCategory[]>({
@@ -150,7 +163,7 @@ export default function CreateProduct() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(createProductSchema),
-    defaultValues: { name: "", category: "", customCategory: "", barcode: "", price: undefined as unknown as number, stock: 0, lowStockThreshold: 5, imageUrl: "" },
+    defaultValues: { name: "", category: "", customCategory: "", barcode: initialBarcode, price: undefined as unknown as number, stock: 0, lowStockThreshold: 5, imageUrl: "" },
   });
 
   const selectedCategory     = form.watch("category");
@@ -236,7 +249,12 @@ export default function CreateProduct() {
         onSuccess: (product) => {
           toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
           queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
-          setLocation(`/product?sku=${product.sku}`);
+          /* Back on Entry Data the new product opens in the stock-in panel
+             (deep link by sku), so the operator sees it exists and can carry
+             on scanning the rest of the delivery. */
+          setLocation(returnToEntry
+            ? `/stock-entry?sku=${encodeURIComponent(product.sku)}`
+            : `/product?sku=${product.sku}`);
         },
         onError: (error: any) => {
           toast.error(error?.data?.error || error.message || "Failed to create product");
@@ -272,7 +290,7 @@ export default function CreateProduct() {
     <div className="flex flex-col h-full bg-background">
       {/* ── Page header ── */}
       <div className="p-4 md:px-6 border-b flex items-center gap-3 sticky top-0 bg-background z-10">
-        <Link href="/products" className="p-2 -ml-2 rounded-full hover:bg-muted active:scale-95 transition-all">
+        <Link href={backHref} className="p-2 -ml-2 rounded-full hover:bg-muted active:scale-95 transition-all" aria-label="Back">
           <ArrowLeft className="w-6 h-6" />
         </Link>
         <h1 className="text-xl font-black">New Product</h1>

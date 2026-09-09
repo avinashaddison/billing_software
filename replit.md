@@ -43,6 +43,7 @@ A multi-tenant billing and inventory web app for retail shops. It includes an Ex
 - On first boot with an empty staff table, the API bootstraps a default Owner with PIN `1234` (logged as a warning). Change this PIN immediately in Staff Management on any real deployment.
 - Tenant isolation: reads use `tenantWhere` (strict by default — see `STRICT_TENANT` above) and all mutations use `tenantWhereWrite` (always strict, never the NULL fallback). New shops created via the platform admin are fully isolated from each other and from the legacy null-tenant data.
 - Stock Check sheet (`/suppliers/stock-check`) can be printed, shared (Web Share API, PDF file) or downloaded. The PDF is built client-side with `jspdf` + `jspdf-autotable` (`toy-mall/src/lib/stock-check-pdf.ts`, lazy-loaded); built-in fonts are WinAnsi-only, so non-Latin characters are replaced with "?".
+- Staff permissions: **creating** a product (`POST /api/products`) is allowed with Write on **either** `products` or `scan` ("Scan & Billing" — the stock-in/Entry Data permission), via `requireAnyWrite("products","scan")`. Editing, deleting and bulk import still need `products: write`. The SPA mirrors this in `useCanCreateProducts()` / `PRODUCT_CREATE_RESOURCES` (`toy-mall/src/lib/permissions.ts`) — keep the two lists identical.
 
 ## User preferences
 (None recorded yet.)

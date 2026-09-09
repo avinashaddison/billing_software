@@ -1,7 +1,7 @@
 export const RESOURCES = [
   { key: "dashboard",  label: "Dashboard",        description: "View sales overview & stats" },
   { key: "products",   label: "Products",          description: "Browse & manage inventory" },
-  { key: "scan",       label: "Scan & Billing",    description: "Process sales & stock-in" },
+  { key: "scan",       label: "Scan & Billing",    description: "Process sales, stock-in & add new products" },
   { key: "billing",    label: "Bills History",     description: "View past bills & receipts" },
   { key: "logs",       label: "Stock Logs",        description: "View stock movement history" },
   { key: "stockAlert", label: "Stock Alert",       description: "Live stock, low-stock alerts & movement" },
@@ -57,11 +57,24 @@ export function hasAccess(
   return false;
 }
 
+/**
+ * Resources whose `write` level lets a staff member CREATE a product.
+ * Mirrors the server's `requireAnyWrite("products", "scan")` on
+ * POST /api/products: stock-in of a never-seen item starts by creating it,
+ * so "entry" staff (scan: write) can add products without being handed
+ * edit/delete rights over the catalog (which stay `products: write`).
+ * Keep this list identical to the server's or buttons/routes will disagree
+ * with the 403 it returns.
+ */
+export const PRODUCT_CREATE_RESOURCES: readonly ResourceKey[] = ["products", "scan"];
+
 /** Map page path → resource key */
 export const PATH_RESOURCE: Record<string, ResourceKey> = {
   "/settings":   "settings",
   "/dashboard":  "dashboard",
   "/products":   "products",
+  /* Creation is really any-of PRODUCT_CREATE_RESOURCES — the route itself is
+     gated by useCanCreateProducts(), not by this single key. */
   "/products/new": "products",
   "/stock-entry": "scan",
   "/product":    "products",

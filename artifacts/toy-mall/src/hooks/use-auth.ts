@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { OWNER_PERMISSIONS, type Permissions } from "@/lib/permissions";
+import { OWNER_PERMISSIONS, PRODUCT_CREATE_RESOURCES, type Permissions } from "@/lib/permissions";
 import { useStoreSettings } from "@/lib/store-info";
 
 export type StaffRole = "owner" | "staff";
@@ -88,4 +88,18 @@ export function usePermission(resource: string): "none" | "read" | "write" {
   const { role, permissions } = useAuth();
   if (role === "owner") return "write";
   return (permissions as Record<string, "none" | "read" | "write">)[resource] ?? "none";
+}
+
+/**
+ * Can this user create a product? Mirrors the server gate on
+ * POST /api/products (`requireAnyWrite("products", "scan")`): full catalog
+ * rights OR stock-in rights. Use this — not `usePermission("products")` —
+ * for the New Product route/buttons, otherwise entry-only staff either lose
+ * the button or get a form that 403s on save.
+ */
+export function useCanCreateProducts(): boolean {
+  const { role, permissions } = useAuth();
+  if (role === "owner") return true;
+  const map = permissions as Record<string, "none" | "read" | "write">;
+  return PRODUCT_CREATE_RESOURCES.some((r) => map[r] === "write");
 }

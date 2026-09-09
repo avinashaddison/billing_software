@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, useSearch, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,7 +7,7 @@ import { SnowOverlay } from "@/components/effects/SnowOverlay";
 import { CartProvider } from "@/contexts/cart-context";
 import { useEffect }           from "react";
 import { useRealtime }         from "@/hooks/use-realtime";
-import { useAuth, usePermission } from "@/hooks/use-auth";
+import { useAuth, usePermission, useCanCreateProducts } from "@/hooks/use-auth";
 import { useStoreSettings }    from "@/lib/store-info";
 import { type ResourceKey } from "@/lib/permissions";
 import NotFound from "@/pages/not-found";
@@ -149,24 +149,44 @@ function RealtimeProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AccessRestricted({ hint }: { hint?: string }) {
+  return (
+    <div className="flex flex-col h-full items-center justify-center gap-4 text-center px-6" data-testid="access-restricted">
+      <div className="text-5xl">🔒</div>
+      <div>
+        <p className="text-xl font-black text-foreground">Access Restricted</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {hint ?? "You don't have permission to view this page."}<br />
+          Ask the owner to grant you access.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /** Render page only if user has required access level, else show blocked screen */
 function Protected({ resource, children }: { resource: ResourceKey; children: React.ReactNode }) {
   const level = usePermission(resource);
-  if (level === "none") {
-    return (
-      <div className="flex flex-col h-full items-center justify-center gap-4 text-center px-6">
-        <div className="text-5xl">🔒</div>
-        <div>
-          <p className="text-xl font-black text-foreground">Access Restricted</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            You don't have permission to view this page.<br />
-            Ask the owner to grant you access.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  if (level === "none") return <AccessRestricted />;
   return <>{children}</>;
+}
+
+/* New Product is gated on the ability to CREATE (products: write OR
+   scan: write — the server's gate on POST /products), not on merely being
+   able to browse the catalog. Read-only staff used to reach the whole form
+   and only learn at Save that they had no permission. */
+function ProtectedProductsNew() {
+  const canCreate = useCanCreateProducts();
+  /* The form reads `?barcode=` into its defaultValues once, at mount. A
+     query-only navigation (second unknown-code toast, history back/forward)
+     keeps the same route and would therefore keep the FIRST code in the
+     field while the URL names the second. A different barcode is a new
+     creation intent, so remount the form for it. */
+  const barcodeParam = new URLSearchParams(useSearch()).get("barcode") ?? "";
+  if (!canCreate) {
+    return <AccessRestricted hint="Adding products needs Write access to Products or to Scan & Billing (stock-in)." />;
+  }
+  return <ProductsNew key={barcodeParam} />;
 }
 
 function Router() {
@@ -204,7 +224,7 @@ function Router() {
           <Switch>
             <Route path="/dashboard"    component={() => <Protected resource="dashboard"><Dashboard /></Protected>} />
             <Route path="/products"     component={() => <Protected resource="products"><Products /></Protected>} />
-            <Route path="/products/new" component={() => <Protected resource="products"><ProductsNew /></Protected>} />
+            <Route path="/products/new" component={ProtectedProductsNew} />
             <Route path="/products/bulk-sale-price" component={() => <Protected resource="products"><BulkSalePrice /></Protected>} />
             <Route path="/stock-entry" component={() => <Protected resource="scan"><ProductsEntry /></Protected>} />
             <Route path="/product"      component={() => <Protected resource="products"><ProductDetail /></Protected>} />

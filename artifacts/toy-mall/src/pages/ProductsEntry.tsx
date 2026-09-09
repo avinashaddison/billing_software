@@ -12,7 +12,7 @@
  * in-memory product list instead.
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Link, useSearch } from "wouter";
+import { Link, useSearch, useLocation } from "wouter";
 import {
   PackagePlus, ScanLine, Camera, CameraOff, Loader2, Search, X,
   Volume2, VolumeX, Plus, Minus, Boxes, AlertTriangle, Keyboard,
@@ -44,7 +44,7 @@ import {
   useGetProductStockHistory,
   useListProducts,
 } from "@workspace/api-client-react";
-import { useAuth, usePermission } from "@/hooks/use-auth";
+import { useAuth, usePermission, useCanCreateProducts } from "@/hooks/use-auth";
 import { StockBatchHistory } from "@/components/stock/StockBatchHistory";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -209,7 +209,12 @@ export default function ProductsEntry() {
      (locked out of a page they're meant to live in), while a catalog-only
      manager would get an enabled button and a 403. */
   const canAddStock = usePermission("scan") === "write";
+  /* Stock-in of a never-carried item starts by creating it, so the server
+     lets scan:write create products too (POST /products). Mirror that here
+     for the "New product" button and the unknown-code shortcut. */
+  const canCreateProduct = useCanCreateProducts();
   const urlQuery = useSearch();
+  const [, navigate] = useLocation();
 
   const [mode, setMode]           = useState<InputMode>("scan");
   const [muted, setMuted]         = useState(() => isSoundMuted());
@@ -391,9 +396,18 @@ export default function ProductsEntry() {
         if (cancelled) return;
         playError();
         if (err.message === "not_found") {
-          toast.error(`No product with code "${lookupCode}"`, {
-            description: "Check the code, search by name, or add it as a new product.",
-          });
+          /* Hand the scanned code straight to the New Product form so the
+             operator doesn't have to retype it — and only offer the shortcut
+             when the server would actually accept the create. */
+          toast.error(`No product with code "${lookupCode}"`, canCreateProduct
+            ? {
+                description: "Check the code, search by name, or add it as a new product.",
+                action: {
+                  label: "Add new product",
+                  onClick: () => navigate(`/products/new?barcode=${encodeURIComponent(lookupCode)}&from=entry`),
+                },
+              }
+            : { description: "Check the code or search by name. Ask the owner to add new products." });
         } else {
           toast.error("Lookup failed — check your connection and try again.");
         }
@@ -407,7 +421,7 @@ export default function ProductsEntry() {
       });
 
     return () => { cancelled = true; };
-  }, [lookupCode, mode]);
+  }, [lookupCode, mode, canCreateProduct, navigate]);
 
   /* ── That product's own FIFO batch history ───────────────────── */
   const productId = product?.id ?? "";
@@ -598,6 +612,13 @@ export default function ProductsEntry() {
                 <Clock className="h-4 w-4" /> Full history
               </Button>
             </Link>
+            {canCreateProduct && (
+              <Link href="/products/new?from=entry">
+                <Button size="sm" className="gap-1.5" data-testid="link-entry-new-product">
+                  <Plus className="h-4 w-4" /> New product
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 
