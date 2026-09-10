@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -17,7 +17,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { RESOURCES, type AccessLevel, type ResourceKey, DEFAULT_STAFF_PERMISSIONS } from "@/lib/permissions";
+import { RESOURCES, BINARY_RESOURCES, type AccessLevel, type ResourceKey, DEFAULT_STAFF_PERMISSIONS } from "@/lib/permissions";
 import { useAuth } from "@/hooks/use-auth";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -106,34 +106,51 @@ function StaffFormModal({ open, initial, onClose, onSave }: {
 function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; staffName: string; onClose: () => void }) {
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
-  const [perms, setPerms] = useState<PermissionMap>({});
-  const [loaded, setLoaded] = useState(false);
+  /* The editable draft. `null` until the server's CURRENT permissions have
+     arrived — it is never seeded from a cached snapshot (Save would write a
+     stale copy back over anything changed since) and never re-seeded once
+     the owner has started editing. Save stays disabled while it is null. */
+  const [perms, setPerms] = useState<PermissionMap | null>(null);
 
-  const { isLoading } = useQuery<PermissionMap>({
+  const { data, isFetching, isError } = useQuery<PermissionMap>({
     queryKey: ["staff-perms", staffId],
     retry: 1,
+    /* An editor must start from the server, not the app-wide 2-minute cache:
+       open → Cancel → reopen would otherwise serve cached data and (with the
+       draft only ever seeded by a real fetch) show a permanent "couldn't load". */
+    staleTime: 0,
     queryFn: async () => {
       const r = await fetch(api(`staff/${staffId}/permissions`));
       // Never enable Save with fabricated defaults on a failed/non-JSON
       // response — that could silently overwrite this member's real
       // permissions. Throw instead so the dialog shows an error and Save stays
-      // disabled (gated on `loaded`) until the real permissions load.
+      // disabled until the real permissions load.
       if (!r.ok) throw new Error("Failed to load permissions");
       const raw = await r.json().catch(() => null);
       if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
         throw new Error("Malformed permissions response");
       }
       const merged = { ...DEFAULT_STAFF_PERMISSIONS, ...raw } as PermissionMap;
-      setPerms(merged);
-      setLoaded(true);
+      /* A binary ability has no read tier; a stray "read" (older client,
+         hand-edited row) would render with neither button lit — treat it as
+         not granted, which is also what the server's write gate does. */
+      for (const key of BINARY_RESOURCES) if (merged[key] === "read") merged[key] = "none";
       return merged;
     },
   });
 
+  useEffect(() => {
+    if (perms === null && data && !isFetching && !isError) setPerms(data);
+  }, [perms, data, isFetching, isError]);
+
+  const loaded    = perms !== null;
+  const isLoading = !loaded && !isError;
+
   const setLevel = (resource: ResourceKey, level: AccessLevel) =>
-    setPerms((p) => ({ ...p, [resource]: level }));
+    setPerms((p) => ({ ...(p ?? {}), [resource]: level }));
 
   const handleSave = async () => {
+    if (!perms) return;
     setSaving(true);
     try {
       const r = await fetch(api(`staff/${staffId}/permissions`), {
@@ -177,18 +194,24 @@ function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; st
         ) : (
           <div className="space-y-1.5 py-2">
             {RESOURCES.filter((r) => r.key !== "staff").map((res) => {
-              const current = (perms[res.key] ?? "none") as AccessLevel;
+              const current = (perms?.[res.key] ?? "none") as AccessLevel;
+              const binary  = BINARY_RESOURCES.has(res.key);
               const levels: readonly AccessLevel[] =
-                res.key === "productReports" ? ["none", "read"] : ["none", "read", "write"];
+                res.key === "productReports" ? ["none", "read"]
+                : binary ? ["none", "write"]
+                : ["none", "read", "write"];
+              /* An on/off ability is "Allowed", not "Full Access" — there is
+                 no read tier for it to be "full" relative to. */
+              const badge = binary && current === "write" ? "Allowed" : LEVEL_LABELS[current].label;
               return (
-                <div key={res.key} className="rounded-xl border bg-card p-3">
+                <div key={res.key} className="rounded-xl border bg-card p-3" data-testid={`perm-row-${res.key}`}>
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div>
                       <p className="font-bold text-sm">{res.label}</p>
                       <p className="text-xs text-muted-foreground">{res.description}</p>
                     </div>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${LEVEL_LABELS[current].color}`}>
-                      {LEVEL_LABELS[current].label}
+                      {badge}
                     </span>
                   </div>
                   <div className="flex gap-1.5">
@@ -204,7 +227,7 @@ function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; st
                             : "border-border text-muted-foreground hover:bg-muted"
                         }`}
                       >
-                        {level === "none" ? "None" : level === "read" ? "Read" : "Write"}
+                        {level === "none" ? "None" : level === "read" ? "Read" : binary ? "Allow" : "Write"}
                       </button>
                     ))}
                   </div>

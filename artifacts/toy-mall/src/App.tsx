@@ -172,9 +172,9 @@ function Protected({ resource, children }: { resource: ResourceKey; children: Re
 }
 
 /* New Product is gated on the ability to CREATE (products: write OR
-   scan: write — the server's gate on POST /products), not on merely being
-   able to browse the catalog. Read-only staff used to reach the whole form
-   and only learn at Save that they had no permission. */
+   productEntry: write — the server's gate on POST /products), not on merely
+   being able to browse the catalog. Read-only staff used to reach the whole
+   form and only learn at Save that they had no permission. */
 function ProtectedProductsNew() {
   const canCreate = useCanCreateProducts();
   /* The form reads `?barcode=` into its defaultValues once, at mount. A
@@ -184,7 +184,7 @@ function ProtectedProductsNew() {
      creation intent, so remount the form for it. */
   const barcodeParam = new URLSearchParams(useSearch()).get("barcode") ?? "";
   if (!canCreate) {
-    return <AccessRestricted hint="Adding products needs Write access to Products or to Scan & Billing (stock-in)." />;
+    return <AccessRestricted hint="Adding products needs the Product Entry permission (or Write access to Products)." />;
   }
   return <ProductsNew key={barcodeParam} />;
 }

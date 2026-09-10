@@ -209,9 +209,9 @@ export default function ProductsEntry() {
      (locked out of a page they're meant to live in), while a catalog-only
      manager would get an enabled button and a 403. */
   const canAddStock = usePermission("scan") === "write";
-  /* Stock-in of a never-carried item starts by creating it, so the server
-     lets scan:write create products too (POST /products). Mirror that here
-     for the "New product" button and the unknown-code shortcut. */
+  /* Creating a product is a separate grant ("Product Entry", or full
+     Products write) — mirror the server's POST /products gate here for the
+     "New product" button and the unknown-code shortcut. */
   const canCreateProduct = useCanCreateProducts();
   const urlQuery = useSearch();
   const [, navigate] = useLocation();

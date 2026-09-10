@@ -92,22 +92,36 @@ function marginColour(pct: number) {
 }
 
 /* ── Component ───────────────────────────────────────────────────── */
-export default function CreateProduct() {
+/* A staff member who may add products but open neither the catalog nor
+   Entry Data has nowhere to be sent after saving, so they stay here for the
+   next item. Remounting the form (rather than resetting each piece of state
+   by hand — supplier, generated SKU, category popover…) is the one reliable
+   way to get a genuinely blank form. */
+export default function CreateProductPage() {
+  const [generation, setGeneration] = useState(0);
+  return <CreateProduct key={generation} onStartNext={() => setGeneration((g) => g + 1)} />;
+}
+
+function CreateProduct({ onStartNext }: { onStartNext: () => void }) {
   const [, setLocation] = useLocation();
   const queryClient   = useQueryClient();
   const createProduct = useCreateProduct();
 
   /* Entry Data hands over here for a barcode it couldn't find
-     (`?barcode=…&from=entry`). Read once at mount: the params seed the form
-     and decide where Back / Save return to. Entry-only staff (scan: write,
-     products: none) cannot open the catalog or the product page at all, so
-     they are routed back to Entry Data even without the `from` flag. */
-  const searchParams   = new URLSearchParams(useSearch());
-  const initialBarcode = (searchParams.get("barcode") ?? "").trim();
-  const cameFromEntry  = searchParams.get("from") === "entry";
-  const productsLevel  = usePermission("products");
-  const returnToEntry  = cameFromEntry || productsLevel === "none";
-  const backHref       = returnToEntry ? "/stock-entry" : "/products";
+     (`?barcode=…&from=entry`). Read once at mount (the route re-keys this
+     component on the barcode param): the params seed the form and decide
+     where Back / Save return to. Where we can send someone depends on what
+     they may open: a staff member holding only the Product Entry permission
+     can see neither the catalog nor Entry Data, so after saving they stay
+     here with a cleared form for the next item. */
+  const searchParams    = new URLSearchParams(useSearch());
+  const initialBarcode  = (searchParams.get("barcode") ?? "").trim();
+  const cameFromEntry   = searchParams.get("from") === "entry";
+  const canViewProducts = usePermission("products") !== "none";
+  const canViewEntry    = usePermission("scan") !== "none";
+  const returnToEntry   = canViewEntry && (cameFromEntry || !canViewProducts);
+  const stayAfterSave   = !returnToEntry && !canViewProducts;
+  const backHref        = returnToEntry ? "/stock-entry" : canViewProducts ? "/products" : "/dashboard";
 
   /* Press Esc to go back to where we came from. If a dropdown/menu is open,
      let it handle its own Escape first (don't navigate away). */
@@ -247,8 +261,20 @@ export default function CreateProduct() {
       { data: { name: data.name, category: finalCategory, price: data.price, salePrice: salePriceVal ?? null, salePriceUntil: null, purchasePrice: purchasePriceVal ?? null, stock: data.stock ?? 0, lowStockThreshold: data.lowStockThreshold ?? 5, sku: autoSku, imageUrl: data.imageUrl || null, supplierId: selectedSupplierId || null, barcode: data.barcode?.trim() || null } },
       {
         onSuccess: (product) => {
-          toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
           queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
+          if (stayAfterSave) {
+            /* Nowhere to show the product to this staff member — confirm
+               what was saved and give them a blank form for the next one.
+               Clearing the query string also drops a handed-over barcode. */
+            toast.success(`Saved ${product.name} (${product.sku})`, {
+              description: "Ready for the next product.",
+              icon: <CheckCircle2 className="w-5 h-5 text-green-600" />,
+            });
+            setLocation("/products/new", { replace: true });
+            onStartNext();
+            return;
+          }
+          toast.success("Product created!", { icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> });
           /* Back on Entry Data the new product opens in the stock-in panel
              (deep link by sku), so the operator sees it exists and can carry
              on scanning the rest of the delivery. */

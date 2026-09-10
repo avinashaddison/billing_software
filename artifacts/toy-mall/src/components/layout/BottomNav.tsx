@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Home, Package, PackagePlus, ScanLine, Clock, User, IndianRupee, ShoppingCart, ArrowRight, PencilLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/contexts/cart-context";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, useCanCreateProducts } from "@/hooks/use-auth";
 import { type Permissions } from "@/lib/permissions";
 
 function getLevel(role: string | null, permissions: Permissions, resource: string): "none" | "read" | "write" {
@@ -16,10 +16,17 @@ export function BottomNav() {
   const { role, permissions } = useAuth();
 
   const visible = (resource: string) => getLevel(role, permissions, resource) !== "none";
+  /* Same rule as SideNav: the New Product form takes the Products slot only
+     for someone who may add products but cannot open the catalog. */
+  const canCreateProducts = useCanCreateProducts();
+  const showProductEntry  = canCreateProducts && !visible("products");
 
   const allItems = [
     { name: "Home",    href: "/dashboard", icon: Home,       resource: "dashboard" },
     { name: "Products",href: "/products", icon: Package,    resource: "products"  },
+    ...(showProductEntry
+      ? [{ name: "Add Item", href: "/products/new", icon: Package, resource: null as string | null }]
+      : []),
     /* Stock-in workstation. Short label — the bar is at its practical limit. */
     { name: "Entry",   href: "/stock-entry", icon: PackagePlus, resource: "scan" },
     { name: "Scan",    href: "/scan",     icon: ScanLine,   resource: "scan",    highlight: true },

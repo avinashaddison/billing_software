@@ -289,9 +289,9 @@ export function requireWrite(resource: string) {
  * Same gate as `requireWrite`, but a PIN staff member passes when they hold
  * `write` on ANY of the listed resources. For the rare action that
  * legitimately belongs to two permissions at once — creating a product is
- * both catalog management (`products`) and stock-in (`scan`), because
- * stocking-in an item the shop has never carried starts by creating it, and
- * an "entry only" staff member must not need full catalog rights for that.
+ * covered by full catalog management (`products`) and by the narrower
+ * "Product Entry" permission (`productEntry`), so a data-entry staff member
+ * can add new items without being given edit/delete rights.
  *
  * The 403 names the FIRST resource so the message stays the familiar
  * "No permission to modify products" regardless of which grant was missing.

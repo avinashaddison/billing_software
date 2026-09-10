@@ -778,8 +778,8 @@ export default function Products() {
   const debouncedSearch             = useDebounce(search, 300);
   const { role }                    = useAuth();
   const isAdmin                     = role === "owner";
-  /* Same gate as the server's POST /products — entry staff (scan: write)
-     may add products; read-only staff must not see a button that 403s. */
+  /* Same gate as the server's POST /products — "Product Entry" staff may add
+     products; read-only staff must not see a button that 403s. */
   const canCreate                   = useCanCreateProducts();
   const qc                          = useQueryClient();
   const [, navigate]                = useLocation();

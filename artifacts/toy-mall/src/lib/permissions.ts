@@ -1,7 +1,10 @@
 export const RESOURCES = [
   { key: "dashboard",  label: "Dashboard",        description: "View sales overview & stats" },
   { key: "products",   label: "Products",          description: "Browse & manage inventory" },
-  { key: "scan",       label: "Scan & Billing",    description: "Process sales, stock-in & add new products" },
+  /* Create-only slice of Products: lets a data-entry staff member add new
+     items without edit/delete rights. Binary — see BINARY_RESOURCES. */
+  { key: "productEntry", label: "Product Entry",   description: "Add new products only — no edit or delete" },
+  { key: "scan",       label: "Scan & Billing",    description: "Process sales & stock-in" },
   { key: "billing",    label: "Bills History",     description: "View past bills & receipts" },
   { key: "logs",       label: "Stock Logs",        description: "View stock movement history" },
   { key: "stockAlert", label: "Stock Alert",       description: "Live stock, low-stock alerts & movement" },
@@ -21,10 +24,15 @@ export type ResourceKey = typeof RESOURCES[number]["key"];
 export type AccessLevel  = "none" | "read" | "write";
 export type Permissions  = Partial<Record<ResourceKey, AccessLevel>>;
 
+/** Resources that are an on/off ability rather than a page — "read" means
+ *  nothing for them, so the permissions dialog offers only None / Write. */
+export const BINARY_RESOURCES: ReadonlySet<ResourceKey> = new Set<ResourceKey>(["productEntry"]);
+
 /** Default permissions for a new staff member */
 export const DEFAULT_STAFF_PERMISSIONS: Permissions = {
   dashboard:  "read",
   products:   "read",
+  productEntry: "none",
   scan:       "write",
   billing:    "read",
   logs:       "read",
@@ -59,14 +67,14 @@ export function hasAccess(
 
 /**
  * Resources whose `write` level lets a staff member CREATE a product.
- * Mirrors the server's `requireAnyWrite("products", "scan")` on
- * POST /api/products: stock-in of a never-seen item starts by creating it,
- * so "entry" staff (scan: write) can add products without being handed
- * edit/delete rights over the catalog (which stay `products: write`).
+ * Mirrors the server's `requireAnyWrite("products", "productEntry")` on
+ * POST /api/products: full catalog rights create too, and the narrower
+ * "Product Entry" permission lets a data-entry staff member add new items
+ * without edit/delete rights (those stay `products: write`).
  * Keep this list identical to the server's or buttons/routes will disagree
  * with the 403 it returns.
  */
-export const PRODUCT_CREATE_RESOURCES: readonly ResourceKey[] = ["products", "scan"];
+export const PRODUCT_CREATE_RESOURCES: readonly ResourceKey[] = ["products", "productEntry"];
 
 /** Map page path → resource key */
 export const PATH_RESOURCE: Record<string, ResourceKey> = {

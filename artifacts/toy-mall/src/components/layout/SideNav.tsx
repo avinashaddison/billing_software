@@ -4,7 +4,7 @@ import { Home, Package, PackagePlus, ScanLine, Clock, User, Sun, Moon, IndianRup
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, useCanCreateProducts } from "@/hooks/use-auth";
 import { type Permissions } from "@/lib/permissions";
 import { useStoreSettings } from "@/lib/store-info";
 import { getSidebarTheme } from "@/lib/sidebar-themes";
@@ -27,6 +27,11 @@ export function SideNav() {
 
   const perm    = (resource: string) => getLevel(role, permissions, resource);
   const visible = (resource: string) => perm(resource) !== "none";
+  /* Someone granted only "Product Entry" has no Products page to add from,
+     so the form itself takes that slot. Everyone who can see Products uses
+     its Add button instead — the nav never grows for them. */
+  const canCreateProducts = useCanCreateProducts();
+  const showProductEntry  = canCreateProducts && !visible("products");
 
   /* See BottomNav for context. When already on /checkout, wouter's Link
      doesn't remount Checkout — so the URL flag wouldn't open the dialog.
@@ -45,6 +50,9 @@ export function SideNav() {
   const navItems = [
     { name: "Dashboard",   href: "/dashboard",         icon: Home,        highlight: false, resource: "dashboard" },
     { name: "Products",    href: "/products",          icon: Package,     highlight: false, resource: "products"  },
+    ...(showProductEntry
+      ? [{ name: "Product Entry", href: "/products/new", icon: Package, highlight: false, resource: null as string | null }]
+      : []),
     /* Stock-in workstation. Separate from Scan (billing-first) and Logs
        (read-only history) — this is where stock actually comes IN. */
     { name: "Entry Data",  href: "/stock-entry",       icon: PackagePlus, highlight: false, resource: "scan"      },

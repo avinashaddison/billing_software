@@ -90,12 +90,12 @@ router.get("/products", async (req, res): Promise<void> => {
   res.json(products.map(mapProduct));
 });
 
-/* Creating a product is granted by EITHER `products: write` (catalog
-   management) OR `scan: write` (stock-in): an entry-only staff member
-   stocking-in an item the shop has never carried must be able to create it
-   without being handed edit/delete rights over the whole catalog. Editing
-   and deleting below stay `products: write` only. */
-router.post("/products", requireAnyWrite("products", "scan"), async (req, res): Promise<void> => {
+/* Creating a product is granted by EITHER `products: write` (full catalog
+   management) OR `productEntry: write` — the owner-granted "Product Entry"
+   permission that lets a data-entry staff member add new items without
+   being handed edit/delete rights over the whole catalog. Editing and
+   deleting below stay `products: write` only. */
+router.post("/products", requireAnyWrite("products", "productEntry"), async (req, res): Promise<void> => {
   const parsed = CreateProductBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

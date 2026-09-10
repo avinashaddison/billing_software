@@ -92,10 +92,10 @@ export function usePermission(resource: string): "none" | "read" | "write" {
 
 /**
  * Can this user create a product? Mirrors the server gate on
- * POST /api/products (`requireAnyWrite("products", "scan")`): full catalog
- * rights OR stock-in rights. Use this — not `usePermission("products")` —
- * for the New Product route/buttons, otherwise entry-only staff either lose
- * the button or get a form that 403s on save.
+ * POST /api/products (`requireAnyWrite("products", "productEntry")`): full
+ * catalog rights OR the "Product Entry" permission. Use this — not
+ * `usePermission("products")` — for the New Product route/buttons, otherwise
+ * entry-only staff either lose the button or get a form that 403s on save.
  */
 export function useCanCreateProducts(): boolean {
   const { role, permissions } = useAuth();

@@ -16,7 +16,7 @@
 - ["Last one standing" guards](invariant-guards-need-locks.md) — count-siblings-then-write leaves a shop with zero owners under concurrency; lock the whole sibling set FOR UPDATE in a stable id order.
 - [Read-only "view as" session scope](view-as-readonly-scope.md) — the blanket write-refusal covers the TENANT surface only; platform routes stay outside it on purpose.
 - [lib/db composite build](lib-db-composite-build.md) — no build script but a real project reference with a stale dist; new schema exports are invisible until `npx tsc -b lib/db`.
-- [Permission gates mirror the server](permission-gate-mirrors-server.md) — gate on what the server checks; new resource keys lock everyone out; product CREATE is any-of products|scan write.
+- [Permission gates mirror the server](permission-gate-mirrors-server.md) — gate on the server's write list; owners want a named switch (productEntry), not an implicit any-of; editors need staleTime 0.
 - [Scan-then-confirm stale selection](scan-lookup-stale-selection.md) — clear the selection when the async lookup STARTS, and generation-check the write's own completion handler; funnel every entry path through one helper.
 - [Filter-change request races](filter-change-request-race.md) — newest-request-wins token on any filtered list, and never leave the previous filter's totals sitting under the new filter's label.
 - [Rounding breaks inferred figures](rounding-breaks-inferred-figures.md) — changing a stored total's precision corrupts anything derived by algebra from it (receipt discount, refund ratios); read the line rows instead.
