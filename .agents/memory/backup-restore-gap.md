@@ -72,6 +72,13 @@ line of defence on the real one.
 client tools, and `pg_dump` refuses a server newer than itself. Detect the
 server major and locate matching binaries rather than hardcoding a path.
 
+**Gotcha (workspace):** the `drill:restore` script is wired to `tsx`, which is
+not a dependency, so the pnpm command fails with "tsx not found". Bundle the
+script with the api-server's esbuild instead (workspace packages inlined,
+node_modules external, `createRequire` banner) and run the `.mjs`; stopping the
+scratch cluster leaves ~50 MB in `/tmp/pgdrill` to delete. Last PASS drill:
+2026-09-10 (26 tables incl. held_bills/active_carts).
+
 ## Restore assumes today's schema shapes — re-drill after migrations
 
 The json-snapshot restore handles serial/uuid keys, plain FKs and json/jsonb,
