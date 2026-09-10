@@ -532,13 +532,28 @@ function DealQuickModal({ product, onClose, onSaved }: DealQuickModalProps) {
 
 /* ── Memoized product rows ── */
 interface ProductRowProps {
-  product: { id: string; name: string; sku: string; category: string; price: number; salePrice?: number | null; salePriceUntil?: string | null; stock: number; lowStockThreshold: number; imageUrl?: string | null; supplierId?: string | null; isTodayDeal?: boolean };
+  product: { id: string; name: string; sku: string; category: string; price: number; salePrice?: number | null; salePriceUntil?: string | null; purchasePrice?: number | null; stock: number; lowStockThreshold: number; imageUrl?: string | null; supplierId?: string | null; isTodayDeal?: boolean };
   supplierName?: string | null;
+  /* Owner-only affordances: select/delete/deal toggle and the cost price
+     (purchase price is owner-only everywhere else, e.g. ProductDetail). */
   isAdmin?: boolean;
   onDelete?: (product: { id: string; name: string; sku: string }) => void;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
   onToggleDeal?: (product: { id: string; name: string; price: number; salePrice?: number | null; isTodayDeal?: boolean }) => void;
+}
+
+const fmtMoney = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/* Purchase (cost) price line shown under the selling price — owner only.
+   "—" when no cost is recorded so the owner can spot products still missing it. */
+function CostLine({ purchasePrice, className = "" }: { purchasePrice?: number | null; className?: string }) {
+  return (
+    <span className={`inline-flex items-baseline gap-1 whitespace-nowrap text-muted-foreground ${className}`} data-testid="text-cost-price">
+      <span className="text-[9px] font-bold uppercase tracking-wider">Cost</span>
+      <span className="text-xs font-semibold tabular-nums">{purchasePrice != null ? `₹${fmtMoney(purchasePrice)}` : "—"}</span>
+    </span>
+  );
 }
 
 const ProductMobileCard = memo(function ProductMobileCard({ product, supplierName, isAdmin, onDelete, selected, onToggleSelect, onToggleDeal }: ProductRowProps) {
@@ -597,6 +612,7 @@ const ProductMobileCard = memo(function ProductMobileCard({ product, supplierNam
               ) : (
                 <span className="text-[10px] text-muted-foreground">₹{product.price.toLocaleString("en-IN")}</span>
               )}
+              {isAdmin && <CostLine purchasePrice={product.purchasePrice} className="mt-0.5" />}
             </div>
             {isAdmin && onDelete && (
               <button
@@ -671,15 +687,16 @@ const ProductDesktopRow = memo(function ProductDesktopRow({ product, supplierNam
             <span className="text-xs text-muted-foreground/50 italic">—</span>
           )}
         </div>
-        <div className="w-24 text-right">
+        <div className="w-28 text-right">
           {product.salePrice != null ? (
             <div>
-              <p className="text-xs line-through text-muted-foreground">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p className="font-bold text-red-600">₹{product.salePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-xs line-through text-muted-foreground">₹{fmtMoney(product.price)}</p>
+              <p className="font-bold text-red-600">₹{fmtMoney(product.salePrice)}</p>
             </div>
           ) : (
-            <p className="font-semibold">₹{product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p className="font-semibold">₹{fmtMoney(product.price)}</p>
           )}
+          {isAdmin && <CostLine purchasePrice={product.purchasePrice} />}
         </div>
         <div className="w-20 text-right flex items-center justify-end gap-1.5">
           {isLow && <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />}
@@ -1122,7 +1139,7 @@ export default function Products() {
         <span>Product</span>
         <span className="w-32 text-center">Category</span>
         <span className="w-36 text-left">Supplier</span>
-        <span className="w-24 text-right">Price</span>
+        <span className="w-28 text-right">Price</span>
         <span className="w-20 text-right">Stock</span>
         <span className="w-28 text-center">Today Deal</span>
         <span className="w-10"></span>
