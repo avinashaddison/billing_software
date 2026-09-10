@@ -68,6 +68,7 @@ const MIGRATION_FILES = [
   "0019_held_bills.sql",
   "0020_active_carts.sql",
   "0021_stock_log_restock_metadata.sql",
+  "0022_backup_runs.sql",
 ];
 
 function findMigration(name: string): string | null {

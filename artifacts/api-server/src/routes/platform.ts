@@ -26,16 +26,21 @@ import {
   salesTable,
   auditEventsTable,
 } from "@workspace/db";
-import zlib from "node:zlib";
 import { logger } from "../lib/logger";
 import { recordAudit } from "../lib/audit";
 import { requirePlatformAdmin } from "../middlewares/platform-admin";
 import { anchorExtension, resolveExpiry, PRESET_DURATIONS } from "../lib/tenant-access";
 import { runDatabaseBackup } from "../lib/backup";
+import { resolveBackupKey, BackupKeyError } from "../lib/backup-crypto";
+import { recentRuns } from "../lib/backup-runs";
+import { INTRADAY_CHOICES, describeNextNightly } from "../lib/backup-schedule";
 import { isConfigured as telegramConfigured } from "../lib/telegram";
 import { isR2Configured, listR2Backups, downloadR2Backup, isBackupKey } from "../lib/r2";
-import { getBackupHour, applyBackupSchedule } from "../lib/scheduler";
-import { restoreDatabaseBackup, restoreSnapshot } from "../lib/restore";
+import { getBackupSettings, applyBackupSettings, getBackupFreshness } from "../lib/backup-scheduler";
+import {
+  restoreDatabaseBackup, restoreSnapshot, restoreTenantSnapshot, previewTenantRestore,
+  parseSnapshotBytes, isEncryptedBackup,
+} from "../lib/restore";
 import multer from "multer";
 import {
   PLATFORM_COOKIE_NAME,
@@ -774,7 +779,7 @@ router.patch("/platform/settings", requirePlatformAdmin, async (req, res): Promi
   }
 });
 
-/* ───── POST /api/platform/backup — on-demand DB backup to Telegram ───
+/* ───── POST /api/platform/backup — on-demand DB backup ───
  *
  * Runs the same routine as the nightly scheduled job, immediately, so the
  * vendor can verify backups work (and grab an ad-hoc copy) without waiting for
@@ -782,13 +787,13 @@ router.patch("/platform/settings", requirePlatformAdmin, async (req, res): Promi
  */
 router.post("/platform/backup", requirePlatformAdmin, async (req, res): Promise<void> => {
   try {
-    const summary = await runDatabaseBackup();
+    const summary = await runDatabaseBackup({ kind: "manual" });
     void recordAudit({
       action:     "platform.backup",
       actorId:    req.platformActor!.id,
       actorEmail: req.platformActor!.email,
       ip:         req.ip,
-      metadata:   { tables: summary.tables, totalRows: summary.totalRows, sizeBytes: summary.sizeBytes, r2: summary.destinations.r2, telegram: summary.destinations.telegram },
+      metadata:   { tables: summary.tables, totalRows: summary.totalRows, sizeBytes: summary.sizeBytes, encrypted: summary.encrypted, r2: summary.destinations.r2, telegram: summary.destinations.telegram },
     });
     res.json({ ok: true, ...summary });
   } catch (err: any) {
@@ -797,34 +802,71 @@ router.post("/platform/backup", requirePlatformAdmin, async (req, res): Promise<
   }
 });
 
-/* ───── GET /api/platform/backups — backup config + stored R2 files ───── */
+/** Encryption state for the admin page — never the key itself. */
+function encryptionStatus(): { enabled: boolean; problem: string | null } {
+  try {
+    return { enabled: resolveBackupKey() !== null, problem: null };
+  } catch (err) {
+    return { enabled: false, problem: err instanceof BackupKeyError ? err.message : "BACKUP_ENCRYPTION_KEY is invalid" };
+  }
+}
+
+/* ───── GET /api/platform/backups — status, config, ledger, stored files ───── */
 router.get("/platform/backups", requirePlatformAdmin, async (_req, res): Promise<void> => {
+  const settings = getBackupSettings();
   const base = {
     r2Configured:       isR2Configured(),
     telegramConfigured: telegramConfigured(),
-    backupHour:         getBackupHour(),
+    encryption:         encryptionStatus(),
+    backupHour:         settings.backupHour,
+    intradayEveryHours: settings.intradayEveryHours,
+    intradayChoices:    INTRADAY_CHOICES,
+    nextNightly:        describeNextNightly(new Date(), settings),
+    monitorPath:        "/api/healthz/backup",
   };
-  if (!base.r2Configured) { res.json({ ...base, files: [] }); return; }
+  const [freshness, runs] = await Promise.all([
+    getBackupFreshness().catch((err) => { logger.error({ err }, "backup freshness failed"); return null; }),
+    recentRuns(12).catch((err) => { logger.error({ err }, "backup_runs read failed"); return []; }),
+  ]);
+  if (!base.r2Configured) { res.json({ ...base, freshness, runs, files: [] }); return; }
   try {
-    res.json({ ...base, files: await listR2Backups() });
+    res.json({ ...base, freshness, runs, files: await listR2Backups() });
   } catch (err) {
     logger.error({ err }, "failed to list R2 backups");
-    res.json({ ...base, files: [], listError: "Could not reach Cloudflare R2 — check the R2_* credentials" });
+    res.json({ ...base, freshness, runs, files: [], listError: "Could not reach Cloudflare R2 — check the R2_* credentials" });
   }
 });
 
-/* ───── PUT /api/platform/backup-settings — set the nightly hour ─────
- * Persists to platform_settings.backupHour AND reschedules the running
- * cron job immediately — no server restart needed. Minute is fixed :30. */
+/* ───── PUT /api/platform/backup-settings — nightly hour / intraday interval ─
+ * Persists to platform_settings AND applies to this process immediately; the
+ * other process (workspace vs deployment) picks the change up on its next
+ * one-minute tick. Nightly minute is fixed :30. */
 router.put("/platform/backup-settings", requirePlatformAdmin, async (req, res): Promise<void> => {
-  const hour = req.body?.hour;
-  if (typeof hour !== "number" || !Number.isInteger(hour) || hour < 0 || hour > 23) {
+  const hour  = req.body?.hour;
+  const every = req.body?.intradayEveryHours;
+  if (hour !== undefined && (typeof hour !== "number" || !Number.isInteger(hour) || hour < 0 || hour > 23)) {
     res.status(400).json({ error: "hour must be an integer 0–23 (IST)" });
+    return;
+  }
+  if (every !== undefined && !(INTRADAY_CHOICES as readonly number[]).includes(every)) {
+    res.status(400).json({ error: `intradayEveryHours must be one of ${INTRADAY_CHOICES.join(", ")} (0 = off)` });
+    return;
+  }
+  if (hour === undefined && every === undefined) {
+    res.status(400).json({ error: "Nothing to change" });
+    return;
+  }
+  if (every !== undefined && every > 0 && !isR2Configured()) {
+    res.status(400).json({ error: "Intraday backups need Cloudflare R2 (R2_* env vars) — they are not sent to Telegram" });
     return;
   }
   try {
     const existing = await readPlatformSettings();
-    const nextData = { ...existing, backupHour: hour };
+    const nextData = {
+      ...existing,
+      ...(hour  !== undefined ? { backupHour: hour } : {}),
+      ...(every !== undefined ? { intradayEveryHours: every } : {}),
+    };
     await db
       .insert(platformSettingsTable)
       .values({ id: PLATFORM_SETTINGS_ID, data: nextData })
@@ -832,46 +874,58 @@ router.put("/platform/backup-settings", requirePlatformAdmin, async (req, res): 
         target: platformSettingsTable.id,
         set:    { data: nextData, updatedAt: new Date() },
       });
-    applyBackupSchedule(hour);
+    const applied = applyBackupSettings({ backupHour: hour, intradayEveryHours: every });
     void recordAudit({
       action:     "platform.backup_schedule_update",
       actorId:    req.platformActor!.id,
       actorEmail: req.platformActor!.email,
       ip:         req.ip,
-      metadata:   { backupHour: hour },
+      metadata:   { ...applied },
     });
-    res.json({ ok: true, backupHour: hour });
-  } catch {
-    res.status(500).json({ error: "Failed to save backup time" });
+    res.json({ ok: true, ...applied, nextNightly: describeNextNightly(new Date(), applied) });
+  } catch (err) {
+    logger.error({ err }, "failed to save backup settings");
+    res.status(500).json({ error: "Failed to save backup settings" });
   }
 });
 
-/* ───── GET /api/platform/backups/preview?key= — what's inside a backup ─────
- * Downloads the snapshot from R2, gunzips it and returns ONLY the metadata +
- * per-table row counts — never the row data itself (it holds password hashes
- * and every tenant's records; the full file is available via /download). */
+/* ───── GET /api/platform/backups/preview?key=&tenantId= — what's inside ─────
+ * Downloads the snapshot from R2, opens it (decrypting if needed) and returns
+ * ONLY the metadata + per-table row counts — never the row data itself (it
+ * holds password hashes and every tenant's records; the full file is available
+ * via /download). With tenantId, adds what a per-shop restore would change. */
 router.get("/platform/backups/preview", requirePlatformAdmin, async (req, res): Promise<void> => {
-  const key = String(req.query.key ?? "");
+  const key      = String(req.query.key ?? "");
+  const tenantId = req.query.tenantId ? String(req.query.tenantId) : null;
   if (!isBackupKey(key)) { res.status(400).json({ error: "Invalid backup key" }); return; }
   if (!isR2Configured())  { res.status(400).json({ error: "Cloudflare R2 is not configured" }); return; }
+  let bytes: Buffer;
   try {
-    const gz      = await downloadR2Backup(key);
-    const payload = JSON.parse(zlib.gunzipSync(gz).toString("utf8")) as {
-      meta?: Record<string, unknown>;
-      data?: Record<string, unknown[]>;
-    };
-    const tables = Object.entries(payload.data ?? {})
-      .map(([name, rows]) => ({ name, rows: Array.isArray(rows) ? rows.length : 0 }))
+    bytes = await downloadR2Backup(key);
+  } catch (err) {
+    logger.error({ err, key }, "backup download for preview failed");
+    res.status(500).json({ error: "Could not download that backup file" });
+    return;
+  }
+  try {
+    const snapshot = parseSnapshotBytes(bytes);
+    const tables = Object.entries(snapshot.data)
+      .map(([name, rows]) => ({ name, rows: rows.length }))
       .sort((a, b) => b.rows - a.rows);
+    const tenant = tenantId ? await previewTenantRestore(bytes, tenantId) : null;
     res.json({
       key,
-      sizeBytes: gz.length,
-      meta:      payload.meta ?? {},
+      sizeBytes: bytes.length,
+      encrypted: isEncryptedBackup(bytes),
+      meta:      snapshot.meta,
       tables,
+      tenant,
     });
-  } catch (err) {
-    logger.error({ err, key }, "backup preview failed");
-    res.status(500).json({ error: "Could not read that backup file" });
+  } catch (err: any) {
+    logger.error({ err, key, tenantId }, "backup preview failed");
+    /* The open/validate errors are written for the admin (wrong key, corrupt
+       file, unknown shop) — pass them through. */
+    res.status(400).json({ error: err?.message || "Could not read that backup file" });
   }
 });
 
@@ -879,14 +933,29 @@ router.get("/platform/backups/preview", requirePlatformAdmin, async (req, res): 
  * The nuclear option, so belt and braces: the client must echo confirm:
  * "RESTORE", a safety backup of the CURRENT data is taken first (abort if it
  * fails), and the whole restore runs in one transaction — any failure rolls
- * back to the pre-restore state. Affects EVERY tenant. */
+ * back to the pre-restore state. Without tenantId it affects EVERY tenant;
+ * with tenantId only that shop's rows are replaced (see restoreTenantSnapshot). */
 router.post("/platform/backups/restore", requirePlatformAdmin, async (req, res): Promise<void> => {
-  const key     = String(req.body?.key ?? "");
-  const confirm = String(req.body?.confirm ?? "");
+  const key      = String(req.body?.key ?? "");
+  const confirm  = String(req.body?.confirm ?? "");
+  const tenantId = req.body?.tenantId ? String(req.body.tenantId) : null;
   if (!isBackupKey(key)) { res.status(400).json({ error: "Invalid backup key" }); return; }
   if (confirm !== "RESTORE") { res.status(400).json({ error: 'Confirmation missing — type RESTORE to proceed' }); return; }
   if (!isR2Configured())  { res.status(400).json({ error: "Cloudflare R2 is not configured" }); return; }
   try {
+    if (tenantId) {
+      const summary = await restoreTenantSnapshot(await downloadR2Backup(key), tenantId, { source: key });
+      void recordAudit({
+        action:     "platform.backup_restore_tenant",
+        actorId:    req.platformActor!.id,
+        actorEmail: req.platformActor!.email,
+        ip:         req.ip,
+        targetTenant: tenantId,
+        metadata:   { key, tables: summary.tables.length, rowsDeleted: summary.rowsDeleted, rowsRestored: summary.rowsRestored, safetyBackup: summary.safetyBackup },
+      });
+      res.json({ ok: true, scope: "tenant", ...summary });
+      return;
+    }
     const summary = await restoreDatabaseBackup(key);
     void recordAudit({
       action:     "platform.backup_restore",
@@ -895,9 +964,9 @@ router.post("/platform/backups/restore", requirePlatformAdmin, async (req, res):
       ip:         req.ip,
       metadata:   { key, tables: summary.tables, rowsRestored: summary.rowsRestored, safetyBackup: summary.safetyBackup },
     });
-    res.json({ ok: true, ...summary });
+    res.json({ ok: true, scope: "platform", ...summary });
   } catch (err: any) {
-    logger.error({ err, key }, "database restore failed");
+    logger.error({ err, key, tenantId }, "database restore failed");
     res.status(500).json({ error: err?.message || "Restore failed — the database was left unchanged" });
   }
 });
@@ -906,9 +975,10 @@ router.post("/platform/backups/restore", requirePlatformAdmin, async (req, res):
  * The nightly backup can deliver to Telegram, but restore could previously only
  * read from Cloudflare R2. A shop with only Telegram configured therefore had
  * backups it had no way to restore — the worst kind of backup. This accepts the
- * .json.gz directly, so the copy sitting in a Telegram chat is enough to
- * recover. Same protections as the R2 path: platform admin, typed
- * confirmation, safety backup first, one transaction. */
+ * .json.gz (or .json.gz.enc) directly, so the copy sitting in a Telegram chat
+ * is enough to recover. Same protections as the R2 path: platform admin, typed
+ * confirmation, safety backup first, one transaction; optional tenantId for a
+ * per-shop restore. */
 const backupUpload = multer({
   storage: multer.memoryStorage(),
   /* Comfortably above Telegram's own 50 MB document ceiling, so any file the
@@ -921,7 +991,8 @@ router.post(
   requirePlatformAdmin,
   backupUpload.single("file"),
   async (req, res): Promise<void> => {
-    const confirm = String(req.body?.confirm ?? "");
+    const confirm  = String(req.body?.confirm ?? "");
+    const tenantId = req.body?.tenantId ? String(req.body.tenantId) : null;
     if (confirm !== "RESTORE") {
       res.status(400).json({ error: 'Confirmation missing — type RESTORE to proceed' });
       return;
@@ -930,10 +1001,22 @@ router.post(
       res.status(400).json({ error: "No backup file uploaded" });
       return;
     }
+    const source = req.file.originalname || "uploaded snapshot";
     try {
-      const summary = await restoreSnapshot(req.file.buffer, {
-        source: req.file.originalname || "uploaded snapshot",
-      });
+      if (tenantId) {
+        const summary = await restoreTenantSnapshot(req.file.buffer, tenantId, { source });
+        void recordAudit({
+          action:     "platform.backup_restore_upload_tenant",
+          actorId:    req.platformActor!.id,
+          actorEmail: req.platformActor!.email,
+          ip:         req.ip,
+          targetTenant: tenantId,
+          metadata:   { filename: req.file.originalname, sizeBytes: req.file.size, tables: summary.tables.length, rowsDeleted: summary.rowsDeleted, rowsRestored: summary.rowsRestored, safetyBackup: summary.safetyBackup },
+        });
+        res.json({ ok: true, scope: "tenant", ...summary });
+        return;
+      }
+      const summary = await restoreSnapshot(req.file.buffer, { source });
       void recordAudit({
         action:     "platform.backup_restore_upload",
         actorId:    req.platformActor!.id,
@@ -947,31 +1030,31 @@ router.post(
           safetyBackup: summary.safetyBackup,
         },
       });
-      res.json({ ok: true, ...summary });
+      res.json({ ok: true, scope: "platform", ...summary });
     } catch (err: any) {
-      logger.error({ err, filename: req.file?.originalname }, "database restore from upload failed");
+      logger.error({ err, filename: req.file?.originalname, tenantId }, "database restore from upload failed");
       res.status(500).json({ error: err?.message || "Restore failed — the database was left unchanged" });
     }
   },
 );
 
-/* ───── GET /api/platform/backups/download?key= — fetch the .json.gz ───── */
+/* ───── GET /api/platform/backups/download?key= — fetch the stored file ───── */
 router.get("/platform/backups/download", requirePlatformAdmin, async (req, res): Promise<void> => {
   const key = String(req.query.key ?? "");
   if (!isBackupKey(key)) { res.status(400).json({ error: "Invalid backup key" }); return; }
   if (!isR2Configured())  { res.status(400).json({ error: "Cloudflare R2 is not configured" }); return; }
   try {
-    const gz = await downloadR2Backup(key);
+    const bytes = await downloadR2Backup(key);
     void recordAudit({
       action:     "platform.backup_download",
       actorId:    req.platformActor!.id,
       actorEmail: req.platformActor!.email,
       ip:         req.ip,
-      metadata:   { key, sizeBytes: gz.length },
+      metadata:   { key, sizeBytes: bytes.length },
     });
-    res.setHeader("Content-Type", "application/gzip");
-    res.setHeader("Content-Disposition", `attachment; filename="${key.slice("backups/".length)}"`);
-    res.send(gz);
+    res.setHeader("Content-Type", key.endsWith(".enc") ? "application/octet-stream" : "application/gzip");
+    res.setHeader("Content-Disposition", `attachment; filename="${key.slice(key.lastIndexOf("/") + 1)}"`);
+    res.send(bytes);
   } catch (err) {
     logger.error({ err, key }, "backup download failed");
     res.status(500).json({ error: "Could not download that backup file" });

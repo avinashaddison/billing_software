@@ -72,12 +72,11 @@ line of defence on the real one.
 client tools, and `pg_dump` refuses a server newer than itself. Detect the
 server major and locate matching binaries rather than hardcoding a path.
 
-**Gotcha (workspace):** the `drill:restore` script is wired to `tsx`, which is
-not a dependency, so the pnpm command fails with "tsx not found". Bundle the
-script with the api-server's esbuild instead (workspace packages inlined,
-node_modules external, `createRequire` banner) and run the `.mjs`; stopping the
-scratch cluster leaves ~50 MB in `/tmp/pgdrill` to delete. Last PASS drill:
-2026-09-10 (26 tables incl. held_bills/active_carts).
+**Gotcha (workspace):** `drill:restore` runs through `tsx` (now a devDependency
+of the api-server — keep it). Stopping the scratch cluster leaves ~50 MB in
+`/tmp/pgdrill` (+ `/tmp/pgdrill.log`, `/tmp/drill-schema.sql`) to delete. The
+drill now also proves an encrypted round-trip and a per-shop restore. Last PASS
+drill: 2026-09-10 (26 tables; plain + encrypted + per-shop).
 
 ## Restore assumes today's schema shapes — re-drill after migrations
 
@@ -87,3 +86,54 @@ and the sequence-reset query only matches `nextval(...)` defaults) and NOT
 self-referential/cyclic FKs (chunked inserts aren't dependency-ordered within a
 table). **How to apply:** any migration adding either must extend the restore
 first, and the restore drill is the release gate that catches it.
+
+## Per-shop restore: rows pinned by legacy NULL-tenant references
+
+The live DB still holds a handful of pre-tenancy rows with `tenant_id IS NULL`
+(one bill + its line, four products, a category, two stock logs). One such
+legacy `sale_items` row points at a `hira-sons` product, so a per-shop restore
+that "fails closed on any outside reference" makes the one shop that owns the
+legacy data the one shop that can never be restored. The drill caught it; unit
+tests could not.
+
+**How to apply:** delete child-first `WHERE tenant_id = $1 AND NOT EXISTS
+(<any referrer>)`, keep whatever survives ("pinned"), then upsert the snapshot
+rows `ON CONFLICT (pk) DO UPDATE … WHERE <row>.tenant_id = $1` so pinned rows
+are overwritten in place and a PK collision with another shop is refused, never
+hijacked. Upsert pinned rows first within a table so unique keys (SKU) they
+still hold are released. Report `rowsKept`/`rowsKeptStale`; the preview's
+"pinned" estimate uses `tenant_id IS DISTINCT FROM $1` on referrers and must
+equal what the restore finds (the drill asserts it).
+
+## Tenant ids are slugs, not UUIDs
+
+`tenants.id` is text like `hira-sons`; a UUID regex on a tenant id rejects
+every real shop. Validate with the slug pattern used at creation.
+
+## Multi-process scheduling: claim named slots in the DB
+
+Workspace and deployment run the same scheduler against one Neon DB. Instead of
+env-sniffing or leader election, each scheduled run is a slot named on the IST
+calendar (`nightly:YYYY-MM-DD`, `intraday:YYYY-MM-DDTHH`) claimed with
+`INSERT … ON CONFLICT … DO UPDATE … WHERE` in `backup_runs` (re-claim only when
+`running` for >20 min or `failed` with attempts left). The ledger is excluded
+from snapshots and never restored — it is metadata about backups. A ledger
+failure must never stop a backup: fall back to an in-process claim. The
+non-deployment process waits a grace period so prod gets first dibs.
+
+## Restore barrier and safety copy ordering
+
+Take the write barrier (`LOCK TABLE … IN SHARE ROW EXCLUSIVE MODE` on the
+tables being rewritten AND every table with an FK into them, with a
+lock_timeout) BEFORE the safety backup, inside the restore transaction. Taken
+after, a write can land between "copied" and "replaced" and is unrecoverable;
+without it, the per-shop FK guards judge a world that can change under them.
+Reads (the dump connection) still pass. Sequences are shared across shops and
+`setval` survives rollback — only ever move them forward, comparing against
+the sequence's own last_value, never MAX(column).
+
+## "Delivered" must mean accepted
+
+A send helper that swallows HTTP failures turns a pre-restore safety copy into
+a success that went nowhere. Delivery helpers must return how many recipients
+accepted; zero is a failure at the call site.

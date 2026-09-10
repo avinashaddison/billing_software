@@ -1,9 +1,8 @@
-import { schedule, type ScheduledTask } from "node-cron";
-import { eq, sql, desc, and, or, lt, isNotNull } from "drizzle-orm";
-import { db, billsTable, saleItemsTable, productsTable, authSessionsTable, platformSettingsTable, returnsTable } from "@workspace/db";
-import { sendDailySalesSummary, sendBackupFailureAlert, isConfigured as isTelegramConfigured } from "./telegram";
-import { isR2Configured } from "./r2";
-import { runDatabaseBackup } from "./backup";
+import { schedule } from "node-cron";
+import { sql, desc, and, or, lt, isNotNull } from "drizzle-orm";
+import { db, billsTable, saleItemsTable, productsTable, authSessionsTable, returnsTable } from "@workspace/db";
+import { sendDailySalesSummary } from "./telegram";
+import { startBackupScheduler } from "./backup-scheduler";
 import { logger } from "./logger";
 
 const DAY_MS = 86_400_000;
@@ -112,63 +111,8 @@ export function startDailyReportScheduler(): void {
     );
   }, { timezone: "Asia/Kolkata" });
 
-  /* Nightly full-database backup → R2/Telegram at HH:30 IST. The hour is
-     admin-configurable (platform_settings.backupHour, editable live from the
-     admin panel); BACKUP_HOUR env is the fallback for fresh installs. Runs
-     before the cleanup so a backup captures the pre-prune state. */
-  /* A backup with nowhere to go is not a backup. Complain loudly at boot rather
-     than letting the shop find out on the day it needs to restore. */
-  if (!isR2Configured() && !isTelegramConfigured()) {
-    logger.error(
-      "DATABASE BACKUPS ARE NOT CONFIGURED — the nightly job will run but has nowhere to " +
-      "store the file. Set R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET, " +
-      "or TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID.",
-    );
-  }
-
-  void readPersistedBackupHour().then((hour) => applyBackupSchedule(hour));
-}
-
-/* ═════════ Configurable backup schedule ═════════ */
-
-let backupTask: ScheduledTask | null = null;
-let currentBackupHour = clampHour(parseInt(process.env.BACKUP_HOUR ?? "2", 10));
-
-function clampHour(h: number): number {
-  return Math.max(0, Math.min(23, Number.isFinite(h) ? Math.trunc(h) : 2));
-}
-
-/** The persisted admin choice, falling back to BACKUP_HOUR env, then 2 AM. */
-async function readPersistedBackupHour(): Promise<number> {
-  try {
-    const [row] = await db
-      .select({ data: platformSettingsTable.data })
-      .from(platformSettingsTable)
-      .where(eq(platformSettingsTable.id, 1));
-    const stored = (row?.data as { backupHour?: unknown } | null)?.backupHour;
-    if (stored !== undefined && stored !== null && Number.isFinite(Number(stored))) {
-      return clampHour(Number(stored));
-    }
-  } catch { /* fall through to env default */ }
-  return clampHour(parseInt(process.env.BACKUP_HOUR ?? "2", 10));
-}
-
-export function getBackupHour(): number {
-  return currentBackupHour;
-}
-
-/** (Re)schedule the nightly backup at HH:30 IST — replaces any existing job,
- *  so the admin panel can change the time without a server restart. */
-export function applyBackupSchedule(hour: number): void {
-  const h = clampHour(hour);
-  backupTask?.stop();
-  currentBackupHour = h;
-  logger.info({ backupHour: h, timezone: "Asia/Kolkata" }, "Scheduling nightly DB backup (R2 / Telegram)");
-  backupTask = schedule(`30 ${h} * * *`, () => {
-    runDatabaseBackup().catch((err) => {
-      logger.error({ err }, "Nightly database backup failed");
-      /* Push it to Telegram too — nobody reads server logs at 2:30 AM. */
-      void sendBackupFailureAlert(err instanceof Error ? err.message : String(err));
-    });
-  }, { timezone: "Asia/Kolkata" });
+  /* Database backups: nightly archive at HH:30 IST plus intraday snapshots,
+     scheduled through the backup_runs ledger so the deployment and a dev
+     workspace never both take the same slot. See backup-scheduler.ts. */
+  startBackupScheduler();
 }

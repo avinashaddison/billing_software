@@ -33,6 +33,7 @@ export const PUBLIC_PATHS: ReadonlySet<string> = new Set([
   "/auth/me",
   "/health",
   "/healthz",
+  "/healthz/backup",
 ]);
 
 /**

@@ -91,7 +91,8 @@ export default function Health() {
   }
 
   interface BackupFile { key?: string; filename?: string; sizeBytes?: number; lastModified?: string | null }
-  interface BackupsPayload { r2Configured?: boolean; files?: BackupFile[]; listError?: string }
+  interface BackupFreshness { state: "ok" | "stale" | "unknown"; lastSuccessAt: string | null; ageMinutes: number | null; thresholdMinutes: number }
+  interface BackupsPayload { r2Configured?: boolean; telegramConfigured?: boolean; files?: BackupFile[]; listError?: string; freshness?: BackupFreshness | null }
 
   const backups = backupsData as BackupsPayload | undefined;
   let backupTone: "neutral" | "positive" | "warn" | "danger" = "neutral";
@@ -105,11 +106,24 @@ export default function Health() {
       .map((f) => (f.lastModified ? new Date(f.lastModified).getTime() : NaN))
       .filter((t) => Number.isFinite(t));
     latestBackupTime = times.length ? Math.max(...times) : null;
+    const fresh = backups?.freshness ?? null;
 
     if (backupsError) {
       backupTone = "danger";
       backupTitle = "Backup status unknown";
       backupStatusMsg = "The backup list could not be read, so there is no proof a recent backup exists.";
+    } else if (fresh && fresh.state === "stale") {
+      /* The run ledger is the authority: it knows about every successful
+         backup (Telegram-only ones included) and what the schedule promised. */
+      backupTone = "danger";
+      backupTitle = "Backup is overdue";
+      backupStatusMsg = fresh.lastSuccessAt
+        ? `The last successful backup was ${formatTimeAgo(new Date(fresh.lastSuccessAt).getTime())}; the schedule allows at most ${Math.round(fresh.thresholdMinutes / 60)} hours.`
+        : "No backup has ever succeeded.";
+    } else if (fresh && fresh.state === "ok" && fresh.lastSuccessAt) {
+      backupTone = "positive";
+      backupTitle = "Healthy";
+      backupStatusMsg = `Last successful backup ${formatTimeAgo(new Date(fresh.lastSuccessAt).getTime())}.`;
     } else if (backups?.listError) {
       backupTone = "danger";
       backupTitle = "Backup storage unreachable";

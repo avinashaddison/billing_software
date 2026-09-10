@@ -143,20 +143,61 @@ export async function sendBackupFailureAlert(reason: string): Promise<void> {
 }
 
 /**
+ * The watchdog's alert: nothing has succeeded for longer than the schedule
+ * allows. Unlike the failure alert this fires even when the backup job never
+ * ran at all (dead process, wrong clock, destination misconfigured).
+ */
+export async function sendBackupStaleAlert(ageMinutes: number, lastSuccessAt: string | null): Promise<void> {
+  const hours = Math.floor(ageMinutes / 60);
+  const mins  = ageMinutes % 60;
+  const headline = lastSuccessAt
+    ? `Last successful backup: <b>${escapeHtml(new Date(lastSuccessAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }))}</b> (${hours}h ${mins}m ago).`
+    : `<b>No backup has ever succeeded</b> — the scheduler has been trying for ${hours}h ${mins}m.`;
+  try {
+    await sendMessage(
+      "⚠️ <b>Database backup is OVERDUE</b>\n\n" +
+      `${headline}\n\n` +
+      "The scheduler may be down, or the storage may be failing. " +
+      "Open /admin → Backups and press <b>Backup now</b> to check.",
+    );
+  } catch (err) {
+    logger.warn({ err }, "could not deliver backup-stale alert");
+  }
+}
+
+export async function sendBackupRecoveredAlert(lastSuccessAt: string | null): Promise<void> {
+  const last = lastSuccessAt
+    ? new Date(lastSuccessAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })
+    : "just now";
+  try {
+    await sendMessage(`✅ <b>Database backups are running again</b>\n\nLatest successful backup: ${escapeHtml(last)}.`);
+  } catch (err) {
+    logger.warn({ err }, "could not deliver backup-recovered alert");
+  }
+}
+
+/**
  * Send a file (e.g. a gzipped DB backup) as a Telegram document to every
  * configured chat — or an explicit override list (BACKUP_TELEGRAM_CHAT_ID).
  * Uses multipart/form-data via the global FormData/Blob (Node 18+). Silently
  * no-ops when unconfigured. Telegram's bot document limit is ~50 MB.
+ */
+/**
+ * Send a file to each chat. Resolves to the number of chats that ACCEPTED it —
+ * a backup caller must treat 0 as "not delivered", never as success, because a
+ * pre-restore safety copy that quietly went nowhere is the worst kind of
+ * backup. Per-chat failures are logged and do not stop the other chats.
  */
 export async function sendDocument(
   filename: string,
   content: Buffer,
   caption: string,
   chatIdsOverride?: string[],
-): Promise<void> {
+): Promise<number> {
   const token   = process.env.TELEGRAM_BOT_TOKEN;
   const chatIds = chatIdsOverride && chatIdsOverride.length > 0 ? chatIdsOverride : getChatIds();
-  if (!token || chatIds.length === 0) return;
+  if (!token || chatIds.length === 0) return 0;
+  let accepted = 0;
   for (const chatId of chatIds) {
     try {
       const form = new FormData();
@@ -168,11 +209,14 @@ export async function sendDocument(
       if (!res.ok) {
         const body = await res.text().catch(() => "");
         logger.warn({ status: res.status, chatId, body }, "Telegram sendDocument failed");
+        continue;
       }
+      accepted++;
     } catch (err) {
       logger.warn({ err, chatId }, "Telegram sendDocument error");
     }
   }
+  return accepted;
 }
 
 export interface SaleAlertItem {

@@ -28,8 +28,9 @@ import path from "node:path";
 import zlib from "node:zlib";
 import pg from "pg";
 import { pool as livePool } from "@workspace/db";
-import { restoreSnapshot, type PoolLike } from "../lib/restore";
+import { restoreSnapshot, restoreTenantSnapshot, type PoolLike } from "../lib/restore";
 import { dumpDatabaseSnapshot, type SnapshotSource } from "../lib/backup";
+import { encryptBackup, resolveBackupKey } from "../lib/backup-crypto";
 
 const execFileAsync = promisify(execFile);
 
@@ -164,7 +165,7 @@ async function main(): Promise<void> {
   const serverMajor = Number(/(\d+)\./.exec(verRows[0]?.v ?? "")?.[1] ?? NaN);
   if (!serverMajor) throw new Error("Could not determine the live PostgreSQL version");
 
-  console.log(`0/5  Preparing a throwaway PostgreSQL ${serverMajor} to restore into…`);
+  console.log(`0/7  Preparing a throwaway PostgreSQL ${serverMajor} to restore into…`);
   const binDir = await resolvePgBinDir(serverMajor);
   const stopCluster = await ensureCluster(binDir);
   const bin = (name: string) => (binDir ? path.join(binDir, name) : name);
@@ -175,7 +176,7 @@ async function main(): Promise<void> {
     scratchPool = new pg.Pool(SCRATCH);
 
     /* ── 1. Copy the schema (read-only against live) ── */
-    console.log("1/5  Copying the live schema into the scratch database…");
+    console.log("1/7  Copying the live schema into the scratch database…");
     /* Wipe whatever a previous rehearsal left behind, so this is re-runnable.
        The check runs on the SAME connection that then executes the DROP.
        Proving one connection is the scratch cluster and destroying through a
@@ -199,7 +200,7 @@ async function main(): Promise<void> {
     });
 
     /* ── 2. Take a snapshot with the REAL dump code (read-only) ── */
-    console.log("2/5  Taking a snapshot of live data (SELECT only)…");
+    console.log("2/7  Taking a snapshot of live data (SELECT only)…");
     const snap = await dumpDatabaseSnapshot(livePool as unknown as SnapshotSource);
     const liveCounts: Record<string, number> = {};
     for (const [table, rows] of Object.entries(snap.payload.data)) liveCounts[table] = rows.length;
@@ -207,7 +208,7 @@ async function main(): Promise<void> {
     console.log(`     ${snap.tables} tables, ${snap.totalRows} rows, ${(gz.length / 1024 / 1024).toFixed(2)} MB gzipped`);
 
     /* ── 3. Restore it into the scratch database with the REAL restore code ── */
-    console.log("3/5  Restoring into the scratch database…");
+    console.log("3/7  Restoring into the scratch database…");
     /* Same rule for the restore's own TRUNCATE: every connection it takes
        re-proves the target before it is handed over. */
     const verifiedScratch = {
@@ -232,7 +233,7 @@ async function main(): Promise<void> {
     if (summary.skippedTables.length > 0) console.log(`     skipped tables: ${summary.skippedTables.join(", ")}`);
 
     /* ── 4. Verify every table came back with the same number of rows ── */
-    console.log("4/5  Verifying row counts…");
+    console.log("4/7  Verifying row counts…");
     const problems: string[] = [];
     for (const table of Object.keys(liveCounts)) {
       const { rows } = await scratchPool.query<{ n: string }>(
@@ -243,7 +244,7 @@ async function main(): Promise<void> {
     }
 
     /* ── 5. Verify the money survived exactly (the point of the whole exercise) ── */
-    console.log("5/5  Verifying money values…");
+    console.log("5/7  Verifying money values…");
     const money: Array<[string, string]> = [
       ["bills.total_amount", `SELECT sum(total_amount)::text AS v FROM bills`],
       ["sale_items.subtotal", `SELECT sum(subtotal)::text AS v FROM sale_items`],
@@ -259,9 +260,102 @@ async function main(): Promise<void> {
       if (label === "bills.total_amount") billsTotal = a.rows[0]?.v ?? "";
     }
 
+    /* ── 6. The same restore through an ENCRYPTED file ──
+       Proves the key in this environment can open what the backup job writes
+       (or, with no key configured, that the format itself round-trips). */
+    console.log("6/7  Restoring again from an encrypted copy…");
+    let drillKey: string;
+    try {
+      drillKey = resolveBackupKey() ?? "";
+    } catch (err) {
+      problems.push(`BACKUP_ENCRYPTION_KEY rejected: ${err instanceof Error ? err.message : String(err)}`);
+      drillKey = "";
+    }
+    const keyIsConfigured = drillKey.length > 0;
+    if (!keyIsConfigured) {
+      drillKey = "restore-drill-throwaway-key-not-for-real-backups";
+      process.env["BACKUP_ENCRYPTION_KEY"] = drillKey;
+    }
+    const sealed = encryptBackup(gz, drillKey);
+    const encSummary = await restoreSnapshot(sealed, {
+      source: "restore rehearsal (encrypted)",
+      pool: verifiedScratch as unknown as PoolLike,
+      takeSafetyBackup: async () => "skipped — rehearsal target is a scratch database",
+    });
+    if (encSummary.rowsRestored !== summary.rowsRestored) {
+      problems.push(`encrypted restore put back ${encSummary.rowsRestored} rows, plain restore ${summary.rowsRestored}`);
+    }
+    console.log(`     ${keyIsConfigured ? "configured BACKUP_ENCRYPTION_KEY" : "throwaway key (BACKUP_ENCRYPTION_KEY is not set here)"} — ${encSummary.rowsRestored} rows restored from ${(sealed.length / 1024 / 1024).toFixed(2)} MB`);
+
+    /* ── 7. Per-shop restore: damage one shop in scratch, restore only it ── */
+    console.log("7/7  Rehearsing a per-shop restore…");
+    const { rows: shopRows } = await scratchPool.query<{ id: string; name: string; n: string }>(
+      `SELECT t.id, t.name, count(b.id)::text AS n
+         FROM tenants t LEFT JOIN bills b ON b.tenant_id = t.id
+        GROUP BY t.id, t.name HAVING count(b.id) > 0 ORDER BY count(b.id) DESC LIMIT 2`,
+    );
+    const victim = shopRows[0];
+    const bystander = shopRows[1] ?? null;
+    if (!victim) {
+      console.log("     no shop with bills — skipped");
+    } else {
+      const productSum = async (db: pg.Pool, tenantId: string) =>
+        (await db.query<{ v: string | null }>(`SELECT sum(price)::text AS v FROM products WHERE tenant_id = $1`, [tenantId])).rows[0]?.v ?? null;
+      const productCount = async (db: pg.Pool, tenantId: string) =>
+        Number((await db.query<{ n: string }>(`SELECT count(*)::text AS n FROM products WHERE tenant_id = $1`, [tenantId])).rows[0]?.n ?? 0);
+
+      const victimSumBefore   = await productSum(livePool, victim.id);
+      const victimCountBefore = await productCount(livePool, victim.id);
+
+      /* Damage: reprice every product and add a junk one. If there is a second
+         shop, reprice it too — that change must SURVIVE the victim's restore. */
+      await scratchPool.query(`UPDATE products SET price = price + 1 WHERE tenant_id = $1`, [victim.id]);
+      await scratchPool.query(
+        `INSERT INTO products (tenant_id, name, sku, category, price, stock) VALUES ($1, 'DRILL JUNK PRODUCT', 'DRILL-JUNK-SKU', 'drill', 1, 0)`,
+        [victim.id],
+      );
+      let bystanderSumDamaged: string | null = null;
+      if (bystander) {
+        await scratchPool.query(`UPDATE products SET price = price + 1 WHERE tenant_id = $1`, [bystander.id]);
+        bystanderSumDamaged = await productSum(scratchPool, bystander.id);
+      }
+
+      const tenantSummary = await restoreTenantSnapshot(gz, victim.id, {
+        source: "restore rehearsal (per-shop)",
+        pool: verifiedScratch as unknown as PoolLike,
+        takeSafetyBackup: async () => "skipped — rehearsal target is a scratch database",
+      });
+      console.log(
+        `     "${victim.name}": ${tenantSummary.rowsDeleted} rows cleared, ${tenantSummary.rowsRestored} put back across ${tenantSummary.tables.length} tables` +
+        (tenantSummary.rowsKept > 0
+          ? `; ${tenantSummary.rowsKept} row(s) referenced from outside the shop were overwritten in place (${tenantSummary.rowsKeptStale} had no snapshot version)`
+          : ""),
+      );
+      if (tenantSummary.totalPinned !== tenantSummary.rowsKept) {
+        problems.push(`per-shop restore: preview estimated ${tenantSummary.totalPinned} pinned rows, restore found ${tenantSummary.rowsKept}`);
+      }
+
+      if ((await productSum(scratchPool, victim.id)) !== victimSumBefore) problems.push(`per-shop restore: ${victim.name} product prices did not revert`);
+      if ((await productCount(scratchPool, victim.id)) !== victimCountBefore) problems.push(`per-shop restore: ${victim.name} product count differs from live`);
+      for (const t of tenantSummary.tables) {
+        const { rows } = await scratchPool.query<{ n: string }>(`SELECT count(*)::text AS n FROM "${t.table.replace(/"/g, '""')}" WHERE tenant_id = $1`, [victim.id]);
+        if (tenantSummary.rowsKeptStale === 0 && Number(rows[0]?.n ?? -1) !== t.snapshot) {
+          problems.push(`per-shop restore: ${t.table} has ${rows[0]?.n} rows for ${victim.name}, snapshot has ${t.snapshot}`);
+        }
+      }
+      if (bystander) {
+        if ((await productSum(scratchPool, bystander.id)) !== bystanderSumDamaged) problems.push(`per-shop restore: touched "${bystander.name}", which was not being restored`);
+      }
+      for (const [label, q] of money) {
+        const a = await livePool.query<{ v: string | null }>(q);
+        const b = await scratchPool.query<{ v: string | null }>(q);
+        if (a.rows[0]?.v !== b.rows[0]?.v) problems.push(`after per-shop restore ${label}: live ${a.rows[0]?.v} vs scratch ${b.rows[0]?.v}`);
+      }
+    }
+
     console.log("");
     if (problems.length === 0) {
-      console.log("RESULT: PASS — every table and every rupee restored exactly.");
+      console.log("RESULT: PASS — every table and every rupee restored exactly (plain, encrypted and per-shop).");
       console.log(`        Verified ₹${billsTotal} of billing across ${liveCounts["bills"] ?? 0} bills.`);
     } else {
       console.log("RESULT: FAIL");
