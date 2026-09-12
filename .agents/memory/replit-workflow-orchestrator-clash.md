@@ -53,3 +53,18 @@ has its own dev orchestrator, check the workflow list for duplicates first.
 
 ### When the Replit development URL alone is a 502
 - If the workflow is running, Vite reports `0.0.0.0:5000`, and both the local web route and API route return 200, a 502 from the `.replit.dev` URL is a platform forwarding fault. Reapplying the 5000 webview workflow configuration and restarting once is safe; if the URL remains 502, do not rewrite ports or application code.
+
+# Secrets changes reboot the whole environment (seen Sep 2026)
+
+Adding/changing a Replit secret restarted the container: every workflow booted at the
+same second, the per-artifact API workflow won 8080, "Start application" died with
+EADDRINUSE and port 5000 (the preview) went dark. Worse, the surviving API process was
+spawned before the new secret propagated, so it ran WITHOUT the secret even though new
+shells already had it — and WorkflowsRestart of "Start application" kept "succeeding"
+while the old artifact-owned process stayed on 8080.
+
+**How to apply:** after any secret change, do not trust "restarted". Check
+`tr '\0' '\n' < /proc/<api pid>/environ | grep ^NAME=` for the new variable and
+`ps -o lstart` for the pid's start time. If the artifact workflow owns 8080, kill its
+process tree (pnpm → sh → node), confirm 8080/5000 are free, then restart
+"Start application" and re-check the environ.

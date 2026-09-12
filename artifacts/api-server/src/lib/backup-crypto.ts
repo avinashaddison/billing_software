@@ -31,7 +31,10 @@ const HEADER_LEN = MAGIC.length + 1 + SALT_LEN + IV_LEN;
 const SCRYPT = { N: 1 << 14, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 
 export const ENCRYPTED_EXTENSION = ".enc";
-export const MIN_KEY_LENGTH = 16;
+/** Floor against token-like values ("1234", "secret"), not a strength
+ *  guarantee — a 12-character dictionary phrase is still weak. The per-file
+ *  scrypt derivation is what makes a decent passphrase expensive to guess. */
+export const MIN_KEY_LENGTH = 12;
 
 export class BackupKeyError extends Error {}
 

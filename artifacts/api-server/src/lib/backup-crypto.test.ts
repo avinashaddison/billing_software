@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import zlib from "node:zlib";
 import {
-  encryptBackup, decryptBackup, openBackupBytes, isEncryptedBackup, resolveBackupKey, BackupKeyError,
+  encryptBackup, decryptBackup, openBackupBytes, isEncryptedBackup, resolveBackupKey, BackupKeyError, MIN_KEY_LENGTH,
 } from "./backup-crypto";
 
 const key = "correct horse battery staple 2026";
@@ -57,6 +57,8 @@ describe("resolveBackupKey", () => {
 
   it("refuses a short key instead of silently writing plaintext", () => {
     expect(() => resolveBackupKey({ BACKUP_ENCRYPTION_KEY: "short" })).toThrow(BackupKeyError);
+    expect(() => resolveBackupKey({ BACKUP_ENCRYPTION_KEY: "x".repeat(MIN_KEY_LENGTH - 1) })).toThrow(BackupKeyError);
+    expect(resolveBackupKey({ BACKUP_ENCRYPTION_KEY: "x".repeat(MIN_KEY_LENGTH) })).toBe("x".repeat(MIN_KEY_LENGTH));
   });
 
   it("trims and returns a usable key", () => {

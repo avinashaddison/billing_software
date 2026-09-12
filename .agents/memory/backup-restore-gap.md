@@ -137,3 +137,11 @@ the sequence's own last_value, never MAX(column).
 A send helper that swallows HTTP failures turns a pre-restore safety copy into
 a success that went nowhere. Delivery helpers must return how many recipients
 accepted; zero is a failure at the call site.
+
+## Encryption key floor is 12, not 16
+
+The vendor's chosen key is 14 characters; asked twice, they kept it. The length floor
+only exists to reject token-like values — strength comes from the per-file scrypt
+derivation and the passphrase itself — so the floor was lowered to 12 rather than
+leaving every backup refused. Do not raise it again without checking the live key
+length first (a set-but-short key fails every backup by design).

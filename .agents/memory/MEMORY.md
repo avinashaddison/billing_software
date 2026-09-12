@@ -1,5 +1,5 @@
 - [DB migrations, tenancy & which DB the app uses](db-tenancy-migrations.md) — app hits NEON, not the executeSql `heliumdb`; idempotent boot SQL only (never drizzle push); migrations are additive-only so they can't bootstrap an empty DB.
-- [Dev orchestrator vs artifact workflows](replit-workflow-orchestrator-clash.md) — orchestrator owns 8080/5000; after server edits restart "Start application", never the artifact one (EADDRINUSE).
+- [Dev orchestrator vs artifact workflows](replit-workflow-orchestrator-clash.md) — restart only "Start application"; a secret change reboots all workflows — check the api pid's environ, kill the artifact tree if it won 8080.
 - [EOD & product-report money math](eod-reporting.md) — ledger collections; covered profit; manual lines costed only via cashier-typed purchase_price, never 100% profit; refunds hit processing day.
 - [Defensive fetch handling](defensive-fetch.md) — check r.ok before r.json() (non-JSON error pages crash); never fall back to defaults on a failed load that feeds a Save-able form (overwrites real data).
 - [API error-handling contract](api-error-handling.md) — centralized 4-arg errorHandler (Express 5 auto-forwards rejections); apiNotFound after router/before SPA; 5xx never leaks err.message; structural ZodError detection (no zod import).

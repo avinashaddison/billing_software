@@ -339,7 +339,7 @@ export default function Backups() {
                     </>
                   ) : (
                     <>
-                      Files are only gzipped. Anyone with the R2 credentials, the Telegram chat, or a downloaded copy can read every shop's records and login hashes. Set <span className="font-mono">BACKUP_ENCRYPTION_KEY</span> (16+ characters) in the server secrets — for the workspace <em>and</em> the deployment — and new backups are encrypted automatically.
+                      Files are only gzipped. Anyone with the R2 credentials, the Telegram chat, or a downloaded copy can read every shop's records and login hashes. Set <span className="font-mono">BACKUP_ENCRYPTION_KEY</span> (12+ characters — longer is better) in the server secrets — for the workspace <em>and</em> the deployment — and new backups are encrypted automatically.
                     </>
                   )}
                 </p>
