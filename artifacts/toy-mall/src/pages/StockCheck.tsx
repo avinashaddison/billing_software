@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
   ArrowLeft, Printer, ClipboardList, Search, Package, Loader2,
-  CheckSquare, Square, RefreshCw, Share2, Download,
+  CheckSquare, Square, RefreshCw, Share2, Download, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { listProductStockTotals, type ProductStockTotals } from "@workspace/api-client-react";
@@ -11,9 +11,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useStoreSettings } from "@/lib/store-info";
 import {
   buildStockSheetPdfSync, downloadBlob, getLoadedPdfLibs, preloadStockSheetPdf, sharePdf,
-  stockSheetFilename, sheetTotalsLine, SHEET_LEGEND, SHEET_LEGEND_ADJ,
+  sheetFigures, stockSheetFilename, sheetTotalsLine, SHEET_LEGEND, SHEET_LEGEND_ADJ,
   type StockSheetGroup, type StockSheetItem,
 } from "@/lib/stock-check-pdf";
+import { ProductTimelineDialog, type TimelineSubject } from "@/components/stock/ProductTimelineDialog";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -29,33 +30,20 @@ type Group = StockSheetGroup;
 const UNASSIGNED = "__unassigned__";
 
 /**
- * Reduce a product's lifetime totals to the sheet's four figures, such that
- * `inTotal - outNet - adj === stock` on every row (the server guarantees the
- * underlying identity; see api-server/src/lib/stock-totals.ts).
- *
- * "In" deliberately includes stock that never went through a stock entry —
- * most of this catalogue was typed in with its opening stock when the product
- * was created, and that stock did come from the supplier all the same. It is
- * counted as one entry so "4 in · 0 entries" can never appear.
+ * One sheet row from a product and its lifetime totals (rule: `sheetFigures`).
+ * A product created after the totals were fetched has no totals row yet; with
+ * no movements the server would report all of its stock as unlogged-in, so
+ * the same rule is applied here — a derivation, not a placeholder. Stock comes
+ * from the totals snapshot so the row still reconciles if a sale landed
+ * between the two requests.
  */
-const toSheetItem = (p: ProductLite, t: ProductStockTotals | undefined): StockSheetItem => {
-  /* A product created after the totals were fetched has no row yet. With no
-     movements the server would report all of its stock as unlogged-in, so the
-     same rule is applied here — a derivation, not a placeholder. */
-  const opening = t ? t.unloggedInQuantity : p.stock;
-  const inEntries = t?.inCount ?? 0;
-  const returned = t?.returnedQuantity ?? 0;
-  return {
-    id: p.id, name: p.name, sku: p.sku, category: p.category,
-    inTotal: opening + (t?.inQuantity ?? 0),
-    entries: inEntries + (opening > 0 ? 1 : 0),
-    outNet: (t?.outQuantity ?? 0) - returned,
-    returned,
-    adj: t?.unloggedOutQuantity ?? 0,
-    // Stock from the same snapshot as the movements, so the row reconciles even if a sale landed between the two requests.
-    stock: t?.currentStock ?? p.stock,
-  };
-};
+const toSheetItem = (p: ProductLite, t: ProductStockTotals | undefined): StockSheetItem => ({
+  id: p.id, name: p.name, sku: p.sku, category: p.category,
+  ...sheetFigures(t ?? {
+    productId: p.id, currentStock: p.stock, inQuantity: 0, inCount: 0,
+    outQuantity: 0, returnedQuantity: 0, unloggedInQuantity: p.stock, unloggedOutQuantity: 0,
+  }),
+});
 
 const sumFigures = (items: StockSheetItem[]) => ({
   units: items.reduce((n, p) => n + p.stock, 0),
@@ -88,6 +76,8 @@ export default function StockCheck() {
   const [selected, setSelected]         = useState<Set<string> | null>(null); // null = not initialised yet
   const [hideZero, setHideZero]         = useState(false);
   const [pagePerSupplier, setPagePerSupplier] = useState(false);
+  /** Product whose full movement history is open in the dialog. */
+  const [tracking, setTracking]         = useState<TimelineSubject | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -485,7 +475,14 @@ export default function StockCheck() {
                   </div>
                   <div className="divide-y divide-border">
                     {g.items.map((p) => (
-                      <div key={p.id} className="px-4 py-2.5 flex items-center gap-3" data-testid={`row-${p.id}`}>
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setTracking({ id: p.id, name: p.name, sku: p.sku, category: p.category })}
+                        className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-muted/40 active:bg-muted/60 transition-colors focus-visible:outline-none focus-visible:bg-muted/40"
+                        aria-label={`${p.name} — full stock history`}
+                        data-testid={`row-${p.id}`}
+                      >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold truncate">{p.name}</p>
                           {/* Figures first: on a narrow screen this line truncates from the right,
@@ -502,7 +499,8 @@ export default function StockCheck() {
                           <p className="w-11 text-right font-bold text-muted-foreground">{p.outNet}</p>
                           <p className={`w-11 text-right font-black ${p.stock === 0 ? "text-muted-foreground/50" : ""}`}>{p.stock}</p>
                         </div>
-                      </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0 -mr-1" aria-hidden />
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -589,6 +587,8 @@ export default function StockCheck() {
           </div>
         )}
       </div>
+
+      <ProductTimelineDialog subject={tracking} onClose={() => setTracking(null)} />
     </>
   );
 }

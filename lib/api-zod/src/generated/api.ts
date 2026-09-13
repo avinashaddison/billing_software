@@ -358,6 +358,147 @@ export const GetProductStockHistoryResponse = zod.object({
 });
 
 /**
+ * Every stock-in, sale, customer return and correction recorded for the product, newest first, each with the exact time, who recorded it and — for sales and returns — the bill number and customer. Sales made from the Scan/Entry screens without a bill appear with `bill: null`. The events come from the same ledger the Stock Check sheet is summed from, so they reconcile with its In / Out / Stock figures; stock that never went through an entry (opening stock, edits, imports) is reported in `totals` as unlogged instead of being invented as a dated event. Archived (deleted) products remain readable here.
+ * Readable by owners and by staff holding read access to Suppliers (the Stock Check sheet) or Stock Logs. Owners receive purchase cost and customer phone numbers; the staff (manager) view omits those fields entirely.
+ * @summary Dated movement history of a product, with bills and customers
+ */
+export const GetProductTimelineParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetProductTimelineResponse = zod.object({
+  product: zod.object({
+    id: zod.string().uuid(),
+    name: zod.string(),
+    sku: zod.string(),
+    category: zod.string(),
+    stock: zod.number().int(),
+    supplierName: zod.string().nullable(),
+    deleted: zod
+      .boolean()
+      .describe(
+        "True when the product has been deleted (archived) from the catalogue",
+      ),
+    createdAt: zod.coerce.date(),
+  }),
+  totals: zod
+    .object({
+      productId: zod.string(),
+      currentStock: zod
+        .number()
+        .int()
+        .describe("Current stock level of the product"),
+      inQuantity: zod
+        .number()
+        .int()
+        .describe(
+          "Units received through stock entries (IN movements), all time",
+        ),
+      inCount: zod
+        .number()
+        .int()
+        .describe("Number of stock entries (IN movements), all time"),
+      outQuantity: zod
+        .number()
+        .int()
+        .describe("Units sold (OUT movements), all time"),
+      returnedQuantity: zod
+        .number()
+        .int()
+        .describe(
+          "Units customers returned to stock (RETURN movements), all time",
+        ),
+      unloggedInQuantity: zod
+        .number()
+        .int()
+        .describe(
+          "Stock that arrived without a stock entry — opening stock typed in when the product was created, upward edits or corrections. Never negative.\n",
+        ),
+      unloggedOutQuantity: zod
+        .number()
+        .int()
+        .describe(
+          "Stock that left without a sale or return — downward edits or corrections, write-offs. Never negative.\n",
+        ),
+    })
+    .describe(
+      "Lifetime stock figures for one product. Always satisfies currentStock = unloggedInQuantity + inQuantity − outQuantity + returnedQuantity − unloggedOutQuantity; at most one of the two unlogged figures is non-zero.\n",
+    ),
+  events: zod
+    .array(
+      zod
+        .object({
+          id: zod.string(),
+          type: zod.enum(["IN", "OUT", "RETURN", "ADJUSTMENT"]),
+          quantity: zod
+            .number()
+            .int()
+            .describe(
+              "Units moved. For an ADJUSTMENT with `setsLevel: true` it is the resulting stock level instead of a change.\n",
+            ),
+          setsLevel: zod
+            .boolean()
+            .describe(
+              "ADJUSTMENT only — `quantity` is the new stock level, not a change",
+            ),
+          at: zod.coerce.date(),
+          by: zod
+            .string()
+            .nullable()
+            .describe(
+              'Staff name, \"API key · name\" for API writes, or null when unknown',
+            ),
+          note: zod.string().nullable(),
+          supplierName: zod.string().nullable().describe("Stock-in only"),
+          invoiceNumber: zod.string().nullable().describe("Stock-in only"),
+          purchasePrice: zod
+            .number()
+            .nullish()
+            .describe(
+              "Stock-in only — cost per unit recorded with the entry. Owner view only — absent from the staff (manager) view.\n",
+            ),
+          bill: zod
+            .union([
+              zod
+                .object({
+                  id: zod.string().uuid(),
+                  number: zod.number().int(),
+                  customerName: zod.string().nullable(),
+                  customerPhone: zod
+                    .string()
+                    .nullish()
+                    .describe(
+                      "Owner view only — absent from the staff (manager) view",
+                    ),
+                  paymentMode: zod.string().describe("cash, upi or credit"),
+                  unitPrice: zod
+                    .number()
+                    .nullable()
+                    .describe(
+                      "Unit price the customer paid for this product on the bill (sales only). Null when the product was rung up on several lines of the bill at different prices, where no single per-event figure exists.\n",
+                    ),
+                  lineTotal: zod
+                    .number()
+                    .nullable()
+                    .describe(
+                      "What this movement's units came to on the bill (sales only): the line's subtotal, or `quantity × unit price` when the product was rung up on several lines at one price. Null when unitPrice is null.\n",
+                    ),
+                })
+                .describe("The bill a sale or return belongs to."),
+              zod.null(),
+            ])
+            .describe(
+              "Sales and returns only; null for counter sales made without a bill",
+            ),
+          refundAmount: zod.number().nullable().describe("Returns only"),
+          returnReason: zod.string().nullable().describe("Returns only"),
+        })
+        .describe("One ledger movement of the product."),
+    )
+    .describe("Newest first"),
+});
+
+/**
  * @summary Get QR code data URL for a product
  */
 export const GetProductQrParams = zod.object({

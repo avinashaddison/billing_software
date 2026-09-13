@@ -648,7 +648,11 @@ router.post("/products/:id/stock", requireWrite("stockEntry"), async (req, res):
         type,
         quantity,
         ...restockMetadata,
-        userId: userId ?? null,
+        /* Attribute the movement to the signed-in staff member, as checkout
+           and returns do; the client-declared id is only a fallback for
+           sessions that carry no staff id, so the history can name who
+           actually did it rather than whoever the request claimed. */
+        userId: req.staffId ?? userId ?? null,
       })
       .returning();
 

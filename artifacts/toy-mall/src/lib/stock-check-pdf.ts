@@ -13,7 +13,7 @@ import type { CellHookData, Styles, UserOptions, __createTable, __drawTable } fr
 
 /**
  * One sheet row. The lifetime figures come from `/api/stock-logs/product-totals`
- * and are reduced on the page (see StockCheck's `toSheetItem`) so that
+ * and are reduced by `sheetFigures` below so that
  * `inTotal - outNet - adj === stock` holds for every row.
  */
 export interface StockSheetItem {
@@ -33,6 +33,34 @@ export interface StockSheetItem {
   adj: number;
   stock: number;
 }
+
+/** The figures the sheet prints for a product, minus its identity. */
+export type StockSheetFigures = Pick<StockSheetItem, "inTotal" | "entries" | "outNet" | "returned" | "adj" | "stock">;
+
+/**
+ * Reduce a product's lifetime totals (`/api/stock-logs/product-totals`) to the
+ * sheet's figures, such that `inTotal - outNet - adj === stock` on every row
+ * (the server guarantees the underlying identity; see
+ * api-server/src/lib/stock-totals.ts).
+ *
+ * "In" deliberately includes stock that never went through a stock entry —
+ * most of this catalogue was typed in with its opening stock when the product
+ * was created, and that stock did come from the supplier all the same. It is
+ * counted as one entry so "4 in · 0 entries" can never appear. Every screen
+ * that quotes these figures for a product must use this one rule, or the
+ * product's detail view will disagree with the row that opened it.
+ */
+export const sheetFigures = (t: {
+  unloggedInQuantity: number; inQuantity: number; inCount: number;
+  outQuantity: number; returnedQuantity: number; unloggedOutQuantity: number; currentStock: number;
+}): StockSheetFigures => ({
+  inTotal: t.unloggedInQuantity + t.inQuantity,
+  entries: t.inCount + (t.unloggedInQuantity > 0 ? 1 : 0),
+  outNet: t.outQuantity - t.returnedQuantity,
+  returned: t.returnedQuantity,
+  adj: t.unloggedOutQuantity,
+  stock: t.currentStock,
+});
 
 export interface StockSheetGroup {
   key: string;

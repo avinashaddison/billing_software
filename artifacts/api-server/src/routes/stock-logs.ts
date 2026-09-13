@@ -1,8 +1,13 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, asc, and, or, ilike, isNull, sql, type SQL } from "drizzle-orm";
-import { db, stockLogsTable, productsTable } from "@workspace/db";
+import { z } from "zod/v4";
+import {
+  db, stockLogsTable, productsTable, billsTable, saleItemsTable, returnsTable,
+  staffProfilesTable, suppliersTable,
+} from "@workspace/db";
 import {
   GetProductStockHistoryParams,
+  GetProductTimelineParams,
   ListStockLogsQueryParams,
   ListStockEntrySummaryQueryParams,
 } from "@workspace/api-zod";
@@ -11,6 +16,8 @@ import { liveProduct } from "../lib/product-scope";
 import { istToday } from "../lib/ist";
 import { buildStockBatchHistory } from "../lib/stock-batch-history";
 import { deriveStockTotals } from "../lib/stock-totals";
+import { shapeTimelineEvent, type ProductTimeline, type TimelineRow, type TimelineView } from "../lib/product-timeline";
+import { requireRead } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -114,6 +121,193 @@ router.get("/products/:id/stock-history", async (req, res): Promise<void> => {
     snapshot.product.stock,
     snapshot.movements,
   ));
+});
+
+/**
+ * Dated movement history of one product with the people behind each line:
+ * who recorded it, and for sales/returns which bill and customer. See
+ * lib/product-timeline.ts for why bills are matched by `created_at`.
+ *
+ * History-facing: an archived product stays readable so a row on a report
+ * can still be explained after the product is deleted.
+ */
+router.get("/products/:id/timeline", requireRead("suppliers", "logs"), async (req, res): Promise<void> => {
+  const parsed = GetProductTimelineParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  /* products.id is a uuid column: a malformed id is "no such product", not a
+     database error (Postgres would otherwise reject the comparison itself). */
+  if (!z.uuid().safeParse(parsed.data.id).success) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  const ownOrLegacyBill = (tenantId: string | null | undefined): SQL =>
+    tenantId == null
+      ? isNull(billsTable.tenantId)
+      : (or(eq(billsTable.tenantId, tenantId), isNull(billsTable.tenantId)) as SQL);
+
+  const snapshot = await db.transaction(async (tx) => {
+    const [product] = await tx
+      .select({
+        id: productsTable.id,
+        name: productsTable.name,
+        sku: productsTable.sku,
+        category: productsTable.category,
+        stock: productsTable.stock,
+        deletedAt: productsTable.deletedAt,
+        createdAt: productsTable.createdAt,
+        supplierName: suppliersTable.name,
+      })
+      .from(productsTable)
+      .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
+      .where(and(
+        eq(productsTable.id, parsed.data.id),
+        tenantWhere(productsTable.tenantId, req.tenantId),
+      ));
+
+    if (!product) return null;
+
+    /* The bill a sale row belongs to: written in the same transaction as the
+       ledger row, hence the identical timestamp. Grouped per bill so a product
+       billed on two lines of one bill still yields a single match. */
+    const saleBill = tx
+      .select({
+        billId: billsTable.id,
+        billNumber: billsTable.billNumber,
+        customerName: billsTable.customerName,
+        customerPhone: billsTable.customerPhone,
+        paymentMode: billsTable.paymentMode,
+        lineCount: sql<number>`COUNT(*)::int`.as("line_count"),
+        minPrice: sql<string>`MIN(${saleItemsTable.price})`.as("min_price"),
+        maxPrice: sql<string>`MAX(${saleItemsTable.price})`.as("max_price"),
+        linesTotal: sql<string>`SUM(${saleItemsTable.subtotal})`.as("lines_total"),
+      })
+      .from(billsTable)
+      .innerJoin(saleItemsTable, and(
+        eq(saleItemsTable.saleId, billsTable.id),
+        eq(saleItemsTable.productId, stockLogsTable.productId),
+      ))
+      .where(and(
+        eq(stockLogsTable.type, "OUT"),
+        eq(billsTable.createdAt, stockLogsTable.createdAt),
+        ownOrLegacyBill(req.tenantId),
+      ))
+      .groupBy(billsTable.id)
+      .orderBy(billsTable.id)
+      .limit(1)
+      .as("sale_bill");
+
+    /* Same idea for a customer return: the returns row and the RETURN ledger
+       row share one transaction, and the returns row points at the bill. */
+    const returnRow = tx
+      .select({
+        billId: returnsTable.billId,
+        refundAmount: returnsTable.refundAmount,
+        reason: returnsTable.reason,
+      })
+      .from(returnsTable)
+      .where(and(
+        eq(stockLogsTable.type, "RETURN"),
+        eq(returnsTable.productId, stockLogsTable.productId),
+        eq(returnsTable.createdAt, stockLogsTable.createdAt),
+      ))
+      .orderBy(returnsTable.id)
+      .limit(1)
+      .as("return_row");
+
+    const returnBill = tx
+      .select({
+        billId: billsTable.id,
+        billNumber: billsTable.billNumber,
+        customerName: billsTable.customerName,
+        customerPhone: billsTable.customerPhone,
+        paymentMode: billsTable.paymentMode,
+      })
+      .from(billsTable)
+      .where(and(eq(billsTable.id, returnRow.billId), ownOrLegacyBill(req.tenantId)))
+      .limit(1)
+      .as("return_bill");
+
+    const rows = await tx
+      .select({
+        id: stockLogsTable.id,
+        type: stockLogsTable.type,
+        quantity: stockLogsTable.quantity,
+        userId: stockLogsTable.userId,
+        staffName: staffProfilesTable.name,
+        purchasePrice: stockLogsTable.purchasePrice,
+        supplierName: stockLogsTable.supplierName,
+        invoiceNumber: stockLogsTable.invoiceNumber,
+        note: stockLogsTable.note,
+        createdAt: stockLogsTable.createdAt,
+        billId: sql<string | null>`COALESCE(${saleBill.billId}, ${returnBill.billId})`,
+        billNumber: sql<number | null>`COALESCE(${saleBill.billNumber}, ${returnBill.billNumber})`,
+        customerName: sql<string | null>`COALESCE(${saleBill.customerName}, ${returnBill.customerName})`,
+        customerPhone: sql<string | null>`COALESCE(${saleBill.customerPhone}, ${returnBill.customerPhone})`,
+        paymentMode: sql<string | null>`COALESCE(${saleBill.paymentMode}, ${returnBill.paymentMode})`,
+        lineCount: saleBill.lineCount,
+        minPrice: saleBill.minPrice,
+        maxPrice: saleBill.maxPrice,
+        linesTotal: saleBill.linesTotal,
+        refundAmount: returnRow.refundAmount,
+        returnReason: returnRow.reason,
+      })
+      .from(stockLogsTable)
+      /* user_id is free text (staff uuid, "apikey:…", or NULL): cast the
+         staff id to text rather than the other way round, which would raise. */
+      .leftJoin(staffProfilesTable, sql`${staffProfilesTable.id}::text = ${stockLogsTable.userId}`)
+      .leftJoinLateral(saleBill, sql`true`)
+      .leftJoinLateral(returnRow, sql`true`)
+      .leftJoinLateral(returnBill, sql`true`)
+      .where(and(
+        eq(stockLogsTable.productId, product.id),
+        ownOrLegacyLog(req.tenantId),
+      ))
+      .orderBy(desc(stockLogsTable.createdAt), desc(stockLogsTable.id));
+
+    return { product, rows };
+  }, {
+    isolationLevel: "repeatable read",
+    accessMode: "read only",
+  });
+
+  if (!snapshot) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  /* Set by requireRead: owners see cost and customer phones, staff do not. */
+  const view: TimelineView = res.locals.resourceReadView === "owner" ? "owner" : "manager";
+
+  const { product, rows } = snapshot;
+  const ledger = rows.reduce(
+    (acc, row) => {
+      if (row.type === "IN") { acc.inQuantity += row.quantity; acc.inCount += 1; }
+      else if (row.type === "OUT") acc.outQuantity += row.quantity;
+      else if (row.type === "RETURN") acc.returnedQuantity += row.quantity;
+      return acc;
+    },
+    { inQuantity: 0, inCount: 0, outQuantity: 0, returnedQuantity: 0 },
+  );
+
+  const timeline: ProductTimeline = {
+    product: {
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      category: product.category,
+      stock: product.stock,
+      supplierName: product.supplierName ?? null,
+      deleted: product.deletedAt != null,
+      createdAt: product.createdAt.toISOString(),
+    },
+    totals: deriveStockTotals(product.id, product.stock, ledger),
+    events: rows.map((row) => shapeTimelineEvent(row as TimelineRow, view)),
+  };
+  res.json(timeline);
 });
 
 router.get("/stock-logs", async (req, res): Promise<void> => {

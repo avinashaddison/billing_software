@@ -368,8 +368,13 @@ export function resolveResourceReadView(
  * manager-safe view — granting "write" must never turn into access to cost or
  * profit data. Email manager/cashier accounts do not have a per-resource map,
  * so they are denied in the same way requireWrite denies them.
+ *
+ * A surface reachable from more than one page may list every resource that
+ * opens it (like `requireAnyWrite`): a PIN staff member passes with read on
+ * ANY of them, and the 403 names the first.
  */
-export function requireRead(resource: string) {
+export function requireRead(resource: string, ...alsoVia: string[]) {
+  const resources = [resource, ...alsoVia];
   return async function (req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (req.authKind === "email" && req.userId) {
@@ -416,14 +421,16 @@ export function requireRead(resource: string) {
           next();
           return;
         }
-        const [perm] = await db
+        const perms = await db
           .select({ level: staffPermissionsTable.level })
           .from(staffPermissionsTable)
           .where(and(
             eq(staffPermissionsTable.staffId, req.staffId),
-            eq(staffPermissionsTable.resource, resource),
+            inArray(staffPermissionsTable.resource, resources),
           ));
-        const staffView = resolveResourceReadView("pin", me.role, perm?.level);
+        /* Any grant that reads suffices; the level itself never changes the view. */
+        const level = perms.find((p) => p.level === "write" || p.level === "read")?.level;
+        const staffView = resolveResourceReadView("pin", me.role, level);
         if (staffView) {
           res.locals.resourceReadView = staffView;
           next();

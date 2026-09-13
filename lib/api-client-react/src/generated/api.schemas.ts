@@ -204,6 +204,131 @@ export interface StockBatch {
   addedAt: string;
 }
 
+/**
+ * The bill a sale or return belongs to.
+ */
+export interface ProductTimelineBill {
+  id: string;
+  number: number;
+  /** @nullable */
+  customerName: string | null;
+  /**
+   * Owner view only — absent from the staff (manager) view
+   * @nullable
+   */
+  customerPhone?: string | null;
+  /** cash, upi or credit */
+  paymentMode: string;
+  /**
+   * Unit price the customer paid for this product on the bill (sales only). Null when the product was rung up on several lines of the bill at different prices, where no single per-event figure exists.
+   * @nullable
+   */
+  unitPrice: number | null;
+  /**
+   * What this movement's units came to on the bill (sales only): the line's subtotal, or `quantity × unit price` when the product was rung up on several lines at one price. Null when unitPrice is null.
+   * @nullable
+   */
+  lineTotal: number | null;
+}
+
+export type ProductTimelineEventType =
+  (typeof ProductTimelineEventType)[keyof typeof ProductTimelineEventType];
+
+export const ProductTimelineEventType = {
+  IN: "IN",
+  OUT: "OUT",
+  RETURN: "RETURN",
+  ADJUSTMENT: "ADJUSTMENT",
+} as const;
+
+/**
+ * One ledger movement of the product.
+ */
+export interface ProductTimelineEvent {
+  id: string;
+  type: ProductTimelineEventType;
+  /** Units moved. For an ADJUSTMENT with `setsLevel: true` it is the resulting stock level instead of a change. */
+  quantity: number;
+  /** ADJUSTMENT only — `quantity` is the new stock level, not a change */
+  setsLevel: boolean;
+  at: string;
+  /**
+   * Staff name, "API key · name" for API writes, or null when unknown
+   * @nullable
+   */
+  by: string | null;
+  /** @nullable */
+  note: string | null;
+  /**
+   * Stock-in only
+   * @nullable
+   */
+  supplierName: string | null;
+  /**
+   * Stock-in only
+   * @nullable
+   */
+  invoiceNumber: string | null;
+  /**
+   * Stock-in only — cost per unit recorded with the entry. Owner view only — absent from the staff (manager) view.
+   * @nullable
+   */
+  purchasePrice?: number | null;
+  /** Sales and returns only; null for counter sales made without a bill */
+  bill: ProductTimelineBill | null;
+  /**
+   * Returns only
+   * @nullable
+   */
+  refundAmount: number | null;
+  /**
+   * Returns only
+   * @nullable
+   */
+  returnReason: string | null;
+}
+
+export interface ProductTimelineProduct {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  stock: number;
+  /** @nullable */
+  supplierName: string | null;
+  /** True when the product has been deleted (archived) from the catalogue */
+  deleted: boolean;
+  createdAt: string;
+}
+
+/**
+ * Lifetime stock figures for one product. Always satisfies currentStock = unloggedInQuantity + inQuantity − outQuantity + returnedQuantity − unloggedOutQuantity; at most one of the two unlogged figures is non-zero.
+ */
+export interface ProductStockTotals {
+  productId: string;
+  /** Current stock level of the product */
+  currentStock: number;
+  /** Units received through stock entries (IN movements), all time */
+  inQuantity: number;
+  /** Number of stock entries (IN movements), all time */
+  inCount: number;
+  /** Units sold (OUT movements), all time */
+  outQuantity: number;
+  /** Units customers returned to stock (RETURN movements), all time */
+  returnedQuantity: number;
+  /** Stock that arrived without a stock entry — opening stock typed in when the product was created, upward edits or corrections. Never negative. */
+  unloggedInQuantity: number;
+  /** Stock that left without a sale or return — downward edits or corrections, write-offs. Never negative. */
+  unloggedOutQuantity: number;
+}
+
+export interface ProductTimeline {
+  product: ProductTimelineProduct;
+  totals: ProductStockTotals;
+  /** Newest first */
+  events: ProductTimelineEvent[];
+}
+
 export type ProductStockHistorySummary = {
   /** Total units recorded by stock-in events */
   stockedQuantity: number;
@@ -254,27 +379,6 @@ export interface StockEntrySummary {
   products: ProductEntrySummary[];
   /** True when more products matched than `limit` returned */
   truncated: boolean;
-}
-
-/**
- * Lifetime stock figures for one product. Always satisfies currentStock = unloggedInQuantity + inQuantity − outQuantity + returnedQuantity − unloggedOutQuantity; at most one of the two unlogged figures is non-zero.
- */
-export interface ProductStockTotals {
-  productId: string;
-  /** Current stock level of the product */
-  currentStock: number;
-  /** Units received through stock entries (IN movements), all time */
-  inQuantity: number;
-  /** Number of stock entries (IN movements), all time */
-  inCount: number;
-  /** Units sold (OUT movements), all time */
-  outQuantity: number;
-  /** Units customers returned to stock (RETURN movements), all time */
-  returnedQuantity: number;
-  /** Stock that arrived without a stock entry — opening stock typed in when the product was created, upward edits or corrections. Never negative. */
-  unloggedInQuantity: number;
-  /** Stock that left without a sale or return — downward edits or corrections, write-offs. Never negative. */
-  unloggedOutQuantity: number;
 }
 
 export interface ProductStockTotalsList {

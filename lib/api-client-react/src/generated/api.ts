@@ -33,6 +33,7 @@ import type {
   Product,
   ProductStockHistory,
   ProductStockTotalsList,
+  ProductTimeline,
   QrCodeResponse,
   ReceivablesSummary,
   RecordPaymentInput,
@@ -842,6 +843,95 @@ export function useGetProductStockHistory<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetProductStockHistoryQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getGetProductTimelineUrl = (id: string) => {
+  return `/api/products/${id}/timeline`;
+};
+
+/**
+ * Every stock-in, sale, customer return and correction recorded for the product, newest first, each with the exact time, who recorded it and — for sales and returns — the bill number and customer. Sales made from the Scan/Entry screens without a bill appear with `bill: null`. The events come from the same ledger the Stock Check sheet is summed from, so they reconcile with its In / Out / Stock figures; stock that never went through an entry (opening stock, edits, imports) is reported in `totals` as unlogged instead of being invented as a dated event. Archived (deleted) products remain readable here.
+ * Readable by owners and by staff holding read access to Suppliers (the Stock Check sheet) or Stock Logs. Owners receive purchase cost and customer phone numbers; the staff (manager) view omits those fields entirely.
+ * @summary Dated movement history of a product, with bills and customers
+ */
+export const getProductTimeline = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<ProductTimeline> => {
+  return customFetch<ProductTimeline>(getGetProductTimelineUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetProductTimelineQueryKey = (id: string) => {
+  return [`/api/products/${id}/timeline`] as const;
+};
+
+export const getGetProductTimelineQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProductTimeline>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProductTimeline>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetProductTimelineQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProductTimeline>>
+  > = ({ signal }) => getProductTimeline(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProductTimeline>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProductTimelineQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProductTimeline>>
+>;
+export type GetProductTimelineQueryError = ErrorType<void | ErrorResponse>;
+
+/**
+ * @summary Dated movement history of a product, with bills and customers
+ */
+
+export function useGetProductTimeline<
+  TData = Awaited<ReturnType<typeof getProductTimeline>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProductTimeline>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProductTimelineQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -260,6 +260,49 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /products/{id}/timeline:
+    get:
+      operationId: getProductTimeline
+      tags: [products, stock-logs]
+      summary: Dated movement history of a product, with bills and customers
+      description: >
+        Every stock-in, sale, customer return and correction recorded for the
+        product, newest first, each with the exact time, who recorded it and —
+        for sales and returns — the bill number and customer. Sales made from
+        the Scan/Entry screens without a bill appear with `bill: null`. The
+        events come from the same ledger the Stock Check sheet is summed from,
+        so they reconcile with its In / Out / Stock figures; stock that never
+        went through an entry (opening stock, edits, imports) is reported in
+        `totals` as unlogged instead of being invented as a dated event.
+        Archived (deleted) products remain readable here.
+
+        Readable by owners and by staff holding read access to Suppliers (the
+        Stock Check sheet) or Stock Logs. Owners receive purchase cost and
+        customer phone numbers; the staff (manager) view omits those fields
+        entirely.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Product movement timeline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductTimeline"
+        "403":
+          description: No read access to Suppliers or Stock Logs
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /products/{id}/qr:
     get:
       operationId: getProductQr
@@ -883,6 +926,153 @@ components:
         - note
         - remainingQuantity
         - addedAt
+
+    ProductTimelineBill:
+      type: object
+      description: The bill a sale or return belongs to.
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: integer
+        customerName:
+          type: ["string", "null"]
+        customerPhone:
+          type: ["string", "null"]
+          description: Owner view only — absent from the staff (manager) view
+        paymentMode:
+          type: string
+          description: cash, upi or credit
+        unitPrice:
+          type: ["number", "null"]
+          description: >
+            Unit price the customer paid for this product on the bill (sales
+            only). Null when the product was rung up on several lines of the
+            bill at different prices, where no single per-event figure exists.
+        lineTotal:
+          type: ["number", "null"]
+          description: >
+            What this movement's units came to on the bill (sales only): the
+            line's subtotal, or `quantity × unit price` when the product was
+            rung up on several lines at one price. Null when unitPrice is null.
+      required:
+        - id
+        - number
+        - customerName
+        - paymentMode
+        - unitPrice
+        - lineTotal
+
+    ProductTimelineEvent:
+      type: object
+      description: One ledger movement of the product.
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [IN, OUT, RETURN, ADJUSTMENT]
+        quantity:
+          type: integer
+          description: >
+            Units moved. For an ADJUSTMENT with `setsLevel: true` it is the
+            resulting stock level instead of a change.
+        setsLevel:
+          type: boolean
+          description: ADJUSTMENT only — `quantity` is the new stock level, not a change
+        at:
+          type: string
+          format: date-time
+        by:
+          type: ["string", "null"]
+          description: Staff name, "API key · name" for API writes, or null when unknown
+        note:
+          type: ["string", "null"]
+        supplierName:
+          type: ["string", "null"]
+          description: Stock-in only
+        invoiceNumber:
+          type: ["string", "null"]
+          description: Stock-in only
+        purchasePrice:
+          type: ["number", "null"]
+          description: >
+            Stock-in only — cost per unit recorded with the entry. Owner view
+            only — absent from the staff (manager) view.
+        bill:
+          oneOf:
+            - $ref: "#/components/schemas/ProductTimelineBill"
+            - type: "null"
+          description: Sales and returns only; null for counter sales made without a bill
+        refundAmount:
+          type: ["number", "null"]
+          description: Returns only
+        returnReason:
+          type: ["string", "null"]
+          description: Returns only
+      required:
+        - id
+        - type
+        - quantity
+        - setsLevel
+        - at
+        - by
+        - note
+        - supplierName
+        - invoiceNumber
+        - bill
+        - refundAmount
+        - returnReason
+
+    ProductTimelineProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        sku:
+          type: string
+        category:
+          type: string
+        stock:
+          type: integer
+        supplierName:
+          type: ["string", "null"]
+        deleted:
+          type: boolean
+          description: True when the product has been deleted (archived) from the catalogue
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - sku
+        - category
+        - stock
+        - supplierName
+        - deleted
+        - createdAt
+
+    ProductTimeline:
+      type: object
+      properties:
+        product:
+          $ref: "#/components/schemas/ProductTimelineProduct"
+        totals:
+          $ref: "#/components/schemas/ProductStockTotals"
+        events:
+          type: array
+          description: Newest first
+          items:
+            $ref: "#/components/schemas/ProductTimelineEvent"
+      required:
+        - product
+        - totals
+        - events
 
     ProductStockHistory:
       type: object
