@@ -6,13 +6,13 @@ import {
   stockLogsTable,
   salesTable,
   saleItemsTable,
-  returnsTable,
   suppliersTable,
 } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { liveProduct } from "../lib/product-scope";
+import { recordAudit, tenantActor } from "../lib/audit";
 import { requireWrite, requireAnyWrite } from "../middlewares/auth";
-import { logger } from "../lib/logger";
 import {
   ListProductsQueryParams,
   CreateProductBody,
@@ -64,7 +64,7 @@ router.get("/products", async (req, res): Promise<void> => {
 
   let query = db.select().from(productsTable).$dynamic();
 
-  const conditions = [tenantWhere(productsTable.tenantId, req.tenantId)];
+  const conditions = [tenantWhere(productsTable.tenantId, req.tenantId), liveProduct()];
 
   if (search) {
     conditions.push(
@@ -178,6 +178,9 @@ router.get("/products/next-sku", async (req, res): Promise<void> => {
   const prefix = categoryCode.toUpperCase();
   const likePattern = `${prefix}-%`;
 
+  /* Deliberately counts ARCHIVED products too (no liveProduct()): a deleted
+     item's SKU is still printed on old bills, so auto-numbering must keep
+     moving past it rather than hand the same code to a new product. */
   const products = await db
     .select({ sku: productsTable.sku })
     .from(productsTable)
@@ -210,6 +213,7 @@ router.get("/products/sku/:sku", async (req, res): Promise<void> => {
     .where(and(
       eq(productsTable.sku, params.data.sku),
       tenantWhere(productsTable.tenantId, req.tenantId),
+      liveProduct(),
     ));
 
   if (!product) {
@@ -235,6 +239,7 @@ router.get("/products/scan/:code", async (req, res): Promise<void> => {
     .where(and(
       eq(productsTable.sku, code),
       tenantWhere(productsTable.tenantId, req.tenantId),
+      liveProduct(),
     ));
 
   // Fall back to barcode match (case-insensitive)
@@ -245,6 +250,7 @@ router.get("/products/scan/:code", async (req, res): Promise<void> => {
       .where(and(
         eq(productsTable.barcode, req.params.code.trim()),
         tenantWhere(productsTable.tenantId, req.tenantId),
+        liveProduct(),
       ));
   }
 
@@ -269,6 +275,7 @@ router.get("/products/:id", async (req, res): Promise<void> => {
     .where(and(
       eq(productsTable.id, params.data.id),
       tenantWhere(productsTable.tenantId, req.tenantId),
+      liveProduct(),
     ));
 
   if (!product) {
@@ -322,6 +329,7 @@ router.patch("/products/:id", requireWrite("products"), async (req, res): Promis
     .where(and(
       eq(productsTable.id, params.data.id),
       tenantWhereWrite(productsTable.tenantId, req.tenantId),
+      liveProduct(),
     ));
 
   if (!existing) {
@@ -396,6 +404,7 @@ router.patch("/products/:id", requireWrite("products"), async (req, res): Promis
     .where(and(
       eq(productsTable.id, params.data.id),
       tenantWhereWrite(productsTable.tenantId, req.tenantId),
+      liveProduct(),
     ))
     .returning();
 
@@ -409,6 +418,15 @@ router.patch("/products/:id", requireWrite("products"), async (req, res): Promis
   res.json(mapProduct(product));
 });
 
+/* Deleting a product ARCHIVES it (stamps `deleted_at`); nothing is ever
+   hard-deleted. A product that was ever billed is referenced by sale_items,
+   sales (quick-OUT), returns and stock_logs: removing the row would either
+   fail on those foreign keys or erase financial history, and nulling the
+   bill lines' product_id trips sale_items' "product OR custom name" CHECK —
+   which is exactly why every billed product used to answer DELETE with a
+   500. Archiving keeps every bill, refund, report and movement intact while
+   the product disappears from the catalogue (see lib/product-scope). Its SKU
+   and barcode become free for reuse — uniqueness covers live rows only. */
 router.delete("/products/:id", requireWrite("products"), async (req, res): Promise<void> => {
   const params = DeleteProductParams.safeParse(req.params);
   if (!params.success) {
@@ -418,80 +436,42 @@ router.delete("/products/:id", requireWrite("products"), async (req, res): Promi
 
   const { id } = params.data;
 
-  try {
-    const outcome = await db.transaction(async (tx) => {
-      /* Confirm the product belongs to the caller's tenant before we delete
-         it (and its stock-log history). */
-      const [owned] = await tx
-        .select({ id: productsTable.id })
-        .from(productsTable)
-        .where(and(
-          eq(productsTable.id, id),
-          tenantWhereWrite(productsTable.tenantId, req.tenantId),
-        ));
-      if (!owned) return { status: "not_found" as const };
+  /* Single guarded UPDATE: the tenant predicate and liveProduct() sit on the
+     write itself, so a product of another shop, or one already deleted, is a
+     404 rather than a second stamp. */
+  const [archived] = await db
+    .update(productsTable)
+    .set({ deletedAt: new Date() })
+    .where(and(
+      eq(productsTable.id, id),
+      tenantWhereWrite(productsTable.tenantId, req.tenantId),
+      liveProduct(),
+    ))
+    .returning({ id: productsTable.id, name: productsTable.name, sku: productsTable.sku, stock: productsTable.stock, tenantId: productsTable.tenantId });
 
-      /* Guard: `sales` (quick-OUT) and `returns` reference this product with
-         NOT NULL foreign keys. A hard delete would either hit a raw FK-violation
-         500, or — if we cascaded — permanently erase financial history. Neither
-         is acceptable, so block the delete with a clear message instead. Bill
-         line items (`sale_items`) are handled below by nulling the reference,
-         which preserves the printed bill. */
-      const [salesRef] = await tx
-        .select({ n: sql<number>`count(*)::int` })
-        .from(salesTable)
-        .where(eq(salesTable.productId, id));
-      const [returnsRef] = await tx
-        .select({ n: sql<number>`count(*)::int` })
-        .from(returnsTable)
-        .where(eq(returnsTable.productId, id));
-      if ((salesRef?.n ?? 0) > 0 || (returnsRef?.n ?? 0) > 0) {
-        return { status: "has_history" as const };
-      }
-
-      /* The two dependent cleanups below are scoped by productId alone, on
-         purpose. The product itself is ownership-checked above and productId is
-         globally unique, so a tenant predicate adds no isolation — but it WOULD
-         skip any legacy dependent row carrying a NULL tenant_id, leaving a
-         stock-log behind that then breaks the product delete on its foreign key.
-         The tenant guarantee belongs on the product delete itself, below. */
-
-      /* 1. Remove stock-movement logs (history has no value without the product) */
-      await tx.delete(stockLogsTable).where(eq(stockLogsTable.productId, id));
-
-      /* 2. Nullify the product reference in sale items so bill history is preserved */
-      await tx
-        .update(saleItemsTable)
-        .set({ productId: null })
-        .where(eq(saleItemsTable.productId, id));
-
-      /* 3. Delete the product itself */
-      const [deleted] = await tx
-        .delete(productsTable)
-        .where(and(
-          eq(productsTable.id, id),
-          tenantWhereWrite(productsTable.tenantId, req.tenantId),
-        ))
-        .returning();
-      return { status: "ok" as const, product: deleted };
-    });
-
-    if (outcome.status === "not_found") {
-      res.status(404).json({ error: "Product not found" });
-      return;
-    }
-    if (outcome.status === "has_history") {
-      res.status(409).json({
-        error: "This product has sales or return history and can't be deleted. Set its stock to 0 to retire it instead.",
-      });
-      return;
-    }
-
-    res.sendStatus(204);
-  } catch (err) {
-    logger.error({ err, productId: id }, "Product delete failed");
-    res.status(500).json({ error: "Failed to delete product" });
+  if (!archived) {
+    res.status(404).json({ error: "Product not found" });
+    return;
   }
+
+  /* Reuses the `product_updated` event on purpose: every client (including
+     already-deployed ones) refetches its product lists and dashboard on it,
+     which is all a deletion needs. */
+  broadcast("product_updated", { productId: archived.id, name: archived.name, sku: archived.sku, deleted: true }, req.tenantId);
+
+  /* The stock that was on hand at deletion is the one figure no report will
+     show afterwards, so it goes in the audit row. Never blocks the response. */
+  void (async () => {
+    await recordAudit({
+      action: "tenant.product.delete",
+      ...(await tenantActor(req)),
+      targetTenant: req.tenantId ?? archived.tenantId ?? null,
+      metadata: { productId: archived.id, name: archived.name, sku: archived.sku, stockAtDeletion: archived.stock },
+      ip: req.ip,
+    });
+  })();
+
+  res.sendStatus(204);
 });
 
 /* Stock IN / OUT / ADJUSTMENT on an existing product. Gated by the dedicated
@@ -564,6 +544,7 @@ router.post("/products/:id/stock", requireWrite("stockEntry"), async (req, res):
       .where(and(
         eq(productsTable.id, params.data.id),
         tenantWhereWrite(productsTable.tenantId, req.tenantId),
+        liveProduct(),
       ));
 
     if (!product) return { status: "not_found" as const };
@@ -615,18 +596,22 @@ router.post("/products/:id/stock", requireWrite("stockEntry"), async (req, res):
       };
     }
 
-    /* Each stock write repeats the tenant predicate rather than relying solely
-       on the ownership SELECT above — same reasoning as the delete route: the
-       guarantee should live on the statement that actually changes data. */
+    /* Each stock write repeats the tenant AND live predicates rather than
+       relying solely on the ownership SELECT above — same reasoning as the
+       delete route: the guarantee should live on the statement that actually
+       changes data. The SELECT is unlocked, so a delete committing between it
+       and this UPDATE must make the write miss, not mutate an archived row. */
+    const writeGuard = and(
+      eq(productsTable.id, params.data.id),
+      tenantWhereWrite(productsTable.tenantId, req.tenantId),
+      liveProduct(),
+    );
     let updatedProduct: typeof productsTable.$inferSelect | undefined;
     if (type === "IN") {
       [updatedProduct] = await tx
         .update(productsTable)
         .set({ stock: sql`${productsTable.stock} + ${quantity}` })
-        .where(and(
-          eq(productsTable.id, params.data.id),
-          tenantWhereWrite(productsTable.tenantId, req.tenantId),
-        ))
+        .where(writeGuard)
         .returning();
     } else if (type === "OUT") {
       /* Guarded decrement: the row only updates if enough stock is still on
@@ -634,24 +619,26 @@ router.post("/products/:id/stock", requireWrite("stockEntry"), async (req, res):
       [updatedProduct] = await tx
         .update(productsTable)
         .set({ stock: sql`${productsTable.stock} - ${quantity}` })
-        .where(and(
-          eq(productsTable.id, params.data.id),
-          tenantWhereWrite(productsTable.tenantId, req.tenantId),
-          gte(productsTable.stock, quantity),
-        ))
+        .where(and(writeGuard, gte(productsTable.stock, quantity)))
         .returning();
-      if (!updatedProduct) return { status: "insufficient" as const };
+      if (!updatedProduct) {
+        /* Distinguish "sold out" from "deleted a moment ago". */
+        const [still] = await tx
+          .select({ deletedAt: productsTable.deletedAt })
+          .from(productsTable)
+          .where(eq(productsTable.id, params.data.id));
+        if (!still || still.deletedAt != null) return { status: "not_found" as const };
+        return { status: "insufficient" as const };
+      }
     } else {
       // ADJUSTMENT — set absolute value
       [updatedProduct] = await tx
         .update(productsTable)
         .set({ stock: quantity })
-        .where(and(
-          eq(productsTable.id, params.data.id),
-          tenantWhereWrite(productsTable.tenantId, req.tenantId),
-        ))
+        .where(writeGuard)
         .returning();
     }
+    if (!updatedProduct) return { status: "not_found" as const };
 
     const [log] = await tx
       .insert(stockLogsTable)
@@ -750,6 +737,7 @@ router.get("/products/:id/qr", async (req, res): Promise<void> => {
     .where(and(
       eq(productsTable.id, params.data.id),
       tenantWhere(productsTable.tenantId, req.tenantId),
+      liveProduct(),
     ));
 
   if (!product) {
@@ -795,6 +783,7 @@ router.post("/products/bulk-assign-supplier", requireWrite("products"), async (r
     .where(and(
       inArray(productsTable.id, productIds),
       tenantWhereWrite(productsTable.tenantId, req.tenantId),
+      liveProduct(),
     ))
     .returning({ id: productsTable.id, name: productsTable.name, sku: productsTable.sku });
 
@@ -827,6 +816,7 @@ router.post("/products/bulk-import", requireWrite("products"), async (req, res):
       .where(and(
         eq(productsTable.sku, sku),
         tenantWhereWrite(productsTable.tenantId, req.tenantId),
+        liveProduct(),
       ));
 
     if (!existing) {
@@ -897,6 +887,7 @@ router.post("/products/bulk-import", requireWrite("products"), async (req, res):
       .where(and(
         eq(productsTable.sku, sku),
         tenantWhereWrite(productsTable.tenantId, req.tenantId),
+        liveProduct(),
       ));
     results.updated++;
   }
@@ -932,7 +923,7 @@ async function buildSalePriceRecoveryCandidates(tenantId: string | null | undefi
   const products = await db
     .select()
     .from(productsTable)
-    .where(and(isNull(productsTable.salePrice), tenantWhere(productsTable.tenantId, tenantId)));
+    .where(and(isNull(productsTable.salePrice), tenantWhere(productsTable.tenantId, tenantId), liveProduct()));
 
   const candidates: {
     id: string;
@@ -1007,6 +998,7 @@ router.post("/products/sale-price-recovery/apply", requireWrite("products"), asy
       .where(and(
         eq(productsTable.id, c.id),
         tenantWhereWrite(productsTable.tenantId, req.tenantId),
+        liveProduct(),
       ))
       .returning({ id: productsTable.id });
     if (updated) restored++;

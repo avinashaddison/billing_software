@@ -172,6 +172,11 @@ paths:
       operationId: deleteProduct
       tags: [products]
       summary: Delete a product
+      description: >-
+        Archives the product: it disappears from lists, search, scan, stock
+        check, dashboards and billing, while its bills, refunds, reports and
+        stock movements are kept. Its SKU and barcode become free for reuse.
+        Deleting an already-deleted product returns 404.
       parameters:
         - name: id
           in: path

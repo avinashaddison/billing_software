@@ -30,3 +30,4 @@
 - [orval codegen gotchas](orval-codegen-gotchas.md) — after regenerating from openapi.yaml, restore lib/api-zod/src/index.ts (barrel collides) and prettier the generated dirs.
 - [Required fields at checkout](checkout-required-fields.md) — customer mobile + manual-line cost are global rules; enforce at server 400, both billing pages, and BEFORE the offline enqueue; blank=enabled-bounce, partial=disabled.
 - [Client-side PDF export](client-pdf-export.md) — jspdf fonts are WinAnsi-only; autotable only guarantees the head fits (measure via __createTable); navigator.share needs a no-await warm path.
+- [Product deletion is archival](product-soft-delete.md) — sale_items CHECK + NOT NULL FKs make hard delete impossible; liveProduct() on catalog reads AND guarded stock UPDATEs, never on history; live-only unique indexes.

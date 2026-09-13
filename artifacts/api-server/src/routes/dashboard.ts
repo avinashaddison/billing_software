@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { lte, sql, gte, and, desc, eq, gt } from "drizzle-orm";
 import { db, productsTable, stockLogsTable, billsTable, returnsTable } from "@workspace/db";
 import { tenantWhere } from "../lib/tenant";
+import { liveProduct } from "../lib/product-scope";
 import { istToday } from "../lib/ist";
 
 const router: IRouter = Router();
@@ -15,7 +16,7 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
       lowStockCount: sql<number>`count(case when ${productsTable.stock} <= ${productsTable.lowStockThreshold} then 1 end)::int`,
     })
     .from(productsTable)
-    .where(tenantWhere(productsTable.tenantId, req.tenantId));
+    .where(and(tenantWhere(productsTable.tenantId, req.tenantId), liveProduct()));
 
   const today = istToday();
 
@@ -47,6 +48,7 @@ router.get("/dashboard/low-stock", async (req, res): Promise<void> => {
     .where(and(
       lte(productsTable.stock, productsTable.lowStockThreshold),
       tenantWhere(productsTable.tenantId, req.tenantId),
+      liveProduct(),
     ))
     .orderBy(productsTable.stock);
 
@@ -86,7 +88,7 @@ router.get("/dashboard/categories", async (req, res): Promise<void> => {
       stockValue: sql<number>`sum(${productsTable.stock}::numeric * ${productsTable.price})`,
     })
     .from(productsTable)
-    .where(tenantWhere(productsTable.tenantId, req.tenantId))
+    .where(and(tenantWhere(productsTable.tenantId, req.tenantId), liveProduct()))
     .groupBy(productsTable.category)
     .orderBy(productsTable.category);
 

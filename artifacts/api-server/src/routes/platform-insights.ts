@@ -37,6 +37,7 @@ import {
 } from "@workspace/db";
 import { requirePlatformAdmin } from "../middlewares/platform-admin";
 import { anchorExtension, PRESET_DURATIONS, resolveExpiry } from "../lib/tenant-access";
+import { liveProduct } from "../lib/product-scope";
 import { recordAudit } from "../lib/audit";
 import { istToday, istShiftDay } from "../lib/ist";
 
@@ -135,7 +136,7 @@ router.get("/platform/overview", requirePlatformAdmin, async (_req, res): Promis
         .leftJoin(refundsSq, eq(refundsSq.billId, billsTable.id))
         .groupBy(billsTable.tenantId),
 
-      db.select({ tenantId: productsTable.tenantId,      c: sql<number>`count(*)::int` }).from(productsTable).groupBy(productsTable.tenantId),
+      db.select({ tenantId: productsTable.tenantId,      c: sql<number>`count(*)::int` }).from(productsTable).where(liveProduct()).groupBy(productsTable.tenantId),
       db.select({ tenantId: staffProfilesTable.tenantId, c: sql<number>`count(*)::int` }).from(staffProfilesTable).groupBy(staffProfilesTable.tenantId),
       db.select({ tenantId: authUsersTable.tenantId,     c: sql<number>`count(*)::int` }).from(authUsersTable).groupBy(authUsersTable.tenantId),
 
@@ -390,7 +391,7 @@ router.get("/platform/tenants/:id/detail", requirePlatformAdmin, async (req, res
           lowStock:   sql<number>`(count(*) filter (where ${productsTable.stock} <= ${productsTable.lowStockThreshold}))::int`,
         })
         .from(productsTable)
-        .where(eq(productsTable.tenantId, id)),
+        .where(and(eq(productsTable.tenantId, id), liveProduct())),
     ]);
 
     const [dues] = await db

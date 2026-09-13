@@ -3,6 +3,7 @@ import { eq, desc, and, sql, inArray, gte } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable, billPaymentsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { liveProduct } from "../lib/product-scope";
 import { requireWrite } from "../middlewares/auth";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 import { logger } from "../lib/logger";
@@ -253,25 +254,50 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
           .where(and(
             eq(productsTable.id, item.productId),
             tenantWhereWrite(productsTable.tenantId, tenantId),
+            liveProduct(),
           ));
 
-        if (!product) throw new Error(`Product not found: ${item.productId}`);
+        /* A deleted product is not billable, even from a cart or held bill
+           that still carries it. Name it in the error — the id alone means
+           nothing to a cashier who has to fix the bill. */
+        if (!product) {
+          const [gone] = await tx
+            .select({ name: productsTable.name })
+            .from(productsTable)
+            .where(and(
+              eq(productsTable.id, item.productId),
+              tenantWhereWrite(productsTable.tenantId, tenantId),
+            ));
+          throw new Error(gone
+            ? `"${gone.name}" has been deleted from products — remove it from the bill`
+            : `Product not found: ${item.productId}`);
+        }
 
         /* Atomic GUARDED decrement — only succeeds if enough stock is still on
            hand at write time, so two concurrent checkouts can't oversell the
-           same unit. A non-matching row (insufficient stock) returns nothing,
-           and throwing here rolls the whole bill transaction back. */
+           same unit. The live predicate is repeated HERE, on the write: the
+           SELECT above is unlocked, so a delete committing in between would
+           otherwise let this UPDATE sell an archived product. A non-matching
+           row returns nothing, and throwing rolls the whole bill back. */
         const [decremented] = await tx
           .update(productsTable)
           .set({ stock: sql`${productsTable.stock} - ${item.quantity}` })
           .where(and(
             eq(productsTable.id, item.productId),
             tenantWhereWrite(productsTable.tenantId, tenantId),
+            liveProduct(),
             gte(productsTable.stock, item.quantity),
           ))
           .returning({ stock: productsTable.stock });
 
         if (!decremented) {
+          const [still] = await tx
+            .select({ deletedAt: productsTable.deletedAt })
+            .from(productsTable)
+            .where(eq(productsTable.id, item.productId));
+          if (!still || still.deletedAt != null) {
+            throw new Error(`"${product.name}" has been deleted from products — remove it from the bill`);
+          }
           throw new Error(
             `Insufficient stock for "${product.name}" (available: ${product.stock}, requested: ${item.quantity})`
           );

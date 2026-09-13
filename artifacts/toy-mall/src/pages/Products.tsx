@@ -56,7 +56,8 @@ function DeleteConfirmModal({
           <p className="text-sm text-muted-foreground">
             <span className="font-bold text-foreground">{product.name}</span>
             <span className="font-mono text-xs ml-1 text-muted-foreground">({product.sku})</span>
-            {" "}will be permanently removed. This cannot be undone.
+            {" "}will be removed from your products, scan and stock check.
+            Its past bills and reports are kept. This cannot be undone.
           </p>
         </div>
         <div className="flex gap-3 p-4 border-t">
@@ -925,12 +926,22 @@ export default function Products() {
     setDeleting(true);
     try {
       const r = await fetch(`${BASE_URL}/api/products/${pendingDelete.id}`, { method: "DELETE" });
-      if (!r.ok && r.status !== 204) throw new Error("Delete failed");
+      if (!r.ok) {
+        /* Surface the server's reason (404 already deleted, 403 no
+           permission…) instead of one blanket message. Error pages may not
+           be JSON, so parse defensively. */
+        let reason = "";
+        try {
+          const body = (await r.json()) as { error?: unknown };
+          if (typeof body?.error === "string") reason = body.error;
+        } catch { /* non-JSON body */ }
+        throw new Error(reason || `Delete failed (${r.status})`);
+      }
       qc.invalidateQueries({ queryKey: getListProductsQueryKey() });
       toast.success(`"${pendingDelete.name}" deleted`);
       setPendingDelete(null);
-    } catch {
-      toast.error("Failed to delete product");
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : "Failed to delete product");
     } finally {
       setDeleting(false);
     }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useSearch } from "wouter";
 import {
   ArrowLeft, Printer, Truck, Package, ArrowDownToLine, ArrowUpToLine,
@@ -16,10 +16,28 @@ interface SupplierOption { id: string; name: string; phone?: string | null; }
 
 interface ReportProduct {
   id: string; name: string; sku: string; stock: number;
+  /** Deleted after moving in this range: purchases count, stock is 0 and
+   *  there is no product page to open (its SKU may belong to a new product). */
+  deleted?: boolean;
   purchasePrice: number | null; purchasedQty: number; soldQty: number;
   purchaseValue: number | null;
   /** Last stock-IN date, or the product's creation date if never restocked. */
   entryDate: string | null;
+}
+
+/** Deleted products have no product page (their SKU may now belong to a
+ *  new product), so their rows render without a link. */
+function RowLink({ sku, deleted, children }: { sku: string; deleted?: boolean; children: ReactNode }) {
+  if (deleted) return <div>{children}</div>;
+  return <Link href={`/product?sku=${encodeURIComponent(sku)}`}>{children}</Link>;
+}
+
+function DeletedTag() {
+  return (
+    <span className="ml-2 align-middle text-[9px] font-black uppercase tracking-widest text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm">
+      Deleted
+    </span>
+  );
 }
 
 interface SupplierReportData {
@@ -266,10 +284,13 @@ export default function SupplierReport() {
                     </div>
                     <div className="divide-y divide-border">
                       {report.products.map((p) => (
-                        <Link key={p.id} href={`/product?sku=${encodeURIComponent(p.sku)}`}>
-                          <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-3 hover:bg-muted/30 transition-colors items-center cursor-pointer">
+                        <RowLink key={p.id} sku={p.sku} deleted={p.deleted}>
+                          <div className={`grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-3 transition-colors items-center ${p.deleted ? "opacity-70" : "hover:bg-muted/30 cursor-pointer"}`}>
                             <div className="min-w-0">
-                              <p className="font-bold truncate">{p.name}</p>
+                              <p className="font-bold truncate">
+                                {p.name}
+                                {p.deleted && <DeletedTag />}
+                              </p>
                               <p className="text-xs font-mono text-muted-foreground">{p.sku}</p>
                             </div>
                             <div className="w-24 text-right text-sm font-bold text-muted-foreground tabular-nums">
@@ -286,7 +307,7 @@ export default function SupplierReport() {
                               {p.purchaseValue != null && p.purchaseValue > 0 ? `₹${inr(p.purchaseValue)}` : "—"}
                             </div>
                           </div>
-                        </Link>
+                        </RowLink>
                       ))}
                     </div>
                   </div>
@@ -294,9 +315,12 @@ export default function SupplierReport() {
                   {/* Mobile cards */}
                   <div className="md:hidden px-4 pb-4 space-y-3">
                     {report.products.map((p) => (
-                      <Link key={p.id} href={`/product?sku=${encodeURIComponent(p.sku)}`}>
-                        <div className="p-4 rounded-2xl border bg-card shadow-sm active:scale-[0.99] transition-all">
-                          <p className="font-bold text-sm truncate">{p.name}</p>
+                      <RowLink key={p.id} sku={p.sku} deleted={p.deleted}>
+                        <div className={`p-4 rounded-2xl border bg-card shadow-sm transition-all ${p.deleted ? "opacity-70" : "active:scale-[0.99]"}`}>
+                          <p className="font-bold text-sm truncate">
+                            {p.name}
+                            {p.deleted && <DeletedTag />}
+                          </p>
                           <p className="text-xs font-mono text-muted-foreground mb-2">
                             {p.sku} · <span className="font-sans font-semibold">Entry: {fmtEntry(p.entryDate)}</span>
                           </p>
@@ -315,7 +339,7 @@ export default function SupplierReport() {
                             </div>
                           </div>
                         </div>
-                      </Link>
+                      </RowLink>
                     ))}
                   </div>
                 </>
@@ -369,7 +393,7 @@ export default function SupplierReport() {
                   {report.products.map((p) => (
                     <tr key={p.id}>
                       <td className="pr-1 leading-tight py-0.5">
-                        {p.name}
+                        {p.name}{p.deleted ? " (deleted)" : ""}
                         <span className="block text-[8px]">{p.sku} · {fmtEntry(p.entryDate)}</span>
                       </td>
                       <td className="text-right align-top py-0.5 tabular-nums">{p.purchasedQty}</td>

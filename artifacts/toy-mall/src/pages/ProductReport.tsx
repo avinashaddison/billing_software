@@ -25,6 +25,9 @@ interface ProductData {
   currentStock: number;
   lowStockThreshold: number;
   isLowStock: boolean;
+  /** Product was deleted after selling in this range: its money counts,
+   *  its stock is 0 and it is not in the catalogue totals. */
+  deleted?: boolean;
   totalQty: number;
   totalRevenue: number;
   billCount: number;
@@ -144,6 +147,11 @@ function ProductMobileCard({ product, view }: { product: ProductData, view: 'man
             <span className="text-[10px] font-bold bg-muted/50 text-muted-foreground px-1.5 py-0.5 rounded-md truncate max-w-[100px]">{product.category}</span>
           </div>
           <h4 className="font-bold text-sm leading-tight text-foreground truncate">{product.productName}</h4>
+          {product.deleted && (
+            <span data-testid={`badge-deleted-${product.productId}`} className="inline-block mt-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm">
+              Deleted
+            </span>
+          )}
         </div>
         <div className="text-right shrink-0 pl-2">
           <div className={`text-sm font-black tabular-nums ${product.isLowStock ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`}>
@@ -293,7 +301,7 @@ export default function ProductReport() {
     
     const headers = [
       "Rank", "Product Name", "SKU", "Category", "Current Stock", "Low Stock",
-      "Net Units Sold", "Net Revenue", "Bills"
+      "Net Units Sold", "Net Revenue", "Bills", "Status"
     ];
     
     if (data.view === "owner") {
@@ -310,7 +318,8 @@ export default function ProductReport() {
         p.isLowStock ? "Yes" : "No",
         p.totalQty,
         p.totalRevenue,
-        p.billCount
+        p.billCount,
+        p.deleted ? "Deleted" : "Active"
       ];
       
       if (data.view === "owner") {
@@ -542,6 +551,9 @@ export default function ProductReport() {
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">{p.productSku}</span>
                           <span className="text-[10px] bg-muted/60 text-muted-foreground px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">{p.category}</span>
+                          {p.deleted && (
+                            <span data-testid={`badge-deleted-${p.productId}`} className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md font-black uppercase tracking-wider">Deleted</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3.5 text-right">

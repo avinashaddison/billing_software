@@ -198,6 +198,7 @@ export const UpdateProductResponse = zod.object({
 });
 
 /**
+ * Archives the product: it disappears from lists, search, scan, stock check, dashboards and billing, while its bills, refunds, reports and stock movements are kept. Its SKU and barcode become free for reuse. Deleting an already-deleted product returns 404.
  * @summary Delete a product
  */
 export const DeleteProductParams = zod.object({

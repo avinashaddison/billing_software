@@ -25,6 +25,7 @@ import {
   stockLogsTable,
 } from "@workspace/db";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { liveProduct } from "../lib/product-scope";
 import { requireWriteScope } from "../middlewares/api-key";
 import { recordAudit } from "../lib/audit";
 
@@ -135,7 +136,7 @@ const ProductsQuery = PageQuery.extend({
 
 router.get("/products", async (req, res): Promise<void> => {
   const q = ProductsQuery.parse(req.query);
-  const conditions: SQL[] = [tenantWhere(productsTable.tenantId, req.tenantId)];
+  const conditions: SQL[] = [tenantWhere(productsTable.tenantId, req.tenantId), liveProduct()];
   if (q.search) {
     const pattern = `%${q.search}%`;
     conditions.push(
@@ -162,7 +163,7 @@ router.get("/products/:id", async (req, res): Promise<void> => {
   const id = String(req.params.id);
   if (!isUuid(id)) { res.status(404).json({ error: "Product not found" }); return; }
   const [row] = await db.select(productColumns).from(productsTable)
-    .where(and(eq(productsTable.id, id), tenantWhere(productsTable.tenantId, req.tenantId)));
+    .where(and(eq(productsTable.id, id), tenantWhere(productsTable.tenantId, req.tenantId), liveProduct()));
   if (!row) { res.status(404).json({ error: "Product not found" }); return; }
   res.json(row);
 });
@@ -266,14 +267,17 @@ router.patch("/products/:id", requireWriteScope, async (req, res): Promise<void>
   }
 
   try {
-    /* Row-locked snapshot + update so the audit diff is exact under races. */
+    /* Row-locked snapshot + update so the audit diff is exact under races.
+       The live predicate sits on the locked SELECT (re-checked after the lock
+       is granted, so a delete that commits first makes it miss) and again on
+       the UPDATE, the statement that actually changes data. */
     const result = await db.transaction(async (tx) => {
       const [before] = await tx.select().from(productsTable)
-        .where(and(eq(productsTable.id, id), tenantWhereWrite(productsTable.tenantId, req.tenantId)))
+        .where(and(eq(productsTable.id, id), tenantWhereWrite(productsTable.tenantId, req.tenantId), liveProduct()))
         .for("update");
       if (!before) return null;
       const [row] = await tx.update(productsTable).set(updates)
-        .where(and(eq(productsTable.id, id), tenantWhereWrite(productsTable.tenantId, req.tenantId)))
+        .where(and(eq(productsTable.id, id), tenantWhereWrite(productsTable.tenantId, req.tenantId), liveProduct()))
         .returning(productColumns);
       if (!row) return null;
       return { before, row };
@@ -317,15 +321,18 @@ router.post("/products/:id/stock", requireWriteScope, async (req, res): Promise<
   const body = StockBody.parse(req.body);
 
   const result = await db.transaction(async (tx) => {
+    /* Archived products are not syncable: live predicate on the locked
+       SELECT and on the UPDATE itself (see PATCH above). */
     const [before] = await tx.select().from(productsTable)
-      .where(and(eq(productsTable.id, id), tenantWhereWrite(productsTable.tenantId, req.tenantId)))
+      .where(and(eq(productsTable.id, id), tenantWhereWrite(productsTable.tenantId, req.tenantId), liveProduct()))
       .for("update");
     if (!before) return { kind: "notfound" as const };
     const newStock = before.stock + body.change;
     if (newStock < 0) return { kind: "negative" as const, current: before.stock };
     const [row] = await tx.update(productsTable).set({ stock: newStock })
-      .where(eq(productsTable.id, before.id))
+      .where(and(eq(productsTable.id, before.id), tenantWhereWrite(productsTable.tenantId, req.tenantId), liveProduct()))
       .returning(productColumns);
+    if (!row) return { kind: "notfound" as const };
     /* Store the resulting absolute level, matching the in-app ADJUSTMENT
        contract. Older v1 rows used signed deltas and carry an `apikey:` userId;
        the distinct marker below lets history replay those legacy rows without
@@ -361,7 +368,7 @@ router.post("/products/:id/stock", requireWriteScope, async (req, res): Promise<
 router.get("/categories", async (req, res): Promise<void> => {
   const rows = await db.selectDistinct({ category: productsTable.category })
     .from(productsTable)
-    .where(tenantWhere(productsTable.tenantId, req.tenantId))
+    .where(and(tenantWhere(productsTable.tenantId, req.tenantId), liveProduct()))
     .orderBy(productsTable.category);
   res.json(rows.map((r) => r.category));
 });

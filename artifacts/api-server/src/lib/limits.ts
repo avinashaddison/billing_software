@@ -12,6 +12,7 @@
  */
 
 import { and, eq, sql } from "drizzle-orm";
+import { liveProduct } from "./product-scope";
 import { db, tenantsTable, staffProfilesTable, productsTable } from "@workspace/db";
 
 export type LimitKind = "staff" | "products";
@@ -43,7 +44,8 @@ export async function tenantLimitBlock(tenantId: string | null, kind: LimitKind)
     : await db
         .select({ n: sql<number>`(count(*))::int` })
         .from(productsTable)
-        .where(eq(productsTable.tenantId, tenantId));
+        /* Archived products don't occupy a catalogue slot. */
+        .where(and(eq(productsTable.tenantId, tenantId), liveProduct()));
 
   const used = row?.n ?? 0;
   if (used < cap) return null;

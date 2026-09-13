@@ -30,6 +30,7 @@ import { logger } from "../lib/logger";
 import { recordAudit } from "../lib/audit";
 import { requirePlatformAdmin } from "../middlewares/platform-admin";
 import { anchorExtension, resolveExpiry, PRESET_DURATIONS } from "../lib/tenant-access";
+import { liveProduct } from "../lib/product-scope";
 import { runDatabaseBackup } from "../lib/backup";
 import { resolveBackupKey, BackupKeyError } from "../lib/backup-crypto";
 import { recentRuns } from "../lib/backup-runs";
@@ -187,6 +188,7 @@ router.get("/platform/tenants", requirePlatformAdmin, async (_req, res): Promise
     const productCounts = await db
       .select({ tenantId: productsTable.tenantId, c: sql<number>`count(*)::int` })
       .from(productsTable)
+      .where(liveProduct())
       .groupBy(productsTable.tenantId);
     const saleCounts = await db
       .select({ tenantId: salesTable.tenantId, c: sql<number>`count(*)::int` })

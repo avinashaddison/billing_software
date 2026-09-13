@@ -7,6 +7,7 @@ import {
   ListStockEntrySummaryQueryParams,
 } from "@workspace/api-zod";
 import { tenantWhere } from "../lib/tenant";
+import { liveProduct } from "../lib/product-scope";
 import { istToday } from "../lib/ist";
 import { buildStockBatchHistory } from "../lib/stock-batch-history";
 import { deriveStockTotals } from "../lib/stock-totals";
@@ -276,7 +277,7 @@ router.get("/stock-logs/product-totals", async (req, res): Promise<void> => {
       eq(stockLogsTable.productId, productsTable.id),
       ownOrLegacyLog(req.tenantId),
     ))
-    .where(tenantWhere(productsTable.tenantId, req.tenantId))
+    .where(and(tenantWhere(productsTable.tenantId, req.tenantId), liveProduct()))
     .groupBy(productsTable.id);
 
   res.json({

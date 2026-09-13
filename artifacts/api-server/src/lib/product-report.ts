@@ -8,6 +8,9 @@ export interface ProductReportAggregateRow {
   currentStock: number;
   lowStockThreshold: number;
   purchasePrice: string | null;
+  /** Set when the product has been deleted (archived). Such a row is only
+   *  in the report because it sold or was refunded inside the range. */
+  deletedAt: Date | string | null;
   totalQty: number | null;
   totalRevenue: string | null;
   billCount: number | null;
@@ -25,6 +28,10 @@ interface ManagerProductRow {
   currentStock: number;
   lowStockThreshold: number;
   isLowStock: boolean;
+  /** Deleted products keep their sales/refund figures for the range but
+   *  hold no stock: currentStock is 0, they are never low-stock, and they
+   *  are excluded from productCount / stock totals. */
+  deleted: boolean;
   totalQty: number;
   totalRevenue: number;
   billCount: number;
@@ -88,27 +95,36 @@ export function buildProductReport(
 ): ProductReportResponse {
   const managerProducts: ManagerProductRow[] = rows.map((row, index) => {
     const totalQty = Number(row.totalQty ?? 0);
+    const deleted = row.deletedAt != null;
+    /* A deleted product's on-hand units left the catalogue with it (the
+       dashboard no longer counts them), so the report must not either —
+       otherwise "current stock" here contradicts every other screen. */
+    const currentStock = deleted ? 0 : Number(row.currentStock);
     return {
       rank: index + 1,
       productId: row.productId,
       productName: row.productName,
       productSku: row.productSku,
       category: row.category,
-      currentStock: Number(row.currentStock),
+      currentStock,
       lowStockThreshold: Number(row.lowStockThreshold),
-      isLowStock: Number(row.currentStock) <= Number(row.lowStockThreshold),
+      isLowStock: !deleted && currentStock <= Number(row.lowStockThreshold),
+      deleted,
       totalQty,
       totalRevenue: Number(row.totalRevenue ?? 0),
       billCount: Number(row.billCount ?? 0),
     };
   });
 
+  const liveProducts = managerProducts.filter((row) => !row.deleted);
   const managerTotals: ManagerTotals = {
-    productCount: managerProducts.length,
+    /* Catalogue-side totals count live products only; money-side totals
+       (units, revenue, profit) include deleted rows — their sales happened. */
+    productCount: liveProducts.length,
     unitsSold: managerProducts.reduce((sum, row) => sum + row.totalQty, 0),
     revenue: managerProducts.reduce((sum, row) => sum + row.totalRevenue, 0),
-    currentStock: managerProducts.reduce((sum, row) => sum + row.currentStock, 0),
-    lowStockCount: managerProducts.filter((row) => row.isLowStock).length,
+    currentStock: liveProducts.reduce((sum, row) => sum + row.currentStock, 0),
+    lowStockCount: liveProducts.filter((row) => row.isLowStock).length,
   };
 
   if (view === "manager") {
@@ -134,7 +150,9 @@ export function buildProductReport(
     return {
       ...row,
       purchaseCost,
-      stockValue: purchaseCost == null ? null : purchaseCost * row.currentStock,
+      /* null = cost unknown (excluded from coverage); a deleted product is
+         simply not stock any more, so it is excluded the same way. */
+      stockValue: purchaseCost == null || row.deleted ? null : purchaseCost * row.currentStock,
       costOfGoods: totalCost,
       profit,
       margin,

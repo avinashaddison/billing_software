@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { asc, desc, sql, and, eq } from "drizzle-orm";
+import { asc, desc, sql, and, or, eq, isNotNull } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable, billPaymentsTable } from "@workspace/db";
 import { tenantWhere } from "../lib/tenant";
+import { liveProduct } from "../lib/product-scope";
 import { istToday, istShiftDay } from "../lib/ist";
 import { requireRead, type ResourceReadView } from "../middlewares/auth";
 import { buildProductReport } from "../lib/product-report";
@@ -280,6 +281,7 @@ router.get("/reports/products", requireRead("productReports"), async (req, res):
       currentStock: productsTable.stock,
       lowStockThreshold: productsTable.lowStockThreshold,
       purchasePrice: productsTable.purchasePrice,
+      deletedAt: productsTable.deletedAt,
       totalQty: sql<number>`(COALESCE(${productSales.totalQty}, 0) - COALESCE(${productReturns.returnedQty}, 0))::int`,
       totalRevenue: sql<string>`COALESCE(${productSales.totalRevenue}, 0) - COALESCE(${productReturns.refunds}, 0)`,
       billCount: productSales.billCount,
@@ -290,7 +292,13 @@ router.get("/reports/products", requireRead("productReports"), async (req, res):
     .from(productsTable)
     .leftJoin(productSales, eq(productsTable.id, productSales.productId))
     .leftJoin(productReturns, eq(productsTable.id, productReturns.productId))
-    .where(tenantWhere(productsTable.tenantId, tenantId))
+    /* Deleted products stay in the report for any range in which they sold
+       or were refunded — that money is real and the totals must keep it —
+       and drop out of ranges where they did nothing. */
+    .where(and(
+      tenantWhere(productsTable.tenantId, tenantId),
+      or(liveProduct(), isNotNull(productSales.productId), isNotNull(productReturns.productId)),
+    ))
     .orderBy(
       desc(sql`COALESCE(${productSales.totalRevenue}, 0) - COALESCE(${productReturns.refunds}, 0)`),
       asc(productsTable.name),

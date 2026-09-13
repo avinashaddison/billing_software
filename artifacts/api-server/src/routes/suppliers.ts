@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, or, sql } from "drizzle-orm";
 import { db, suppliersTable, supplierPaymentsTable, productsTable, stockLogsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { liveProduct } from "../lib/product-scope";
 import { requireAdmin, requireWrite } from "../middlewares/auth";
 import { recordAudit, tenantActor } from "../lib/audit";
 
@@ -239,6 +240,7 @@ router.get("/suppliers/:id/report", async (req, res): Promise<void> => {
         sku:           productsTable.sku,
         stock:         productsTable.stock,
         purchasePrice: productsTable.purchasePrice,
+        deletedAt:     productsTable.deletedAt,
         purchasedQty:  sql<number>`COALESCE(SUM(CASE WHEN ${stockLogsTable.type} = 'IN'  THEN ${stockLogsTable.quantity} END), 0)::int`.as("purchased_qty"),
         soldQty:       sql<number>`COALESCE(SUM(CASE WHEN ${stockLogsTable.type} = 'OUT' THEN ${stockLogsTable.quantity} END), 0)::int`.as("sold_qty"),
         /* Last stock-IN ever (not range-limited — the join above is), falling
@@ -257,6 +259,10 @@ router.get("/suppliers/:id/report", async (req, res): Promise<void> => {
         tenantWhere(productsTable.tenantId, req.tenantId),
       ))
       .groupBy(productsTable.id)
+      /* A deleted product is listed only for a range in which it moved:
+         its purchases are what the supplier is owed for, so they must stay
+         in purchaseValue; outside such a range it is just dead weight. */
+      .having(or(liveProduct(), sql`COUNT(${stockLogsTable.id}) > 0`))
       .orderBy(
         desc(sql`COALESCE(SUM(CASE WHEN ${stockLogsTable.type} = 'IN' THEN ${stockLogsTable.quantity} END), 0)`),
         productsTable.name,
@@ -274,10 +280,16 @@ router.get("/suppliers/:id/report", async (req, res): Promise<void> => {
       )),
   ]);
 
-  const rows = products.map((p) => {
+  const rows = products.map(({ deletedAt, ...p }) => {
     const purchasePrice = p.purchasePrice != null ? Number(p.purchasePrice) : null;
+    const deleted = deletedAt != null;
     return {
       ...p,
+      /* A deleted product's units are no longer in the shop, whatever the
+         column still says; its purchases stay because the supplier was
+         still paid for them. */
+      stock: deleted ? 0 : p.stock,
+      deleted,
       purchasePrice,
       purchaseValue: purchasePrice != null ? p.purchasedQty * purchasePrice : null,
     };

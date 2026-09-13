@@ -27,6 +27,11 @@ export const productsTable = pgTable(
     imageUrl:          text("image_url"),
     supplierId:        uuid("supplier_id"),
     createdAt:         timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Soft delete (migration 0024). Non-NULL = archived: the product is gone
+        from every catalogue-facing read (list/search/scan/stock check/billing)
+        but its bills, refunds, reports and stock movements still resolve to
+        it. Products are never hard-deleted once created. */
+    deletedAt:         timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
     index("products_sku_idx").on(table.sku),

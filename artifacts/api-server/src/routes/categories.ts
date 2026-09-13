@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, asc, sql, and } from "drizzle-orm";
 import { db, categoriesTable, productsTable } from "@workspace/db";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
+import { liveProduct } from "../lib/product-scope";
 import { requireWrite } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -20,7 +21,15 @@ router.get("/categories", async (req, res): Promise<void> => {
         totalStock:   sql<number>`cast(coalesce(sum(${productsTable.stock}), 0) as int)`,
       })
       .from(categoriesTable)
-      .leftJoin(productsTable, eq(productsTable.category, categoriesTable.name))
+      /* Tenant + live predicates belong in the JOIN, not the WHERE, so a
+         category with no live products still lists (with 0). Without the
+         tenant predicate the counts summed every shop's products that
+         happened to share the category name. */
+      .leftJoin(productsTable, and(
+        eq(productsTable.category, categoriesTable.name),
+        tenantWhere(productsTable.tenantId, req.tenantId),
+        liveProduct(),
+      ))
       .where(tenantWhere(categoriesTable.tenantId, req.tenantId))
       .groupBy(categoriesTable.id)
       .orderBy(asc(categoriesTable.name));
