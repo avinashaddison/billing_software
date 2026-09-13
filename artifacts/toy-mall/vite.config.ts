@@ -46,6 +46,14 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        /* The main bundle passed Workbox's 2 MiB default precache limit
+           (2.11 MB in Sep 2026), which FAILS the production build rather
+           than skipping the file. The bundle is the app itself and must be
+           pre-cached for offline use, so the limit is raised instead of
+           the chunk being dropped. Headroom is deliberate: the limit is
+           the next thing to break as pages are added. (manualChunks is
+           not an option — see the build section below.) */
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // After an update, the new service worker activates immediately
         // (skipWaiting) and takes control of every open tab (clientsClaim).
         // Without these, customers see yesterday's UI until they manually
