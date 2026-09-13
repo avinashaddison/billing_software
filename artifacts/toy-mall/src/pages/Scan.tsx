@@ -1177,7 +1177,7 @@ export default function Scan() {
         </div>
       </div>
 
-      {/* ── Mode Toggle — only for staff who may move stock (Stock Entry) ── */}
+      {/* ── Mode Toggle — only for staff who may move stock (Entry Data write) ── */}
       {canStockIn && (
       <div className="shrink-0 px-4 pt-3 pb-2">
         <div className="flex rounded-xl bg-muted border p-1 gap-1">

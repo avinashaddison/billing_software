@@ -131,7 +131,7 @@ function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; st
         throw new Error("Malformed permissions response");
       }
       const merged = { ...DEFAULT_STAFF_PERMISSIONS, ...raw } as PermissionMap;
-      /* A map saved before "Stock Entry" existed has no such key. The default
+      /* A map saved before "Entry Data" (stockEntry) existed has no such key. The default
          (write) is right for a general staff member, but a member who holds
          the add-only Product Entry grant was set up to add items and nothing
          else — pre-fill none for them (the same rule the server's backfill

@@ -878,8 +878,8 @@ export default function ProductsEntry() {
                   {!canAddStock ? (
                     <div className="flex items-start gap-2 rounded-xl border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
                       <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                      You can view stock here, but your account isn't allowed to add stock.
-                      Ask the owner to give you write access.
+                      View only — adding or removing stock needs Entry Data write access.
+                      Ask the owner if you should have it.
                     </div>
                   ) : (
                     <div className="space-y-4">

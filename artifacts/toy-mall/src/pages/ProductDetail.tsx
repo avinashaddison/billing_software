@@ -677,7 +677,7 @@ export default function ProductDetail() {
 
                 {/* The entry page is the one screen that shows this product's
                     complete entry record AND lets you add to it. Staff without
-                    Stock Entry write can't add there, so send them to the read-only log. */}
+                    Entry Data write can't add there, so send them to the read-only log. */}
                 <Link
                   href={canEnterStock ? `/stock-entry?sku=${encodeURIComponent(sku)}` : "/logs"}
                   className="mt-3 flex items-center justify-between gap-2 text-sm font-semibold text-primary hover:underline"
@@ -699,7 +699,7 @@ export default function ProductDetail() {
               <h2 className="text-lg font-bold">Quick Adjust</h2>
               <div className="text-4xl" aria-hidden>🔒</div>
               <p className="text-sm text-muted-foreground">
-                Changing stock needs the <span className="font-semibold text-foreground">Stock Entry</span> permission.
+                Changing stock needs <span className="font-semibold text-foreground">Entry Data</span> write access.
                 <br />Ask the owner to grant it.
               </p>
             </div>

@@ -4,12 +4,15 @@ export const RESOURCES = [
   /* Create-only slice of Products: lets a data-entry staff member add new
      items without edit/delete rights. Binary — see BINARY_RESOURCES. */
   { key: "productEntry", label: "Product Entry",   description: "Add new products only — no edit, delete or stock changes" },
-  /* Moving inventory on EXISTING products (Entry Data page, Scan page's
-     Stock IN mode, Quick Adjust). Split from `scan` so a cashier can bill
-     without being able to change stock, and a data-entry staff member can
-     hold Product Entry without this. Mirrors the server's
+  /* The Entry Data page and every stock move on EXISTING products (Scan
+     page's Stock IN mode, Quick Adjust). Labelled after the page — owners
+     look for the nav item's name, not "stock". Read = open the page, scan,
+     see recent entries and batch history (and hand unknown codes to Product
+     Entry); Write = add or remove stock. Split from `scan` so a cashier can
+     bill without changing stock, and a data-entry staff member can hold
+     Product Entry + view without either. Mirrors the server's
      requireWrite("stockEntry") on POST /products/:id/stock. */
-  { key: "stockEntry", label: "Stock Entry",       description: "Add or remove stock of existing products" },
+  { key: "stockEntry", label: "Entry Data",        description: "Read: view stock entries & batch history · Write: add or remove stock" },
   { key: "scan",       label: "Scan & Billing",    description: "Process sales at the counter" },
   { key: "billing",    label: "Bills History",     description: "View past bills & receipts" },
   { key: "logs",       label: "Stock Logs",        description: "View stock movement history" },
