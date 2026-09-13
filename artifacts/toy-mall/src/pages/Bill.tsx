@@ -3,6 +3,7 @@ import { Link, useParams } from "wouter";
 import { ArrowLeft, ScanLine, Printer, RotateCcw, X, Minus, Plus, Check, Loader2, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { useStoreSettings } from "@/lib/store-info";
+import { usePermission } from "@/hooks/use-auth";
 
 interface BillItem {
   id: string;
@@ -239,6 +240,10 @@ export default function Bill() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [showReturn, setShowReturn] = useState(false);
+  /* Mirrors the server's requireAnyWrite("scan", "billing") on POST /returns:
+     a return reverses a sale (counter staff) or manages a bill (bill
+     managers). Read-only bill history must not offer a button that 403s. */
+  const canReturn = usePermission("scan") === "write" || usePermission("billing") === "write";
 
   const loadBill = () => {
     if (!billId) return;
@@ -1120,13 +1125,16 @@ export default function Bill() {
             <Share2 className="w-4 h-4" />
             Share Receipt
           </button>
-          <button
-            onClick={() => setShowReturn(true)}
-            className="w-full h-10 flex items-center justify-center gap-2 border border-orange-400 text-orange-600 font-bold rounded-2xl hover:bg-orange-50 dark:hover:bg-orange-950/20 active:scale-95 transition-all text-sm"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Process Return / Refund
-          </button>
+          {canReturn && (
+            <button
+              onClick={() => setShowReturn(true)}
+              className="w-full h-10 flex items-center justify-center gap-2 border border-orange-400 text-orange-600 font-bold rounded-2xl hover:bg-orange-50 dark:hover:bg-orange-950/20 active:scale-95 transition-all text-sm"
+              data-testid="button-process-return"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Process Return / Refund
+            </button>
+          )}
         </div>
 
       </div>

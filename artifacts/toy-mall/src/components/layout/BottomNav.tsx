@@ -28,7 +28,7 @@ export function BottomNav() {
       ? [{ name: "Add Item", href: "/products/new", icon: Package, resource: null as string | null }]
       : []),
     /* Stock-in workstation. Short label — the bar is at its practical limit. */
-    { name: "Entry",   href: "/stock-entry", icon: PackagePlus, resource: "scan" },
+    { name: "Entry",   href: "/stock-entry", icon: PackagePlus, resource: "stockEntry" },
     { name: "Scan",    href: "/scan",     icon: ScanLine,   resource: "scan",    highlight: true },
     /* Manual Bill — deep-links into /checkout with ?manual=1 so the
        dialog auto-opens. Same permission gate as billing since it

@@ -5,6 +5,7 @@ import { broadcast } from "../lib/sse";
 import { logger } from "../lib/logger";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { computeBillStatus } from "./bills";
+import { requireAnyWrite } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -49,8 +50,15 @@ router.get("/returns", async (req, res): Promise<void> => {
  *   Batch:  { billId, items: [{productId, quantity}], reason?, notes? }
  *
  * Restocks each returned product and calculates total refund.
+ *
+ * Gate: a return is a sale reversal, so it belongs to whoever may make the
+ * sale (`scan: write`, same as checkout) or manage bills (`billing: write`).
+ * It moves stock as a side effect, which is why it must NOT be open to every
+ * signed-in session — a staff member holding only Product Entry, or with
+ * read-only bill history, could otherwise restock and refund at will. The
+ * Bill page mirrors this pair for its "Process Return / Refund" button.
  */
-router.post("/returns", async (req, res): Promise<void> => {
+router.post("/returns", requireAnyWrite("scan", "billing"), async (req, res): Promise<void> => {
   const { billId, productId, quantity, reason, notes, items } = req.body;
 
   /* Normalise to a single array of {productId, quantity} */

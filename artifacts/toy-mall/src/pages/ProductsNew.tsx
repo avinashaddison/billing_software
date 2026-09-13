@@ -118,7 +118,7 @@ function CreateProduct({ onStartNext }: { onStartNext: () => void }) {
   const initialBarcode  = (searchParams.get("barcode") ?? "").trim();
   const cameFromEntry   = searchParams.get("from") === "entry";
   const canViewProducts = usePermission("products") !== "none";
-  const canViewEntry    = usePermission("scan") !== "none";
+  const canViewEntry    = usePermission("stockEntry") !== "none";
   const returnToEntry   = canViewEntry && (cameFromEntry || !canViewProducts);
   const stayAfterSave   = !returnToEntry && !canViewProducts;
   const backHref        = returnToEntry ? "/stock-entry" : canViewProducts ? "/products" : "/dashboard";

@@ -116,22 +116,42 @@ function AuthFetchGuard() {
  */
 function SessionSync() {
   useEffect(() => {
-    if (!useAuth.getState().isLoggedIn) return;
+    const { isLoggedIn, staffId: probedStaffId } = useAuth.getState();
+    if (!isLoggedIn) return;
     const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     let cancelled = false;
+    /* Every verdict below is about the session that was signed in when the
+       probe STARTED. If the user logged out — or out and back in as someone
+       else — while it was in flight, the answer describes a session that no
+       longer exists; acting on it would log out a fresh login or paste one
+       account's permissions onto another. */
+    const sameSession = () => {
+      const s = useAuth.getState();
+      return s.isLoggedIn && s.staffId === probedStaffId;
+    };
     (async () => {
       try {
         const r = await fetch(`${base}/api/auth/me`);
-        if (cancelled) return;
+        if (cancelled || !sameSession()) return;
         if (r.status === 401) { useAuth.getState().logout(); return; }
         if (r.ok) {
-          /* Client `isLoggedIn` means a COMPLETED staff (PIN) session. If the
-             cookie only carries the pre-PIN email step (kind:"email") or any
-             other shape, the persisted full-login is stale — drop it so the
-             user re-selects staff + PIN instead of running with old, possibly
-             wrong, permissions. */
+          /* Client `isLoggedIn` means a COMPLETED staff (PIN) session for the
+             persisted staff id. If the cookie only carries the pre-PIN email
+             step (kind:"email"), any other shape, or a DIFFERENT staff
+             account, the persisted login is stale — drop it so the user
+             re-selects staff + PIN instead of running one account's screens
+             against another account's cookie. */
           const me = await r.json().catch(() => null);
-          if (!cancelled && me?.kind !== "pin") useAuth.getState().logout();
+          if (cancelled || !sameSession()) return;
+          if (me?.kind !== "pin" || me.id !== probedStaffId) { useAuth.getState().logout(); return; }
+          /* Same session, but the grants may have moved on since the PIN
+             login that seeded the persisted map (owner edited them, or a
+             release introduced a new permission key that the server has
+             since backfilled). Adopt the server's map — it is what every
+             write gate will actually be checked against. */
+          if (me.permissions && typeof me.permissions === "object") {
+            useAuth.getState().syncPermissions(me.permissions);
+          }
         }
       } catch { /* offline / transient — keep the session as-is */ }
     })();
@@ -226,7 +246,7 @@ function Router() {
             <Route path="/products"     component={() => <Protected resource="products"><Products /></Protected>} />
             <Route path="/products/new" component={ProtectedProductsNew} />
             <Route path="/products/bulk-sale-price" component={() => <Protected resource="products"><BulkSalePrice /></Protected>} />
-            <Route path="/stock-entry" component={() => <Protected resource="scan"><ProductsEntry /></Protected>} />
+            <Route path="/stock-entry" component={() => <Protected resource="stockEntry"><ProductsEntry /></Protected>} />
             <Route path="/product"      component={() => <Protected resource="products"><ProductDetail /></Protected>} />
             <Route path="/scan"         component={() => <Protected resource="scan"><Scan /></Protected>} />
             <Route path="/logs"         component={() => <Protected resource="logs"><Logs /></Protected>} />

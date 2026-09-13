@@ -299,8 +299,16 @@ export function requireWrite(resource: string) {
  * The SPA mirrors this gate in `useCanCreateProducts()` — keep the two lists
  * identical or buttons and routes will disagree with the server.
  */
+/* Human names for the 403 text. Permission keys are camelCase identifiers;
+   the message is read by a cashier in a toast. */
+const RESOURCE_LABELS: Record<string, string> = {
+  productEntry: "products",
+  stockEntry:   "stock",
+  scan:         "billing",
+};
+
 export function requireAnyWrite(...resources: [string, ...string[]]) {
-  const primary = resources[0];
+  const primary = RESOURCE_LABELS[resources[0]] ?? resources[0];
   return async function (req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (req.authKind === "email" && req.userId) {

@@ -3,8 +3,14 @@ export const RESOURCES = [
   { key: "products",   label: "Products",          description: "Browse & manage inventory" },
   /* Create-only slice of Products: lets a data-entry staff member add new
      items without edit/delete rights. Binary — see BINARY_RESOURCES. */
-  { key: "productEntry", label: "Product Entry",   description: "Add new products only — no edit or delete" },
-  { key: "scan",       label: "Scan & Billing",    description: "Process sales & stock-in" },
+  { key: "productEntry", label: "Product Entry",   description: "Add new products only — no edit, delete or stock changes" },
+  /* Moving inventory on EXISTING products (Entry Data page, Scan page's
+     Stock IN mode, Quick Adjust). Split from `scan` so a cashier can bill
+     without being able to change stock, and a data-entry staff member can
+     hold Product Entry without this. Mirrors the server's
+     requireWrite("stockEntry") on POST /products/:id/stock. */
+  { key: "stockEntry", label: "Stock Entry",       description: "Add or remove stock of existing products" },
+  { key: "scan",       label: "Scan & Billing",    description: "Process sales at the counter" },
   { key: "billing",    label: "Bills History",     description: "View past bills & receipts" },
   { key: "logs",       label: "Stock Logs",        description: "View stock movement history" },
   { key: "stockAlert", label: "Stock Alert",       description: "Live stock, low-stock alerts & movement" },
@@ -33,6 +39,7 @@ export const DEFAULT_STAFF_PERMISSIONS: Permissions = {
   dashboard:  "read",
   products:   "read",
   productEntry: "none",
+  stockEntry: "write",
   scan:       "write",
   billing:    "read",
   logs:       "read",
@@ -84,7 +91,7 @@ export const PATH_RESOURCE: Record<string, ResourceKey> = {
   /* Creation is really any-of PRODUCT_CREATE_RESOURCES — the route itself is
      gated by useCanCreateProducts(), not by this single key. */
   "/products/new": "products",
-  "/stock-entry": "scan",
+  "/stock-entry": "stockEntry",
   "/product":    "products",
   "/scan":       "scan",
   "/billing":    "billing",

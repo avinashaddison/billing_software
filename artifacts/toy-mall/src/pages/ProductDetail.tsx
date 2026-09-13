@@ -57,7 +57,10 @@ export default function ProductDetail() {
     return () => window.removeEventListener("keydown", onKey);
   }, [setLocation]);
   const isOwner = role === "owner";
-  const canEnterStock = usePermission("scan") === "write";
+  /* Mirrors the server's requireWrite("stockEntry") on POST /products/:id/stock.
+     Without it the Quick Adjust card is replaced by a notice — an enabled
+     STOCK IN/OUT that 403s at the server is worse than no button. */
+  const canEnterStock = usePermission("stockEntry") === "write";
   const store = useStoreSettings();
   const { addItem, count } = useCart();
 
@@ -674,7 +677,7 @@ export default function ProductDetail() {
 
                 {/* The entry page is the one screen that shows this product's
                     complete entry record AND lets you add to it. Staff without
-                    `scan` write can't open it, so send them to the read-only log. */}
+                    Stock Entry write can't add there, so send them to the read-only log. */}
                 <Link
                   href={canEnterStock ? `/stock-entry?sku=${encodeURIComponent(sku)}` : "/logs"}
                   className="mt-3 flex items-center justify-between gap-2 text-sm font-semibold text-primary hover:underline"
@@ -688,6 +691,19 @@ export default function ProductDetail() {
           </div>
 
           {/* ══ Col 2: Stock adjust ══ */}
+          {!canEnterStock ? (
+            <div
+              className="p-5 bg-card border rounded-3xl shadow-sm flex flex-col items-center justify-center gap-3 text-center"
+              data-testid="stock-adjust-restricted"
+            >
+              <h2 className="text-lg font-bold">Quick Adjust</h2>
+              <div className="text-4xl" aria-hidden>🔒</div>
+              <p className="text-sm text-muted-foreground">
+                Changing stock needs the <span className="font-semibold text-foreground">Stock Entry</span> permission.
+                <br />Ask the owner to grant it.
+              </p>
+            </div>
+          ) : (
           <div className="p-5 bg-card border rounded-3xl shadow-sm flex flex-col gap-6">
             <h2 className="text-lg font-bold text-center">Quick Adjust</h2>
 
@@ -761,6 +777,7 @@ export default function ProductDetail() {
               </Button>
             </div>
           </div>
+          )}
 
           {/* ══ Col 3: Print Label preview ══ */}
           <div className="bg-card border rounded-3xl shadow-sm overflow-hidden flex flex-col">

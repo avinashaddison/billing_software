@@ -21,5 +21,16 @@ Decision (Sep 2026): product **creation** is any-of `products: write` OR a dedic
 - Whoever holds only the new key needs an entry point (nav item) and a post-save destination that doesn't require pages they can't open.
 - A form that seeds itself from a query param must be re-keyed on that param, or a query-only navigation keeps the previous value.
 
+# Splitting an ability OUT of a key that already shipped
+Decision (Sep 2026): stock moves on existing products (`POST /products/:id/stock`, Entry Data page, Scan page's "Stock IN" mode, Quick Adjust) require a dedicated `stockEntry` key (none/read/write); `scan` is billing only (checkout, held bills, shared cart, returns). Returns are `scan` OR `billing` write — they had NO gate before.
+
+**Why:** the vendor found a "Product Entry" staff member restocking; the ability had come bundled with `scan: write`, the default for every cashier. Contradicts the "never backfill live rows" rule above on purpose: when the ability ALREADY shipped inside another key, defaulting the new key to `none` would break every shop's stock entry on deploy.
+
+**How to apply:**
+- Backfill with a boot-idempotent, insert-only migration that copies the OLD key's level into the new key (`WHERE NOT EXISTS`, `ON CONFLICT DO NOTHING`); encode the vendor's exception (holders of the add-only grant → `none`) in the same SQL and in the editor's missing-key pre-fill. Only touch staff who have a row for the old key — staff with no rows are "nothing until the owner saves", and the editor pre-fills from defaults.
+- Persisted client permission maps are seeded at PIN login only, so a new key is invisible on devices that stay signed in. The boot probe (`/api/auth/me`) now re-syncs the map for the SAME staff id (non-owner); keep it identity-bound: snapshot the staff id when the probe starts, ignore the answer if the session changed meanwhile, log out on a different id.
+- Grep every `postStockIn`/stock fetch in the SPA — the billing Scan page had its own Stock IN mode with no gate at all; derive `isStockIn = mode==="stockin" && can` so a stale mode can't render the panel.
+- The 403 text names the resource key; keep a label map (`stockEntry` → "stock") so toasts read like English.
+
 # Editor dialogs and the app-wide staleTime
 A dialog that seeds its draft inside `queryFn` breaks on open → Cancel → reopen: the 2-minute app-wide cache skips `queryFn`, so the draft never seeds and the dialog reports "couldn't load". Editors need `staleTime: 0` and must seed the draft from a *completed, successful* fetch (`data && !isFetching && !isError`), exactly once, never from cache.

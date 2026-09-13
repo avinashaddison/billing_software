@@ -14,6 +14,11 @@ interface AuthState {
   priorScannerThresholdMs: number | null;
 
   login:  (data: { id: string; name: string; role: StaffRole; permissions: Permissions }) => void;
+  /* Replace the persisted permission map with the server's current one
+     (same staff, same role). Used by the boot-time session probe so a grant
+     changed — or a permission key added by a release — reaches devices that
+     stay signed in for weeks without a fresh PIN login. */
+  syncPermissions: (permissions: Permissions) => void;
   logout: () => void;
 
   /* legacy compat */
@@ -49,6 +54,12 @@ export const useAuth = create<AuthState>()(
            the user manually refreshes. Fire-and-forget; if it fails the
            persisted defaults stay visible. */
         void useStoreSettings.getState().hydrateFromServer();
+      },
+
+      syncPermissions: (permissions) => {
+        const { isLoggedIn, role } = get();
+        if (!isLoggedIn || role === "owner") return;   // owners are all-write by role
+        set({ permissions });
       },
 
       logout: () => {

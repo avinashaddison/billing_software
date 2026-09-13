@@ -494,7 +494,14 @@ router.delete("/products/:id", requireWrite("products"), async (req, res): Promi
   }
 });
 
-router.post("/products/:id/stock", requireWrite("scan"), async (req, res): Promise<void> => {
+/* Stock IN / OUT / ADJUSTMENT on an existing product. Gated by the dedicated
+   "Stock Entry" permission (`stockEntry`), NOT by `scan`: `scan` is what every
+   cashier needs to bill, and moving inventory is a separate trust level. A
+   data-entry staff member holding only "Product Entry" (`productEntry`) can
+   add new items via POST /products but can never change stock here. The SPA
+   mirrors this gate (Entry Data page, Scan page's Stock IN mode, product
+   Quick Adjust) — keep them in step or buttons will disagree with the 403. */
+router.post("/products/:id/stock", requireWrite("stockEntry"), async (req, res): Promise<void> => {
   const params = UpdateStockParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

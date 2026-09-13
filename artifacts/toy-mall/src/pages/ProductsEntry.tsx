@@ -202,13 +202,13 @@ const money = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDi
 export default function ProductsEntry() {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
-  /* The server gates POST /products/:id/stock with requireWrite("scan"), so
-     `scan` is the single source of truth — mirror it exactly and the button's
-     state can never disagree with the server's answer. Gating on `products`
-     instead breaks both ways: default staff are products:read + scan:write
-     (locked out of a page they're meant to live in), while a catalog-only
-     manager would get an enabled button and a 403. */
-  const canAddStock = usePermission("scan") === "write";
+  /* The server gates POST /products/:id/stock with requireWrite("stockEntry"),
+     so `stockEntry` is the single source of truth — mirror it exactly and the
+     button's state can never disagree with the server's answer. It is NOT
+     `scan` (billing) and NOT `products`/`productEntry` (catalog): a cashier
+     can bill without moving inventory, and a data-entry staff member can add
+     new items without touching existing stock. */
+  const canAddStock = usePermission("stockEntry") === "write";
   /* Creating a product is a separate grant ("Product Entry", or full
      Products write) — mirror the server's POST /products gate here for the
      "New product" button and the unknown-code shortcut. */

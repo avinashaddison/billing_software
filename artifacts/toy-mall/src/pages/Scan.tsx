@@ -24,6 +24,7 @@ import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useOnline }       from "@/hooks/use-online";
 import { WifiOff, RefreshCw, Clock, PauseCircle } from "lucide-react";
 import { useStoreSettings } from "@/lib/store-info";
+import { usePermission } from "@/hooks/use-auth";
 import {
   HeldBillRequestError,
   useHeldBills,
@@ -809,8 +810,13 @@ export default function Scan() {
   /* Auto-focus the SKU input so the USB scanner can type into it directly */
   useEffect(() => { manualInputRef.current?.focus(); }, []);
 
-  const isBilling = mode === "billing";
-  const isStockIn = mode === "stockin";
+  /* Stock IN posts to /products/:id/stock, which the server gates with
+     requireWrite("stockEntry") — a separate grant from `scan` (billing).
+     Without it the mode toggle and its shortcuts are simply absent, and a
+     stale mode can't linger: the page always renders Billing. */
+  const canStockIn = usePermission("stockEntry") === "write";
+  const isBilling = mode === "billing" || !canStockIn;
+  const isStockIn = mode === "stockin" && canStockIn;
 
   const { flash, triggerFlash } = useScanFlash();
   const { lowStockFlash, triggerLowStockFlash } = useLowStockFlash();
@@ -912,13 +918,14 @@ export default function Scan() {
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
       if (e.key === "Enter" && isBilling && items.length > 0 && !isCartDialogOpen) { e.preventDefault(); setShowModal(true); return; }
       if (e.key === "Escape" && showModal) { setShowModal(false); return; }
+      if (!canStockIn) return;
       if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setMode((m) => m === "billing" ? "stockin" : "billing"); return; }
       if (e.key === "b" || e.key === "B") { setMode("billing"); return; }
       if (e.key === "s" || e.key === "S") { setMode("stockin"); return; }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isBilling, items.length, showModal, isCartDialogOpen]);
+  }, [isBilling, items.length, showModal, isCartDialogOpen, canStockIn]);
 
   /* ── Product-name search ──
      Barcode stickers get torn, swapped or stolen — staff must still be able
@@ -1170,7 +1177,8 @@ export default function Scan() {
         </div>
       </div>
 
-      {/* ── Mode Toggle ── */}
+      {/* ── Mode Toggle — only for staff who may move stock (Stock Entry) ── */}
+      {canStockIn && (
       <div className="shrink-0 px-4 pt-3 pb-2">
         <div className="flex rounded-xl bg-muted border p-1 gap-1">
           <button onClick={() => switchMode("billing")}
@@ -1193,6 +1201,7 @@ export default function Scan() {
           </button>
         </div>
       </div>
+      )}
 
       {/* ── Scanner ── */}
       {showScanner && (

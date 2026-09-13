@@ -55,9 +55,9 @@ const DEFAULT_OWNER_PIN = "8085";
 /* Resources granted to the auto-created owner. Mirrors the frontend
    permissions resources — owners always get full write. */
 const OWNER_RESOURCES = [
-  "dashboard", "products", "scan", "billing", "logs", "reports",
-  "customers", "categories", "labels", "suppliers", "deals", "staff",
-  "settings",
+  "dashboard", "products", "productEntry", "stockEntry", "scan", "billing",
+  "logs", "stockAlert", "productReports", "reports", "analytics", "customers",
+  "categories", "labels", "suppliers", "deals", "staff", "settings",
 ] as const;
 
 const router: IRouter = Router();
