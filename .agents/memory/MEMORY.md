@@ -26,6 +26,7 @@
 - [Public API keys](public-api-key-auth.md) — issuing is vendor-only (/admin), no owner surface; hash-only + reveal-once; keys need an ACTIVE tenants row; INSERT caps need advisory locks.
 - [Atomic active/held cart swaps](atomic-active-held-cart-swaps.md) — active and parked snapshots must share one durable transaction; CAS plus a tenant row lock prevents cross-device loss.
 - [Stock-batch provenance](stock-batch-provenance.md) — FIFO may attribute sales only when provenance is defensible; absolute-adjustment gaps stay unattributed instead of rewriting batch history.
+- [Ledger under-reports receipts](ledger-under-reports-receipts.md) — creation/edit/import set stock with no log row (~80% of units); reconcile against products.stock and report the gap as unlogged in/out, never as sales or entries.
 - [orval codegen gotchas](orval-codegen-gotchas.md) — after regenerating from openapi.yaml, restore lib/api-zod/src/index.ts (barrel collides) and prettier the generated dirs.
 - [Required fields at checkout](checkout-required-fields.md) — customer mobile + manual-line cost are global rules; enforce at server 400, both billing pages, and BEFORE the offline enqueue; blank=enabled-bounce, partial=disabled.
 - [Client-side PDF export](client-pdf-export.md) — jspdf fonts are WinAnsi-only; autotable only guarantees the head fits (measure via __createTable); navigator.share needs a no-await warm path.

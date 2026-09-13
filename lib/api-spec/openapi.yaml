@@ -386,6 +386,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/StockEntrySummary"
 
+  /stock-logs/product-totals:
+    get:
+      operationId: listProductStockTotals
+      tags: [stock-logs]
+      summary: All-time stock totals for every product
+      description: >
+        One row per product of the shop with lifetime figures: units received
+        through stock entries (and how many entries), units sold, units
+        returned by customers, and the current level. Stock that never went
+        through a stock entry — the quantity typed in when the product was
+        created, edits, corrections — is reported separately as unlogged
+        in/out so that the figures always reconcile:
+        currentStock = unloggedIn + in − out + returned − unloggedOut.
+        Products with no movements are included.
+      responses:
+        "200":
+          description: Per-product lifetime stock totals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductStockTotalsList"
+
   /sales:
     get:
       operationId: listSales
@@ -961,6 +983,61 @@ components:
         - totals
         - products
         - truncated
+
+    ProductStockTotals:
+      type: object
+      description: >
+        Lifetime stock figures for one product. Always satisfies
+        currentStock = unloggedInQuantity + inQuantity − outQuantity
+        + returnedQuantity − unloggedOutQuantity; at most one of the two
+        unlogged figures is non-zero.
+      properties:
+        productId:
+          type: string
+        currentStock:
+          type: integer
+          description: Current stock level of the product
+        inQuantity:
+          type: integer
+          description: Units received through stock entries (IN movements), all time
+        inCount:
+          type: integer
+          description: Number of stock entries (IN movements), all time
+        outQuantity:
+          type: integer
+          description: Units sold (OUT movements), all time
+        returnedQuantity:
+          type: integer
+          description: Units customers returned to stock (RETURN movements), all time
+        unloggedInQuantity:
+          type: integer
+          description: >
+            Stock that arrived without a stock entry — opening stock typed in
+            when the product was created, upward edits or corrections. Never negative.
+        unloggedOutQuantity:
+          type: integer
+          description: >
+            Stock that left without a sale or return — downward edits or
+            corrections, write-offs. Never negative.
+      required:
+        - productId
+        - currentStock
+        - inQuantity
+        - inCount
+        - outQuantity
+        - returnedQuantity
+        - unloggedInQuantity
+        - unloggedOutQuantity
+
+    ProductStockTotalsList:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductStockTotals"
+      required:
+        - products
 
     Sale:
       type: object

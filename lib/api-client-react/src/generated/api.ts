@@ -32,6 +32,7 @@ import type {
   ListStockLogsParams,
   Product,
   ProductStockHistory,
+  ProductStockTotalsList,
   QrCodeResponse,
   ReceivablesSummary,
   RecordPaymentInput,
@@ -1125,6 +1126,83 @@ export function useListStockEntrySummary<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListStockEntrySummaryQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getListProductStockTotalsUrl = () => {
+  return `/api/stock-logs/product-totals`;
+};
+
+/**
+ * One row per product of the shop with lifetime figures: units received through stock entries (and how many entries), units sold, units returned by customers, and the current level. Stock that never went through a stock entry — the quantity typed in when the product was created, edits, corrections — is reported separately as unlogged in/out so that the figures always reconcile: currentStock = unloggedIn + in − out + returned − unloggedOut. Products with no movements are included.
+ * @summary All-time stock totals for every product
+ */
+export const listProductStockTotals = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<ProductStockTotalsList> => {
+  return customFetch<ProductStockTotalsList>(getListProductStockTotalsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProductStockTotalsQueryKey = () => {
+  return [`/api/stock-logs/product-totals`] as const;
+};
+
+export const getListProductStockTotalsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProductStockTotals>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listProductStockTotals>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListProductStockTotalsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProductStockTotals>>
+  > = ({ signal }) => listProductStockTotals({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProductStockTotals>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProductStockTotalsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProductStockTotals>>
+>;
+export type ListProductStockTotalsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary All-time stock totals for every product
+ */
+
+export function useListProductStockTotals<
+  TData = Awaited<ReturnType<typeof listProductStockTotals>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listProductStockTotals>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProductStockTotalsQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

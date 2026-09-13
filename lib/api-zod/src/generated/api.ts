@@ -516,6 +516,58 @@ export const ListStockEntrySummaryResponse = zod
   );
 
 /**
+ * One row per product of the shop with lifetime figures: units received through stock entries (and how many entries), units sold, units returned by customers, and the current level. Stock that never went through a stock entry — the quantity typed in when the product was created, edits, corrections — is reported separately as unlogged in/out so that the figures always reconcile: currentStock = unloggedIn + in − out + returned − unloggedOut. Products with no movements are included.
+ * @summary All-time stock totals for every product
+ */
+export const ListProductStockTotalsResponse = zod.object({
+  products: zod.array(
+    zod
+      .object({
+        productId: zod.string(),
+        currentStock: zod
+          .number()
+          .int()
+          .describe("Current stock level of the product"),
+        inQuantity: zod
+          .number()
+          .int()
+          .describe(
+            "Units received through stock entries (IN movements), all time",
+          ),
+        inCount: zod
+          .number()
+          .int()
+          .describe("Number of stock entries (IN movements), all time"),
+        outQuantity: zod
+          .number()
+          .int()
+          .describe("Units sold (OUT movements), all time"),
+        returnedQuantity: zod
+          .number()
+          .int()
+          .describe(
+            "Units customers returned to stock (RETURN movements), all time",
+          ),
+        unloggedInQuantity: zod
+          .number()
+          .int()
+          .describe(
+            "Stock that arrived without a stock entry — opening stock typed in when the product was created, upward edits or corrections. Never negative.\n",
+          ),
+        unloggedOutQuantity: zod
+          .number()
+          .int()
+          .describe(
+            "Stock that left without a sale or return — downward edits or corrections, write-offs. Never negative.\n",
+          ),
+      })
+      .describe(
+        "Lifetime stock figures for one product. Always satisfies currentStock = unloggedInQuantity + inQuantity − outQuantity + returnedQuantity − unloggedOutQuantity; at most one of the two unlogged figures is non-zero.\n",
+      ),
+  ),
+});
+
+/**
  * @summary List sales records
  */
 export const listSalesQueryLimitDefault = 50;

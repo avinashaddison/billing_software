@@ -9,13 +9,28 @@
  * `navigator.share` without waiting on the network.
  */
 import type { jsPDF } from "jspdf";
-import type { CellHookData, UserOptions, __createTable, __drawTable } from "jspdf-autotable";
+import type { CellHookData, Styles, UserOptions, __createTable, __drawTable } from "jspdf-autotable";
 
+/**
+ * One sheet row. The lifetime figures come from `/api/stock-logs/product-totals`
+ * and are reduced on the page (see StockCheck's `toSheetItem`) so that
+ * `inTotal - outNet - adj === stock` holds for every row.
+ */
 export interface StockSheetItem {
   id: string;
   name: string;
   sku: string;
   category: string;
+  /** All units ever received: stock entries plus opening stock set at creation. */
+  inTotal: number;
+  /** Number of stock-ins; opening stock counts as one. */
+  entries: number;
+  /** Units sold minus units customers returned. */
+  outNet: number;
+  /** Units customers returned (already netted out of `outNet`; shown as a note). */
+  returned: number;
+  /** Units removed without a sale (corrections / edits); shown as a note under Stock. */
+  adj: number;
   stock: number;
 }
 
@@ -25,6 +40,8 @@ export interface StockSheetGroup {
   phone?: string | null;
   items: StockSheetItem[];
   units: number;
+  inTotal: number;
+  outNet: number;
 }
 
 export interface StockSheetInput {
@@ -36,7 +53,19 @@ export interface StockSheetInput {
   printedAt: string;
   totalItems: number;
   totalUnits: number;
+  totalIn: number;
+  totalOut: number;
 }
+
+/** How the figure columns are defined — printed under the sheet header so the reader needs no app. */
+export const SHEET_LEGEND =
+  "In = stock entries + opening stock (stock not covered by any entry) · Entries = number of stock-ins, opening counts as one · Out = sold minus returns · Stock = in system now";
+/** Appended to the legend only when some row carries an adjustment note. */
+export const SHEET_LEGEND_ADJ = " · adj = removed without a sale (correction)";
+
+/** Footer/summary wording shared by the screen, print and PDF views. */
+export const sheetTotalsLine = (items: number, inTotal: number, outNet: number, units: number): string =>
+  `${items} item${items !== 1 ? "s" : ""} · ${inTotal} in · ${outNet} out · ${units} pc in system`;
 
 export type PdfLibs = {
   jsPDF: typeof jsPDF;
@@ -106,7 +135,14 @@ const MARGIN_TOP = 12;
 const MARGIN_BOTTOM = 14;
 const COUNT_BOX = { w: 13, h: 4.8 };
 const GROUP_GAP = 5;
-const COLUMNS = 6;
+const COLUMNS = 9;
+/* Column indexes — the body row array and didDrawCell must agree on these. */
+const COL = { index: 0, item: 1, category: 2, in: 3, entries: 4, out: 5, stock: 6, counted: 7, note: 8 } as const;
+/* Sum of the widths below must stay 186 (A4 width minus the two margins). */
+const COL_WIDTHS: Record<number, number> = {
+  [COL.index]: 7, [COL.item]: 52, [COL.category]: 25, [COL.in]: 14, [COL.entries]: 14,
+  [COL.out]: 14, [COL.stock]: 14, [COL.counted]: 18, [COL.note]: 28,
+};
 
 /* ── Builder ─────────────────────────────────────────────────────── */
 
@@ -146,7 +182,21 @@ export function buildStockSheetPdfSync({ jsPDF, createTable, drawTable }: PdfLib
   doc.setDrawColor(0);
   doc.setLineWidth(0.5);
   doc.line(MARGIN_X, y, pageW - MARGIN_X, y);
-  y += 4;
+  y += 3;
+  /* Column legend: the sheet travels on paper / WhatsApp, so it explains its own figures. */
+  const hasAdj = input.groups.some((g) => g.items.some((p) => p.adj > 0));
+  doc.setFontSize(7);
+  doc.setTextColor(90);
+  const legendLines: string[] = doc.splitTextToSize(pdfText(SHEET_LEGEND + (hasAdj ? SHEET_LEGEND_ADJ : "")), contentW);
+  doc.text(legendLines, MARGIN_X, y + 2);
+  y += 2 + legendLines.length * 3;
+
+  /* Figures sit at the top of their cell so they line up with the item name,
+     leaving the bottom band free for the small notes drawn in didDrawCell. */
+  const figure: Partial<Styles> = {
+    halign: "right", valign: "top", fontStyle: "bold",
+    cellPadding: { top: 1.2, bottom: 3.9, left: 1.5, right: 1.5 },
+  };
 
   input.groups.forEach((group, gi) => {
     if (gi > 0 && input.pagePerSupplier) {
@@ -155,10 +205,14 @@ export function buildStockSheetPdfSync({ jsPDF, createTable, drawTable }: PdfLib
     }
 
     const count = group.items.length;
-    const meta = `${count} item${count !== 1 ? "s" : ""} · ${group.units} pc`;
+    const meta = `${count} item${count !== 1 ? "s" : ""} · ${group.inTotal} in · ${group.outNet} out · ${group.units} pc`;
     const title = `${gi + 1}. ${pdfText(group.name)}`;
     const phoneSuffix = group.phone ? `  ·  ${pdfText(group.phone)}` : "";
     const skus = group.items.map((p) => pdfText(p.sku));
+    /* Small notes under a figure: "2 ret" under Out, "-3 adj" under Stock. ASCII
+       hyphen on purpose — U+2212 is outside WinAnsi and would print as "?". */
+    const outNotes = group.items.map((p) => (p.returned > 0 ? `${p.returned} ret` : ""));
+    const stockNotes = group.items.map((p) => (p.adj > 0 ? `-${p.adj} adj` : ""));
 
     /* The supplier title is the first head row, so it repeats on continuation
        pages and can never be separated from its column header. The meta text
@@ -177,12 +231,15 @@ export function buildStockSheetPdfSync({ jsPDF, createTable, drawTable }: PdfLib
         fillColor: 235, textColor: 20, fontStyle: "bold", fontSize: 7, lineColor: 120, lineWidth: 0.3,
       },
       columnStyles: {
-        0: { cellWidth: 8, textColor: 90, halign: "center" },
-        1: { cellWidth: 80, fontStyle: "bold", cellPadding: { top: 1.2, bottom: 3.9, left: 1.5, right: 1.5 } },
-        2: { cellWidth: 30, textColor: 90 },
-        3: { cellWidth: 14, halign: "right", fontStyle: "bold" },
-        4: { cellWidth: 20, minCellHeight: COUNT_BOX.h + 2.4 },
-        5: { cellWidth: 34 },
+        [COL.index]: { cellWidth: COL_WIDTHS[COL.index], textColor: 90, halign: "center" },
+        [COL.item]: { cellWidth: COL_WIDTHS[COL.item], fontStyle: "bold", cellPadding: { top: 1.2, bottom: 3.9, left: 1.5, right: 1.5 } },
+        [COL.category]: { cellWidth: COL_WIDTHS[COL.category], textColor: 90 },
+        [COL.in]: { ...figure, cellWidth: COL_WIDTHS[COL.in], textColor: 60 },
+        [COL.entries]: { ...figure, cellWidth: COL_WIDTHS[COL.entries], fontStyle: "normal", textColor: 90 },
+        [COL.out]: { ...figure, cellWidth: COL_WIDTHS[COL.out], textColor: 60 },
+        [COL.stock]: { ...figure, cellWidth: COL_WIDTHS[COL.stock] },
+        [COL.counted]: { cellWidth: COL_WIDTHS[COL.counted], minCellHeight: COUNT_BOX.h + 2.4 },
+        [COL.note]: { cellWidth: COL_WIDTHS[COL.note] },
       },
       head: [
         [{
@@ -193,10 +250,18 @@ export function buildStockSheetPdfSync({ jsPDF, createTable, drawTable }: PdfLib
             cellPadding: { top: 1.5, bottom: 1.5, left: 0, right: 0 },
           },
         }],
-        ["#", "ITEM", "CATEGORY", "STOCK", "COUNTED", "NOTE"],
+        [
+          "#", "ITEM", "CATEGORY",
+          { content: "IN", styles: { halign: "right" } },
+          { content: "ENTRIES", styles: { halign: "right" } },
+          { content: "OUT", styles: { halign: "right" } },
+          { content: "STOCK", styles: { halign: "right" } },
+          "COUNTED", "NOTE",
+        ],
       ],
       body: group.items.map((p, i) => [
-        String(i + 1), pdfText(p.name), pdfText(p.category) || "—", String(p.stock), "", "",
+        String(i + 1), pdfText(p.name), pdfText(p.category) || "—",
+        String(p.inTotal), String(p.entries), String(p.outNet), String(p.stock), "", "",
       ]),
       didDrawCell: (data: CellHookData) => {
         const { cell } = data;
@@ -216,7 +281,7 @@ export function buildStockSheetPdfSync({ jsPDF, createTable, drawTable }: PdfLib
           return;
         }
         if (data.section !== "body") return;
-        if (data.column.index === 1) {
+        if (data.column.index === COL.item) {
           const sku = skus[data.row.index];
           if (sku) {
             doc.setFont("courier", "normal");
@@ -224,7 +289,15 @@ export function buildStockSheetPdfSync({ jsPDF, createTable, drawTable }: PdfLib
             doc.setTextColor(110);
             doc.text(fitText(doc, sku, cell.width - 3), cell.x + 1.5, cell.y + cell.height - 1.5);
           }
-        } else if (data.column.index === 4) {
+        } else if (data.column.index === COL.out || data.column.index === COL.stock) {
+          const note = (data.column.index === COL.out ? outNotes : stockNotes)[data.row.index];
+          if (note) {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(6.3);
+            doc.setTextColor(110);
+            doc.text(note, cell.x + cell.width - 1.5, cell.y + cell.height - 1.5, { align: "right" });
+          }
+        } else if (data.column.index === COL.counted) {
           doc.setDrawColor(140);
           doc.setLineWidth(0.25);
           doc.roundedRect(
@@ -258,7 +331,7 @@ export function buildStockSheetPdfSync({ jsPDF, createTable, drawTable }: PdfLib
   doc.setFontSize(8);
   doc.setTextColor(90);
   doc.text(
-    fitText(doc, `${input.totalItems} items · ${input.totalUnits} pc in system · Generated by ${storeName}`, contentW),
+    fitText(doc, `${sheetTotalsLine(input.totalItems, input.totalIn, input.totalOut, input.totalUnits)} · Generated by ${storeName}`, contentW),
     pageW / 2, y + 2, { align: "center" },
   );
 

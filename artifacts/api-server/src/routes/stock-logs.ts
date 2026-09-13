@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, asc, and, or, ilike, sql, type SQL } from "drizzle-orm";
+import { eq, desc, asc, and, or, ilike, isNull, sql, type SQL } from "drizzle-orm";
 import { db, stockLogsTable, productsTable } from "@workspace/db";
 import {
   GetProductStockHistoryParams,
@@ -9,8 +9,23 @@ import {
 import { tenantWhere } from "../lib/tenant";
 import { istToday } from "../lib/ist";
 import { buildStockBatchHistory } from "../lib/stock-batch-history";
+import { deriveStockTotals } from "../lib/stock-totals";
 
 const router: IRouter = Router();
+
+/**
+ * Movement rows that belong to the caller's tenant — plus the handful written
+ * before tenancy existed, which carry a NULL tenant_id (two OUT rows on the
+ * live shop). Those rows are only ever read through a product that has already
+ * been tenant-checked, so admitting NULL cannot leak another shop's data,
+ * whereas the strict `tenantWhere` silently drops them and mis-states a
+ * product's sold figure (and, by difference, its opening stock). Rows tagged
+ * with a *different* tenant stay excluded even if they point at our product.
+ */
+const ownOrLegacyLog = (tenantId: string | null | undefined): SQL =>
+  tenantId == null
+    ? isNull(stockLogsTable.tenantId)
+    : (or(eq(stockLogsTable.tenantId, tenantId), isNull(stockLogsTable.tenantId)) as SQL);
 
 /**
  * The shop's business day is an Asia/Kolkata calendar day, so a date-range
@@ -78,7 +93,7 @@ router.get("/products/:id/stock-history", async (req, res): Promise<void> => {
       .from(stockLogsTable)
       .where(and(
         eq(stockLogsTable.productId, product.id),
-        tenantWhere(stockLogsTable.tenantId, req.tenantId),
+        ownOrLegacyLog(req.tenantId),
       ))
       .orderBy(asc(stockLogsTable.createdAt), asc(stockLogsTable.id));
 
@@ -230,6 +245,42 @@ router.get("/stock-logs/entry-summary", async (req, res): Promise<void> => {
     totals: resolved,
     products: rows,
     truncated: resolved.productCount > rows.length,
+  });
+});
+
+/**
+ * All-time stock totals for EVERY product of the shop, one row each.
+ *
+ * Feeds the supplier-wise Stock Check sheet, which needs "how much of this
+ * ever came in, how much went out, what's left" for the whole catalogue at
+ * once — one grouped query rather than a stock-history call per product.
+ * Products without a single movement are included too: their stock was set
+ * when they were created, and that is precisely what `unloggedInQuantity`
+ * reports (see lib/stock-totals).
+ *
+ * Products and their movements are read in the same statement, so the
+ * current level and the ledger come from one snapshot and reconcile exactly.
+ */
+router.get("/stock-logs/product-totals", async (req, res): Promise<void> => {
+  const rows = await db
+    .select({
+      productId: productsTable.id,
+      currentStock: productsTable.stock,
+      inQuantity: sql<number>`COALESCE(SUM(${stockLogsTable.quantity}) FILTER (WHERE ${stockLogsTable.type} = 'IN'), 0)::int`,
+      inCount: sql<number>`COUNT(${stockLogsTable.id}) FILTER (WHERE ${stockLogsTable.type} = 'IN')::int`,
+      outQuantity: sql<number>`COALESCE(SUM(${stockLogsTable.quantity}) FILTER (WHERE ${stockLogsTable.type} = 'OUT'), 0)::int`,
+      returnedQuantity: sql<number>`COALESCE(SUM(${stockLogsTable.quantity}) FILTER (WHERE ${stockLogsTable.type} = 'RETURN'), 0)::int`,
+    })
+    .from(productsTable)
+    .leftJoin(stockLogsTable, and(
+      eq(stockLogsTable.productId, productsTable.id),
+      ownOrLegacyLog(req.tenantId),
+    ))
+    .where(tenantWhere(productsTable.tenantId, req.tenantId))
+    .groupBy(productsTable.id);
+
+  res.json({
+    products: rows.map((row) => deriveStockTotals(row.productId, row.currentStock, row)),
   });
 });
 

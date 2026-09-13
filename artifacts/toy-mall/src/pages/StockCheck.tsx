@@ -5,12 +5,14 @@ import {
   CheckSquare, Square, RefreshCw, Share2, Download,
 } from "lucide-react";
 import { toast } from "sonner";
+import { listProductStockTotals, type ProductStockTotals } from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStoreSettings } from "@/lib/store-info";
 import {
   buildStockSheetPdfSync, downloadBlob, getLoadedPdfLibs, preloadStockSheetPdf, sharePdf,
-  stockSheetFilename,
+  stockSheetFilename, sheetTotalsLine, SHEET_LEGEND, SHEET_LEGEND_ADJ,
+  type StockSheetGroup, type StockSheetItem,
 } from "@/lib/stock-check-pdf";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -21,13 +23,51 @@ interface ProductLite {
   id: string; name: string; sku: string; category: string;
   stock: number; supplierId?: string | null;
 }
-interface Group {
-  key: string; name: string; phone?: string | null;
-  items: ProductLite[]; units: number;
-}
+type Group = StockSheetGroup;
 
 /** Group key for products that have no supplier set. */
 const UNASSIGNED = "__unassigned__";
+
+/**
+ * Reduce a product's lifetime totals to the sheet's four figures, such that
+ * `inTotal - outNet - adj === stock` on every row (the server guarantees the
+ * underlying identity; see api-server/src/lib/stock-totals.ts).
+ *
+ * "In" deliberately includes stock that never went through a stock entry —
+ * most of this catalogue was typed in with its opening stock when the product
+ * was created, and that stock did come from the supplier all the same. It is
+ * counted as one entry so "4 in · 0 entries" can never appear.
+ */
+const toSheetItem = (p: ProductLite, t: ProductStockTotals | undefined): StockSheetItem => {
+  /* A product created after the totals were fetched has no row yet. With no
+     movements the server would report all of its stock as unlogged-in, so the
+     same rule is applied here — a derivation, not a placeholder. */
+  const opening = t ? t.unloggedInQuantity : p.stock;
+  const inEntries = t?.inCount ?? 0;
+  const returned = t?.returnedQuantity ?? 0;
+  return {
+    id: p.id, name: p.name, sku: p.sku, category: p.category,
+    inTotal: opening + (t?.inQuantity ?? 0),
+    entries: inEntries + (opening > 0 ? 1 : 0),
+    outNet: (t?.outQuantity ?? 0) - returned,
+    returned,
+    adj: t?.unloggedOutQuantity ?? 0,
+    // Stock from the same snapshot as the movements, so the row reconciles even if a sale landed between the two requests.
+    stock: t?.currentStock ?? p.stock,
+  };
+};
+
+const sumFigures = (items: StockSheetItem[]) => ({
+  units: items.reduce((n, p) => n + p.stock, 0),
+  inTotal: items.reduce((n, p) => n + p.inTotal, 0),
+  outNet: items.reduce((n, p) => n + p.outNet, 0),
+});
+
+const plural = (n: number, word: string) => `${n} ${word}${n !== 1 ? "s" : ""}`;
+
+/** "18 items · 84 in · 31 out · 53 pc" — the same figures on screen, paper and PDF. */
+const groupMeta = (g: Group) =>
+  `${plural(g.items.length, "item")} · ${g.inTotal} in · ${g.outNet} out · ${g.units} pc`;
 
 const printedStamp = () =>
   new Date().toLocaleString("en-IN", {
@@ -40,6 +80,7 @@ export default function StockCheck() {
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts]   = useState<ProductLite[]>([]);
+  const [totals, setTotals]       = useState<Map<string, ProductStockTotals>>(new Map());
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState(false);
 
@@ -60,10 +101,15 @@ export default function StockCheck() {
         if (!r.ok) throw new Error("products");
         return r.json();
       }),
+      /* The in/out figures are part of the sheet, not decoration: if they
+         can't be loaded the page shows its error state rather than a sheet
+         with blanks or zeros that would be read as "nothing ever came in". */
+      listProductStockTotals(),
     ])
-      .then(([s, p]) => {
+      .then(([s, p, t]) => {
         setSuppliers(Array.isArray(s) ? s : []);
         setProducts(Array.isArray(p) ? p : []);
+        setTotals(new Map(t.products.map((row) => [row.productId, row])));
       })
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
@@ -74,16 +120,16 @@ export default function StockCheck() {
      "No supplier" always last. */
   const groups = useMemo<Group[]>(() => {
     const knownIds = new Set(suppliers.map((s) => s.id));
-    const bySupplier = new Map<string, ProductLite[]>();
+    const bySupplier = new Map<string, StockSheetItem[]>();
     for (const p of products) {
       /* Products pointing at a deleted supplier fall into the "No supplier"
          group too — the count sheet must never silently omit inventory. */
       const key = p.supplierId && knownIds.has(p.supplierId) ? p.supplierId : UNASSIGNED;
       const list = bySupplier.get(key) ?? [];
-      list.push(p);
+      list.push(toSheetItem(p, totals.get(p.id)));
       bySupplier.set(key, list);
     }
-    const sortItems = (list: ProductLite[]) =>
+    const sortItems = (list: StockSheetItem[]) =>
       [...list].sort((a, b) => a.name.localeCompare(b.name, "en-IN"));
 
     const out: Group[] = [];
@@ -91,21 +137,15 @@ export default function StockCheck() {
       const items = bySupplier.get(s.id);
       if (!items || items.length === 0) continue;
       const sorted = sortItems(items);
-      out.push({
-        key: s.id, name: s.name, phone: s.phone,
-        items: sorted, units: sorted.reduce((n, p) => n + p.stock, 0),
-      });
+      out.push({ key: s.id, name: s.name, phone: s.phone, items: sorted, ...sumFigures(sorted) });
     }
     const un = bySupplier.get(UNASSIGNED);
     if (un && un.length > 0) {
       const sorted = sortItems(un);
-      out.push({
-        key: UNASSIGNED, name: "No supplier set",
-        items: sorted, units: sorted.reduce((n, p) => n + p.stock, 0),
-      });
+      out.push({ key: UNASSIGNED, name: "No supplier set", items: sorted, ...sumFigures(sorted) });
     }
     return out;
-  }, [suppliers, products]);
+  }, [suppliers, products, totals]);
 
   /* Everything selected by default once data arrives. */
   useEffect(() => {
@@ -128,13 +168,16 @@ export default function StockCheck() {
       .filter((g) => sel.has(g.key))
       .map((g) => {
         const items = hideZero ? g.items.filter((p) => p.stock > 0) : g.items;
-        return { ...g, items, units: items.reduce((n, p) => n + p.stock, 0) };
+        return { ...g, items, ...sumFigures(items) };
       })
       .filter((g) => g.items.length > 0);
   }, [groups, sel, hideZero]);
 
   const totalItems = printGroups.reduce((n, g) => n + g.items.length, 0);
   const totalUnits = printGroups.reduce((n, g) => n + g.units, 0);
+  const totalIn    = printGroups.reduce((n, g) => n + g.inTotal, 0);
+  const totalOut   = printGroups.reduce((n, g) => n + g.outNet, 0);
+  const hasAdj     = printGroups.some((g) => g.items.some((p) => p.adj > 0));
 
   const pickerGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -161,6 +204,8 @@ export default function StockCheck() {
     printedAt: printedStamp(),
     totalItems,
     totalUnits,
+    totalIn,
+    totalOut,
   });
 
   const handleDownload = async () => {
@@ -408,32 +453,55 @@ export default function StockCheck() {
               </div>
 
               {/* ── What will print ── */}
-              <div className="rounded-2xl border bg-muted/30 px-4 py-3 flex items-center gap-3">
-                <Package className="w-5 h-5 text-primary shrink-0" />
-                <p className="text-sm font-bold">
-                  {totalItems === 0
-                    ? "Nothing selected to print yet"
-                    : <>Sheet will list <span className="tabular-nums">{totalItems}</span> item{totalItems !== 1 ? "s" : ""} from <span className="tabular-nums">{printGroups.length}</span> supplier{printGroups.length !== 1 ? "s" : ""} · <span className="tabular-nums">{totalUnits}</span> pc in system</>}
-                </p>
+              <div className="rounded-2xl border bg-muted/30 px-4 py-3 flex items-start gap-3">
+                <Package className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-sm font-bold tabular-nums" data-testid="text-sheet-summary">
+                    {totalItems === 0
+                      ? "Nothing selected to print yet"
+                      : <>Sheet will list {plural(totalItems, "item")} from {plural(printGroups.length, "supplier")} · {totalIn} in · {totalOut} out · {totalUnits} pc in system</>}
+                  </p>
+                  {totalItems > 0 && (
+                    <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">
+                      {SHEET_LEGEND}{hasAdj ? SHEET_LEGEND_ADJ : ""}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* ── Screen preview ── */}
               {printGroups.map((g) => (
-                <div key={g.key} className="border rounded-2xl bg-card overflow-hidden">
+                <div key={g.key} className="border rounded-2xl bg-card overflow-hidden" data-testid={`group-${g.key}`}>
                   <div className="px-4 py-3 border-b bg-muted/30 flex items-center justify-between gap-3">
                     <p className="font-black text-sm truncate">{g.name}</p>
-                    <p className="text-xs text-muted-foreground font-bold tabular-nums shrink-0">
-                      {g.items.length} item{g.items.length !== 1 ? "s" : ""} · {g.units} pc
+                    <p className="text-xs text-muted-foreground font-bold tabular-nums shrink-0 text-right">
+                      {groupMeta(g)}
                     </p>
+                  </div>
+                  <div className="px-4 py-1 border-b flex justify-end gap-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                    <span className="w-11 text-right">In</span>
+                    <span className="w-11 text-right">Out</span>
+                    <span className="w-11 text-right">Stock</span>
                   </div>
                   <div className="divide-y divide-border">
                     {g.items.map((p) => (
-                      <div key={p.id} className="px-4 py-2.5 flex items-center gap-3">
+                      <div key={p.id} className="px-4 py-2.5 flex items-center gap-3" data-testid={`row-${p.id}`}>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold truncate">{p.name}</p>
-                          <p className="text-[11px] font-mono text-muted-foreground truncate">{p.sku}{p.category ? ` · ${p.category}` : ""}</p>
+                          {/* Figures first: on a narrow screen this line truncates from the right,
+                              and the entry count must survive when the SKU/category do not. */}
+                          <p className="text-[11px] font-mono text-muted-foreground truncate">
+                            {p.entries} {p.entries === 1 ? "entry" : "entries"}
+                            {p.returned > 0 ? ` · ${p.returned} returned` : ""}
+                            {p.adj > 0 ? ` · −${p.adj} adj` : ""}
+                            {" · "}{p.sku}{p.category ? ` · ${p.category}` : ""}
+                          </p>
                         </div>
-                        <p className={`shrink-0 font-black tabular-nums ${p.stock === 0 ? "text-muted-foreground/50" : ""}`}>{p.stock}</p>
+                        <div className="flex gap-1 shrink-0 tabular-nums">
+                          <p className="w-11 text-right font-bold text-muted-foreground">{p.inTotal}</p>
+                          <p className="w-11 text-right font-bold text-muted-foreground">{p.outNet}</p>
+                          <p className={`w-11 text-right font-black ${p.stock === 0 ? "text-muted-foreground/50" : ""}`}>{p.stock}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -458,6 +526,9 @@ export default function StockCheck() {
                   <span>Checked by: ____________________&nbsp;&nbsp;&nbsp;Date: ____________</span>
                 </div>
               </div>
+              <p style={{ fontSize: "8px", color: "#555", marginTop: "-1.5mm", marginBottom: "3mm" }}>
+                {SHEET_LEGEND}{hasAdj ? SHEET_LEGEND_ADJ : ""}
+              </p>
 
               {printGroups.map((g, gi) => (
                 <div key={g.key} className={`supplier-section${pagePerSupplier && gi > 0 ? " page-break" : ""}`} style={{ marginBottom: "5mm" }}>
@@ -465,8 +536,8 @@ export default function StockCheck() {
                     <p style={{ fontSize: "12px", fontWeight: 800 }}>
                       {gi + 1}. {g.name}{g.phone ? <span style={{ fontWeight: 400, fontSize: "10px" }}> · {g.phone}</span> : null}
                     </p>
-                    <p style={{ fontSize: "9.5px", fontWeight: 700 }}>
-                      {g.items.length} items · {g.units} pc
+                    <p style={{ fontSize: "9.5px", fontWeight: 700, whiteSpace: "nowrap" }}>
+                      {groupMeta(g)}
                     </p>
                   </div>
                   <table>
@@ -474,10 +545,13 @@ export default function StockCheck() {
                       <tr>
                         <th style={{ width: "7mm" }}>#</th>
                         <th>Item</th>
-                        <th style={{ width: "24mm" }}>Category</th>
+                        <th style={{ width: "22mm" }}>Category</th>
+                        <th style={{ width: "13mm", textAlign: "right" }}>In</th>
+                        <th style={{ width: "14mm", textAlign: "right" }}>Entries</th>
+                        <th style={{ width: "13mm", textAlign: "right" }}>Out</th>
                         <th style={{ width: "13mm", textAlign: "right" }}>Stock</th>
                         <th style={{ width: "17mm", textAlign: "center" }}>Counted</th>
-                        <th style={{ width: "26mm" }}>Note</th>
+                        <th style={{ width: "24mm" }}>Note</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -489,7 +563,16 @@ export default function StockCheck() {
                             <span style={{ display: "block", fontSize: "8px", color: "#555", fontFamily: "monospace" }}>{p.sku}</span>
                           </td>
                           <td style={{ color: "#555" }}>{p.category || "—"}</td>
-                          <td style={{ textAlign: "right", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{p.stock}</td>
+                          <td style={{ textAlign: "right", fontWeight: 700, color: "#333", fontVariantNumeric: "tabular-nums" }}>{p.inTotal}</td>
+                          <td style={{ textAlign: "right", color: "#555", fontVariantNumeric: "tabular-nums" }}>{p.entries}</td>
+                          <td style={{ textAlign: "right", fontWeight: 700, color: "#333", fontVariantNumeric: "tabular-nums" }}>
+                            {p.outNet}
+                            {p.returned > 0 && <span style={{ display: "block", fontSize: "7.5px", fontWeight: 400, color: "#555" }}>{p.returned} ret</span>}
+                          </td>
+                          <td style={{ textAlign: "right", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                            {p.stock}
+                            {p.adj > 0 && <span style={{ display: "block", fontSize: "7.5px", fontWeight: 400, color: "#555" }}>−{p.adj} adj</span>}
+                          </td>
                           <td style={{ textAlign: "center" }}><span className="counted-box" /></td>
                           <td />
                         </tr>
@@ -500,7 +583,7 @@ export default function StockCheck() {
               ))}
 
               <p style={{ fontSize: "9px", color: "#555", textAlign: "center", marginTop: "2mm" }}>
-                {totalItems} items · {totalUnits} pc in system · Generated by {store.name}
+                {sheetTotalsLine(totalItems, totalIn, totalOut, totalUnits)} · Generated by {store.name}
               </p>
             </div>
           </div>

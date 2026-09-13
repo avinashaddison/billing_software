@@ -31,6 +31,8 @@ export * from "./product";
 export * from "./productEntrySummary";
 export * from "./productStockHistory";
 export * from "./productStockHistorySummary";
+export * from "./productStockTotals";
+export * from "./productStockTotalsList";
 export * from "./qrCodeResponse";
 export * from "./receivablesSummary";
 export * from "./recordPaymentInput";
