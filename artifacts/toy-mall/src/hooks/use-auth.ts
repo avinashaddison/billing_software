@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { OWNER_PERMISSIONS, PRODUCT_CREATE_RESOURCES, type Permissions } from "@/lib/permissions";
+import {
+  OWNER_PERMISSIONS, PRODUCT_CREATE_RESOURCES, TIMELINE_READ_RESOURCES, type Permissions,
+} from "@/lib/permissions";
 import { useStoreSettings } from "@/lib/store-info";
+import { queryClient } from "@/lib/query-client";
 
 export type StaffRole = "owner" | "staff";
 
@@ -39,6 +42,13 @@ export const useAuth = create<AuthState>()(
       setRole:     () => {},
 
       login: ({ id, name, role, permissions }) => {
+        /* Every cached API response is shaped for the account that fetched
+           it (owner views carry cost prices and customer phones that staff
+           views omit). Drop the previous sign-in's copies before this
+           account's pages mount, so a staff member signing in after the
+           owner on a shared tablet is never served the owner's cache while
+           the background refetch is still in flight. */
+        queryClient.clear();
         const currentThreshold = useStoreSettings.getState().scannerThresholdMs;
         set({
           isLoggedIn:  true,
@@ -76,6 +86,9 @@ export const useAuth = create<AuthState>()(
           priorScannerThresholdMs: null,
           userId:      "user-1",
         });
+        /* Same reasoning as in login(): nothing fetched under the old
+           session may survive into the next one. */
+        queryClient.clear();
         /* Drop the persisted store-settings cache so the next sign-in (possibly
            a different tenant on the same browser) hydrates from scratch
            instead of flashing the previous tenant's name/logo/etc.
@@ -113,4 +126,17 @@ export function useCanCreateProducts(): boolean {
   if (role === "owner") return true;
   const map = permissions as Record<string, "none" | "read" | "write">;
   return PRODUCT_CREATE_RESOURCES.some((r) => map[r] === "write");
+}
+
+/**
+ * Can this user open a product's movement timeline? Mirrors the server gate
+ * on GET /api/products/:id/timeline (`requireRead("suppliers", "logs")`).
+ * The Product page is reachable with `products: read` alone, so its tracking
+ * card must check this, not the page's own permission.
+ */
+export function useCanViewTimeline(): boolean {
+  const { role, permissions } = useAuth();
+  if (role === "owner") return true;
+  const map = permissions as Record<string, "none" | "read" | "write">;
+  return TIMELINE_READ_RESOURCES.some((r) => map[r] === "read" || map[r] === "write");
 }

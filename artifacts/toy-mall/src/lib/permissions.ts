@@ -86,6 +86,17 @@ export function hasAccess(
  */
 export const PRODUCT_CREATE_RESOURCES: readonly ResourceKey[] = ["products", "productEntry"];
 
+/**
+ * Resources whose `read` level opens a product's movement timeline (every
+ * stock-in, sale and return with date, time, staff and bill). Mirrors the
+ * server's `requireRead("suppliers", "logs")` on GET /api/products/:id/timeline:
+ * the Stock Check sheet (Suppliers) and the Stock Logs page both show this
+ * history, so either grant is enough. The Product page can be opened with
+ * `products: read` alone, which does NOT cover it — gate the tracking card
+ * on this list or products-only staff get a card that 403s.
+ */
+export const TIMELINE_READ_RESOURCES: readonly ResourceKey[] = ["suppliers", "logs"];
+
 /** Map page path → resource key */
 export const PATH_RESOURCE: Record<string, ResourceKey> = {
   "/settings":   "settings",

@@ -8,12 +8,12 @@ import {
   getGetProductBySkuQueryKey, getGetDashboardSummaryQueryKey,
   getGetTodayActivityQueryKey, getListProductsQueryKey,
   getGetLowStockProductsQueryKey, getListStockLogsQueryKey,
-  getGetProductStockHistoryQueryKey,
+  getGetProductStockHistoryQueryKey, getGetProductTimelineQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth, usePermission } from "@/hooks/use-auth";
-import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode, Truck } from "lucide-react";
+import { ArrowLeft, Package, AlertTriangle, ArrowDownToLine, ArrowUpToLine, ChevronRight, Edit3, X, Check, Loader2, Download, Printer, Barcode, Truck, History } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -29,6 +29,7 @@ import { getCategoryStyle, getCategoryEmoji, getCategoryHex } from "@/lib/catego
 import { useStoreSettings } from "@/lib/store-info";
 import { MM_TO_PX, loadLabelSize } from "@/lib/label-size";
 import { StockBatchHistory } from "@/components/stock/StockBatchHistory";
+import { ProductTrackingCard } from "@/components/stock/ProductTrackingCard";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -189,6 +190,7 @@ export default function ProductDetail() {
       queryClient.invalidateQueries({ queryKey: getGetLowStockProductsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListStockLogsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetProductStockHistoryQueryKey(product.id) });
+      queryClient.invalidateQueries({ queryKey: getGetProductTimelineQueryKey(product.id) });
       setQuantity(1);
     } catch (error: any) {
       playError();
@@ -686,6 +688,18 @@ export default function ProductDetail() {
                   {canEnterStock ? "Full stock history & add stock" : "View full stock history"}
                   <ChevronRight className="w-4 h-4 shrink-0" />
                 </Link>
+
+                {/* The tracking card sits under the three columns — on a phone
+                    that is two cards further down, so offer a jump. */}
+                <button
+                  type="button"
+                  onClick={() => document.getElementById("tracking")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  className="mt-2 flex w-full items-center justify-between gap-2 text-sm font-semibold text-primary hover:underline"
+                  data-testid="link-jump-tracking"
+                >
+                  <span className="inline-flex items-center gap-1.5"><History className="w-4 h-4 shrink-0" /> Tracking — every in, sale & return</span>
+                  <ChevronRight className="w-4 h-4 shrink-0 rotate-90" />
+                </button>
               </div>
             </div>
           </div>
@@ -874,6 +888,14 @@ export default function ProductDetail() {
             </div>
           </div>
 
+        </div>
+
+        {/* ══ Tracking: every movement of this product, right here ══ */}
+        <div id="tracking" className="mt-4 scroll-mt-4">
+          {/* Keyed by product: this page stays mounted when the URL moves to
+              another sku (scan → scan), and the card's type filter must not
+              carry over from the previous product. */}
+          <ProductTrackingCard key={product.id} productId={product.id} />
         </div>
       </div>
     </div>

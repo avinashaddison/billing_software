@@ -1,5 +1,6 @@
 import { Switch, Route, Router as WouterRouter, useLocation, useSearch, Redirect } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/query-client";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -44,17 +45,6 @@ import AdminPage       from "@/pages/admin/index";
 import Landing         from "@/pages/Landing";
 import Legal           from "@/pages/Legal";
 import Developers      from "@/pages/Developers";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 2,
-      gcTime: 1000 * 60 * 10,
-      retry: 1,
-    },
-  },
-});
 
 /**
  * Global 401 guard. The API now enforces authentication server-side, so a
