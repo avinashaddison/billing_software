@@ -220,7 +220,16 @@ function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; st
                       {badge}
                     </span>
                   </div>
-                  <div className="flex gap-1.5">
+                  {res.key === "todayBilling" ? (
+                    <button type="button" role="switch"
+                      aria-checked={current === "write"}
+                      aria-label="Allow Today's Bills & Totals"
+                      data-testid="today-billing-toggle"
+                      onClick={() => setLevel("todayBilling", current === "write" ? "none" : "write")}
+                      className={`rounded-full px-4 py-2 text-xs font-bold border ${current === "write" ? "bg-blue-500 text-white" : "bg-muted"}`}>
+                      {current === "write" ? "Allowed" : "Not allowed"}
+                    </button>
+                  ) : <div className="flex gap-1.5">
                     {levels.map((level) => (
                       <button
                         key={level}
@@ -236,7 +245,7 @@ function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; st
                         {level === "none" ? "None" : level === "read" ? "Read" : binary ? "Allow" : "Write"}
                       </button>
                     ))}
-                  </div>
+                  </div>}
                 </div>
               );
             })}

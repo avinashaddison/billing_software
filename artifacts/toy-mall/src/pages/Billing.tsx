@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "wouter";
-import { format, isToday, isThisWeek } from "date-fns";
+import { format, isThisWeek } from "date-fns";
 import {
   ChevronRight, IndianRupee, ShoppingBag,
   CalendarDays, TrendingUp, Search, X, FileText, User, Truck,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePermission } from "@/hooks/use-auth";
+import { isIstToday } from "@/lib/ist-date";
 
 /* ── Types ───────────────────────────────────────────────────────── */
 
@@ -50,27 +52,49 @@ type Party = "all" | "customer" | "supplier";
 /* ── Component ───────────────────────────────────────────────────── */
 
 export default function Billing() {
+  const canToday = usePermission("todayBilling") === "write";
+  const canHistory = usePermission("billing") !== "none";
   const [bills, setBills]       = useState<Bill[]>([]);
   const [payments, setPayments] = useState<SupplierPayment[]>([]);
   const [loading, setLoading]   = useState(true);
-  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [dateFilter, setDateFilter] = useState<DateFilter>(canHistory ? "all" : "today");
   const [party, setParty]       = useState<Party>("all");
   const [search, setSearch]     = useState("");
+  const [error, setError] = useState("");
+  const [todaySummary, setTodaySummary] = useState<{ billCount: number; totalAmount: number } | null>(null);
+  const generation = useRef(0);
 
   const load = useCallback(() => {
+    const request = ++generation.current;
+    setLoading(true);
+    setError("");
+    setBills([]);
+    setPayments([]);
+    setTodaySummary(null);
+    const read = async (response: Response) => {
+      if (!response.ok) throw new Error(response.status === 403 ? "Owner permission required" : "Could not load billing data");
+      return response.json();
+    };
     return Promise.all([
-      fetch(`${BASE_URL}/api/bills`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${BASE_URL}/api/supplier-payments`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${BASE_URL}/api/bills${canHistory ? "" : "?scope=today"}`).then(read),
+      canHistory ? fetch(`${BASE_URL}/api/supplier-payments`).then(read) : Promise.resolve([]),
+      canToday ? fetch(`${BASE_URL}/api/bills/today-summary`).then(read) : Promise.resolve(null),
     ])
-      .then(([b, p]) => {
+      .then(([b, p, summary]) => {
+        if (request !== generation.current) return;
         setBills(Array.isArray(b) ? b : []);
         setPayments(Array.isArray(p) ? p : []);
+        setTodaySummary(summary);
       })
-      .catch(() => { setBills([]); setPayments([]); })
-      .finally(() => setLoading(false));
-  }, []);
+      .catch((err) => { if (request === generation.current) setError((err as Error).message); })
+      .finally(() => { if (request === generation.current) setLoading(false); });
+  }, [canToday, canHistory]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    setDateFilter(canHistory ? "all" : "today");
+    void load();
+    return () => { generation.current++; };
+  }, [load, canHistory]);
 
   /* Live refresh: a sale, payment, return, or supplier payment elsewhere in
      the app broadcasts an SSE event that use-realtime bridges to these window
@@ -86,9 +110,8 @@ export default function Billing() {
   }, [load]);
 
   /* ── Stats (customer sales = revenue only; supplier payments are money out) ── */
-  const todayBills   = bills.filter((b) => isToday(new Date(b.createdAt)));
   const weekBills    = bills.filter((b) => isThisWeek(new Date(b.createdAt)));
-  const todayRevenue = todayBills.reduce((s, b) => s + b.totalAmount, 0);
+  const todayRevenue = todaySummary?.totalAmount ?? 0;
   const weekRevenue  = weekBills.reduce((s, b) => s + b.totalAmount, 0);
   const totalRevenue = bills.reduce((s, b) => s + b.totalAmount, 0);
 
@@ -114,14 +137,14 @@ export default function Billing() {
     method: p.method,
   }));
 
-  const allRows = [...customerRows, ...supplierRows].sort(
+  const allRows = [...customerRows, ...supplierRows].filter(row => canToday || !isIstToday(row.date)).sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
 
   /* ── Filter + search pipeline ── */
   const partyFiltered = party === "all" ? allRows : allRows.filter((r) => r.kind === party);
   const timeFiltered =
-    dateFilter === "today" ? partyFiltered.filter((r) => isToday(new Date(r.date)))
+    dateFilter === "today" ? partyFiltered.filter((r) => isIstToday(r.date))
     : dateFilter === "week" ? partyFiltered.filter((r) => isThisWeek(new Date(r.date)))
     : partyFiltered;
 
@@ -151,13 +174,19 @@ export default function Billing() {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24 md:pb-6">
+        {error && <div role="alert" className="p-4 text-destructive">
+          {error} <button onClick={() => void load()} className="underline font-bold">Retry</button>
+        </div>}
+        {!canToday && <p data-testid="today-billing-restricted" className="px-4 pt-4 text-sm text-muted-foreground">
+          Today's bills and totals are hidden. Ask the owner to enable Today's Bills & Totals in Staff Permissions.
+        </p>}
 
         {/* ── Stats row ── */}
         <div className="grid grid-cols-3 gap-3 p-4 md:px-6">
           {[
             {
               label: "Today's Bills",
-              value: loading ? null : todayBills.length,
+              value: loading ? null : todaySummary?.billCount ?? 0,
               sub:   loading ? null : `₹${todayRevenue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`,
               icon:  CalendarDays,
               color: "text-blue-600 dark:text-blue-400",
@@ -179,7 +208,7 @@ export default function Billing() {
               color: "text-green-600 dark:text-green-400",
               bg:    "bg-green-50 dark:bg-green-950/40",
             },
-          ].map((stat) => {
+          ].filter(stat => stat.label === "Today's Bills" ? canToday : canHistory).map((stat) => {
             const Icon = stat.icon;
             return (
               <div key={stat.label} className={`${stat.bg} rounded-2xl p-3 flex flex-col gap-1`}>
@@ -225,7 +254,7 @@ export default function Billing() {
 
         {/* ── Date filter pills ── */}
         <div className="flex gap-2 px-4 md:px-6 mb-3">
-          {(["all", "week", "today"] as DateFilter[]).map((f) => (
+          {(["all", "week", "today"] as DateFilter[]).filter(f => f === "today" ? canToday : canHistory).map((f) => (
             <button
               key={f}
               onClick={() => setDateFilter(f)}

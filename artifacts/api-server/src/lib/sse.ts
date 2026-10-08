@@ -22,6 +22,7 @@ type SseClient = {
   id:       string;
   tenantId: string | null;
   send:     (event: string, data: unknown) => void;
+  canReadMoney: () => Promise<boolean>;
 };
 
 const clients = new Set<SseClient>();
@@ -30,6 +31,9 @@ const clients = new Set<SseClient>();
 export function addClient(
   res: import("express").Response,
   tenantId: string | null = null,
+  checks: { canReadMoney: () => Promise<boolean>; isActive: () => Promise<boolean> } = {
+    canReadMoney: async () => false, isActive: async () => true,
+  },
 ): () => void {
   const id = Math.random().toString(36).slice(2);
 
@@ -46,11 +50,14 @@ export function addClient(
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
-  const client: SseClient = { id, tenantId, send };
+  const client: SseClient = { id, tenantId, send, canReadMoney: checks.canReadMoney };
   clients.add(client);
 
   // Keep-alive ping every 25 s (prevents proxy timeouts)
-  const ping = setInterval(() => {
+  const ping = setInterval(async () => {
+    try {
+      if (!(await checks.isActive())) { res.end(); return; }
+    } catch { res.end(); return; }
     res.write(":ping\n\n");
   }, 25_000);
 
@@ -105,6 +112,15 @@ export function broadcast(
     }
 
     if (!shouldSend) continue;
+    if (/^(bill_|sale_|return_)/.test(event)) {
+      // Check each financial event against CURRENT grants, not the grants
+      // at connection time. Revoking the toggle immediately redacts money.
+      void client.canReadMoney().then(allowed => {
+        if (!clients.has(client)) return;
+        client.send(allowed ? event : "inventory_changed", allowed ? data : {});
+      }).catch(() => {});
+      continue;
+    }
     try { client.send(event, data); } catch { /* ignore dead conn */ }
   }
 }

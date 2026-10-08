@@ -5,6 +5,7 @@ import {
 } from "@/lib/permissions";
 import { useStoreSettings } from "@/lib/store-info";
 import { queryClient } from "@/lib/query-client";
+import { ownerActivityKey } from "@/lib/owner-idle";
 
 export type StaffRole = "owner" | "staff";
 
@@ -14,6 +15,7 @@ interface AuthState {
   staffName:   string;
   role:        StaffRole | null;
   permissions: Permissions;
+  sessionGeneration: number;
   priorScannerThresholdMs: number | null;
 
   login:  (data: { id: string; name: string; role: StaffRole; permissions: Permissions }) => void;
@@ -37,11 +39,22 @@ export const useAuth = create<AuthState>()(
       staffName:   "",
       role:        null,
       permissions: {},
+      sessionGeneration: 0,
       priorScannerThresholdMs: null,
       userId:      "user-1",
       setRole:     () => {},
 
       login: ({ id, name, role, permissions }) => {
+        if (role === "owner") {
+          localStorage.setItem(ownerActivityKey(id), String(Date.now()));
+          const saved = localStorage.getItem(`toy-mall-owner-pending:${id}`);
+          if (saved) {
+            localStorage.setItem("hira-sons-offline-queue-v1", saved);
+            localStorage.removeItem(`toy-mall-owner-pending:${id}`);
+          }
+          const savedCart = localStorage.getItem(`toy-mall-owner-cart:${id}`);
+          if (savedCart) localStorage.setItem("toy-mall-cart", savedCart);
+        }
         /* Every cached API response is shaped for the account that fetched
            it (owner views carry cost prices and customer phones that staff
            views omit). Drop the previous sign-in's copies before this
@@ -52,6 +65,7 @@ export const useAuth = create<AuthState>()(
         const currentThreshold = useStoreSettings.getState().scannerThresholdMs;
         set({
           isLoggedIn:  true,
+          sessionGeneration: (get().sessionGeneration ?? 0) + 1,
           staffId:     id,
           staffName:   name,
           role,
@@ -69,16 +83,27 @@ export const useAuth = create<AuthState>()(
       syncPermissions: (permissions) => {
         const { isLoggedIn, role } = get();
         if (!isLoggedIn || role === "owner") return;   // owners are all-write by role
+        if (JSON.stringify(get().permissions) !== JSON.stringify(permissions)) queryClient.clear();
         set({ permissions });
       },
 
       logout: () => {
+        // Idle logout must not silently discard unsynced sales. Quarantine
+        // them by owner id; only that same owner restores them on next login.
+        const current = get();
+        if (current.role === "owner" && current.staffId) {
+          const queue = localStorage.getItem("hira-sons-offline-queue-v1");
+          if (queue) localStorage.setItem(`toy-mall-owner-pending:${current.staffId}`, queue);
+          const cart = localStorage.getItem("toy-mall-cart");
+          if (cart) localStorage.setItem(`toy-mall-owner-cart:${current.staffId}`, cart);
+        }
         const { priorScannerThresholdMs } = get();
         if (priorScannerThresholdMs !== null) {
           useStoreSettings.getState().update({ scannerThresholdMs: priorScannerThresholdMs });
         }
         set({
           isLoggedIn:  false,
+          sessionGeneration: (get().sessionGeneration ?? 0) + 1,
           staffId:     null,
           staffName:   "",
           role:        null,
@@ -137,6 +162,7 @@ export function useCanCreateProducts(): boolean {
 export function useCanViewTimeline(): boolean {
   const { role, permissions } = useAuth();
   if (role === "owner") return true;
+  if (permissions.todayBilling !== "write") return false;
   const map = permissions as Record<string, "none" | "read" | "write">;
   return TIMELINE_READ_RESOURCES.some((r) => map[r] === "read" || map[r] === "write");
 }

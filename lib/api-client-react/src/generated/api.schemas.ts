@@ -659,3 +659,27 @@ export type ListSalesParams = {
   limit?: number;
   offset?: number;
 };
+
+export type ListBillsParams = {
+  scope?: ListBillsScope;
+};
+
+export type ListBillsScope =
+  (typeof ListBillsScope)[keyof typeof ListBillsScope];
+
+export const ListBillsScope = {
+  today: "today",
+} as const;
+
+export type GetTodayBillingSummary200 = {
+  billCount: number;
+  totalAmount: number;
+};
+
+export type RecordUserActivityBody = {
+  /**
+   * @minimum 0
+   * @maximum 60000
+   */
+  idleForMs: number;
+};

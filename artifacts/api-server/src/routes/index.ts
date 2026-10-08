@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { eq } from "drizzle-orm";
+import { dailyMoneyReadGate } from "../middlewares/today-billing";
 import { db, tenantsTable } from "@workspace/db";
 import healthRouter      from "./health";
 import productsRouter    from "./products";
@@ -106,6 +107,7 @@ router.use(readOnlySessionGate);
 // AFTER the platform routes (which have their own admin gate) and the tenant
 // suspend gate, but BEFORE every tenant data/mutation router below.
 router.use(requireAuth);
+router.use(dailyMoneyReadGate);
 
 router.use(updatesRouter);
 router.use(authRouter);

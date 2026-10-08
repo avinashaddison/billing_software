@@ -586,6 +586,14 @@ paths:
       operationId: listBills
       tags: [bills]
       summary: List all bills
+      description: Staff without Today's Bills & Totals permission receive historical bills only. A today-only grant never grants history access.
+      parameters:
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [today]
       responses:
         "200":
           description: List of bills
@@ -595,6 +603,53 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Bill"
+
+  /bills/today-summary:
+    get:
+      operationId: getTodayBillingSummary
+      tags: [bills]
+      summary: Today's bill count and billed total in Asia/Kolkata
+      description: Requires owner access or the explicit todayBilling staff permission. Totals are over every bill, not the capped history list.
+      responses:
+        "200":
+          description: Today's totals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [billCount, totalAmount]
+                properties:
+                  billCount:
+                    type: integer
+                  totalAmount:
+                    type: number
+        "403":
+          description: Owner permission required
+  /auth/activity:
+    post:
+      operationId: recordUserActivity
+      tags: [auth]
+      summary: Record a genuine user interaction for owner idle expiry
+      description: Authentication checks the existing idle deadline first. Polling must never call this endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idleForMs]
+              properties:
+                idleForMs:
+                  type: number
+                  minimum: 0
+                  maximum: 60000
+      responses:
+        "204":
+          description: Interaction recorded
+        "400":
+          description: Invalid interaction age
+        "401":
+          description: Session expired or revoked
 
   /bills/{id}:
     get:

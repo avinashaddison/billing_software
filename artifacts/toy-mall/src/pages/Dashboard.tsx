@@ -376,6 +376,7 @@ const quickTiles = [
 export default function Dashboard() {
   const store = useStoreSettings();
   const { role, permissions } = useAuth();
+  const canViewToday = role === "owner" || permissions.todayBilling === "write";
   const visibleQuickTiles = quickTiles.filter(({ resource }) =>
     role === "owner" || permissions[resource] === "read" || permissions[resource] === "write"
   );
@@ -423,8 +424,11 @@ export default function Dashboard() {
 
       {/* ── Revenue + Receivables (money in / money owed) ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <RevenueChart />
-        <ReceivablesCard />
+        {canViewToday ? <><RevenueChart /><ReceivablesCard /></> : (
+          <p className="text-sm text-muted-foreground p-4 border rounded-xl">
+            Today's bills and live totals need owner approval in Staff Permissions.
+          </p>
+        )}
       </div>
 
       {/* ── Quick-access tiles ── */}

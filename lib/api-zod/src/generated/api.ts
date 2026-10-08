@@ -906,8 +906,13 @@ export const CheckoutResponse = zod.object({
 });
 
 /**
+ * Staff without Today's Bills & Totals permission receive historical bills only. A today-only grant never grants history access.
  * @summary List all bills
  */
+export const ListBillsQueryParams = zod.object({
+  scope: zod.enum(["today"]).optional(),
+});
+
 export const ListBillsResponseItem = zod.object({
   id: zod.string(),
   billNumber: zod.number().int().optional(),
@@ -925,6 +930,31 @@ export const ListBillsResponseItem = zod.object({
   createdAt: zod.string(),
 });
 export const ListBillsResponse = zod.array(ListBillsResponseItem);
+
+/**
+ * Requires owner access or the explicit todayBilling staff permission. Totals are over every bill, not the capped history list.
+ * @summary Today's bill count and billed total in Asia/Kolkata
+ */
+export const GetTodayBillingSummaryResponse = zod.object({
+  billCount: zod.number().int(),
+  totalAmount: zod.number(),
+});
+
+/**
+ * Authentication checks the existing idle deadline first. Polling must never call this endpoint.
+ * @summary Record a genuine user interaction for owner idle expiry
+ */
+export const recordUserActivityBodyIdleForMsMin = 0;
+export const recordUserActivityBodyIdleForMsMax = 60000;
+
+export const RecordUserActivityBody = zod.object({
+  idleForMs: zod
+    .number()
+    .min(recordUserActivityBodyIdleForMsMin)
+    .max(recordUserActivityBodyIdleForMsMax),
+});
+
+export const RecordUserActivityResponse = zod.void();
 
 /**
  * @summary Get a single bill with its items

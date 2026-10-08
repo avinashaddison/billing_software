@@ -8,6 +8,7 @@ import { SnowOverlay } from "@/components/effects/SnowOverlay";
 import { CartProvider } from "@/contexts/cart-context";
 import { useEffect }           from "react";
 import { useRealtime }         from "@/hooks/use-realtime";
+import { useOwnerIdle } from "@/hooks/use-owner-idle";
 import { useAuth, usePermission, useCanCreateProducts } from "@/hooks/use-auth";
 import { useStoreSettings }    from "@/lib/store-info";
 import { type ResourceKey } from "@/lib/permissions";
@@ -62,6 +63,7 @@ function AuthFetchGuard() {
   useEffect(() => {
     const original = window.fetch;
     window.fetch = async (...args: Parameters<typeof window.fetch>) => {
+      const generation = useAuth.getState().sessionGeneration;
       const response = await original(...args);
       try {
         if (response.status === 401) {
@@ -79,7 +81,8 @@ function AuthFetchGuard() {
             url.includes("/api/auth/login") || // login + login-email
             url.includes("/api/auth/me") ||    // session probe on boot
             url.includes("/api/platform/");    // vendor /admin console
-          if (isApi && !isExempt && useAuth.getState().isLoggedIn) {
+          if (isApi && !isExempt && useAuth.getState().isLoggedIn
+            && useAuth.getState().sessionGeneration === generation) {
             useAuth.getState().logout();
             setLocation("/login");
           }
@@ -105,6 +108,7 @@ function AuthFetchGuard() {
  * Network errors are ignored so a brief blip never logs anyone out.
  */
 function SessionSync() {
+  useOwnerIdle();
   useEffect(() => {
     const { isLoggedIn, staffId: probedStaffId } = useAuth.getState();
     if (!isLoggedIn) return;
@@ -175,9 +179,17 @@ function AccessRestricted({ hint }: { hint?: string }) {
 }
 
 /** Render page only if user has required access level, else show blocked screen */
-function Protected({ resource, children }: { resource: ResourceKey; children: React.ReactNode }) {
+function Protected({ resource, children, allowToday = false, allowReceipt = false }: {
+  resource: ResourceKey; children: React.ReactNode; allowToday?: boolean; allowReceipt?: boolean;
+}) {
   const level = usePermission(resource);
-  if (level === "none") return <AccessRestricted />;
+  const todayLevel = usePermission("todayBilling");
+  const checkoutLevel = usePermission("scan");
+  if (level === "none" && !(allowToday && todayLevel === "write")
+    && !(allowReceipt && checkoutLevel === "write")) return <AccessRestricted />;
+  if (["reports", "productReports", "analytics", "customers"].includes(resource) && todayLevel !== "write") {
+    return <AccessRestricted hint="This page includes live sales. Ask the owner to enable Today's Bills & Totals." />;
+  }
   return <>{children}</>;
 }
 
@@ -245,8 +257,8 @@ function Router() {
             <Route path="/analytics"    component={() => <Protected resource="analytics"><Analytics /></Protected>} />
             <Route path="/product-report" component={() => <Protected resource="productReports"><ProductReport /></Protected>} />
             <Route path="/profile"      component={Profile} />
-            <Route path="/billing"      component={() => <Protected resource="billing"><Billing /></Protected>} />
-            <Route path="/bill/:id"     component={() => <Protected resource="billing"><Bill /></Protected>} />
+            <Route path="/billing"      component={() => <Protected resource="billing" allowToday><Billing /></Protected>} />
+            <Route path="/bill/:id"     component={() => <Protected resource="billing" allowToday allowReceipt><Bill /></Protected>} />
             <Route path="/suppliers"    component={() => <Protected resource="suppliers"><Suppliers /></Protected>} />
             <Route path="/suppliers/report" component={() => <Protected resource="suppliers"><SupplierReport /></Protected>} />
             <Route path="/suppliers/stock-check" component={() => <Protected resource="suppliers"><StockCheck /></Protected>} />

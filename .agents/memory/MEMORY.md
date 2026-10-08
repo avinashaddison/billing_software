@@ -33,3 +33,4 @@
 - [PWA precache limit breaks publish](pwa-precache-build-limit.md) — workbox FAILS the build past maximumFileSizeToCacheInBytes (2 MiB default); raise it or lazy-load routes, never manualChunks.
 - [Ledger ↔ bill matching](bill-ledger-matching.md) — no FK: pair OUT/RETURN logs to bills by exact same-transaction created_at; multi-line bills need qty×price not the aggregate; rebuild api-zod/client-react dists after orval.
 - [Product deletion is archival](product-soft-delete.md) — sale_items CHECK + NOT NULL FKs make hard delete impossible; liveProduct() on catalog reads AND guarded stock UPDATEs, never on history; live-only unique indexes.
+- [Owner idle & product retention](owner-idle-and-product-retention.md) — owner-only 10-minute interaction timeout; continuous 30-day zero-stock grace; today's staff bill viewing needs fresh owner approval.

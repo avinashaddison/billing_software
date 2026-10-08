@@ -17,6 +17,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 import { db, authUsersTable, staffProfilesTable, authSessionsTable, staffPermissionsTable } from "@workspace/db";
 import { clientMeta, createSession } from "../lib/sessions";
 import { logger } from "../lib/logger";
+import { ownerIdleExpired } from "../lib/owner-idle";
 import { TENANT_COOKIE_NAME, signTenantCookie, tenantCookieOptions } from "./tenant";
 
 /**
@@ -83,9 +84,10 @@ async function validateOrUpgradeSession(
   res: Response,
   subjectKind: "pin" | "email",
   subjectId: string,
+  role: string,
 ): Promise<boolean> {
   if (req.sessionId) {
-    let row: { revokedAt: Date | null; lastSeenAt: Date | null } | undefined;
+    let row: { revokedAt: Date | null; lastSeenAt: Date | null; lastActivityAt: Date } | undefined;
     /* One retry, because Neon suspends idle connections and a single transient
        failure is routine. A PERSISTENT failure now denies the request. This
        used to fail OPEN — meaning a session the owner had just revoked kept
@@ -97,6 +99,7 @@ async function validateOrUpgradeSession(
           .select({
             revokedAt:  authSessionsTable.revokedAt,
             lastSeenAt: authSessionsTable.lastSeenAt,
+            lastActivityAt: authSessionsTable.lastActivityAt,
           })
           .from(authSessionsTable)
           .where(and(
@@ -126,6 +129,11 @@ async function validateOrUpgradeSession(
       return false;
     }
 
+    if (ownerIdleExpired(role, row.lastActivityAt)) {
+      res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
+      res.status(401).json({ error: "Owner session inactive for 10 minutes. Please sign in again." });
+      return false;
+    }
     /* Idle expiry. Deliberately read-only: the session row is left alone and
        the scheduled cleanup job prunes it later, so nothing is written to a
        live database on the request path. */
@@ -177,7 +185,7 @@ async function validateOrUpgradeSession(
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
-  if (PUBLIC_PATHS.has(req.path)) { next(); return; }
+  if (PUBLIC_PATHS.has(req.path) && req.path !== "/auth/me") { next(); return; }
   if (!req.staffId && !req.userId) {
     res.status(401).json({ error: "Not authenticated" });
     return;
@@ -190,21 +198,21 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   try {
     if (req.authKind === "email" && req.userId) {
       const [u] = await db
-        .select({ isActive: authUsersTable.isActive })
+        .select({ isActive: authUsersTable.isActive, role: authUsersTable.role })
         .from(authUsersTable)
         .where(eq(authUsersTable.id, req.userId));
       if (!u || !u.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
-      if (!(await validateOrUpgradeSession(req, res, "email", req.userId))) return;
+      if (!(await validateOrUpgradeSession(req, res, "email", req.userId, u.role))) return;
       next();
       return;
     }
     if (req.staffId) {
       const [s] = await db
-        .select({ isActive: staffProfilesTable.isActive })
+        .select({ isActive: staffProfilesTable.isActive, role: staffProfilesTable.role })
         .from(staffProfilesTable)
         .where(eq(staffProfilesTable.id, req.staffId));
       if (!s || !s.isActive) { res.status(401).json({ error: "Not authenticated" }); return; }
-      if (!(await validateOrUpgradeSession(req, res, "pin", req.staffId))) return;
+      if (!(await validateOrUpgradeSession(req, res, "pin", req.staffId, s.role))) return;
       next();
       return;
     }

@@ -236,6 +236,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   ─────────────────────────────────────────────────────────────────── */
   useEffect(() => {
     if (!isLoggedIn) return;
+    // Only the same owner restores a quarantined local draft on sign-in.
+    // Existing server-cart revision checks still decide whether to restore it.
+    if (itemsRef.current.length === 0) {
+      const saved = loadFromStorage();
+      if (saved.length > 0) setLocalItems(saved);
+    }
     fetch(`${BASE_URL}/api/shared-cart`)
       .then(readCartResponse)
       .then((summary) => {
@@ -249,7 +255,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch(() => { /* server may not be ready yet — ignore */ });
-  }, [isLoggedIn, acceptServerCart, queueServerMutation]);
+  }, [isLoggedIn, acceptServerCart, queueServerMutation, setLocalItems]);
 
   /* SSE carries the complete cart, including manual lines and discounts.
      While local mutations are queued, remember the newest server snapshot

@@ -30,6 +30,7 @@ export const authSessionsTable = pgTable(
     ip:          text("ip"),
     createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt:  timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
     /** NULL = active. Set to now() to revoke (log the device out). */
     revokedAt:   timestamp("revoked_at", { withTimezone: true }),
   },

@@ -63,7 +63,8 @@ export function SideNav() {
     { name: "Manual Bill", href: "/checkout?manual=1", icon: PencilLine,  highlight: false, resource: "billing"   },
     { name: "Billing",     href: "/billing",           icon: IndianRupee, highlight: false, resource: "billing"   },
     { name: "Logs",        href: "/logs",              icon: Clock,       highlight: false, resource: "logs"      },
-  ].filter((item) => !item.resource || visible(item.resource));
+  ].filter((item) => !item.resource || visible(item.resource)
+    || (item.href === "/billing" && perm("todayBilling") === "write"));
 
   const extraItems = [
     { name: "Today's Deals", href: "/deals",       icon: Sparkles,      resource: "deals"      },

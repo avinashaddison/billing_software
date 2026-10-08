@@ -39,7 +39,8 @@ export function BottomNav() {
     { name: "Profile", href: "/profile",  icon: User,       resource: null       },
   ];
 
-  const navItems = allItems.filter((item) => !item.resource || visible(item.resource));
+  const navItems = allItems.filter((item) => !item.resource || visible(item.resource)
+    || (item.href === "/billing" && getLevel(role, permissions, "todayBilling") === "write"));
 
   const isOnCheckout = location === "/checkout";
 

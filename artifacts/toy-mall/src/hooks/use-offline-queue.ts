@@ -4,6 +4,7 @@
 ──────────────────────────────────────────────────────────────── */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
+import { useAuth } from "./use-auth";
 
 const BASE_URL   = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const STORAGE_KEY = "hira-sons-offline-queue-v1";
@@ -64,15 +65,22 @@ export function useOfflineQueue() {
   /* Try to sync all queued bills to the server */
   const syncAll = useCallback(async () => {
     if (syncingRef.current) return;
+    const session = useAuth.getState();
+    if (!session.isLoggedIn) return;
     const pending = loadQueue();
     if (!pending.length) return;
 
     syncingRef.current = true;
     let synced = 0;
     let failed = 0;
-    const remaining: QueuedBill[] = [];
+    const completed = new Set<string>();
+    const sameSession = () => {
+      const now = useAuth.getState();
+      return now.isLoggedIn && now.staffId === session.staffId && now.sessionGeneration === session.sessionGeneration;
+    };
 
     for (const bill of pending) {
+      if (!sameSession()) break;
       try {
         const res = await fetch(`${BASE_URL}/api/bills/checkout`, {
           method:  "POST",
@@ -86,16 +94,26 @@ export function useOfflineQueue() {
             discountType:  bill.discountType,
           }),
         });
-        if (res.ok) { synced++; } else { remaining.push(bill); failed++; }
+        if (res.ok) { synced++; completed.add(bill.localId); } else { failed++; }
       } catch {
-        remaining.push(bill);
         failed++;
       }
     }
 
-    saveQueue(remaining);
-    setQueue(remaining);
-    syncingRef.current = false;
+    // Reconcile acknowledgments with the CURRENT queue, preserving bills
+    // appended while syncing. An idle logout moves the queue; never write
+    // that old account's remaining bills into the next account's shared key.
+    const current = useAuth.getState();
+    const stillSameOwner = current.isLoggedIn && current.staffId === session.staffId;
+    const key = stillSameOwner ? STORAGE_KEY : `toy-mall-owner-pending:${session.staffId}`;
+    try {
+      const latest: QueuedBill[] = JSON.parse(localStorage.getItem(key) ?? JSON.stringify(pending));
+      const remaining = latest.filter(bill => !completed.has(bill.localId));
+      localStorage.setItem(key, JSON.stringify(remaining));
+      if (stillSameOwner) setQueue(remaining);
+    } finally {
+      syncingRef.current = false;
+    }
 
     if (synced > 0) {
       toast.success(

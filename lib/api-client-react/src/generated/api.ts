@@ -25,7 +25,9 @@ import type {
   CreateProductInput,
   DashboardSummary,
   ErrorResponse,
+  GetTodayBillingSummary200,
   HealthStatus,
+  ListBillsParams,
   ListProductsParams,
   ListSalesParams,
   ListStockEntrySummaryParams,
@@ -37,6 +39,7 @@ import type {
   QrCodeResponse,
   ReceivablesSummary,
   RecordPaymentInput,
+  RecordUserActivityBody,
   Sale,
   StockEntrySummary,
   StockLog,
@@ -1857,40 +1860,61 @@ export const useCheckout = <
   return useMutation(getCheckoutMutationOptions(options));
 };
 
-export const getListBillsUrl = () => {
-  return `/api/bills`;
+export const getListBillsUrl = (params?: ListBillsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/bills?${stringifiedParams}`
+    : `/api/bills`;
 };
 
 /**
+ * Staff without Today's Bills & Totals permission receive historical bills only. A today-only grant never grants history access.
  * @summary List all bills
  */
 export const listBills = async (
+  params?: ListBillsParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<Bill[]> => {
-  return customFetch<Bill[]>(getListBillsUrl(), {
+  return customFetch<Bill[]>(getListBillsUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListBillsQueryKey = () => {
-  return [`/api/bills`] as const;
+export const getListBillsQueryKey = (params?: ListBillsParams) => {
+  return [`/api/bills`, ...(params ? [params] : [])] as const;
 };
 
 export const getListBillsQueryOptions = <
   TData = Awaited<ReturnType<typeof listBills>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof listBills>>, TError, TData>;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListBillsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBills>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListBillsQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListBillsQueryKey(params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listBills>>> = ({
     signal,
-  }) => listBills({ signal, ...requestOptions });
+  }) => listBills(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listBills>>,
@@ -1911,11 +1935,18 @@ export type ListBillsQueryError = ErrorType<unknown>;
 export function useListBills<
   TData = Awaited<ReturnType<typeof listBills>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof listBills>>, TError, TData>;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListBillsQueryOptions(options);
+>(
+  params?: ListBillsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBills>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBillsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -1923,6 +1954,173 @@ export function useListBills<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+export const getGetTodayBillingSummaryUrl = () => {
+  return `/api/bills/today-summary`;
+};
+
+/**
+ * Requires owner access or the explicit todayBilling staff permission. Totals are over every bill, not the capped history list.
+ * @summary Today's bill count and billed total in Asia/Kolkata
+ */
+export const getTodayBillingSummary = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<GetTodayBillingSummary200> => {
+  return customFetch<GetTodayBillingSummary200>(
+    getGetTodayBillingSummaryUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetTodayBillingSummaryQueryKey = () => {
+  return [`/api/bills/today-summary`] as const;
+};
+
+export const getGetTodayBillingSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTodayBillingSummary>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTodayBillingSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetTodayBillingSummaryQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTodayBillingSummary>>
+  > = ({ signal }) => getTodayBillingSummary({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTodayBillingSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTodayBillingSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTodayBillingSummary>>
+>;
+export type GetTodayBillingSummaryQueryError = ErrorType<void>;
+
+/**
+ * @summary Today's bill count and billed total in Asia/Kolkata
+ */
+
+export function useGetTodayBillingSummary<
+  TData = Awaited<ReturnType<typeof getTodayBillingSummary>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTodayBillingSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTodayBillingSummaryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getRecordUserActivityUrl = () => {
+  return `/api/auth/activity`;
+};
+
+/**
+ * Authentication checks the existing idle deadline first. Polling must never call this endpoint.
+ * @summary Record a genuine user interaction for owner idle expiry
+ */
+export const recordUserActivity = async (
+  recordUserActivityBody: RecordUserActivityBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<void> => {
+  return customFetch<void>(getRecordUserActivityUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(recordUserActivityBody),
+  });
+};
+
+export const getRecordUserActivityMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof recordUserActivity>>,
+    TError,
+    { data: BodyType<RecordUserActivityBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof recordUserActivity>>,
+  TError,
+  { data: BodyType<RecordUserActivityBody> },
+  TContext
+> => {
+  const mutationKey = ["recordUserActivity"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof recordUserActivity>>,
+    { data: BodyType<RecordUserActivityBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return recordUserActivity(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RecordUserActivityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof recordUserActivity>>
+>;
+export type RecordUserActivityMutationBody = BodyType<RecordUserActivityBody>;
+export type RecordUserActivityMutationError = ErrorType<void>;
+
+/**
+ * @summary Record a genuine user interaction for owner idle expiry
+ */
+export const useRecordUserActivity = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof recordUserActivity>>,
+    TError,
+    { data: BodyType<RecordUserActivityBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof recordUserActivity>>,
+  TError,
+  { data: BodyType<RecordUserActivityBody> },
+  TContext
+> => {
+  return useMutation(getRecordUserActivityMutationOptions(options));
+};
 
 export const getGetBillUrl = (id: string) => {
   return `/api/bills/${id}`;

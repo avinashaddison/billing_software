@@ -4,6 +4,7 @@ import { db, billsTable, saleItemsTable, productsTable, authSessionsTable, retur
 import { sendDailySalesSummary } from "./telegram";
 import { startBackupScheduler } from "./backup-scheduler";
 import { logger } from "./logger";
+import { archiveOldZeroStockProducts } from "./zero-stock-cleanup";
 
 const DAY_MS = 86_400_000;
 
@@ -115,4 +116,9 @@ export function startDailyReportScheduler(): void {
      scheduled through the backup_runs ledger so the deployment and a dev
      workspace never both take the same slot. See backup-scheduler.ts. */
   startBackupScheduler();
+  schedule("45 3 * * *", () => {
+    archiveOldZeroStockProducts().catch((err) =>
+      logger.error({ err }, "Zero-stock archive failed; will retry next day"),
+    );
+  }, { timezone: "Asia/Kolkata" });
 }

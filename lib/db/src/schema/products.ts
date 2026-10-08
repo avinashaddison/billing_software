@@ -32,6 +32,7 @@ export const productsTable = pgTable(
         but its bills, refunds, reports and stock movements still resolve to
         it. Products are never hard-deleted once created. */
     deletedAt:         timestamp("deleted_at", { withTimezone: true }),
+    zeroStockSince:    timestamp("zero_stock_since", { withTimezone: true }),
   },
   (table) => [
     index("products_sku_idx").on(table.sku),
@@ -43,6 +44,8 @@ export const productsTable = pgTable(
 export const insertProductSchema = createInsertSchema(productsTable).omit({
   id: true,
   createdAt: true,
+  zeroStockSince: true,
+  deletedAt: true,
 });
 
 export type InsertProduct = z.infer<typeof insertProductSchema>;

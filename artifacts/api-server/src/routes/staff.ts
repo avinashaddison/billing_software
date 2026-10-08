@@ -6,6 +6,7 @@ import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { requireAdmin } from "../middlewares/auth";
 import { tenantLimitBlock } from "../lib/limits";
 import { clientMeta, createSession } from "../lib/sessions";
+import { broadcast } from "../lib/sse";
 import {
   TENANT_COOKIE_NAME,
   signTenantCookie,
@@ -13,6 +14,26 @@ import {
 } from "../middlewares/tenant";
 
 const router: IRouter = Router();
+
+/* Called only for real browser interactions, never a polling heartbeat.
+   requireAuth validates expiry first, so an expired owner cannot revive it. */
+router.post("/auth/activity", async (req, res): Promise<void> => {
+  if (!req.sessionId) { res.status(401).json({ error: "Session required" }); return; }
+  const idleForMs = Number(req.body?.idleForMs);
+  const now = Date.now();
+  if (typeof req.body?.idleForMs !== "number" || !Number.isFinite(idleForMs) || idleForMs < 0 || idleForMs > 60_000) {
+    res.status(400).json({ error: "Recent interaction age required" }); return;
+  }
+  const activityAt = now - idleForMs;
+  await db.update(authSessionsTable)
+    .set({ lastActivityAt: sql`GREATEST(${authSessionsTable.lastActivityAt}, ${new Date(activityAt).toISOString()}::timestamptz)` })
+    .where(and(
+      eq(authSessionsTable.id, req.sessionId),
+      eq(authSessionsTable.subjectId, req.staffId ?? req.userId!),
+      sql`${authSessionsTable.revokedAt} IS NULL`,
+    ));
+  res.status(204).end();
+});
 
 const VALID_LEVELS = ["none", "read", "write"] as const;
 const VALID_ROLES  = ["owner", "staff"] as const;
@@ -389,6 +410,9 @@ router.put("/staff/:id/permissions", requireAdmin, async (req, res): Promise<voi
   if (!permissions || typeof permissions !== "object") {
     res.status(400).json({ error: "permissions object required" }); return;
   }
+  if (permissions.todayBilling !== undefined && !["none", "write"].includes(permissions.todayBilling)) {
+    res.status(400).json({ error: "Today's Bills & Totals must be none or write" }); return;
+  }
 
   try {
     /* Confirm the staff row is in the caller's tenant before mutating. */
@@ -401,9 +425,10 @@ router.put("/staff/:id/permissions", requireAdmin, async (req, res): Promise<voi
       ));
     if (!member) { res.status(404).json({ error: "Staff member not found" }); return; }
 
+    await db.transaction(async (tx) => {
     for (const [resource, level] of Object.entries(permissions)) {
       if (!VALID_LEVELS.includes(level as typeof VALID_LEVELS[number])) continue;
-      await db
+      await tx
         .insert(staffPermissionsTable)
         .values({
           staffId: String(req.params.id),
@@ -416,6 +441,8 @@ router.put("/staff/:id/permissions", requireAdmin, async (req, res): Promise<voi
           set: { level: String(level), tenantId: member.tenantId },
         });
     }
+    });
+    broadcast("permissions_updated", { staffId: String(req.params.id) }, req.tenantId, true);
     const updated = await db
       .select()
       .from(staffPermissionsTable)

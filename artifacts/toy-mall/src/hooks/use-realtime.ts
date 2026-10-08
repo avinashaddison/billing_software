@@ -8,6 +8,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useCart, type CartItem } from "@/contexts/cart-context";
+import { useAuth } from "@/hooks/use-auth";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -54,6 +55,7 @@ function invalidateAllProducts(qc: ReturnType<typeof useQueryClient>) {
 }
 
 export function useRealtime() {
+  const isLoggedIn = useAuth(s => s.isLoggedIn);
   const qc             = useQueryClient();
   const ref            = useRef<EventSource | null>(null);
   const { syncFromServer } = useCart();
@@ -62,6 +64,7 @@ export function useRealtime() {
   useEffect(() => { syncRef.current = syncFromServer; }, [syncFromServer]);
 
   useEffect(() => {
+    if (!isLoggedIn) return;
     let retryTimer: ReturnType<typeof setTimeout>;
     let retryDelay = 2000;
 
@@ -95,6 +98,24 @@ export function useRealtime() {
       });
 
       /* ── bill checked out ── */
+      es.addEventListener("inventory_changed", () => {
+        invalidateAllProducts(qc);
+        invalidateDashboard(qc);
+      });
+      es.addEventListener("permissions_updated", async (event) => {
+        const before = useAuth.getState();
+        const changed = JSON.parse(event.data);
+        if (!before.isLoggedIn || changed.staffId !== before.staffId) return;
+        try {
+          const response = await fetch(`${BASE_URL}/api/auth/me`);
+          if (!response.ok) return;
+          const me = await response.json();
+          if (useAuth.getState().staffId === before.staffId && me.id === before.staffId) {
+            useAuth.getState().syncPermissions(me.permissions);
+            notify("addison:bills-changed");
+          }
+        } catch { /* reconnect/reload will reconcile permissions */ }
+      });
       es.addEventListener("bill_created", (e) => {
         const d = JSON.parse(e.data) as {
           billId:      string;
@@ -179,5 +200,5 @@ export function useRealtime() {
       ref.current?.close();
       ref.current = null;
     };
-  }, [qc]);
+  }, [qc, isLoggedIn]);
 }

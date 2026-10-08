@@ -4,7 +4,9 @@ import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsT
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { liveProduct } from "../lib/product-scope";
-import { requireWrite } from "../middlewares/auth";
+import { requireWrite, requireRead } from "../middlewares/auth";
+import { getBillingAccess, requireTodayBilling } from "../middlewares/today-billing";
+import { istToday } from "../lib/ist";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 import { logger } from "../lib/logger";
 import { round2, checkLinePrice, isAbsurdPrice, exceedsDiscountCeiling, checkBillDiscount, maxDiscountPct, priceGuardMode, isSaneNumber, isValidManualCost, normalizeManualCost, findManualLineWithoutCost, manualCostRequiredMessage } from "../lib/price-integrity";
@@ -481,6 +483,7 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
         .insert(billsTable)
         .values({
           tenantId,
+          createdByStaffId: req.staffId ?? null,
           totalAmount:   String(totalAmount),
           itemsCount,
           paymentMode,
@@ -561,11 +564,35 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
   }
 });
 
-router.get("/bills", async (req, res): Promise<void> => {
+router.get("/bills/today-summary", requireTodayBilling, async (req, res): Promise<void> => {
+  const [summary] = await db.select({
+    billCount: sql<number>`count(*)::int`,
+    totalAmount: sql<string>`coalesce(sum(${billsTable.totalAmount}), 0)`,
+  }).from(billsTable).where(and(
+    tenantWhere(billsTable.tenantId, req.tenantId),
+    sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${istToday()}`,
+  ));
+  res.json({ billCount: summary.billCount, totalAmount: Number(summary.totalAmount) });
+});
+
+router.get("/bills", requireRead("billing", "todayBilling"), async (req, res): Promise<void> => {
+  const { today: canToday, history: historyAllowed } = await getBillingAccess(req);
+  if (!canToday && !historyAllowed) {
+    res.status(403).json({ error: "Owner permission required to view bills" }); return;
+  }
+  const onlyToday = req.query.scope === "today";
+  if (onlyToday && !canToday) {
+    res.status(403).json({ error: "Owner permission required for today's bills" }); return;
+  }
+  const todayCondition = sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${istToday()}`;
+  // A today-only grant must not open historical bills too.
   const bills = await db
     .select()
     .from(billsTable)
-    .where(tenantWhere(billsTable.tenantId, req.tenantId))
+    .where(and(
+      tenantWhere(billsTable.tenantId, req.tenantId),
+      onlyToday || !historyAllowed ? todayCondition : !canToday ? sql`NOT (${todayCondition})` : undefined,
+    ))
     .orderBy(desc(billsTable.createdAt))
     .limit(50);
 
@@ -594,6 +621,18 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
     ));
 
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+
+  const today = new Date(bill.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) === istToday();
+  const access = await getBillingAccess(req);
+  if (!today && !access.history) {
+    res.status(403).json({ error: "Bills History permission required" }); return;
+  }
+  if (today && !access.today) {
+    // Checkout must still print the individual receipt made by this cashier.
+    if (!access.checkout || !req.staffId || bill.createdByStaffId !== req.staffId) {
+      res.status(403).json({ error: "Owner permission required for today's bills" }); return;
+    }
+  }
 
   const refundsMap    = await refundsByBill([bill.id]);
   const refundedAmount = refundsMap.get(bill.id) ?? 0;
