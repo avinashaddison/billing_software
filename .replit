@@ -55,6 +55,6 @@ localPort = 20238
 externalPort = 3000
 
 [deployment]
-deploymentTarget = "autoscale"
+deploymentTarget = "vm"
 run = ["pnpm", "start"]
 build = ["pnpm", "run", "check:release"]

@@ -35,7 +35,7 @@ A multi-tenant billing and inventory web app for retail shops. It includes an Ex
 - The API also runs idempotent boot migrations on startup.
 
 ## Production / Deployment
-- Target: **autoscale**.
+- Target: **Reserved VM** (`vm`), selected by the user so the existing in-process backup and report scheduler can run continuously.
 - Publish build: `pnpm run check:release` (all workspace typechecks, API tests, then frontend/API builds).
 - Run: `pnpm start` (explicit production mode; port defaults to 5000 unless `PORT` is provided).
 - Read-only production HTTP checks: `pnpm --filter @workspace/api-server run test:production`, after the build. This starts an ephemeral server without migrations/schedulers; only the readiness probe reads the existing database. Never use customer credentials or write test transactions to the external database.
@@ -43,7 +43,7 @@ A multi-tenant billing and inventory web app for retail shops. It includes an Ex
 - `SESSION_SECRET` must have at least 32 characters in production; no known-default owner account is created in production. Provision accounts explicitly, never through test fixtures in live data. The platform-admin bootstrap reads `PLATFORM_ADMIN_PASSWORD` from secure environment storage, not command-line arguments.
 - Production CORS defaults to same-origin use (no arbitrary origin reflection). Set `CORS_ORIGIN` only for explicitly trusted additional frontends; browser writes are origin-checked separately. Signed cookies remain HttpOnly, Secure, SameSite=Lax.
 - API responses are `no-store`; the PWA never caches API data across shop/account changes. Hashed static assets are immutable; HTML and service-worker files revalidate. The explicit offline billing queue is unchanged.
-- **Scheduling release requirement:** Autoscale can sleep while idle, so in-process reports/backups are not guaranteed on schedule. Use always-on Reserved VM hosting or a separate reliable scheduler before relying on unattended jobs. The deployment target has not been changed without approval.
+- **Scheduling:** Keep this app on always-on hosting while backups and reports run inside the server process. Switching to Autoscale requires a separate reliable scheduler because idle instances can sleep. The Reserved VM configuration takes effect on the next publish; configuring it does not publish the app.
 - In production the API serves static SPA files from `artifacts/toy-mall/dist/public` with SPA fallback.
 - Relevant env vars: `DATABASE_URL` (required), `SESSION_SECRET`, `PORT` (provided by platform), optional `CORS_ORIGIN`, `STRICT_TENANT`, Cloudinary and Telegram settings.
 - `STRICT_TENANT` now defaults to **strict** tenant isolation (each shop sees only its own rows). Set `STRICT_TENANT=false` ONLY to temporarily re-expose legacy null-tenant rows to real tenants while backfilling a migration. The legacy null-tenant owner always sees its own (`tenant_id IS NULL`) data regardless of this flag.
