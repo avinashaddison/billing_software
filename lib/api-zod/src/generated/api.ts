@@ -812,7 +812,96 @@ export const GetReceivablesSummaryResponse = zod.object({
 });
 
 /**
- * Creating bills requires Scan & Billing write access. Staff applying extra item or bill discounts also need checkoutDiscount write access; catalogue sale prices do not require that extra grant. Existing discount ceilings still apply.
+ * @summary Owner only - list coupons and lifetime usage counts
+ */
+export const ListCouponsResponseItem = zod.object({
+  id: zod.string(),
+  code: zod.string(),
+  discountType: zod.enum(["percent", "amount"]),
+  discountValue: zod.number(),
+  maxUses: zod.number().int(),
+  usedCount: zod.number().int(),
+  remainingUses: zod.number().int(),
+  isActive: zod.boolean(),
+  expiresAt: zod.coerce.date().nullable(),
+  createdAt: zod.coerce.date(),
+});
+export const ListCouponsResponse = zod.array(ListCouponsResponseItem);
+
+/**
+ * @summary Owner only - generate a new coupon code
+ */
+export const createCouponBodyDiscountValueExclusiveMin = 0;
+
+export const createCouponBodyMaxUsesMax = 1000000;
+
+export const CreateCouponBody = zod.object({
+  discountType: zod.enum(["percent", "amount"]),
+  discountValue: zod.number().gt(createCouponBodyDiscountValueExclusiveMin),
+  maxUses: zod.number().int().min(1).max(createCouponBodyMaxUsesMax),
+  expiresAt: zod.coerce.date().nullish(),
+});
+
+export const CreateCouponResponse = zod.object({
+  id: zod.string(),
+  code: zod.string(),
+  discountType: zod.enum(["percent", "amount"]),
+  discountValue: zod.number(),
+  maxUses: zod.number().int(),
+  usedCount: zod.number().int(),
+  remainingUses: zod.number().int(),
+  isActive: zod.boolean(),
+  expiresAt: zod.coerce.date().nullable(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Owner only - enable or disable a coupon without deleting history
+ */
+export const UpdateCouponParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateCouponBody = zod.object({
+  isActive: zod.boolean(),
+});
+
+export const UpdateCouponResponse = zod.object({
+  id: zod.string(),
+  code: zod.string(),
+  discountType: zod.enum(["percent", "amount"]),
+  discountValue: zod.number(),
+  maxUses: zod.number().int(),
+  usedCount: zod.number().int(),
+  remainingUses: zod.number().int(),
+  isActive: zod.boolean(),
+  expiresAt: zod.coerce.date().nullable(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Validate an owner-issued coupon for checkout without consuming a use
+ */
+export const previewCouponBodyCustomerPhoneRegExp = new RegExp("^[0-9]{10}$");
+export const previewCouponBodySubtotalExclusiveMin = 0;
+
+export const PreviewCouponBody = zod.object({
+  code: zod.string(),
+  customerPhone: zod.string().regex(previewCouponBodyCustomerPhoneRegExp),
+  subtotal: zod.number().gt(previewCouponBodySubtotalExclusiveMin),
+});
+
+export const PreviewCouponResponse = zod.object({
+  code: zod.string(),
+  discountType: zod.enum(["percent", "amount"]),
+  discountValue: zod.number(),
+  discountAmount: zod.number(),
+  subtotal: zod.number(),
+  customerPhone: zod.string(),
+});
+
+/**
+ * Creating bills requires Scan & Billing write access. Staff applying discretionary item or bill discounts also need checkoutDiscount write access; catalogue promotions and owner-issued coupons do not require that extra grant. One coupon per bill, no stacking with manual bill discounts. Usage is consumed atomically, once per customer phone, within its total limit. Existing discount ceilings still apply.
  * @summary Create a new bill at checkout
  */
 export const checkoutBodyItemsItemNameMax = 80;
@@ -823,6 +912,16 @@ export const checkoutBodyItemsItemPurchasePriceMax = 99999999.99;
 export const checkoutBodyCustomerPhoneRegExp = new RegExp("^[0-9]{10}$");
 
 export const CheckoutBody = zod.object({
+  couponCode: zod
+    .string()
+    .optional()
+    .describe("Owner-issued coupon code; requires online checkout"),
+  couponDiscountAmount: zod
+    .number()
+    .optional()
+    .describe(
+      "Last previewed rupee discount; verified against actual line subtotal before saving",
+    ),
   items: zod.array(
     zod
       .object({
@@ -877,6 +976,10 @@ export const CheckoutBody = zod.object({
 
 export const CheckoutResponse = zod.object({
   bill: zod.object({
+    couponCode: zod
+      .string()
+      .nullish()
+      .describe("Coupon code snapshot if redeemed on this bill"),
     id: zod.string(),
     billNumber: zod.number().int().optional(),
     totalAmount: zod.number(),
@@ -915,6 +1018,10 @@ export const ListBillsQueryParams = zod.object({
 });
 
 export const ListBillsResponseItem = zod.object({
+  couponCode: zod
+    .string()
+    .nullish()
+    .describe("Coupon code snapshot if redeemed on this bill"),
   id: zod.string(),
   billNumber: zod.number().int().optional(),
   totalAmount: zod.number(),
@@ -966,6 +1073,10 @@ export const GetBillParams = zod.object({
 
 export const GetBillResponse = zod.object({
   bill: zod.object({
+    couponCode: zod
+      .string()
+      .nullish()
+      .describe("Coupon code snapshot if redeemed on this bill"),
     id: zod.string(),
     billNumber: zod.number().int().optional(),
     totalAmount: zod.number(),
@@ -1013,6 +1124,10 @@ export const RecordBillPaymentBody = zod.object({
 });
 
 export const RecordBillPaymentResponse = zod.object({
+  couponCode: zod
+    .string()
+    .nullish()
+    .describe("Coupon code snapshot if redeemed on this bill"),
   id: zod.string(),
   billNumber: zod.number().int().optional(),
   totalAmount: zod.number(),

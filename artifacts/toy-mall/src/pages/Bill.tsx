@@ -35,6 +35,7 @@ interface BillData {
     customerPhone?: string | null;
     discount?: number | null;
     discountType?: string | null;
+    couponCode?: string | null;
     /** Resolved rupee discount as stored by the server. Absent on bills created
      *  before the field was returned, which fall back to a derived value. */
     discountAmount?: number | null;
@@ -1021,7 +1022,7 @@ export default function Bill() {
                     {manualDiscount > 0.001 && (
                       <>
                         <span className="text-black/80">
-                          Bill Discount
+                          {bill.couponCode ? `Coupon ${bill.couponCode}` : "Bill Discount"}
                           {bill.discount != null && bill.discountType === "percent"
                             ? ` (${bill.discount}%)`
                             : ""}

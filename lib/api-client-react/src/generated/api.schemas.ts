@@ -432,6 +432,64 @@ export interface CheckoutItem {
   purchasePrice?: number;
 }
 
+export type CouponDiscountType =
+  (typeof CouponDiscountType)[keyof typeof CouponDiscountType];
+
+export const CouponDiscountType = {
+  percent: "percent",
+  amount: "amount",
+} as const;
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discountType: CouponDiscountType;
+  discountValue: number;
+  maxUses: number;
+  usedCount: number;
+  remainingUses: number;
+  isActive: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export type CreateCouponInputDiscountType =
+  (typeof CreateCouponInputDiscountType)[keyof typeof CreateCouponInputDiscountType];
+
+export const CreateCouponInputDiscountType = {
+  percent: "percent",
+  amount: "amount",
+} as const;
+
+export interface CreateCouponInput {
+  discountType: CreateCouponInputDiscountType;
+  /** @exclusiveMinimum 0 */
+  discountValue: number;
+  /**
+   * @minimum 1
+   * @maximum 1000000
+   */
+  maxUses: number;
+  expiresAt?: string | null;
+}
+
+export type CouponPreviewDiscountType =
+  (typeof CouponPreviewDiscountType)[keyof typeof CouponPreviewDiscountType];
+
+export const CouponPreviewDiscountType = {
+  percent: "percent",
+  amount: "amount",
+} as const;
+
+export interface CouponPreview {
+  code: string;
+  discountType: CouponPreviewDiscountType;
+  discountValue: number;
+  discountAmount: number;
+  subtotal: number;
+  customerPhone: string;
+}
+
 /**
  * Mode of payment. `credit` records the bill as unpaid (receivable) against the customer identified by `customerPhone`.
  */
@@ -456,6 +514,10 @@ export const CheckoutInputDiscountType = {
 } as const;
 
 export interface CheckoutInput {
+  /** Owner-issued coupon code; requires online checkout */
+  couponCode?: string;
+  /** Last previewed rupee discount; verified against actual line subtotal before saving */
+  couponDiscountAmount?: number;
   items: CheckoutItem[];
   /** Mode of payment. `credit` records the bill as unpaid (receivable) against the customer identified by `customerPhone`. */
   paymentMode: CheckoutInputPaymentMode;
@@ -481,6 +543,8 @@ export const BillPaymentStatus = {
 } as const;
 
 export interface Bill {
+  /** Coupon code snapshot if redeemed on this bill */
+  couponCode?: string | null;
   id: string;
   billNumber?: number;
   totalAmount: number;
@@ -658,6 +722,18 @@ export type ListSalesParams = {
   productId?: string;
   limit?: number;
   offset?: number;
+};
+
+export type UpdateCouponBody = {
+  isActive: boolean;
+};
+
+export type PreviewCouponBody = {
+  code: string;
+  /** @pattern ^[0-9]{10}$ */
+  customerPhone: string;
+  /** @exclusiveMinimum 0 */
+  subtotal: number;
 };
 
 export type ListBillsParams = {

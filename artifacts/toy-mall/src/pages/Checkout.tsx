@@ -16,6 +16,9 @@ import {
 } from "@/lib/customer-phone";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { usePermission } from "@/hooks/use-auth";
+import { getListCouponsQueryKey, type CouponPreview } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { CheckoutCoupon } from "@/components/checkout/CheckoutCoupon";
 import { useOnline } from "@/hooks/use-online";
 import { useStoreSettings } from "@/lib/store-info";
 import {
@@ -53,6 +56,8 @@ type CheckoutPayloadItem =
     };
 
 async function postCheckout(payload: {
+  couponCode?: string;
+  couponDiscountAmount?: number;
   items: CheckoutPayloadItem[];
   paymentMode: PaymentMode;
   customerName?: string;
@@ -557,6 +562,7 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
    Ongoing Checkout page
 ═══════════════════════════════════════════════════════════════════ */
 export default function Checkout() {
+  const couponQueries = useQueryClient();
   const canEditDiscount = usePermission("checkoutDiscount") === "write";
   const [, setLocation] = useLocation();
   const { items, count, total, removeItem, updateQty, setLineDiscount, addCustomItem, clearCart, prepareCart, replaceCart } = useCart();
@@ -697,6 +703,7 @@ export default function Checkout() {
   const [discountType, setDiscountType]   = useState<"percent" | "amount">("percent");
 
   const discountNum = parseFloat(discountValue) || 0;
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponPreview | null>(null);
 
   /* Mirror the server's arithmetic step for step (bills.ts checkout): it
      normalises every line to paise BEFORE summing, rounds the discount, then
@@ -708,7 +715,15 @@ export default function Checkout() {
     items.reduce((s, i) => s + r2(r2(effectivePrice(i)) * i.quantity), 0),
   );
 
-  const discountAmount = discountNum > 0
+  const couponActive = partyType === "customer" && appliedCoupon !== null;
+  const couponQuoteCurrent = !couponActive || (
+    appliedCoupon.customerPhone === phone.trim() &&
+    appliedCoupon.subtotal === normalizedSubtotal
+  );
+  const discountAmount = couponActive
+    ? Math.min(normalizedSubtotal, r2(appliedCoupon.discountType === "percent"
+      ? normalizedSubtotal * appliedCoupon.discountValue / 100 : appliedCoupon.discountValue))
+    : discountNum > 0
     ? discountType === "percent"
       ? Math.min(r2(normalizedSubtotal * discountNum / 100), normalizedSubtotal)
       : Math.min(r2(discountNum), normalizedSubtotal)
@@ -833,6 +848,10 @@ export default function Checkout() {
   const uncostedManual = partyType === "supplier" ? undefined : findUncostedManualLine(items);
 
   const handleCheckout = async () => {
+    if (couponActive) {
+      if (!isOnline) { toast.error("Coupon billing needs an internet connection. Remove the coupon to bill offline."); return; }
+      if (!couponQuoteCurrent || discountNum > 0) { toast.error("Apply the coupon again after updating the cart or customer. Manual bill discounts cannot be combined with coupons."); return; }
+    }
     // Apply before both live billing and offline enqueue. Never silently
     // remove existing discounts when access is revoked or a bill resumed.
     if (!canEditDiscount && (discountNum > 0 || items.some(item =>
@@ -928,9 +947,13 @@ export default function Checkout() {
         customerPhone: phone,
         discount:     discountNum > 0 ? discountNum : undefined,
         discountType: discountNum > 0 ? discountType : undefined,
+        couponCode: couponActive ? appliedCoupon.code : undefined,
+        couponDiscountAmount: couponActive ? appliedCoupon.discountAmount : undefined,
       });
       playCheckoutSuccess();
       clearCart();
+      setAppliedCoupon(null);
+      if (couponActive) void couponQueries.invalidateQueries({ queryKey: getListCouponsQueryKey() });
       setSuccessBillId(result.bill.id);
     } catch (err: unknown) {
       playError();
@@ -1082,6 +1105,7 @@ export default function Checkout() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => {
+                      if (couponActive) { toast.error("Remove the coupon before holding this bill. Apply it again when resumed."); return; }
                       if (!isOnline) { toast.error("Cannot hold bill while offline"); return; }
                       setShowHoldModal(true);
                     }}
@@ -1161,12 +1185,21 @@ export default function Checkout() {
                 {!canEditDiscount && <p data-testid="checkout-discount-restricted" className="text-xs text-muted-foreground">
                   Owner permission is required to edit checkout discounts.
                 </p>}
+                {partyType === "customer" && <CheckoutCoupon
+                  subtotal={normalizedSubtotal}
+                  customerPhone={phone.trim()}
+                  isOnline={isOnline}
+                  enabled={partyType === "customer"}
+                  manualDiscount={discountNum}
+                  applied={appliedCoupon}
+                  onChange={setAppliedCoupon}
+                />}
                 <div className="flex items-center gap-2">
                   <div className="flex rounded-xl border overflow-hidden shrink-0">
                     <button
                       type="button"
                       onClick={() => setDiscountType("percent")}
-                      disabled={!canEditDiscount}
+                      disabled={!canEditDiscount || couponActive}
                       className={`px-3 py-1.5 text-xs font-black transition-colors ${discountType === "percent" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                     >
                       %
@@ -1174,7 +1207,7 @@ export default function Checkout() {
                     <button
                       type="button"
                       onClick={() => setDiscountType("amount")}
-                      disabled={!canEditDiscount}
+                      disabled={!canEditDiscount || couponActive}
                       className={`px-3 py-1.5 text-xs font-black transition-colors ${discountType === "amount" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                     >
                       ₹
@@ -1186,7 +1219,7 @@ export default function Checkout() {
                     max={discountType === "percent" ? 100 : total}
                     step="1"
                     value={discountValue}
-                    disabled={!canEditDiscount}
+                    disabled={!canEditDiscount || couponActive}
                     aria-label="Bill discount"
                     onChange={(e) => setDiscountValue(e.target.value)}
                     onWheel={(e) => e.currentTarget.blur()}

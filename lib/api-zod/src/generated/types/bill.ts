@@ -8,6 +8,8 @@
 import type { BillPaymentStatus } from "./billPaymentStatus";
 
 export interface Bill {
+  /** Coupon code snapshot if redeemed on this bill */
+  couponCode?: string | null;
   id: string;
   billNumber?: number;
   totalAmount: number;

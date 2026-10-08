@@ -31,6 +31,7 @@ import appNoticesRouter from "./app-notices";
 import { readOnlySessionGate } from "../middlewares/read-only-session";
 import updatesRouter     from "./updates";
 import authRouter        from "./auth";
+import couponsRouter from "./coupons";
 import { PUBLIC_PATHS, requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -117,6 +118,7 @@ router.use(stockLogsRouter);
 router.use(salesRouter);
 router.use(dashboardRouter);
 router.use(billsRouter);
+router.use(couponsRouter);
 router.use(eventsRouter);
 router.use(suppliersRouter);
 router.use(returnsRouter);

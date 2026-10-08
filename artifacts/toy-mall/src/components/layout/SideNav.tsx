@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Package, PackagePlus, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, PencilLine, AlertTriangle, BarChart3 } from "lucide-react";
+import { Home, Package, PackagePlus, ScanLine, Clock, User, Sun, Moon, IndianRupee, FileText, Users, Tag, Truck, Layers, Users2, ShoppingCart, LogOut, Settings2, Sparkles, PencilLine, AlertTriangle, BarChart3, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { useCart } from "@/contexts/cart-context";
@@ -77,6 +77,7 @@ export function SideNav() {
     { name: "Labels",        href: "/labels",     icon: Tag,       resource: "labels"    },
     { name: "Suppliers",     href: "/suppliers",  icon: Truck,     resource: "suppliers" },
     { name: "Staff",         href: "/staff",      icon: Users2,    resource: "staff"     },
+    ...(role === "owner" ? [{ name: "Coupons", href: "/coupons", icon: Ticket, resource: "staff" as const }] : []),
     ...(role === "owner" ? [{ name: "Settings", href: "/settings", icon: Settings2, resource: "staff" as const }] : []),
   ].filter((item) => visible(item.resource));
 

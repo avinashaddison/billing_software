@@ -556,10 +556,110 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReceivablesSummary"
 
+  /coupons:
+    get:
+      operationId: listCoupons
+      tags: [coupons]
+      summary: Owner only - list coupons and lifetime usage counts
+      responses:
+        "200":
+          description: Coupons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Coupon"
+    post:
+      operationId: createCoupon
+      tags: [coupons]
+      summary: Owner only - generate a new coupon code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCouponInput"
+      responses:
+        "201":
+          description: Generated coupon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        "400":
+          description: Invalid discount or limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /coupons/{id}:
+    patch:
+      operationId: updateCoupon
+      tags: [coupons]
+      summary: Owner only - enable or disable a coupon without deleting history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                isActive:
+                  type: boolean
+              required: [isActive]
+      responses:
+        "200":
+          description: Updated coupon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+  /coupons/preview:
+    post:
+      operationId: previewCoupon
+      tags: [coupons]
+      summary: Validate an owner-issued coupon for checkout without consuming a use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                customerPhone:
+                  type: string
+                  pattern: "^[0-9]{10}$"
+                subtotal:
+                  type: number
+                  exclusiveMinimum: 0
+              required: [code, customerPhone, subtotal]
+      responses:
+        "200":
+          description: Coupon quote, revalidated atomically at checkout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponPreview"
+        "400":
+          description: Invalid, expired, exhausted or already-used coupon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /bills/checkout:
     post:
       operationId: checkout
-      description: Creating bills requires Scan & Billing write access. Staff applying extra item or bill discounts also need checkoutDiscount write access; catalogue sale prices do not require that extra grant. Existing discount ceilings still apply.
+      description: Creating bills requires Scan & Billing write access. Staff applying discretionary item or bill discounts also need checkoutDiscount write access; catalogue promotions and owner-issued coupons do not require that extra grant. One coupon per bill, no stacking with manual bill discounts. Usage is consumed atomically, once per customer phone, within its total limit. Existing discount ceilings still apply.
       tags: [bills]
       summary: Create a new bill at checkout
       requestBody:
@@ -1422,9 +1522,47 @@ components:
         - quantity
         - price
 
+    Coupon:
+      type: object
+      properties:
+        id: { type: string }
+        code: { type: string }
+        discountType: { type: string, enum: [percent, amount] }
+        discountValue: { type: number }
+        maxUses: { type: integer }
+        usedCount: { type: integer }
+        remainingUses: { type: integer }
+        isActive: { type: boolean }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+      required: [id, code, discountType, discountValue, maxUses, usedCount, remainingUses, isActive, expiresAt, createdAt]
+    CreateCouponInput:
+      type: object
+      properties:
+        discountType: { type: string, enum: [percent, amount] }
+        discountValue: { type: number, exclusiveMinimum: 0 }
+        maxUses: { type: integer, minimum: 1, maximum: 1000000 }
+        expiresAt: { type: string, format: date-time, nullable: true }
+      required: [discountType, discountValue, maxUses]
+    CouponPreview:
+      type: object
+      properties:
+        code: { type: string }
+        discountType: { type: string, enum: [percent, amount] }
+        discountValue: { type: number }
+        discountAmount: { type: number }
+        subtotal: { type: number }
+        customerPhone: { type: string }
+      required: [code, discountType, discountValue, discountAmount, subtotal, customerPhone]
     CheckoutInput:
       type: object
       properties:
+        couponCode:
+          type: string
+          description: Owner-issued coupon code; requires online checkout
+        couponDiscountAmount:
+          type: number
+          description: Last previewed rupee discount; verified against actual line subtotal before saving
         items:
           type: array
           items:
@@ -1459,6 +1597,10 @@ components:
     Bill:
       type: object
       properties:
+        couponCode:
+          type: string
+          nullable: true
+          description: Coupon code snapshot if redeemed on this bill
         id:
           type: string
         billNumber:

@@ -8,6 +8,7 @@
 - [Adding a store setting](store-settings-add-field.md) — store_settings.data is JSON (no migration); a new field must be added to interface+defaults+form-init+isDirty-compare or Save/Reset desyncs; receipt headerAlign center|left lives in Bill.tsx.
 - [Price integrity guard](price-integrity-guard.md) — discount CEILING at line and bill level, independent of client metadata; authorized catalogue mismatches only warn.
 - [Checkout discount approval](checkout-discount-authorization.md) — cashier discounts need a separate owner grant; catalogue promotions remain valid; denied edits must not silently change draft totals.
+- [Coupon redemption rules](coupon-redemption-rules.md) — total limit AND once per mobile; owner-issued promotion, online-only, atomic use consumption; refunds/deleted bills do not reset eligibility.
 - [Backup delivery vs restore sources](backup-restore-gap.md) — no restore path = no backup; ONE repeatable-read dump; CASCADE trap; slot-claim ledger for 2 processes; per-shop restore must upsert rows pinned by legacy NULL-tenant refs; tenant ids are slugs.
 - [Tenant scoping on writes](tenant-scoping-writes.md) — repeat the predicate on the primary row only; adding it to dependent cleanups/refund sums hides legacy NULL rows, breaking FK deletes and over-collecting bills.
 - [Vitest pulls a second Vite major](vitest-vite-version-clash.md) — adding vitest broke an untouched artifact's config typecheck with TS2769; pin vitest to the workspace's vite line, then dedupe.
@@ -35,3 +36,4 @@
 - [Ledger ↔ bill matching](bill-ledger-matching.md) — no FK: pair OUT/RETURN logs to bills by exact same-transaction created_at; multi-line bills need qty×price not the aggregate; rebuild api-zod/client-react dists after orval.
 - [Product deletion is archival](product-soft-delete.md) — sale_items CHECK + NOT NULL FKs make hard delete impossible; liveProduct() on catalog reads AND guarded stock UPDATEs, never on history; live-only unique indexes.
 - [Owner idle & product retention](owner-idle-and-product-retention.md) — owner-only 10-minute interaction timeout; continuous 30-day zero-stock grace; today's staff bill viewing needs fresh owner approval.
+- [Callback postprocessing](callback-postprocessing.md) — a block can fail after its mutation succeeded; check resulting state before retrying to avoid duplicates.

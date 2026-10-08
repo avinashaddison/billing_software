@@ -26,6 +26,8 @@ export const billsTable = pgTable(
     /** Raw value the cashier typed (e.g. 10 for "10%" or 50 for "₹50"). */
     discount:      numeric("discount", { precision: 10, scale: 2 }),
     discountType:  text("discount_type"),
+    /** Immutable code snapshot; redemption history survives bill deletion. */
+    couponCode: text("coupon_code"),
     /** The actual rupee discount applied (clamped, percent resolved against
      *  the pre-discount subtotal). Reports MUST use this, not `discount`. */
     discountAmount: numeric("discount_amount", { precision: 15, scale: 2 }),

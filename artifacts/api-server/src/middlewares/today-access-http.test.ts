@@ -7,6 +7,7 @@ const fake = vi.hoisted(() => ({
   writes: vi.fn(),
   transaction: vi.fn(),
   stockWrites: vi.fn(),
+  execute: vi.fn(),
 }));
 vi.mock("@workspace/db", async (original) => {
   const actual = await original<Record<string, unknown>>();
@@ -14,6 +15,7 @@ vi.mock("@workspace/db", async (original) => {
     ...actual,
     db: {
       transaction: fake.transaction,
+      execute: fake.execute,
       select: () => {
         const chain: Record<string, unknown> = {};
         for (const name of [
@@ -53,6 +55,7 @@ import { canEditCheckoutDiscount } from "./checkout-discount";
 import { db } from "@workspace/db";
 import staffRouter from "../routes/staff";
 import billsRouter from "../routes/bills";
+import couponsRouter from "../routes/coupons";
 
 const tenantId = "test-fixture";
 const staffId = "00000000-0000-0000-0000-000000000001";
@@ -70,6 +73,7 @@ app.use(requireAuth);
 app.use(dailyMoneyReadGate);
 app.use(staffRouter);
 app.use(billsRouter);
+app.use(couponsRouter);
 app.get("/test-discount-access", async (req, res) =>
   res.json({ allowed: await canEditCheckoutDiscount(req) }),
 );
@@ -91,6 +95,7 @@ beforeEach(() => {
   fake.writes.mockClear();
   fake.stockWrites.mockClear();
   fake.transaction.mockReset();
+  fake.execute.mockReset();
   fake.transaction.mockImplementation(async () => {
     throw new Error("Mock transaction reached");
   });
@@ -114,6 +119,155 @@ function validAuth(role = "staff") {
     ],
   );
 }
+
+describe("coupon HTTP access (fake database, no live writes)", () => {
+  const coupon = {
+    id: staffId,
+    code: "TM-FIXTURE01",
+    discount_type: "percent",
+    discount_value: "10",
+    max_uses: 2,
+    used_count: 0,
+    is_active: true,
+    expires_at: null,
+    created_at: new Date(),
+  };
+  const request = (path: string, method: string, body?: object) =>
+    fetch(`${base}${path}`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  function owner() {
+    validAuth("owner");
+    fake.rows.push([profile("owner")]);
+  }
+  it.each(["GET", "POST", "PATCH"])(
+    "staff cannot manage coupons using %s",
+    async (method) => {
+      validAuth();
+      fake.rows.push([profile()]);
+      expect(
+        (
+          await request(
+            method === "PATCH" ? `/coupons/${staffId}` : "/coupons",
+            method,
+            method === "GET"
+              ? undefined
+              : {
+                  discountType: "percent",
+                  discountValue: 10,
+                  maxUses: 2,
+                  isActive: false,
+                },
+          )
+        ).status,
+      ).toBe(403);
+      expect(fake.execute).not.toHaveBeenCalled();
+    },
+  );
+  it("owners can generate coupon codes and see their usage fields", async () => {
+    owner();
+    fake.execute.mockResolvedValue({ rows: [coupon] });
+    const response = await request("/coupons", "POST", {
+      discountType: "percent",
+      discountValue: 10,
+      maxUses: 2,
+      expiresAt: null,
+    });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      code: coupon.code,
+      maxUses: 2,
+      usedCount: 0,
+      remainingUses: 2,
+    });
+  });
+  it.each([
+    { discountType: "percent", discountValue: 101, maxUses: 2 },
+    { discountType: "amount", discountValue: 0, maxUses: 2 },
+    { discountType: "amount", discountValue: 1.234, maxUses: 2 },
+    { discountType: "percent", discountValue: 10, maxUses: 0 },
+    { discountType: "percent", discountValue: 10, maxUses: 1.5 },
+    {
+      discountType: "percent",
+      discountValue: 10,
+      maxUses: 2,
+      expiresAt: "2020-01-01",
+    },
+  ])("rejects invalid generation terms %# without inserting", async (body) => {
+    owner();
+    expect((await request("/coupons", "POST", body)).status).toBe(400);
+    expect(fake.execute).not.toHaveBeenCalled();
+  });
+  it("staff with billing access can preview owner-issued coupons without a manual discount grant", async () => {
+    validAuth();
+    fake.rows.push([profile()], [{ level: "write" }]);
+    fake.execute
+      .mockResolvedValueOnce({ rows: [coupon] })
+      .mockResolvedValueOnce({ rows: [] });
+    const response = await request("/coupons/preview", "POST", {
+      code: "tm-fixture01",
+      customerPhone: "0000000001",
+      subtotal: 200,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      code: coupon.code,
+      discountAmount: 20,
+      subtotal: 200,
+    });
+    expect(fake.transaction).not.toHaveBeenCalled();
+  });
+  it("rejects a prior customer redemption during preview", async () => {
+    validAuth();
+    fake.rows.push([profile()], [{ level: "write" }]);
+    fake.execute
+      .mockResolvedValueOnce({ rows: [coupon] })
+      .mockResolvedValueOnce({ rows: [{ id: "fixture" }] });
+    expect(
+      (
+        await request("/coupons/preview", "POST", {
+          code: coupon.code,
+          customerPhone: "0000000001",
+          subtotal: 200,
+        })
+      ).status,
+    ).toBe(400);
+  });
+  it("owners can disable a coupon and wrong-shop identifiers return not found", async () => {
+    owner();
+    fake.execute.mockResolvedValueOnce({
+      rows: [{ ...coupon, is_active: false }],
+    });
+    const changed = await request(`/coupons/${staffId}`, "PATCH", {
+      isActive: false,
+    });
+    expect(changed.status).toBe(200);
+    expect(await changed.json()).toMatchObject({ isActive: false });
+    owner();
+    fake.execute.mockResolvedValueOnce({ rows: [] });
+    expect(
+      (await request(`/coupons/${staffId}`, "PATCH", { isActive: true }))
+        .status,
+    ).toBe(404);
+  });
+  it("coupon and manual bill discounts cannot be stacked", async () => {
+    validAuth();
+    fake.rows.push([profile()], [{ level: "write" }]);
+    const response = await request("/bills/checkout", "POST", {
+      items: [{ productId: staffId, quantity: 1, price: 100 }],
+      paymentMode: "cash",
+      customerPhone: "0000000001",
+      couponCode: coupon.code,
+      couponDiscountAmount: 10,
+      discount: 10,
+      discountType: "percent",
+    });
+    expect(response.status).toBe(400);
+    expect(fake.transaction).not.toHaveBeenCalled();
+  });
+});
 
 describe("checkout discount authorization with a fake database", () => {
   const payload = {

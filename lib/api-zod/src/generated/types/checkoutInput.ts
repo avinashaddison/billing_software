@@ -10,6 +10,10 @@ import type { CheckoutInputPaymentMode } from "./checkoutInputPaymentMode";
 import type { CheckoutItem } from "./checkoutItem";
 
 export interface CheckoutInput {
+  /** Owner-issued coupon code; requires online checkout */
+  couponCode?: string;
+  /** Last previewed rupee discount; verified against actual line subtotal before saving */
+  couponDiscountAmount?: number;
   items: CheckoutItem[];
   /** Mode of payment. `credit` records the bill as unpaid (receivable) against the customer identified by `customerPhone`. */
   paymentMode: CheckoutInputPaymentMode;

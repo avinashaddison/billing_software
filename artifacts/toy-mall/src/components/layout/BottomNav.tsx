@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Package, PackagePlus, ScanLine, Clock, User, IndianRupee, ShoppingCart, ArrowRight, PencilLine } from "lucide-react";
+import { Home, Package, PackagePlus, ScanLine, Clock, User, IndianRupee, ShoppingCart, ArrowRight, PencilLine, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth, useCanCreateProducts } from "@/hooks/use-auth";
@@ -36,6 +36,7 @@ export function BottomNav() {
     { name: "Manual",  href: "/checkout?manual=1", icon: PencilLine, resource: "billing" },
     { name: "Billing", href: "/billing",  icon: IndianRupee,resource: "billing"  },
     { name: "Logs",    href: "/logs",     icon: Clock,      resource: "logs"     },
+    ...(role === "owner" ? [{ name: "Coupons", href: "/coupons", icon: Ticket, resource: null }] : []),
     { name: "Profile", href: "/profile",  icon: User,       resource: null       },
   ];
 

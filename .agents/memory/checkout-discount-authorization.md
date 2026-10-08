@@ -17,6 +17,10 @@ submitted unit prices to the current effective catalogue price, not MRP, and
 allow the normal currency precision. Authorized discounts still follow existing
 price-integrity ceilings; the new ability does not bypass them.
 
+Owner-generated coupons also count as pre-approved promotions, not permission
+to edit manual discounts. Their limited redemption rules are recorded in
+[Coupon redemption rules](coupon-redemption-rules.md).
+
 **Why:** A sale price can be legitimately below MRP without any cashier edit.
 The original mismatch-warning rule still applies to authorized editors, but
 staff without this ability must not bypass it by omitting discount metadata.

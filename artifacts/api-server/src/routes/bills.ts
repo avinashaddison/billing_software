@@ -7,6 +7,7 @@ import { liveProduct } from "../lib/product-scope";
 import { requireWrite, requireRead } from "../middlewares/auth";
 import { getBillingAccess, requireTodayBilling } from "../middlewares/today-billing";
 import { canEditCheckoutDiscount } from "../middlewares/checkout-discount";
+import { CouponError, couponDiscount, lookupCoupon, redeemCoupon } from "../lib/coupons";
 import { requestsExtraDiscount, lowersCataloguePrice, DiscountPermissionError } from "../lib/checkout-discount-policy";
 import { istToday } from "../lib/ist";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
@@ -92,6 +93,8 @@ function isValidCheckoutBody(body: unknown): body is {
   paymentMode:  PaymentMode;
   customerName?: string;
   customerPhone?: string | null;
+  couponCode?: string;
+  couponDiscountAmount?: number;
   discount?:     number;
   discountType?: "percent" | "amount";
 } {
@@ -175,6 +178,12 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
   }
 
   const { items, paymentMode, customerName, customerPhone, discount, discountType } = req.body;
+  const couponCode = req.body.couponCode;
+  if (couponCode != null && (typeof couponCode !== "string" || !couponCode.trim() ||
+    typeof req.body.couponDiscountAmount !== "number" || !Number.isFinite(req.body.couponDiscountAmount) ||
+    req.body.couponDiscountAmount <= 0 || (discount ?? 0) > 0)) {
+    res.status(400).json({ error: "Apply a valid coupon and remove the manual bill discount first." }); return;
+  }
   const tenantId = req.tenantId;
 
   /* Every bill must carry the customer's mobile number — it is what the
@@ -202,6 +211,11 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
   try {
     if (!canDiscount && requestsExtraDiscount({ discount, items })) throw new DiscountPermissionError();
     const result = await db.transaction(async (tx) => {
+      // Lock before stock writes. All coupon checks, the bill and usage consume
+      // live in one transaction: failures roll back everything together.
+      const coupon = couponCode != null
+        ? await lookupCoupon(async query => tx.execute(query), tenantId, couponCode, customerPhone, true)
+        : null;
       const processedItems: {
         /** NULL for manual / non-inventory lines. */
         productId:        string | null;
@@ -438,7 +452,16 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
       const itemsCount = processedItems.reduce((s, i) => s + i.quantity, 0);
 
       let discountAmount = 0;
-      if (discount && discount > 0 && discountType) {
+      let appliedDiscount = discount;
+      let appliedDiscountType = discountType;
+      if (coupon) {
+        discountAmount = couponDiscount(subtotal, coupon.discountType, coupon.discountValue);
+        if (discountAmount <= 0 || round2(req.body.couponDiscountAmount) !== discountAmount) {
+          throw new CouponError("The coupon total changed. Apply the coupon again before checkout.");
+        }
+        appliedDiscount = coupon.discountValue;
+        appliedDiscountType = coupon.discountType;
+      } else if (discount && discount > 0 && discountType) {
         if (discountType === "percent") {
           discountAmount = Math.min(round2(subtotal * discount / 100), subtotal);
         } else {
@@ -506,12 +529,16 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
           paymentStatus,
           customerName:  customerName?.trim() || null,
           customerPhone,
-          discount:      discount && discount > 0 ? String(discount) : null,
-          discountType:  discount && discount > 0 && discountType ? discountType : null,
+          discount:      appliedDiscount && appliedDiscount > 0 ? String(appliedDiscount) : null,
+          discountType:  appliedDiscount && appliedDiscount > 0 && appliedDiscountType ? appliedDiscountType : null,
+          couponCode: coupon?.code ?? null,
           discountAmount: discountAmount > 0 ? discountAmount.toFixed(2) : null,
         })
         .returning();
 
+      if (coupon) {
+        await redeemCoupon(async query => tx.execute(query), tenantId, coupon, customerPhone, bill.id, discountAmount);
+      }
       const saleItemRows = await tx
         .insert(saleItemsTable)
         .values(
@@ -621,6 +648,7 @@ router.get("/bills", requireRead("billing", "todayBilling"), async (req, res): P
     discount:       b.discount != null ? Number(b.discount) : null,
     discountType:   b.discountType ?? null,
     discountAmount: b.discountAmount != null ? Number(b.discountAmount) : null,
+    couponCode: b.couponCode ?? null,
   })));
 });
 
@@ -684,6 +712,7 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
          discount from (subtotal − total), because that gap also holds the
          round-off. */
       discountAmount: bill.discountAmount != null ? Number(bill.discountAmount) : null,
+      couponCode: bill.couponCode ?? null,
     },
     items: items.map((i) => ({
       ...i,

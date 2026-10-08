@@ -43,6 +43,7 @@ import StaffManagement from "@/pages/StaffManagement";
 import Checkout        from "@/pages/Checkout";
 import SettingsPage    from "@/pages/Settings";
 import AdminPage       from "@/pages/admin/index";
+import Coupons         from "@/pages/Coupons";
 import Landing         from "@/pages/Landing";
 import Legal           from "@/pages/Legal";
 import Developers      from "@/pages/Developers";
@@ -211,6 +212,12 @@ function ProtectedProductsNew() {
   return <ProductsNew key={barcodeParam} />;
 }
 
+function OwnerOnly({ children }: { children: React.ReactNode }) {
+  const { role } = useAuth();
+  if (role !== "owner") return <AccessRestricted hint="Coupons are managed by the owner only." />;
+  return <>{children}</>;
+}
+
 function Router() {
   const { isLoggedIn } = useAuth();
   const [location] = useLocation();
@@ -268,6 +275,7 @@ function Router() {
             <Route path="/categories"   component={() => <Protected resource="categories"><Categories /></Protected>} />
             <Route path="/deals"        component={() => <Protected resource="deals"><Deals /></Protected>} />
             <Route path="/staff"        component={() => <Protected resource="staff"><StaffManagement /></Protected>} />
+            <Route path="/coupons"      component={() => <OwnerOnly><Coupons /></OwnerOnly>} />
             <Route path="/checkout"     component={() => <Protected resource="scan"><Checkout /></Protected>} />
             <Route path="/settings"     component={() => <Protected resource="settings"><SettingsPage /></Protected>} />
             <Route                      component={NotFound} />
