@@ -58,3 +58,4 @@ externalPort = 3000
 deploymentTarget = "vm"
 run = ["pnpm", "start"]
 build = ["pnpm", "run", "check:release"]
+ignorePorts = false
