@@ -220,12 +220,12 @@ function PermissionEditor({ staffId, staffName, onClose }: { staffId: string; st
                       {badge}
                     </span>
                   </div>
-                  {res.key === "todayBilling" ? (
+                  {res.key === "todayBilling" || res.key === "checkoutDiscount" ? (
                     <button type="button" role="switch"
                       aria-checked={current === "write"}
-                      aria-label="Allow Today's Bills & Totals"
-                      data-testid="today-billing-toggle"
-                      onClick={() => setLevel("todayBilling", current === "write" ? "none" : "write")}
+                      aria-label={`Allow ${res.label}`}
+                      data-testid={res.key === "todayBilling" ? "today-billing-toggle" : "checkout-discount-toggle"}
+                      onClick={() => setLevel(res.key, current === "write" ? "none" : "write")}
                       className={`rounded-full px-4 py-2 text-xs font-bold border ${current === "write" ? "bg-blue-500 text-white" : "bg-muted"}`}>
                       {current === "write" ? "Allowed" : "Not allowed"}
                     </button>

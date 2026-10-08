@@ -5,6 +5,12 @@ description: Why checkout enforces a discount CEILING rather than catalogue pric
 
 # Checkout price integrity: warn on mismatch, enforce a ceiling
 
+Cashier authorization is a separate rule: see
+[Checkout discount authorization](checkout-discount-authorization.md).
+Staff without permission for extra discounts cannot submit unit prices below
+the effective catalogue price even when within the general ceiling. The
+mismatch-warning guidance below applies to authorized discount editors.
+
 Checkout accepts a client-sent unit price and a client-sent bill discount. Two
 different questions get two different answers:
 

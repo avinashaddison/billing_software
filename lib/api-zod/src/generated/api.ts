@@ -812,6 +812,7 @@ export const GetReceivablesSummaryResponse = zod.object({
 });
 
 /**
+ * Creating bills requires Scan & Billing write access. Staff applying extra item or bill discounts also need checkoutDiscount write access; catalogue sale prices do not require that extra grant. Existing discount ceilings still apply.
  * @summary Create a new bill at checkout
  */
 export const checkoutBodyItemsItemNameMax = 80;

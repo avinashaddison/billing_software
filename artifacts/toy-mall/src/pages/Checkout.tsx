@@ -15,6 +15,7 @@ import {
   isCompleteCustomerPhone, customerPhoneFormatError, customerPhoneSubmitError, CUSTOMER_PHONE_REQUIRED_TOAST,
 } from "@/lib/customer-phone";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
+import { usePermission } from "@/hooks/use-auth";
 import { useOnline } from "@/hooks/use-online";
 import { useStoreSettings } from "@/lib/store-info";
 import {
@@ -153,8 +154,9 @@ interface CartItemRowProps {
   onQtyChange: (productId: string, qty: number) => void;
   onRemove: (productId: string) => void;
   onLineDiscount: (productId: string, type: LineDiscountType, value: number) => void;
+  canEditDiscount: boolean;
 }
-const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onLineDiscount }: CartItemRowProps) {
+const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onLineDiscount, canEditDiscount }: CartItemRowProps) {
   const isManual   = !!item.isManual;
   const onSale     = !isManual && item.mrp != null && item.mrp > item.price;
   const eff        = effectivePrice(item);
@@ -257,6 +259,7 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
           <button
             type="button"
             onClick={() => onLineDiscount(item.productId, "percent", pct)}
+            disabled={!canEditDiscount}
             className={`px-2.5 text-xs font-black transition-colors ${
               dType === "percent"
                 ? "bg-amber-500 text-white"
@@ -269,6 +272,7 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
           <button
             type="button"
             onClick={() => onLineDiscount(item.productId, "amount", amt)}
+            disabled={!canEditDiscount}
             className={`px-2.5 text-xs font-black transition-colors border-l ${
               dType === "amount"
                 ? "bg-amber-500 text-white"
@@ -293,6 +297,8 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
                 : amt === 0 ? "" : String(amt)
             }
             placeholder={dType === "percent" ? "0" : "0.00"}
+            disabled={!canEditDiscount}
+            aria-label={`Item discount for ${item.name}`}
             onChange={(e) => {
               const v = e.target.value === "" ? 0 : parseFloat(e.target.value);
               onLineDiscount(item.productId, dType, Number.isFinite(v) ? v : 0);
@@ -551,6 +557,7 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
    Ongoing Checkout page
 ═══════════════════════════════════════════════════════════════════ */
 export default function Checkout() {
+  const canEditDiscount = usePermission("checkoutDiscount") === "write";
   const [, setLocation] = useLocation();
   const { items, count, total, removeItem, updateQty, setLineDiscount, addCustomItem, clearCart, prepareCart, replaceCart } = useCart();
   const [showManualModal, setShowManualModal] = useState(false);
@@ -776,9 +783,10 @@ export default function Checkout() {
 
   const handleLineDiscount = useCallback(
     (productId: string, type: LineDiscountType, value: number) => {
+      if (!canEditDiscount) return;
       setLineDiscount(productId, type, value);
     },
-    [setLineDiscount],
+    [setLineDiscount, canEditDiscount],
   );
 
   /* Build the items payload sent to /api/bills/checkout. We send the
@@ -825,6 +833,14 @@ export default function Checkout() {
   const uncostedManual = partyType === "supplier" ? undefined : findUncostedManualLine(items);
 
   const handleCheckout = async () => {
+    // Apply before both live billing and offline enqueue. Never silently
+    // remove existing discounts when access is revoked or a bill resumed.
+    if (!canEditDiscount && (discountNum > 0 || items.some(item =>
+      (item.discountType === "amount" ? item.discountAmount ?? 0 : item.discountPercent ?? 0) > 0))) {
+      toast.error("Ask the owner to allow Edit Checkout Discount in Staff Permissions.");
+      playError();
+      return;
+    }
     /* ── Supplier mode: record a payment to the supplier (money out) ── */
     if (partyType === "supplier") {
       if (!supplierId) { toast.error("Select a supplier first"); playError(); return; }
@@ -1096,6 +1112,7 @@ export default function Checkout() {
                   onQtyChange={handleQtyChange}
                   onRemove={removeItem}
                   onLineDiscount={handleLineDiscount}
+                  canEditDiscount={canEditDiscount}
                 />
               ))}
             </div>
@@ -1141,11 +1158,15 @@ export default function Checkout() {
                   <Tag className="w-3.5 h-3.5" /> Discount
                   <span className="normal-case font-medium text-muted-foreground/60">(optional)</span>
                 </p>
+                {!canEditDiscount && <p data-testid="checkout-discount-restricted" className="text-xs text-muted-foreground">
+                  Owner permission is required to edit checkout discounts.
+                </p>}
                 <div className="flex items-center gap-2">
                   <div className="flex rounded-xl border overflow-hidden shrink-0">
                     <button
                       type="button"
                       onClick={() => setDiscountType("percent")}
+                      disabled={!canEditDiscount}
                       className={`px-3 py-1.5 text-xs font-black transition-colors ${discountType === "percent" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                     >
                       %
@@ -1153,6 +1174,7 @@ export default function Checkout() {
                     <button
                       type="button"
                       onClick={() => setDiscountType("amount")}
+                      disabled={!canEditDiscount}
                       className={`px-3 py-1.5 text-xs font-black transition-colors ${discountType === "amount" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                     >
                       ₹
@@ -1164,6 +1186,8 @@ export default function Checkout() {
                     max={discountType === "percent" ? 100 : total}
                     step="1"
                     value={discountValue}
+                    disabled={!canEditDiscount}
+                    aria-label="Bill discount"
                     onChange={(e) => setDiscountValue(e.target.value)}
                     onWheel={(e) => e.currentTarget.blur()}
                     placeholder={discountType === "percent" ? "e.g. 10" : "e.g. 50"}

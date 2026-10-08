@@ -413,6 +413,9 @@ router.put("/staff/:id/permissions", requireAdmin, async (req, res): Promise<voi
   if (permissions.todayBilling !== undefined && !["none", "write"].includes(permissions.todayBilling)) {
     res.status(400).json({ error: "Today's Bills & Totals must be none or write" }); return;
   }
+  if (permissions.checkoutDiscount !== undefined && !["none", "write"].includes(permissions.checkoutDiscount)) {
+    res.status(400).json({ error: "Edit Checkout Discount must be none or write" }); return;
+  }
 
   try {
     /* Confirm the staff row is in the caller's tenant before mutating. */

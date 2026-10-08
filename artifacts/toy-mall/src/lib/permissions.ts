@@ -14,6 +14,7 @@ export const RESOURCES = [
      requireWrite("stockEntry") on POST /products/:id/stock. */
   { key: "stockEntry", label: "Entry Data",        description: "Read: view stock entries & batch history · Write: add or remove stock" },
   { key: "scan",       label: "Scan & Billing",    description: "Process sales at the counter" },
+  { key: "checkoutDiscount", label: "Edit Checkout Discount", description: "Allow extra item and bill discounts at checkout. Existing discount limits still apply." },
   { key: "billing",    label: "Bills History",     description: "View past bills & receipts" },
   { key: "todayBilling", label: "Today's Bills & Totals", description: "Owner approval to view today's bills and live sales totals. Does not change checkout access." },
   { key: "logs",       label: "Stock Logs",        description: "View stock movement history" },
@@ -36,7 +37,7 @@ export type Permissions  = Partial<Record<ResourceKey, AccessLevel>>;
 
 /** Resources that are an on/off ability rather than a page — "read" means
  *  nothing for them, so the permissions dialog offers only None / Write. */
-export const BINARY_RESOURCES: ReadonlySet<ResourceKey> = new Set<ResourceKey>(["productEntry", "todayBilling"]);
+export const BINARY_RESOURCES: ReadonlySet<ResourceKey> = new Set<ResourceKey>(["productEntry", "todayBilling", "checkoutDiscount"]);
 
 /** Default permissions for a new staff member */
 export const DEFAULT_STAFF_PERMISSIONS: Permissions = {
@@ -47,6 +48,7 @@ export const DEFAULT_STAFF_PERMISSIONS: Permissions = {
   scan:       "write",
   billing:    "read",
   todayBilling: "none",
+  checkoutDiscount: "none",
   logs:       "read",
   stockAlert: "read",
   productReports: "none",

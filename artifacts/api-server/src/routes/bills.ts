@@ -6,6 +6,8 @@ import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { liveProduct } from "../lib/product-scope";
 import { requireWrite, requireRead } from "../middlewares/auth";
 import { getBillingAccess, requireTodayBilling } from "../middlewares/today-billing";
+import { canEditCheckoutDiscount } from "../middlewares/checkout-discount";
+import { requestsExtraDiscount, lowersCataloguePrice, DiscountPermissionError } from "../lib/checkout-discount-policy";
 import { istToday } from "../lib/ist";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 import { logger } from "../lib/logger";
@@ -190,7 +192,15 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
     return;
   }
 
+  let canDiscount: boolean;
   try {
+    canDiscount = await canEditCheckoutDiscount(req);
+  } catch {
+    res.status(503).json({ error: "Unable to verify discount permissions. Please try again." });
+    return;
+  }
+  try {
+    if (!canDiscount && requestsExtraDiscount({ discount, items })) throw new DiscountPermissionError();
     const result = await db.transaction(async (tx) => {
       const processedItems: {
         /** NULL for manual / non-inventory lines. */
@@ -275,6 +285,18 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
             : `Product not found: ${item.productId}`);
         }
 
+        const priceCheck = checkLinePrice({
+          product,
+          submittedPrice: item.price,
+          discountType: item.discountType ?? null,
+          discountValue: item.discountValue ?? null,
+        });
+        // Price overrides must not bypass the discount switch by omitting
+        // discount metadata. Catalogue sale prices are still valid.
+        if (!canDiscount && lowersCataloguePrice(item.price, priceCheck.cataloguePrice)) {
+          throw new DiscountPermissionError();
+        }
+
         /* Atomic GUARDED decrement — only succeeds if enough stock is still on
            hand at write time, so two concurrent checkouts can't oversell the
            same unit. The live predicate is repeated HERE, on the write: the
@@ -323,13 +345,6 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
            honest sale gives away nearly the whole value of an item, and the
            deepest real discount in 60 days of sales was 50.5% against a 70%
            limit. See lib/price-integrity.ts. */
-        const priceCheck = checkLinePrice({
-          product,
-          submittedPrice: item.price,
-          discountType:   item.discountType ?? null,
-          discountValue:  item.discountValue ?? null,
-        });
-
         if (isAbsurdPrice(priceCheck)) {
           throw new Error(
             `Refusing "${product.name}": ₹${priceCheck.submitted} is not a possible price ` +
@@ -560,7 +575,7 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
 
     res.status(201).json(result);
   } catch (err: any) {
-    res.status(400).json({ error: err.message || "Checkout failed" });
+    res.status(err instanceof DiscountPermissionError ? 403 : 400).json({ error: err.message || "Checkout failed" });
   }
 });
 
