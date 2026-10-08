@@ -8,6 +8,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePermission } from "@/hooks/use-auth";
 import { isIstToday } from "@/lib/ist-date";
+import { PaymentTypeBadge } from "@/components/billing/PaymentTypeBadge";
 
 /* ── Types ───────────────────────────────────────────────────────── */
 
@@ -19,6 +20,7 @@ interface Bill {
   createdAt: string;
   customerName?: string | null;
   customerPhone?: string | null;
+  paymentMode?: string | null;
 }
 interface SupplierPayment {
   id: string;
@@ -41,7 +43,7 @@ interface Row {
   billNumber?: number;
   shortId?: string;
   itemsCount?: number;
-  method?: string;
+  method?: string | null;
 }
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -126,6 +128,7 @@ export default function Billing() {
     billNumber: b.billNumber,
     shortId: b.id.slice(0, 8).toUpperCase(),
     itemsCount: b.itemsCount,
+    method: b.paymentMode,
   }));
   const supplierRows: Row[] = payments.map((p) => ({
     key: `s-${p.id}`,
@@ -348,10 +351,11 @@ export default function Billing() {
                           </div>
                           <div>
                             <p className="font-bold text-sm">
-                              {row.name}{isSup
-                                ? ` · ${(row.method ?? "cash").toUpperCase()}`
-                                : ` · #${row.billNumber ?? row.shortId} · ${row.itemsCount} item${row.itemsCount !== 1 ? "s" : ""}`}
+                              {row.name}{!isSup
+                                ? ` · #${row.billNumber ?? row.shortId} · ${row.itemsCount} item${row.itemsCount !== 1 ? "s" : ""}`
+                                : ""}
                             </p>
+                            <div className="mt-1.5"><PaymentTypeBadge method={row.method} /></div>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -369,10 +373,11 @@ export default function Billing() {
 
             {/* Desktop table */}
             <div className="hidden md:block px-6">
-              <div className="rounded-2xl border overflow-hidden">
-                <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/40">
+              <div className="rounded-2xl border overflow-x-auto">
+                <div className="min-w-[850px] grid grid-cols-[minmax(180px,1fr)_auto_auto_auto_auto_auto] gap-4 px-5 py-3 border-b text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/40">
                   <span>Entry</span>
                   <span className="w-28 text-center">Type</span>
+                  <span className="w-32 text-center">Payment Type</span>
                   <span className="w-36 text-right">Amount</span>
                   <span className="w-44 text-right">Date &amp; Time</span>
                   <span className="w-8"></span>
@@ -383,7 +388,7 @@ export default function Billing() {
                     const isSup = row.kind === "supplier";
                     return (
                       <Link key={row.key} href={row.href}>
-                        <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-4 hover:bg-muted/30 transition-colors items-center cursor-pointer group">
+                        <div className="min-w-[850px] grid grid-cols-[minmax(180px,1fr)_auto_auto_auto_auto_auto] gap-4 px-5 py-4 hover:bg-muted/30 transition-colors items-center cursor-pointer group">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
                               isSup ? "bg-amber-100 dark:bg-amber-950/50" : "bg-green-100 dark:bg-green-950/50"
@@ -395,9 +400,9 @@ export default function Billing() {
                             <div className="min-w-0">
                               <p className="font-black text-sm text-foreground truncate">{isSup ? "Bill to Supplier" : "Bill to Customer"}</p>
                               <p className="font-mono text-[10px] text-muted-foreground truncate">
-                                {row.name}{isSup
-                                  ? ` · ${(row.method ?? "cash").toUpperCase()}`
-                                  : ` · #${row.billNumber ?? row.shortId} · ${row.itemsCount} item${row.itemsCount !== 1 ? "s" : ""}`}
+                                {row.name}{!isSup
+                                  ? ` · #${row.billNumber ?? row.shortId} · ${row.itemsCount} item${row.itemsCount !== 1 ? "s" : ""}`
+                                  : ""}
                               </p>
                             </div>
                           </div>
@@ -410,6 +415,9 @@ export default function Billing() {
                               {isSup ? <Truck className="w-3 h-3" /> : <User className="w-3 h-3" />}
                               {isSup ? "Supplier" : "Customer"}
                             </span>
+                          </div>
+                          <div className="w-32 text-center">
+                            <PaymentTypeBadge method={row.method} />
                           </div>
                           <div className={`w-36 text-right font-black text-lg ${isSup ? "text-amber-600 dark:text-amber-400" : "text-primary"}`}>
                             {isSup ? "−" : ""}₹{row.amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
