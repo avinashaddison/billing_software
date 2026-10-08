@@ -1,6 +1,6 @@
 ---
 name: Vitest pulls a second Vite major
-description: Adding vitest silently broke an unrelated artifact's vite config typecheck; pin vitest to the line matching the workspace vite.
+description: Test-runner updates can introduce conflicting Vite types; verify all artifacts rather than assuming an old Vitest release is required.
 ---
 
 # Adding vitest can break an unrelated artifact's typecheck
@@ -13,9 +13,14 @@ config fails to typecheck with `TS2769: No overload matches this call` on
 ordinary plugin calls, with a very long "Type 'Plugin<any>' is not assignable to
 type 'PluginOption'" diff naming two different vite paths.
 
-**Fix:** pin vitest to the release line whose peer Vite matches the workspace's
-Vite, then run the package manager's dedupe. Check the fix by listing the
-resolved vite for each frontend package — they must all resolve to one instance.
+**How to apply:** run the whole workspace typecheck after test-runner updates.
+If conflicting Vite types appear, choose a compatible Vitest release and dedupe.
+Do not assume an old Vitest release is always required: a later import's old
+test-worker dependency was blocked by the package firewall, while upgrading
+Vitest passed both all-artifact typechecks and the existing tests.
+
+**Why:** peer-dependency resolution changes across releases; an old workaround
+can prevent a safe install even when a newer test runner is compatible.
 
 **Why it is easy to misdiagnose:** the error points at the victim package's
 config file and mentions plugins that were never changed, so it looks like a

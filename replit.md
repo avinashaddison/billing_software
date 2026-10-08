@@ -18,10 +18,13 @@ A multi-tenant billing and inventory web app for retail shops. It includes an Ex
   - Web (Vite) on port **5000** (0.0.0.0, webview). Vite proxies `/api` → `localhost:8080`.
 - The web dev port is controlled by `WEB_PORT` (defaults to 5000) in `scripts/src/dev.ts`.
 - Vite is configured with `allowedHosts: true` and host `0.0.0.0` for the Replit iframe proxy.
+- Install dependencies with `pnpm install --frozen-lockfile` (Node 20.19+; pnpm 10.26.1), then use Run or `pnpm run dev`.
+- Keep the generated API and web artifact workflows stopped while **Start application** is running: the existing orchestrator already starts both services, so running both sets causes port conflicts.
+- Setup checks: `pnpm run typecheck`, `pnpm --filter @workspace/api-server test`, and `pnpm run build:prod`.
 
 ## Database
 - Uses `NEON_DATABASE_URL` when set (takes precedence), otherwise `DATABASE_URL`.
-- **`NEON_DATABASE_URL` is set in Replit secrets → the app runs against the Neon production database (real shops, products, bills).** The Replit built-in DB (`DATABASE_URL`) also has a full schema copy from initial setup but is empty and unused while the Neon secret exists.
+- **`NEON_DATABASE_URL` is set in Replit secrets → the app runs against the existing external Neon database.** The Replit built-in DB (`DATABASE_URL`) has no public tables in this import and is unused while the Neon secret exists. Do not initialize or switch to it as part of normal startup.
 - After adding/changing secrets, restart the "Start application" workflow — the running process keeps its old environment until restarted. A secret change can also reboot the whole environment, in which case the per-artifact `API Server` workflow may grab port 8080 first (without the new secret) and `Start application` fails with EADDRINUSE: stop/kill that artifact process, then restart `Start application` and confirm the API process actually has the new variable.
 - **Fresh DB setup (Replit):** `drizzle-kit push` requires a TTY and will fail in the shell. Instead, generate the base schema SQL and apply it directly:
   ```
