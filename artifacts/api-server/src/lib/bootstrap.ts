@@ -17,6 +17,9 @@ const BCRYPT_ROUNDS      = 12;
  * without touching anything.
  */
 export async function bootstrapDefaultOwner(): Promise<void> {
+  // Never create a publicly known credential on an internet-facing instance.
+  // Production accounts must be provisioned explicitly by the operator.
+  if (process.env.NODE_ENV === "production") return;
   try {
     const existing = await db
       .select({ id: staffProfilesTable.id })

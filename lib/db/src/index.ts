@@ -18,6 +18,7 @@ export const pool = new Pool({
   // Neon (free tier) suspends idle connections — recycle clients aggressively
   // so the next request gets a fresh one instead of a half-closed socket.
   idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
   // Keep TCP keepalives on so the pool detects a dropped connection sooner.
   keepAlive: true,
 });

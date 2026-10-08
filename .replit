@@ -56,5 +56,5 @@ externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["node", "artifacts/api-server/dist/index.mjs"]
-build = ["pnpm", "run", "build:prod"]
+run = ["pnpm", "start"]
+build = ["pnpm", "run", "check:release"]

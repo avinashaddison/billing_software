@@ -3,17 +3,8 @@ import { logger } from "./lib/logger";
 import { startDailyReportScheduler } from "./lib/scheduler";
 import { bootstrapDefaultOwner } from "./lib/bootstrap";
 import { runBootMigrations } from "./lib/migrate";
-
-// Neon free-tier idle-suspends sockets, which fires async pg-client errors
-// AFTER the originating query handler has already returned. Without these
-// guards a transient ECONNRESET kills the whole process — and the cashier
-// PC has nothing to fall back on. Log loudly and keep serving.
-process.on("uncaughtException", (err) => {
-  logger.error({ err }, "uncaughtException — keeping process alive");
-});
-process.on("unhandledRejection", (reason) => {
-  logger.error({ reason }, "unhandledRejection — keeping process alive");
-});
+import { pool } from "@workspace/db";
+import { runtimeReadiness, verifyDatabase } from "./lib/runtime-readiness";
 
 const rawPort = process.env["PORT"];
 
@@ -25,30 +16,72 @@ if (!rawPort) {
 
 const port = Number(rawPort);
 
-if (Number.isNaN(port) || port <= 0) {
+if (!Number.isInteger(port) || port <= 0 || port > 65535) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, async (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
-
+const server = app.listen(port, "0.0.0.0", async () => {
   logger.info({ port }, "Server listening");
 
-  /* Apply additive tenant + auth-user migrations to the live DB.
-     Idempotent — every statement is `IF NOT EXISTS`. Already-migrated
-     databases are unaffected. */
+  const startupDeadline = setTimeout(() => {
+    logger.fatal("Startup did not become ready within 60 seconds");
+    shutdown(1);
+  }, 60_000);
+  startupDeadline.unref();
+
   try {
     await runBootMigrations();
+    await verifyDatabase();
+    await bootstrapDefaultOwner();
+    if (shuttingDown) return;
+    runtimeReadiness.initialized();
+    startDailyReportScheduler();
+    logger.info("Application ready");
   } catch (err) {
-    logger.error({ err }, "Boot migrations failed — server will keep serving but DB schema may be stale");
+    logger.fatal({ err }, "Startup failed; refusing to serve an unready application");
+    shutdown(1);
+  } finally {
+    clearTimeout(startupDeadline);
   }
+});
 
-  startDailyReportScheduler();
-
-  // First-run: if the DB has no staff yet, create a default Owner so the
-  // operator can log in. No-op on already-seeded databases.
-  await bootstrapDefaultOwner();
+// Bound slow clients, allow normal uploads, and drain in-flight transactions
+// before disconnecting the database during a deployment/restart.
+server.requestTimeout = 60_000;
+server.headersTimeout = 65_000;
+server.keepAliveTimeout = 5_000;
+let shuttingDown = false;
+function shutdown(code: number) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  runtimeReadiness.drain();
+  logger.info({ code }, "Draining server");
+  const deadline = setTimeout(() => {
+    server.closeAllConnections();
+    process.exit(code || 1);
+  }, 15_000);
+  deadline.unref();
+  server.close(() => {
+    void pool.end().then(() => {
+      clearTimeout(deadline);
+      process.exit(code);
+    }).catch(() => process.exit(1));
+  });
+}
+server.on("error", (err) => {
+  logger.fatal({ err }, "HTTP server failed");
+  shutdown(1);
+});
+process.on("SIGTERM", () => shutdown(0));
+process.on("SIGINT", () => shutdown(0));
+// Expected idle Postgres socket errors are handled by the pool itself.
+// Unknown process-level exceptions must not leave financial writes running
+// in a potentially inconsistent process.
+process.on("uncaughtException", (err) => {
+  logger.fatal({ err }, "Uncaught exception");
+  shutdown(1);
+});
+process.on("unhandledRejection", (reason) => {
+  logger.fatal({ reason }, "Unhandled rejection");
+  shutdown(1);
 });

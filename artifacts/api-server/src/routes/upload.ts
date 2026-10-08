@@ -14,7 +14,12 @@ cloudinary.config({
 /* Use memory storage — we stream the buffer directly to Cloudinary */
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB max
+  limits: {
+    fileSize: 8 * 1024 * 1024,
+    files: 1,
+    fields: 0,
+    parts: 1,
+  }, // A single image, no multipart text fields or array parsing.
   fileFilter(_req, file, cb) {
     if (!file.mimetype.startsWith("image/")) {
       cb(badRequest("Only image files are allowed"));

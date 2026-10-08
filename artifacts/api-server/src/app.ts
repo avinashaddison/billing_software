@@ -12,6 +12,8 @@ import { tenantContext } from "./middlewares/tenant";
 import { apiNotFound, errorHandler } from "./middlewares/error";
 import { apiKeyAuth, apiKeyRateLimit } from "./middlewares/api-key";
 import v1Router from "./routes/v1";
+import { runtimeReadiness } from "./lib/runtime-readiness";
+import { allowsWriteOrigin } from "./lib/request-origin";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -35,10 +37,10 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc:  ["'self'"],
-        styleSrc:   ["'self'", "'unsafe-inline'"],
+        styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         imgSrc:     ["'self'", "data:", "blob:", "https:"],
         connectSrc: ["'self'", "https:", "wss:"],
-        fontSrc:    ["'self'", "data:"],
+        fontSrc:    ["'self'", "data:", "https://fonts.gstatic.com"],
         objectSrc:  ["'none'"],
         frameAncestors: ["'none'"],
       },
@@ -82,9 +84,8 @@ app.use(
  *
  * Set CORS_ORIGIN to a comma-separated allowlist (e.g.
  *   "http://localhost:5173,http://localhost:3000")
- * to lock cross-origin requests down. Defaults to reflecting the request
- * origin — which is fine for a private LAN POS install but should be
- * tightened on public SaaS deployments.
+ * to allow an additional trusted frontend. Same-origin requests need no
+ * CORS headers. Production does not reflect arbitrary origins.
  */
 const corsOrigins = (process.env["CORS_ORIGIN"] ?? "")
   .split(",")
@@ -96,13 +97,44 @@ app.use(
     credentials: true,
     origin: corsOrigins.length > 0
       ? corsOrigins
-      : (origin, cb) => cb(null, origin ?? true),
+      : process.env.NODE_ENV === "production" ? false : true,
   }),
 );
 
 app.use(cookieParser());
+app.use("/api", (req, res, next) => {
+  const browserWrite = !["GET", "HEAD", "OPTIONS"].includes(req.method);
+  const bearerApi = req.path === "/v1" || req.path.startsWith("/v1/");
+  if (process.env.NODE_ENV === "production" && browserWrite && !bearerApi &&
+      !allowsWriteOrigin(req.get("origin"), `${req.protocol}://${req.get("host")}`, corsOrigins)) {
+    res.status(403).json({ error: "Request origin is not allowed" });
+    return;
+  }
+  next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Never allow shared proxies or browsers to retain account-specific API data.
+app.use("/api", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
+// Operational endpoint: intentionally independent of tenant/session checks.
+app.get("/api/readyz", async (_req, res) => {
+  const ready = await runtimeReadiness.check();
+  res.status(ready ? 200 : 503).json({ status: ready ? "ok" : "unavailable" });
+});
+
+app.use("/api", (req, res, next) => {
+  if (req.path !== "/healthz" && !runtimeReadiness.acceptingRequests()) {
+    res.setHeader("Retry-After", "5");
+    res.status(503).json({ error: "Service temporarily unavailable" });
+    return;
+  }
+  next();
+});
 
 /* Resolve req.tenantId from the signed cookie on every request. Runs
    BEFORE the API router so every downstream handler can rely on it. */
@@ -162,11 +194,22 @@ if (process.env.NODE_ENV === "production") {
     process.env.STATIC_DIR ??
     path.join(__dirname, "../../toy-mall/dist/public");
 
-  app.use(express.static(staticDir));
+  app.use(express.static(staticDir, {
+    setHeaders(res, filePath) {
+      const hashedAsset = /[/\\]assets[/\\]/.test(filePath);
+      res.setHeader("Cache-Control", hashedAsset
+        ? "public, max-age=31536000, immutable"
+        : "no-cache");
+    },
+  }));
+  app.use("/assets", (_req, res) => {
+    res.status(404).type("text").send("Asset not found");
+  });
 
   // SPA fallback — any path that doesn't match a static file or /api route
   // gets the React shell so client-side routing works.
-  app.use((_req, res) => {
+  app.get("/{*path}", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.join(staticDir, "index.html"));
   });
 }

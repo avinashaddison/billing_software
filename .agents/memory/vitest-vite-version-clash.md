@@ -32,3 +32,8 @@ in a *transitive* peer (two copies of the same vite version differing only by a
 sub-dependency). Dedupe collapses those too; a leftover directory in the package
 store does not mean the duplicate is still linked — check what the package
 actually resolves to.
+
+When dedupe cannot collapse the instances, compare their full peer suffixes.
+A catalog-pinned `tsx` and a newer transitive `tsx` can split the *same* Vite
+version; align the peer constraints rather than repeatedly running dedupe or
+casting plugin types.

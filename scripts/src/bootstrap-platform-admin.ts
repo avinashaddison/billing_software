@@ -2,8 +2,9 @@
  * Bootstrap a platform-admin auth_users row.
  *
  *   Usage:
+ *     Set PLATFORM_ADMIN_PASSWORD in secure environment storage, then:
  *     pnpm --filter @workspace/scripts run bootstrap-platform-admin \
- *       -- --email you@vendor.com --password <strong-password>
+ *       -- --email you@vendor.com
  *
  *   If the email already exists, the row is updated (role promoted to
  *   platform_admin, password rehashed, tenant_id cleared). Safe to re-run.
@@ -22,14 +23,14 @@ function arg(name: string): string | undefined {
 
 async function main() {
   const email    = arg("email")?.trim().toLowerCase();
-  const password = arg("password");
+  const password = process.env.PLATFORM_ADMIN_PASSWORD;
 
   if (!email || !password) {
-    console.error("Usage: bootstrap-platform-admin -- --email <email> --password <password>");
+    console.error("Set PLATFORM_ADMIN_PASSWORD securely, then run bootstrap-platform-admin -- --email <email>");
     process.exit(1);
   }
-  if (password.length < 8) {
-    console.error("Password must be at least 8 characters.");
+  if (password.length < 12) {
+    console.error("Password must be at least 12 characters.");
     process.exit(1);
   }
 
@@ -53,7 +54,7 @@ async function main() {
        WHERE id = $1`,
       [id, hash],
     );
-    console.log("Promoted existing user to platform_admin:", existing.rows[0].email);
+    console.log("Promoted the specified user to platform_admin.");
   } else {
     const inserted = await pool.query<{ email: string }>(
       `INSERT INTO auth_users (tenant_id, email, password_hash, role)
@@ -61,12 +62,10 @@ async function main() {
        RETURNING email`,
       [email, hash],
     );
-    console.log("Created platform_admin:", inserted.rows[0].email);
+    console.log("Created platform_admin.");
   }
 
-  console.log("\nLogin at /admin with:");
-  console.log("  Email:", email);
-  console.log("  Password: <hidden>");
+  console.log("Login at /admin using the credentials you supplied.");
   process.exit(0);
 }
 

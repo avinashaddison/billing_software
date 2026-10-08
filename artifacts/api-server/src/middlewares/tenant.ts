@@ -56,6 +56,10 @@ declare global {
 
 function loadSecret(): string {
   const fromEnv = process.env["SESSION_SECRET"]?.trim();
+  if (process.env.NODE_ENV === "production" &&
+      (!fromEnv || fromEnv.length < 32 || fromEnv === "tenant-session-default-secret-do-not-leak")) {
+    throw new Error("Production requires SESSION_SECRET with at least 32 characters and no built-in default.");
+  }
   if (fromEnv) return fromEnv;
   /* In production we MUST have a real secret. Falling back to the built-in
      default here would mean every signed session cookie could be forged by

@@ -66,13 +66,10 @@ export default defineConfig({
         navigateFallback: "/index.html",
         runtimeCaching: [
           {
-            urlPattern: /^\/api\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache",
-              networkTimeoutSeconds: 10,
-              cacheableResponse: { statuses: [0, 200] },
-            },
+            // Full Request URLs include the origin. Never cache authenticated
+            // data: a shared device can switch shops without changing the URL.
+            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
+            handler: "NetworkOnly",
           },
           {
             urlPattern: ({ request }) => request.mode === "navigate",

@@ -36,8 +36,14 @@ A multi-tenant billing and inventory web app for retail shops. It includes an Ex
 
 ## Production / Deployment
 - Target: **autoscale**.
-- Build: `pnpm run build:prod` (builds toy-mall, then api-server).
-- Run: `NODE_ENV=production node artifacts/api-server/dist/index.mjs`.
+- Publish build: `pnpm run check:release` (all workspace typechecks, API tests, then frontend/API builds).
+- Run: `pnpm start` (explicit production mode; port defaults to 5000 unless `PORT` is provided).
+- Read-only production HTTP checks: `pnpm --filter @workspace/api-server run test:production`, after the build. This starts an ephemeral server without migrations/schedulers; only the readiness probe reads the existing database. Never use customer credentials or write test transactions to the external database.
+- Startup is not ready until migrations and core schema checks succeed; failed initialization exits instead of serving a broken API. `/api/healthz` is liveness only; monitor **`/api/readyz`** for database/schema readiness (200/503, no private details, short cached probe). Shutdown stops new API requests and drains active requests before closing the pool.
+- `SESSION_SECRET` must have at least 32 characters in production; no known-default owner account is created in production. Provision accounts explicitly, never through test fixtures in live data. The platform-admin bootstrap reads `PLATFORM_ADMIN_PASSWORD` from secure environment storage, not command-line arguments.
+- Production CORS defaults to same-origin use (no arbitrary origin reflection). Set `CORS_ORIGIN` only for explicitly trusted additional frontends; browser writes are origin-checked separately. Signed cookies remain HttpOnly, Secure, SameSite=Lax.
+- API responses are `no-store`; the PWA never caches API data across shop/account changes. Hashed static assets are immutable; HTML and service-worker files revalidate. The explicit offline billing queue is unchanged.
+- **Scheduling release requirement:** Autoscale can sleep while idle, so in-process reports/backups are not guaranteed on schedule. Use always-on Reserved VM hosting or a separate reliable scheduler before relying on unattended jobs. The deployment target has not been changed without approval.
 - In production the API serves static SPA files from `artifacts/toy-mall/dist/public` with SPA fallback.
 - Relevant env vars: `DATABASE_URL` (required), `SESSION_SECRET`, `PORT` (provided by platform), optional `CORS_ORIGIN`, `STRICT_TENANT`, Cloudinary and Telegram settings.
 - `STRICT_TENANT` now defaults to **strict** tenant isolation (each shop sees only its own rows). Set `STRICT_TENANT=false` ONLY to temporarily re-expose legacy null-tenant rows to real tenants while backfilling a migration. The legacy null-tenant owner always sees its own (`tenant_id IS NULL`) data regardless of this flag.
@@ -50,7 +56,7 @@ A multi-tenant billing and inventory web app for retail shops. It includes an Ex
 - Rehearse before trusting: `pnpm --filter @workspace/api-server run drill:restore` (~4 min; scratch Postgres in `/tmp/pgdrill`, delete afterwards) proves plain, encrypted and per-shop restores against a copy of live data. Re-run it after any migration that adds a table, FK or identity column.
 
 ## Notes
-- On first boot with an empty staff table, the API bootstraps a default Owner with PIN `1234` (logged as a warning). Change this PIN immediately in Staff Management on any real deployment.
+- Only development boot with an empty staff table creates the documented default Owner. Production never creates this known credential; existing accounts are not changed.
 - Tenant isolation: reads use `tenantWhere` (strict by default — see `STRICT_TENANT` above) and all mutations use `tenantWhereWrite` (always strict, never the NULL fallback). New shops created via the platform admin are fully isolated from each other and from the legacy null-tenant data.
 - Stock Check sheet (`/suppliers/stock-check`) can be printed, shared (Web Share API, PDF file) or downloaded. The PDF is built client-side with `jspdf` + `jspdf-autotable` (`toy-mall/src/lib/stock-check-pdf.ts`, lazy-loaded); built-in fonts are WinAnsi-only, so non-Latin characters are replaced with "?".
 - Stock Check figures per item — **In · Entries · Out · Stock** — come from `GET /api/stock-logs/product-totals` (one row per product, lifetime IN/OUT/RETURN sums + `unloggedIn/unloggedOut` = the part of `products.stock` the ledger can't explain: opening stock typed at creation, edits, imports; derived in `api-server/src/lib/stock-totals.ts`). Sheet semantics: In = IN entries + unlogged-in (opening stock counts as one entry), Out = OUT − RETURN ("N ret" note), "−N adj" note = unlogged-out; every row satisfies In − Out − adj = Stock. The product-totals and per-product stock-history joins scope `stock_logs` through the tenant-checked product only (no tenant predicate on the log rows) so pre-tenancy NULL-tenant movements still count.
