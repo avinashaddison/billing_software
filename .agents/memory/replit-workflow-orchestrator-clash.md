@@ -12,6 +12,15 @@ way to run this project.
 
 # The clash
 
+**Artifact-preview exception:** The registered web artifact has its own workflow
+and preview port. A healthy root workflow does not clear that artifact's failed
+state. A web-only artifact workflow on a distinct port can safely use the
+orchestrator's existing API; do not restart the duplicate API workflow with it.
+**Why:** The artifact preview follows its registered service, not the root Run
+button. Treat those frontend lifecycles separately while keeping one API owner.
+**How to apply:** For an artifact-specific failure, inspect that exact workflow
+and its assigned port rather than assuming the root app's health proves it works.
+
 Registering the artifacts causes Replit to auto-create one workflow **per artifact**
 (api-server, toy-mall web, mockup-sandbox). Those duplicate what the orchestrator
 already launches, and they win the race for the port:
