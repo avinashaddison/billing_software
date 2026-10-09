@@ -53,3 +53,16 @@ empty state for a successful response that genuinely contained nothing.
 
 ### "My data got deleted" complaints are usually this bug
 A raw fetch that resolves `[]` on `!r.ok` makes the page render its EMPTY state ("No suppliers yet") after a network blip or expired/revoked session — shopkeepers report it as "data automatically deleted". Fix pattern: throw on !ok → dedicated error branch with retry + "your data is safe" copy; on a failed REFRESH keep showing the stale list and toast instead (full error screen only when there is nothing to show). Checkout/Labels still swallow supplier-list errors this way (low stakes, dropdowns only).
+
+## Production login diagnosis
+Do not treat an older client's “Could not reach server. Check connection.”
+message as proof of a network outage or rejected credentials.
+
+**Why:** The legacy login catch also handled unreadable JSON responses and
+client-side errors. A proxy HTML response could produce that same message even
+when a server responded. The screenshot alone cannot identify which occurred.
+
+**How to apply:** Compare the actual production URL, HTTP responses and request
+logs before attributing the failure to the database, password or connection.
+Keep credential rejection separate from transport/protocol failure; the latter
+does not justify resetting credentials or consuming a local failed-PIN attempt.

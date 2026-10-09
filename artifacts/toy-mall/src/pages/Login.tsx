@@ -5,6 +5,7 @@ import { type Permissions } from "@/lib/permissions";
 import { Loader2, Delete, Mail, Lock, Eye, EyeOff, LogOut, Flame, MessageCircle, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { useStoreSettings, usePerStaffScannerPrefs } from "@/lib/store-info";
+import { readLoginResponse, loginFailureMessage } from "@/lib/login-response";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -138,7 +139,7 @@ export default function Login() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: trimmed, password }),
       });
-      const data = await r.json();
+      const data = await readLoginResponse<EmailUser & { error?: string }>(r, ["id", "email", "role"]);
       if (!r.ok) {
         setEmailError(data?.error || "Invalid email or password");
         setPassword("");
@@ -150,8 +151,8 @@ export default function Login() {
          the header switches from "Your Shop Name" to the real shop name
          before the user even picks their staff profile. */
       void useStoreSettings.getState().hydrateFromServer();
-    } catch {
-      setEmailError("Could not reach server. Check connection.");
+    } catch (error) {
+      setEmailError(loginFailureMessage(error));
     } finally {
       setSubmittingEmail(false);
     }
@@ -180,7 +181,9 @@ export default function Login() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ staffId: selected.id, pin }),
       });
-      const data = await r.json();
+      const data = await readLoginResponse<StaffMember & {
+        permissions: Permissions; lockedUntil?: string; attemptsLeft?: number; message?: string; error?: string;
+      }>(r, ["id", "name", "role"]);
 
       if (r.status === 429) {
         /* Account locked */
@@ -214,9 +217,9 @@ export default function Login() {
       }
 
       setLocation("/dashboard");
-    } catch {
-      toast.error("Login failed. Check connection.");
-      setPin("");
+    } catch (error) {
+      // A transport/server failure is not evidence of an incorrect PIN.
+      toast.error(loginFailureMessage(error));
     } finally {
       setChecking(false);
     }
