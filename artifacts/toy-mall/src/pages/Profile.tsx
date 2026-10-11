@@ -4,7 +4,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useLocation } from "wouter";
 import {
   Shield, LogOut, Sun, Moon, Users2, ChevronRight, Key,
-  Volume2, VolumeX, Settings2, Sparkles, Palette, ShieldCheck,
+  Volume2, VolumeX, Settings2, Sparkles, Palette, ShieldCheck, BookOpen,
 } from "lucide-react";
 import { useStoreSettings } from "@/lib/store-info";
 import { isSoundMuted, toggleSoundMute } from "@/lib/sounds";
@@ -119,6 +119,13 @@ export default function Profile() {
                   title="Staff Management"
                   subtitle="Manage staff accounts & permissions"
                   onClick={() => setLocation("/staff")}
+                />
+                <NavRow
+                  icon={BookOpen}
+                  tint="amber"
+                  title="Daily Book"
+                  subtitle="Notes, plans and money khata"
+                  onClick={() => setLocation("/daily-book")}
                 />
                 <NavRow
                   icon={Settings2}

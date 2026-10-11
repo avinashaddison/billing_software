@@ -37,3 +37,4 @@
 - [Product deletion is archival](product-soft-delete.md) — sale_items CHECK + NOT NULL FKs make hard delete impossible; liveProduct() on catalog reads AND guarded stock UPDATEs, never on history; live-only unique indexes.
 - [Owner idle & product retention](owner-idle-and-product-retention.md) — owner-only 10-minute interaction timeout; continuous 30-day zero-stock grace; today's staff bill viewing needs fresh owner approval.
 - [Callback postprocessing](callback-postprocessing.md) — a block can fail after its mutation succeeded; check resulting state before retrying to avoid duplicates.
+- [Daily Book scope](daily-book-scope.md) — personal khata stays separate from sales, expenses, profit and EOD collections; automatic integration risks double-counting.

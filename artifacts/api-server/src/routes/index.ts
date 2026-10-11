@@ -32,6 +32,7 @@ import { readOnlySessionGate } from "../middlewares/read-only-session";
 import updatesRouter     from "./updates";
 import authRouter        from "./auth";
 import couponsRouter from "./coupons";
+import dailyBookRouter from "./daily-book";
 import { PUBLIC_PATHS, requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -119,6 +120,7 @@ router.use(salesRouter);
 router.use(dashboardRouter);
 router.use(billsRouter);
 router.use(couponsRouter);
+router.use(dailyBookRouter);
 router.use(eventsRouter);
 router.use(suppliersRouter);
 router.use(returnsRouter);

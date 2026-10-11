@@ -47,6 +47,7 @@ import Coupons         from "@/pages/Coupons";
 import Landing         from "@/pages/Landing";
 import Legal           from "@/pages/Legal";
 import Developers      from "@/pages/Developers";
+import DailyBook       from "@/pages/DailyBook";
 
 /**
  * Global 401 guard. The API now enforces authentication server-side, so a
@@ -212,9 +213,9 @@ function ProtectedProductsNew() {
   return <ProductsNew key={barcodeParam} />;
 }
 
-function OwnerOnly({ children }: { children: React.ReactNode }) {
+function OwnerOnly({ children, hint = "This page is for the owner only." }: { children: React.ReactNode; hint?: string }) {
   const { role } = useAuth();
-  if (role !== "owner") return <AccessRestricted hint="Coupons are managed by the owner only." />;
+  if (role !== "owner") return <AccessRestricted hint={hint} />;
   return <>{children}</>;
 }
 
@@ -275,7 +276,8 @@ function Router() {
             <Route path="/categories"   component={() => <Protected resource="categories"><Categories /></Protected>} />
             <Route path="/deals"        component={() => <Protected resource="deals"><Deals /></Protected>} />
             <Route path="/staff"        component={() => <Protected resource="staff"><StaffManagement /></Protected>} />
-            <Route path="/coupons"      component={() => <OwnerOnly><Coupons /></OwnerOnly>} />
+            <Route path="/coupons"      component={() => <OwnerOnly hint="Coupons are managed by the owner only."><Coupons /></OwnerOnly>} />
+            <Route path="/daily-book"   component={() => <OwnerOnly hint="Daily Book is for the owner only."><DailyBook /></OwnerOnly>} />
             <Route path="/checkout"     component={() => <Protected resource="scan"><Checkout /></Protected>} />
             <Route path="/settings"     component={() => <Protected resource="settings"><SettingsPage /></Protected>} />
             <Route                      component={NotFound} />

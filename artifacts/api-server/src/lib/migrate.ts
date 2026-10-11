@@ -73,6 +73,7 @@ const MIGRATION_FILES = [
   "0024_product_soft_delete.sql",
   "0025_owner_idle_zero_stock.sql",
   "0026_coupons.sql",
+  "0027_daily_book.sql",
 ];
 
 function findMigration(name: string): string | null {
