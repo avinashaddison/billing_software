@@ -8,6 +8,17 @@ prices, coupons, or bill-level promotions. Enabling a category does not grant
 staff the separate checkout-discount permission. Keep the existing ability on
 by default; unmanaged historical categories retain their prior behavior.
 
+Supplier controls apply to **every product linked to that supplier**. Extra
+item discounts require both the category and the supplier to allow them;
+enabling either one cannot override the other's block.
+
+**Why:** The user requested “if block discount in supplier toggle product all
+block of that supplier”, as the supplier equivalent of category controls.
+
+**How to apply:** Resolve rules from current product associations in both
+billing screens and server checkout. Do not overwrite individual product
+prices or category settings to apply a supplier block.
+
 **Why:** The user requested category-specific visibility without asking to
 remove existing promotions or change pending-cart totals.
 

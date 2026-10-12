@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Switch } from "@/components/ui/switch";
 import { Link } from "wouter";
 import { Truck, Plus, X, Edit3, Check, Phone, Mail, MapPin, FileText, Loader2, Search, Package, ChevronDown, AlertTriangle, Wallet, Trash2, CalendarDays, ClipboardList, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, usePermission } from "@/hooks/use-auth";
 import { getCategoryEmoji } from "@/lib/category-colors";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -12,6 +14,7 @@ interface Supplier {
   id: string; name: string; contact?: string;
   email?: string; phone?: string; address?: string; notes?: string;
   createdAt: string;
+  checkoutDiscountEnabled: boolean;
   totalPaid?: string | number;
   paymentCount?: number;
 }
@@ -46,17 +49,19 @@ const methodLabel = (m: string) => PAYMENT_METHODS.find((x) => x.value === m)?.l
    makes the page render "No suppliers yet" after a network blip or expired
    session — which the shopkeeper reads as "my data got deleted". */
 async function fetchSuppliers(): Promise<Supplier[]> {
-  const r = await fetch(`${BASE_URL}/api/suppliers`);
+  const r = await fetch(`${BASE_URL}/api/suppliers`,{cache:"no-store",credentials:"include"});
   if (!r.ok) throw new Error("suppliers load failed");
   const data = await r.json();
-  return Array.isArray(data) ? data : [];
+  if(!Array.isArray(data) || data.some(s=>typeof s.checkoutDiscountEnabled!=="boolean"))throw new Error("Supplier discount settings are unavailable. Retry after the server update.");
+  return data;
 }
 
 async function fetchProducts(): Promise<ProductLite[]> {
   const r = await fetch(`${BASE_URL}/api/products`);
   if (!r.ok) throw new Error("products load failed");
   const data = await r.json();
-  return Array.isArray(data) ? data : [];
+  if(!Array.isArray(data))throw new Error("Invalid product response");
+  return data;
 }
 
 async function fetchPayments(supplierId: string): Promise<Payment[]> {
@@ -66,7 +71,13 @@ async function fetchPayments(supplierId: string): Promise<Payment[]> {
 }
 
 export default function Suppliers() {
-  const { role } = useAuth();
+  const { role,staffId,sessionGeneration } = useAuth();
+  const qc=useQueryClient();
+  const canManageDiscount=usePermission("suppliers")==="write";
+  const [discountSaving,setDiscountSaving]=useState<string|null>(null);
+  const scope=`${staffId}:${sessionGeneration}:${role}`;
+  const scopeRef=useRef(scope);scopeRef.current=scope;
+  const loadVersion=useRef(0);
   const isAdmin = role === "owner";
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts]   = useState<ProductLite[]>([]);
@@ -88,18 +99,45 @@ export default function Suppliers() {
   const [paySaving, setPaySaving]     = useState(false);
 
   const load = () => {
+    const version=++loadVersion.current,requestedScope=scopeRef.current;
     setLoadError(false);
     return Promise.all([fetchSuppliers(), fetchProducts()])
-      .then(([s, p]) => { setSuppliers(s); setProducts(p); })
+      .then(([s, p]) => { if(version===loadVersion.current && requestedScope===scopeRef.current){setSuppliers(s); setProducts(p);} })
       .catch(() => {
+        if(version!==loadVersion.current || requestedScope!==scopeRef.current)return;
         setLoadError(true);
         // A failed REFRESH (after a save) keeps the old list on screen — only
         // tell the user; the full error screen is for when we have nothing.
         toast.error("Couldn't refresh suppliers — check your connection");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {if(version===loadVersion.current && requestedScope===scopeRef.current)setLoading(false);});
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    setSuppliers([]);setProducts([]);setLoading(true);setDiscountSaving(null);
+    void load();
+    const refresh=()=>void load();
+    window.addEventListener("addison:suppliers-changed",refresh);
+    window.addEventListener("focus",refresh);
+    const timer=window.setInterval(refresh,15000);
+    return ()=>{loadVersion.current++;window.clearInterval(timer);window.removeEventListener("addison:suppliers-changed",refresh);window.removeEventListener("focus",refresh);};
+  },[staffId,sessionGeneration,role]);
+  const toggleDiscount=async(id:string,enabled:boolean)=>{
+    if(!canManageDiscount || discountSaving)return;
+    const requestedScope=scopeRef.current;
+    setDiscountSaving(id);
+    try{
+      const r=await fetch(`${BASE_URL}/api/suppliers/${id}`,{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({checkoutDiscountEnabled:enabled})});
+      if(!r.ok)throw new Error("Could not update the supplier discount setting.");
+      const row:Supplier=await r.json();
+      if(requestedScope!==scopeRef.current)return;
+      loadVersion.current++;
+      setSuppliers(old=>old.map(s=>s.id===id?{...s,...row}:s));
+      qc.invalidateQueries({queryKey:["checkout-category-discounts"]});
+      qc.invalidateQueries({queryKey:["suppliers"]});
+      toast.success(enabled?"Supplier item discounts enabled":"Item discounts blocked for all products from this supplier");
+    }catch(e){if(requestedScope===scopeRef.current)toast.error(e instanceof Error?e.message:"Could not update discount settings");}
+    finally{if(requestedScope===scopeRef.current)setDiscountSaving(null);}
+  };
 
   const productsBySupplier = useMemo(() => {
     const map = new Map<string, ProductLite[]>();
@@ -378,6 +416,15 @@ export default function Suppliers() {
                     </div>
                   </div>
 
+                  <div className="mx-4 mb-4 rounded-xl bg-muted/40 p-3 flex items-center justify-between gap-3">
+                    <div>
+                      <label htmlFor={`supplier-discount-${s.id}`} className="text-xs font-bold cursor-pointer">Checkout item discount</label>
+                      <p className="text-[11px] text-muted-foreground mt-1">{s.checkoutDiscountEnabled?"Allowed when the category also allows it":"Blocked for every product from this supplier"}</p>
+                    </div>
+                    <Switch id={`supplier-discount-${s.id}`} aria-label={`Checkout item discounts for supplier ${s.name}`}
+                      checked={s.checkoutDiscountEnabled} disabled={!canManageDiscount || discountSaving!==null}
+                      onCheckedChange={enabled=>void toggleDiscount(s.id,enabled)} />
+                  </div>
                   {isExpanded && productCount > 0 && (
                     <div className="border-t bg-muted/30 px-3 py-2 space-y-1">
                       {supplierProducts.map((p) => {

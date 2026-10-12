@@ -4,7 +4,7 @@ import { db } from "@workspace/db";
 import { randomBytes } from "node:crypto";
 import { requireAdmin, requireWrite } from "../middlewares/auth";
 import { broadcast } from "../lib/sse";
-import { billingActor, decryptAccessKey, digest, encryptAccessKey, generateAccessKey, keyMatches, normalizeKey, ManualAccessError } from "../lib/manual-billing-access";
+import { billingActor, decryptAccessKey, digest, encryptAccessKey, generateAccessKey, keyMatches, accessKeyDigest, ManualAccessError } from "../lib/manual-billing-access";
 const wrap = (fn: (req: Request, res: Response) => Promise<void>) => async (req: Request,res: Response,next: NextFunction) => {
   res.setHeader("Cache-Control", "no-store");
   try { await fn(req,res); } catch (e) {
@@ -20,45 +20,58 @@ router.get("/manual-billing/access-key",requireAdmin,wrap(async (req,res) => {
   const result=await db.execute(sql`SELECT encrypted_key,generated_at FROM manual_billing_keys WHERE tenant_id IS NOT DISTINCT FROM ${tenant}`);
   const row=result.rows[0] as {encrypted_key:string;generated_at:Date} | undefined;
   if (!row) { res.json({currentKey:null,generatedAt:null}); return; }
-  try { res.json({currentKey:decryptAccessKey(row.encrypted_key,tenant,secret()),generatedAt:row.generated_at}); }
+  try {
+    const key=decryptAccessKey(row.encrypted_key,tenant,secret());
+    // Never show an obsolete long key as usable. The owner explicitly generates
+    // the replacement; GET must not silently rotate approvals.
+    res.json(/^[0-9]{4}$/.test(key)?{currentKey:key,generatedAt:row.generated_at}:{currentKey:null,generatedAt:null});
+  }
   catch { throw new ManualAccessError(503,"The current key cannot be displayed. Regenerate a new key to restore access.","MANUAL_ACCESS_UNAVAILABLE"); }
 }));
 router.post("/manual-billing/access-key",requireAdmin,wrap(async (req,res) => {
   const tenant=req.tenantId ?? null;
-  const key=generateAccessKey();
-  const encrypted=encryptAccessKey(key,tenant,secret());
   const result=await db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`manual-key:${tenant ?? "__legacy_null__"}`},0))`);
+    const previous=await tx.execute(sql`SELECT key_hash FROM manual_billing_keys WHERE tenant_id IS NOT DISTINCT FROM ${tenant}`);
+    const oldHash=(previous.rows[0] as {key_hash:string}|undefined)?.key_hash;
+    let key=generateAccessKey();
+    for(let tries=0;oldHash===accessKeyDigest(key,tenant,secret()) && tries<32;tries++)key=generateAccessKey();
+    if(oldHash===accessKeyDigest(key,tenant,secret()))throw new ManualAccessError(503,"Could not generate a different key. Try again.");
+    const encrypted=encryptAccessKey(key,tenant,secret());
     const result=await tx.execute(sql`INSERT INTO manual_billing_keys(tenant_id,key_hash,encrypted_key) VALUES
-      (${tenant},${digest(normalizeKey(key))},${encrypted})
+      (${tenant},${accessKeyDigest(key,tenant,secret())},${encrypted})
       ON CONFLICT ((COALESCE(tenant_id,'__legacy_null__'))) DO UPDATE SET
       key_hash=EXCLUDED.key_hash,encrypted_key=EXCLUDED.encrypted_key,revision=gen_random_uuid(),generated_at=now()
       RETURNING generated_at`);
     await tx.execute(sql`DELETE FROM manual_billing_key_attempts WHERE tenant_id IS NOT DISTINCT FROM ${tenant}`);
-    return result;
+    return {currentKey:key,generatedAt:result.rows[0].generated_at};
   });
   broadcast("manual_billing_key_changed",{},tenant);
-  res.json({currentKey:key,generatedAt:result.rows[0].generated_at});
+  res.json(result);
 }));
 router.post("/manual-billing/authorize",requireWrite("scan"),wrap(async(req,res) => {
   const actor=await billingActor(req);
   if (actor.owner) { res.json({approvalToken:null,expiresAt:null}); return; }
   const tenant=req.tenantId ?? null;
   const result=await db.transaction(async tx => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`manual-key-attempt:${tenant ?? "__legacy_null__"}:${actor.id}`},0))`);
+    // Serialize attempts shop-wide: four digits must not be guessed by spreading
+    // requests across staff accounts. Five per actor, twenty per shop / 15 min.
+    const shopActor="shop-wide";
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`manual-key-attempt:${tenant ?? "__legacy_null__"}`},0))`);
     const keys=await tx.execute(sql`SELECT key_hash,revision FROM manual_billing_keys WHERE tenant_id IS NOT DISTINCT FROM ${tenant} FOR SHARE`);
-    await tx.execute(sql`INSERT INTO manual_billing_key_attempts(tenant_id,actor_id) VALUES(${tenant},${actor.id}) ON CONFLICT DO NOTHING`);
-    const attempts=await tx.execute(sql`SELECT failures,window_start FROM manual_billing_key_attempts
-      WHERE tenant_id IS NOT DISTINCT FROM ${tenant} AND actor_id=${actor.id} FOR UPDATE`);
-    const a=attempts.rows[0] as { failures:number;window_start:Date };
-    const fresh=Date.now()-new Date(a.window_start).getTime()<15*60_000;
-    if (fresh && a.failures>=5) return {error:"Too many incorrect keys. Wait 15 minutes or ask the owner to regenerate.",status:429};
+    await tx.execute(sql`INSERT INTO manual_billing_key_attempts(tenant_id,actor_id) VALUES(${tenant},${actor.id}),(${tenant},${shopActor}) ON CONFLICT DO NOTHING`);
+    const attempts=await tx.execute(sql`SELECT actor_id,failures,window_start FROM manual_billing_key_attempts
+      WHERE tenant_id IS NOT DISTINCT FROM ${tenant} AND actor_id IN (${actor.id},${shopActor}) ORDER BY actor_id FOR UPDATE`);
+    const counters=attempts.rows as {actor_id:string;failures:number;window_start:Date}[];
+    if (counters.some(c=>Date.now()-new Date(c.window_start).getTime()<15*60_000 && c.failures>=(c.actor_id===shopActor?20:5)))
+      return {error:"Too many incorrect keys. Wait 15 minutes or ask the owner to regenerate.",status:429};
     const key=keys.rows[0] as {key_hash:string;revision:string} | undefined;
-    if (!key || !keyMatches(req.body?.key,key.key_hash)) {
+    if (!key || !keyMatches(req.body?.key,key.key_hash,tenant,secret())) {
       // Return, don't throw: failed-attempt counters must commit.
-      await tx.execute(sql`UPDATE manual_billing_key_attempts SET failures=${fresh?a.failures+1:1},
-        window_start=CASE WHEN ${fresh} THEN window_start ELSE now() END
-        WHERE tenant_id IS NOT DISTINCT FROM ${tenant} AND actor_id=${actor.id}`);
+      await tx.execute(sql`UPDATE manual_billing_key_attempts SET
+        failures=CASE WHEN window_start>now()-interval '15 minutes' THEN failures+1 ELSE 1 END,
+        window_start=CASE WHEN window_start>now()-interval '15 minutes' THEN window_start ELSE now() END
+        WHERE tenant_id IS NOT DISTINCT FROM ${tenant} AND actor_id IN (${actor.id},${shopActor})`);
       return {error:key?"Incorrect access key. Ask the owner for the current key.":"The owner must generate a manual billing access key first.",status:403};
     }
     await tx.execute(sql`UPDATE manual_billing_key_attempts SET failures=0,window_start=now()

@@ -174,8 +174,9 @@ interface CartItemRowProps {
   canEditDiscount: boolean;
   categoryDiscountReady: boolean;
   categoryDiscountAllowed: boolean;
+  discountBlockReason?: string;
 }
-const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onLineDiscount, canEditDiscount, categoryDiscountReady, categoryDiscountAllowed }: CartItemRowProps) {
+const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onLineDiscount, canEditDiscount, categoryDiscountReady, categoryDiscountAllowed, discountBlockReason }: CartItemRowProps) {
   const isManual   = !!item.isManual;
   const onSale     = !isManual && item.mrp != null && item.mrp > item.price;
   const eff        = effectivePrice(item);
@@ -340,7 +341,7 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
       </div>
       )}
       {(!categoryDiscountReady || !categoryDiscountAllowed) && <ItemDiscountEditor item={item}
-        ready={categoryDiscountReady} allowed={categoryDiscountAllowed} canEdit={canEditDiscount} onChange={onLineDiscount} />}
+        ready={categoryDiscountReady} allowed={categoryDiscountAllowed} canEdit={canEditDiscount} onChange={onLineDiscount} blockReason={discountBlockReason} />}
     </div>
   );
 });
@@ -1201,6 +1202,7 @@ export default function Checkout() {
                   canEditDiscount={canEditDiscount}
                   categoryDiscountReady={categoryPolicy.ready}
                   categoryDiscountAllowed={categoryPolicy.allowed(item.productId)}
+                  discountBlockReason={categoryPolicy.blockReason(item.productId)}
                 />
               ))}
             </div>

@@ -2,21 +2,22 @@ import type { CartItem, LineDiscountType } from "@/contexts/cart-context";
 
 export function CategoryDiscountLoadError({retry,loading}:{retry:()=>void;loading:boolean}) {
   return <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 p-3 text-xs mb-3">
-    Could not load category discount settings. Item discount edits are unavailable.{" "}
+    Could not load category / supplier discount settings. Item discount edits are unavailable.{" "}
     <button type="button" disabled={loading} className="underline font-bold" onClick={retry}>Retry</button>
   </div>;
 }
 
-export function ItemDiscountEditor({item,ready,allowed,canEdit,onChange}:{
+export function ItemDiscountEditor({item,ready,allowed,canEdit,onChange,blockReason}:{
   item:Pick<CartItem,"productId"|"name"|"price"|"isManual"|"discountType"|"discountPercent"|"discountAmount">;
   ready:boolean;allowed:boolean;canEdit:boolean;
+  blockReason?:string;
   onChange:(id:string,type:LineDiscountType,value:number)=>void;
 }) {
   if(item.isManual)return null;
   const type=item.discountType??"percent";
   const value=type==="amount"?(item.discountAmount??0):(item.discountPercent??0);
   if(!ready || !allowed)return <div className="text-xs text-muted-foreground mt-2 flex flex-wrap gap-2">
-    <span>{ready?"Item discounts turned off for this category":"Waiting for category discount settings…"}</span>
+    <span>{ready?`Item discounts turned off for ${blockReason??"this product"}`:"Waiting for category / supplier discount settings…"}</span>
     {value>0 && <button type="button" className="underline font-bold text-amber-700" onClick={()=>onChange(item.productId,type,0)}>Remove saved discount</button>}
   </div>;
   return <div className="mt-2 flex flex-wrap items-center gap-2" data-testid={`item-discount-${item.productId}`}>

@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { sql, eq } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { Request } from "express";
@@ -10,12 +10,11 @@ export class ManualAccessError extends Error {
 export type Execute = (query: SQL) => Promise<{ rows: unknown[] }>;
 export const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 export function normalizeKey(key: unknown): string {
-  return typeof key === "string" ? key.trim().toUpperCase().replace(/[\s-]/g, "") : "";
+  return typeof key === "string" ? key.trim() : "";
 }
 export function generateAccessKey(): string {
-  // 64 bits of cryptographic entropy, plus a readable owner-shareable format.
-  const raw = randomBytes(8).toString("hex").toUpperCase();
-  return `MB-${raw.match(/.{4}/g)!.join("-")}`;
+  // Keep leading zeroes; authorization is online, authenticated and rate-limited.
+  return randomInt(0,10_000).toString().padStart(4,"0");
 }
 function encryptionKey(secret: string) {
   if (secret.length < 16) throw new ManualAccessError(503, "Manual access key encryption is not configured.", "MANUAL_ACCESS_UNAVAILABLE");
@@ -37,10 +36,16 @@ export function decryptAccessKey(value: string, tenant: string | null, secret: s
   cipher.setAuthTag(tag);
   return Buffer.concat([cipher.update(body), cipher.final()]).toString("utf8");
 }
-export function keyMatches(key: unknown, hash: string): boolean {
+// A bare hash of four digits is trivial to enumerate after a database leak.
+// Bind the verifier to the shop and server secret, separately from bill hashes.
+export function accessKeyDigest(key: string,tenant:string|null,secret:string):string {
+  return createHmac("sha256",encryptionKey(secret)).update("manual-billing-hash:v2\0")
+    .update(JSON.stringify([tenant,normalizeKey(key)])).digest("hex");
+}
+export function keyMatches(key: unknown, hash: string,tenant:string|null,secret:string): boolean {
   const normalized = normalizeKey(key);
-  if (!/^MB[0-9A-F]{16}$/.test(normalized) || !/^[0-9a-f]{64}$/.test(hash)) return false;
-  return timingSafeEqual(Buffer.from(digest(normalized), "hex"), Buffer.from(hash, "hex"));
+  if (!/^[0-9]{4}$/.test(normalized) || !/^[0-9a-f]{64}$/.test(hash)) return false;
+  return timingSafeEqual(Buffer.from(accessKeyDigest(normalized,tenant,secret), "hex"), Buffer.from(hash, "hex"));
 }
 export async function billingActor(req: Request): Promise<{ id: string; owner: boolean }> {
   const tenant = req.tenantId ?? null;

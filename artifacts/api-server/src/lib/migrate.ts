@@ -76,6 +76,7 @@ const MIGRATION_FILES = [
   "0027_daily_book.sql",
   "0028_manual_billing_access.sql",
   "0029_category_checkout_discounts.sql",
+  "0030_supplier_checkout_discounts.sql",
 ];
 
 function findMigration(name: string): string | null {

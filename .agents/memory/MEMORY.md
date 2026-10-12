@@ -7,7 +7,7 @@
 - [IST date ranges](ist-date-ranges.md) — filter, build and display on Asia/Kolkata calendar days; clamp month arithmetic (31 Mar −1mo ≠ 3 Mar); totals over a capped list need their own query.
 - [Adding a store setting](store-settings-add-field.md) — store_settings.data is JSON (no migration); a new field must be added to interface+defaults+form-init+isDirty-compare or Save/Reset desyncs; receipt headerAlign center|left lives in Bill.tsx.
 - [Price integrity guard](price-integrity-guard.md) — discount CEILING at line and bill level, independent of client metadata; authorized catalogue mismatches only warn.
-- [Checkout discount approval](checkout-discount-authorization.md) — cashier discounts need a separate owner grant; catalogue promotions remain valid; denied edits must not silently change draft totals.
+- [Checkout discount approval](checkout-discount-authorization.md) — category AND supplier must allow extra item discounts; staff still need owner permission; promotions and saved drafts stay intact.
 - [Coupon redemption rules](coupon-redemption-rules.md) — total limit AND once per mobile; owner-issued promotion, online-only, atomic use consumption; refunds/deleted bills do not reset eligibility.
 - [Backup delivery vs restore sources](backup-restore-gap.md) — no restore path = no backup; ONE repeatable-read dump; CASCADE trap; slot-claim ledger for 2 processes; per-shop restore must upsert rows pinned by legacy NULL-tenant refs; tenant ids are slugs.
 - [Tenant scoping on writes](tenant-scoping-writes.md) — repeat the predicate on the primary row only; adding it to dependent cleanups/refund sums hides legacy NULL rows, breaking FK deletes and over-collecting bills.
@@ -38,4 +38,4 @@
 - [Owner idle & product retention](owner-idle-and-product-retention.md) — owner-only 10-minute interaction timeout; continuous 30-day zero-stock grace; today's staff bill viewing needs fresh owner approval.
 - [Callback postprocessing](callback-postprocessing.md) — a block can fail after its mutation succeeded; check resulting state before retrying to avoid duplicates.
 - [Daily Book scope](daily-book-scope.md) — personal khata stays separate from sales, expenses, profit and EOD collections; automatic integration risks double-counting.
-- [Manual billing access](manual-billing-access.md) — one owner-readable key, per-bill staff approval; rotation revokes unused grants, but committed retries must not duplicate sales.
+- [Manual billing access](manual-billing-access.md) — one owner-readable 4-digit key, protected against guessing; per-bill approval; rotation revokes unused grants without duplicating committed retries.

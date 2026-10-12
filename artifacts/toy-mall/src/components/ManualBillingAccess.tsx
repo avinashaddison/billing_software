@@ -33,7 +33,7 @@ function KeyPromptDialog({ busy, error, onSubmit, onCancel }: {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [busy, onCancel]);
-  const submit = (e: React.FormEvent) => { e.preventDefault(); if (!busy && key.trim()) onSubmit(key.trim()); };
+  const submit = (e: React.FormEvent) => { e.preventDefault(); if (!busy && /^[0-9]{4}$/.test(key)) onSubmit(key); };
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget && !busy) onCancel(); }}>
@@ -44,7 +44,7 @@ function KeyPromptDialog({ busy, error, onSubmit, onCancel }: {
             <h2 id="manual-key-title" className="text-lg font-black flex items-center gap-2">
               <KeyRound className="w-5 h-5 text-amber-500 shrink-0" /> Manual billing key
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Ask the owner for the current key to bill a manual item.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Ask the owner for the current 4-digit key to bill a manual item.</p>
           </div>
           <button type="button" onClick={onCancel} disabled={busy} aria-label="Cancel"
             className="w-8 h-8 shrink-0 rounded-full bg-muted flex items-center justify-center disabled:opacity-40">
@@ -54,7 +54,8 @@ function KeyPromptDialog({ busy, error, onSubmit, onCancel }: {
         <div className="px-5 py-4 space-y-2">
           <label htmlFor="manual-key-input" className="text-xs font-bold text-muted-foreground uppercase tracking-widest block">Access key</label>
           <input id="manual-key-input" ref={inputRef} type="password" value={key} disabled={busy}
-            onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} autoCapitalize="off"
+            onChange={(e) => setKey(e.target.value.replace(/[^0-9]/g,"").slice(0,4))} inputMode="numeric" pattern="[0-9]{4}" maxLength={4} placeholder="4 digits"
+            autoComplete="off" spellCheck={false} autoCapitalize="off"
             aria-invalid={error ? true : undefined} aria-describedby={error ? "manual-key-error" : undefined}
             data-testid="input-manual-access-key"
             className="w-full h-12 px-3.5 rounded-xl bg-muted border border-border font-mono text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400" />
@@ -63,7 +64,7 @@ function KeyPromptDialog({ busy, error, onSubmit, onCancel }: {
         <div className="px-5 pb-6 grid grid-cols-2 gap-3">
           <button type="button" onClick={onCancel} disabled={busy}
             className="py-3.5 rounded-2xl border border-border text-muted-foreground font-bold text-sm hover:bg-muted disabled:opacity-40">Cancel</button>
-          <button type="submit" disabled={busy || !key.trim()} data-testid="button-manual-key-submit"
+          <button type="submit" disabled={busy || !/^[0-9]{4}$/.test(key)} data-testid="button-manual-key-submit"
             className="py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-white font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50">
             {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking</> : <><ShieldCheck className="w-4 h-4" /> Approve</>}
           </button>
@@ -242,7 +243,7 @@ export function ManualBillingKeyPanel() {
           </button>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground rounded-xl border border-dashed p-3">No key yet. Generate one to let staff bill manual items.</p>
+        <p className="text-xs text-muted-foreground rounded-xl border border-dashed p-3">No 4-digit key yet. Generate one to let staff bill manual items. Older long keys are no longer accepted.</p>
       ))}
       {copyMsg && <p role="status" className="text-xs font-medium text-muted-foreground">{copyMsg}</p>}
       {q.data?.generatedAt && !Number.isNaN(Date.parse(q.data.generatedAt)) && (

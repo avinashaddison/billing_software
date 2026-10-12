@@ -633,8 +633,9 @@ interface CartItemRowProps {
   canEditDiscount: boolean;
   categoryDiscountReady: boolean;
   categoryDiscountAllowed: boolean;
+  discountBlockReason?: string;
 }
-const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThreshold, onQtyChange, onRemove, onLineDiscount, canEditDiscount, categoryDiscountReady, categoryDiscountAllowed }: CartItemRowProps) {
+const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThreshold, onQtyChange, onRemove, onLineDiscount, canEditDiscount, categoryDiscountReady, categoryDiscountAllowed, discountBlockReason }: CartItemRowProps) {
   const hasStockInfo   = stock !== undefined && lowStockThreshold !== undefined;
   const remaining      = hasStockInfo ? stock - item.quantity : null;
   const willBeZero     = remaining !== null && remaining <= 0;
@@ -673,7 +674,7 @@ const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThre
         </div>
         <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
         <ItemDiscountEditor item={item} ready={categoryDiscountReady} allowed={categoryDiscountAllowed}
-          canEdit={canEditDiscount} onChange={onLineDiscount} />
+          canEdit={canEditDiscount} onChange={onLineDiscount} blockReason={discountBlockReason} />
         <p className="text-xs text-muted-foreground mt-0.5">
           ₹{unitPrice.toLocaleString("en-IN")} × {item.quantity} ={" "}
           <span className={`font-bold ${isNew ? "text-green-600 dark:text-green-400" : "text-foreground"}`}>
@@ -1426,6 +1427,7 @@ export default function Scan() {
                     canEditDiscount={canEditDiscount}
                     categoryDiscountReady={categoryPolicy.ready}
                     categoryDiscountAllowed={categoryPolicy.allowed(item.productId)}
+                    discountBlockReason={categoryPolicy.blockReason(item.productId)}
                   />
                 );
               })}

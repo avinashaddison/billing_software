@@ -5,6 +5,18 @@ description: Per-bill staff approval, owner-readable key storage and safe retry 
 
 The owner maintains exactly one active manual-billing key per shop. Staff need
 the current key for each bill containing manual items; owners remain unrestricted.
+The user requires the key to be **exactly four digits**, including possible
+leading zeroes. Regeneration must actually choose a different value.
+
+**Why:** The user explicitly requested “access key i want 4 digits only”.
+
+**How to apply:** Treat keys as strings, not numbers. Short keys require both
+per-actor and shop-wide guessing limits; a bare digest is insufficient against
+offline enumeration, so the verifier must remain protected by the server secret.
+Do not shorten the high-entropy per-bill approval tokens. Obsolete long keys
+require explicit owner replacement after publishing; a read must never silently
+rotate access or change pending approvals.
+
 Regeneration replaces the old key and revokes unused approvals. It does not grant
 discount editing, billing-history access or any other staff permission.
 

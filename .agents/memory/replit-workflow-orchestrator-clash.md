@@ -12,6 +12,16 @@ way to run this project.
 
 # The clash
 
+On a cold start, either the root orchestrator or the managed API workflow may
+win the port race. Check the current running workflow before restarting; never
+assume the root process is still the API owner from the previous session.
+
+**Why:** Managed services can start first while the root Run workflow fails.
+
+**How to apply:** Restart the healthy API owner for backend changes and the
+registered web workflow for frontend changes; do not start its duplicate just
+to clear an unrelated failed workflow indicator.
+
 **Artifact-preview exception:** The registered web artifact has its own workflow
 and preview port. A healthy root workflow does not clear that artifact's failed
 state. A web-only artifact workflow on a distinct port can safely use the

@@ -142,6 +142,11 @@ export function useRealtime() {
 
       /* ── supplier created / paid ── */
       es.addEventListener("supplier_created",       () => notify("addison:suppliers-changed"));
+      es.addEventListener("supplier_updated",()=>{
+        qc.invalidateQueries({queryKey:["checkout-category-discounts"]});
+        qc.invalidateQueries({queryKey:["suppliers"]});
+        notify("addison:suppliers-changed");
+      });
       es.addEventListener("supplier_payment_added", () => notify("addison:suppliers-changed"));
       es.addEventListener("supplier_payment_deleted", () => notify("addison:suppliers-changed"));
 

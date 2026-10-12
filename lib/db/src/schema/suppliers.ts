@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, index, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,6 +14,7 @@ export const suppliersTable = pgTable(
     phone:     text("phone"),
     address:   text("address"),
     notes:     text("notes"),
+    checkoutDiscountEnabled: boolean("checkout_discount_enabled").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

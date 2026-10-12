@@ -27,6 +27,7 @@ router.get("/suppliers", async (req, res): Promise<void> => {
       phone:     suppliersTable.phone,
       address:   suppliersTable.address,
       notes:     suppliersTable.notes,
+      checkoutDiscountEnabled: suppliersTable.checkoutDiscountEnabled,
       createdAt: suppliersTable.createdAt,
       totalPaid: sql<string>`COALESCE(SUM(${supplierPaymentsTable.amount}), 0)`.as("total_paid"),
       paymentCount: sql<number>`COUNT(${supplierPaymentsTable.id})::int`.as("payment_count"),
@@ -70,14 +71,17 @@ router.get("/supplier-payments", async (req, res): Promise<void> => {
 });
 
 router.post("/suppliers", requireWrite("suppliers"), async (req, res): Promise<void> => {
-  const { name, contact, email, phone, address, notes } = req.body;
+  const { name, contact, email, phone, address, notes, checkoutDiscountEnabled } = req.body;
+  if(checkoutDiscountEnabled!==undefined && typeof checkoutDiscountEnabled!=="boolean"){
+    res.status(400).json({error:"checkoutDiscountEnabled must be true or false"});return;
+  }
   if (!name || typeof name !== "string" || !name.trim()) {
     res.status(400).json({ error: "name is required" });
     return;
   }
   const [row] = await db
     .insert(suppliersTable)
-    .values({ tenantId: req.tenantId, name: name.trim(), contact, email, phone, address, notes })
+    .values({ tenantId: req.tenantId, name: name.trim(), contact, email, phone, address, notes, checkoutDiscountEnabled:checkoutDiscountEnabled??true })
     .returning();
   broadcast("supplier_created", { id: row.id, name: row.name }, req.tenantId);
   res.status(201).json(row);
@@ -100,6 +104,12 @@ router.patch("/suppliers/:id", requireWrite("suppliers"), async (req, res): Prom
   const id = String(req.params.id);
   const { name, contact, email, phone, address, notes } = req.body;
   const updates: Record<string, unknown> = {};
+  if(req.body.checkoutDiscountEnabled!==undefined){
+    if(typeof req.body.checkoutDiscountEnabled!=="boolean"){
+      res.status(400).json({error:"checkoutDiscountEnabled must be true or false"});return;
+    }
+    updates.checkoutDiscountEnabled=req.body.checkoutDiscountEnabled;
+  }
   if (name != null) updates.name = name;
   if (contact != null) updates.contact = contact;
   if (email != null) updates.email = email;
@@ -158,6 +168,7 @@ router.patch("/suppliers/:id", requireWrite("suppliers"), async (req, res): Prom
     })();
   }
 
+  broadcast("supplier_updated",{id:row.id},req.tenantId);
   res.json(row);
 });
 
