@@ -72,8 +72,8 @@ spawned before the new secret propagated, so it ran WITHOUT the secret even thou
 shells already had it — and WorkflowsRestart of "Start application" kept "succeeding"
 while the old artifact-owned process stayed on 8080.
 
-**How to apply:** after any secret change, do not trust "restarted". Check
-`tr '\0' '\n' < /proc/<api pid>/environ | grep ^NAME=` for the new variable and
-`ps -o lstart` for the pid's start time. If the artifact workflow owns 8080, kill its
-process tree (pnpm → sh → node), confirm 8080/5000 are free, then restart
-"Start application" and re-check the environ.
+**How to apply:** after a secret change, do not trust "restarted". Use secret
+existence metadata, the API process start time, and a redacted capability/health
+check; never read or print process environment values. Identify the single
+workflow that currently owns the API port and restart that owner, not a second
+competing API. Confirm the preview and API serve requests after restarting.

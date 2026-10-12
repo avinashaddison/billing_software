@@ -14,6 +14,7 @@ import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib
 import { logger } from "../lib/logger";
 import { round2, checkLinePrice, isAbsurdPrice, exceedsDiscountCeiling, checkBillDiscount, maxDiscountPct, priceGuardMode, isSaneNumber, isValidManualCost, normalizeManualCost, findManualLineWithoutCost, manualCostRequiredMessage } from "../lib/price-integrity";
 import { isValidCustomerPhone, CUSTOMER_PHONE_REQUIRED_MESSAGE } from "../lib/customer-phone";
+import { billingActor, lockManualApproval, finishManualApproval, ManualAccessError } from "../lib/manual-billing-access";
 
 const router: IRouter = Router();
 
@@ -210,7 +211,13 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
   }
   try {
     if (!canDiscount && requestsExtraDiscount({ discount, items })) throw new DiscountPermissionError();
-    const result = await db.transaction(async (tx) => {
+    const hasManual = items.some(isManualLine);
+    const actor = hasManual ? await billingActor(req) : null;
+    const attempt = await db.transaction(async (tx) => {
+      const manualApproval = hasManual && actor && !actor.owner
+        ? await lockManualApproval(query => tx.execute(query), tenantId ?? null, actor.id, req.body.manualAccessToken, req.body)
+        : null;
+      if (manualApproval?.response) return { receipt: null, replayResponse: manualApproval.response };
       // Lock before stock writes. All coupon checks, the bill and usage consume
       // live in one transaction: failures roll back everything together.
       const coupon = couponCode != null
@@ -573,12 +580,16 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
         });
       }
 
-      return {
+      const receipt = {
         bill: { ...bill, totalAmount: Number(bill.totalAmount) },
         items: processedItems,
         saleItems: saleItemRows,
       };
+      if (manualApproval) await finishManualApproval(query => tx.execute(query), manualApproval.id, req.body, bill.id, receipt);
+      return { receipt, replayResponse: null };
     });
+    if (attempt.replayResponse) { res.status(201).json(attempt.replayResponse); return; }
+    const result = attempt.receipt!;
 
     // Broadcast to all SSE clients (realtime) — scoped to this tenant
     broadcast("bill_created", {
@@ -602,7 +613,8 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
 
     res.status(201).json(result);
   } catch (err: any) {
-    res.status(err instanceof DiscountPermissionError ? 403 : 400).json({ error: err.message || "Checkout failed" });
+    res.status(err instanceof ManualAccessError ? err.status : err instanceof DiscountPermissionError ? 403 : 400)
+      .json({ error: err.message || "Checkout failed", ...(err instanceof ManualAccessError ? { code: err.code } : {}) });
   }
 });
 

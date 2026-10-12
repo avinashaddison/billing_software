@@ -38,3 +38,4 @@
 - [Owner idle & product retention](owner-idle-and-product-retention.md) — owner-only 10-minute interaction timeout; continuous 30-day zero-stock grace; today's staff bill viewing needs fresh owner approval.
 - [Callback postprocessing](callback-postprocessing.md) — a block can fail after its mutation succeeded; check resulting state before retrying to avoid duplicates.
 - [Daily Book scope](daily-book-scope.md) — personal khata stays separate from sales, expenses, profit and EOD collections; automatic integration risks double-counting.
+- [Manual billing access](manual-billing-access.md) — one owner-readable key, per-bill staff approval; rotation revokes unused grants, but committed retries must not duplicate sales.

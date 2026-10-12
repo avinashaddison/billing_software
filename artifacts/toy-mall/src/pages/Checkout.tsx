@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
@@ -28,6 +29,9 @@ import {
   useResumeHeldBill,
   useDiscardHeldBill,
 } from "@/hooks/use-held-bills";
+import { useManualBillingGate } from "@/components/ManualBillingAccess";
+import { ManualAccessApiError, clearManualApproval } from "@/lib/manual-access-api";
+import { useAuth } from "@/hooks/use-auth";
 import { HoldBillModal, HeldBillsModal } from "@/components/billing/held-bills-modals";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -62,6 +66,7 @@ async function postCheckout(payload: {
   paymentMode: PaymentMode;
   customerName?: string;
   customerPhone?: string;
+  manualAccessToken?: string;
   discount?: number;
   discountType?: "percent" | "amount";
 }) {
@@ -70,8 +75,13 @@ async function postCheckout(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (!res.ok) {
+    let data: { error?: string; code?: string } = {};
+    try { data = await res.json(); } catch {}
+    throw new ManualAccessApiError(data.error || "Could not confirm billing. Keep the cart and try again online.", res.status, data.code);
+  }
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Checkout failed");
+  if (typeof data?.bill?.id !== "string") throw new Error("Billing confirmation was unreadable. Keep the cart and check recent bills before retrying.");
   return data;
 }
 
@@ -373,12 +383,12 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
     onClose();
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[120] flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full md:max-w-sm bg-card rounded-t-3xl md:rounded-3xl border shadow-2xl animate-in slide-in-from-bottom-4 md:zoom-in-95 duration-250 overflow-hidden">
+      <div className="w-full md:max-w-sm max-h-[92dvh] overflow-y-auto bg-card rounded-t-3xl md:rounded-3xl border shadow-2xl animate-in slide-in-from-bottom-4 md:zoom-in-95 duration-250">
         <div className="md:hidden flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
@@ -554,7 +564,8 @@ function ManualItemModal({ onClose, onAdd }: ManualItemModalProps) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -565,8 +576,18 @@ export default function Checkout() {
   const couponQueries = useQueryClient();
   const canEditDiscount = usePermission("checkoutDiscount") === "write";
   const [, setLocation] = useLocation();
-  const { items, count, total, removeItem, updateQty, setLineDiscount, addCustomItem, clearCart, prepareCart, replaceCart } = useCart();
+  const { items, count, total, removeItem, updateQty, setLineDiscount, addCustomItem, clearCart: rawClearCart, prepareCart, replaceCart: rawReplaceCart } = useCart();
+  const clearCart = useCallback(() => { clearManualApproval(); rawClearCart(); }, [rawClearCart]);
+  const replaceCart = useCallback((...args: Parameters<typeof rawReplaceCart>) => {
+    clearManualApproval(); rawReplaceCart(...args);
+  }, [rawReplaceCart]);
+  const manualGate = useManualBillingGate();
   const [showManualModal, setShowManualModal] = useState(false);
+  const openManualRef = useRef<() => Promise<void>>(async () => {});
+  openManualRef.current = async () => {
+    const g = await manualGate.ensureAccess({ validate: true });
+    if (g) setShowManualModal(true);
+  };
   const [showHoldModal, setShowHoldModal] = useState(false);
   const [showHeldBillsModal, setShowHeldBillsModal] = useState(false);
   const [cartSwapPending, setCartSwapPending] = useState(false);
@@ -638,7 +659,7 @@ export default function Checkout() {
     const consumeUrlFlag = () => {
       const params = new URLSearchParams(window.location.search);
       if (params.get("manual") === "1") {
-        setShowManualModal(true);
+        void openManualRef.current();
         params.delete("manual");
         const cleaned = params.toString();
         const newUrl = window.location.pathname + (cleaned ? `?${cleaned}` : "") + window.location.hash;
@@ -648,7 +669,7 @@ export default function Checkout() {
 
     consumeUrlFlag();
 
-    const onOpen = () => setShowManualModal(true);
+    const onOpen = () => void openManualRef.current();
     window.addEventListener("checkout:open-manual", onOpen);
     return () => window.removeEventListener("checkout:open-manual", onOpen);
   }, []);
@@ -848,6 +869,11 @@ export default function Checkout() {
   const uncostedManual = partyType === "supplier" ? undefined : findUncostedManualLine(items);
 
   const handleCheckout = async () => {
+    const checkoutSession = useAuth.getState();
+    const sameCheckoutSession = () => {
+      const a = useAuth.getState();
+      return a.isLoggedIn && a.staffId === checkoutSession.staffId && a.role === checkoutSession.role && a.sessionGeneration === checkoutSession.sessionGeneration;
+    };
     if (couponActive) {
       if (!isOnline) { toast.error("Coupon billing needs an internet connection. Remove the coupon to bill offline."); return; }
       if (!couponQuoteCurrent || discountNum > 0) { toast.error("Apply the coupon again after updating the cart or customer. Manual bill discounts cannot be combined with coupons."); return; }
@@ -914,6 +940,16 @@ export default function Checkout() {
       return;
     }
 
+    /* Staff manual bills need online approval; never queued offline. */
+    let manualToken: string | undefined;
+    if (!manualGate.isOwner && items.some((i) => i.isManual)) {
+      if (!isOnline) { toast.error("Manual bills need an internet connection for staff."); playError(); return; }
+      if (submittingRef.current) return;
+      const g = await manualGate.ensureAccess({ validate: false });
+      if (!g?.token) return;
+      manualToken = g.token;
+    }
+
     /* Committed to submitting — block re-entry from a double-tap. */
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -940,6 +976,7 @@ export default function Checkout() {
 
     setLoading(true);
     try {
+      if (!sameCheckoutSession()) return;
       const result = await postCheckout({
         items: buildCheckoutItems(),
         paymentMode: paymentModeRef.current,
@@ -949,14 +986,28 @@ export default function Checkout() {
         discountType: discountNum > 0 ? discountType : undefined,
         couponCode: couponActive ? appliedCoupon.code : undefined,
         couponDiscountAmount: couponActive ? appliedCoupon.discountAmount : undefined,
+        ...(manualToken ? { manualAccessToken: manualToken } : {}),
       });
+      if (!sameCheckoutSession()) return;
       playCheckoutSuccess();
+      clearManualApproval();
       clearCart();
       setAppliedCoupon(null);
       if (couponActive) void couponQueries.invalidateQueries({ queryKey: getListCouponsQueryKey() });
       setSuccessBillId(result.bill.id);
     } catch (err: unknown) {
+      if (!sameCheckoutSession()) return;
       playError();
+      const code = err instanceof ManualAccessApiError ? err.code : undefined;
+      if (err instanceof ManualAccessApiError && err.status === 403 && code === "MANUAL_ACCESS_REQUIRED") {
+        clearManualApproval();
+        toast.error("Manual billing approval expired. Enter the current key again.");
+        return;
+      }
+      if (err instanceof ManualAccessApiError && err.status === 409 && code === "MANUAL_ACCESS_USED") {
+        toast.error("This approval was already used for a saved bill. Check recent bills before billing again; your cart is kept.");
+        return;
+      }
       toast.error((err as Error).message || "Checkout failed");
     } finally {
       setLoading(false);
@@ -968,6 +1019,7 @@ export default function Checkout() {
 
   return (
     <div className="relative flex flex-col h-full bg-background text-foreground">
+      {manualGate.gate}
       {successBillId && <SuccessOverlay billId={successBillId} />}
       {showManualModal && (
         <ManualItemModal
@@ -1082,7 +1134,7 @@ export default function Checkout() {
               Start Scanning
             </button>
             <button
-              onClick={() => setShowManualModal(true)}
+              onClick={() => void openManualRef.current()}
               className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl border-2 border-amber-400 text-amber-600 dark:text-amber-400 font-bold text-sm hover:bg-amber-50 dark:hover:bg-amber-950/20 active:scale-95 transition-all"
             >
               <PencilLine className="w-4 h-4" />
@@ -1116,7 +1168,7 @@ export default function Checkout() {
                     <PauseCircle className="w-3 h-3" /> Hold bill
                   </button>
                   <button
-                    onClick={() => setShowManualModal(true)}
+                    onClick={() => void openManualRef.current()}
                     className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 font-semibold transition-colors"
                   >
                     <PencilLine className="w-3 h-3" /> Manual item

@@ -32,6 +32,9 @@ import {
   useResumeHeldBill,
   useDiscardHeldBill,
 } from "@/hooks/use-held-bills";
+import { useManualBillingGate } from "@/components/ManualBillingAccess";
+import { ManualAccessApiError, clearManualApproval } from "@/lib/manual-access-api";
+import { useAuth } from "@/hooks/use-auth";
 import { HoldBillModal, HeldBillsModal } from "@/components/billing/held-bills-modals";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -66,14 +69,20 @@ async function postCheckout(payload: {
   paymentMode: PaymentMode;
   customerName?: string;
   customerPhone?: string;
+  manualAccessToken?: string;
 }) {
   const res = await fetch(`${BASE_URL}/api/bills/checkout`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (!res.ok) {
+    let data: { error?: string; code?: string } = {};
+    try { data = await res.json(); } catch {}
+    throw new ManualAccessApiError(data.error || "Could not confirm billing. Keep the cart and try again online.", res.status, data.code);
+  }
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Checkout failed");
+  if (typeof data?.bill?.id !== "string") throw new Error("Billing confirmation was unreadable. Keep the cart and check recent bills before retrying.");
   return data;
 }
 
@@ -688,7 +697,12 @@ const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThre
 ══════════════════════════════════════════════════════════════════════ */
 export default function Scan() {
   const [, setLocation] = useLocation();
-  const { items, count, total, addItem, removeItem, updateQty, clearCart, prepareCart, replaceCart } = useCart();
+  const { items, count, total, addItem, removeItem, updateQty, clearCart: rawClearCart, prepareCart, replaceCart: rawReplaceCart } = useCart();
+  const replaceCart = useCallback((...args: Parameters<typeof rawReplaceCart>) => {
+    clearManualApproval(); rawReplaceCart(...args);
+  }, [rawReplaceCart]);
+  const clearCart = useCallback(() => { clearManualApproval(); rawClearCart(); }, [rawClearCart]);
+  const manualGate = useManualBillingGate();
 
   const [showHoldModal, setShowHoldModal] = useState(false);
   const [showHeldBillsModal, setShowHeldBillsModal] = useState(false);
@@ -990,6 +1004,11 @@ export default function Scan() {
   }, [updateQty]);
 
   const handleConfirmCheckout = async (paymentMode: PaymentMode, customerPhone: string, customerName: string) => {
+    const checkoutSession = useAuth.getState();
+    const sameCheckoutSession = () => {
+      const a = useAuth.getState();
+      return a.isLoggedIn && a.staffId === checkoutSession.staffId && a.role === checkoutSession.role && a.sessionGeneration === checkoutSession.sessionGeneration;
+    };
     if (!items.length) return;
     /* Same rule as the Checkout page: a manual line without a purchase price
        is refused by the server, and offline it would sit in the queue as a
@@ -1004,6 +1023,14 @@ export default function Scan() {
     if (!isCompleteCustomerPhone(customerPhone)) {
       toast.error(CUSTOMER_PHONE_REQUIRED_TOAST);
       return;
+    }
+    let manualToken: string | undefined;
+    if (!manualGate.isOwner && items.some((i) => i.isManual)) {
+      if (!isOnline) { toast.error("Manual bills need an internet connection for staff."); return; }
+      if (submittingRef.current) return;
+      const g = await manualGate.ensureAccess({ validate: false });
+      if (!g?.token) return;
+      manualToken = g.token;
     }
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -1029,14 +1056,28 @@ export default function Scan() {
 
     setChecking(true);
     try {
+      if (!sameCheckoutSession()) return;
       const result = await postCheckout({
         items: items.map(toCheckoutItem),
         paymentMode, customerPhone,
         customerName: customerName || undefined,
+        ...(manualToken ? { manualAccessToken: manualToken } : {}),
       });
-      playCheckoutSuccess(); clearCart(); setShowModal(false);
+      if (!sameCheckoutSession()) return;
+      playCheckoutSuccess(); clearManualApproval(); clearCart(); setShowModal(false);
       setSuccessBillId(result.bill.id);
     } catch (err: any) {
+      const code = err instanceof ManualAccessApiError ? err.code : undefined;
+      if (!sameCheckoutSession()) return;
+      if (err instanceof ManualAccessApiError && err.status === 403 && code === "MANUAL_ACCESS_REQUIRED") {
+        clearManualApproval();
+        toast.error("Manual billing approval expired. Enter the current key again.");
+        return;
+      }
+      if (err instanceof ManualAccessApiError && err.status === 409 && code === "MANUAL_ACCESS_USED") {
+        toast.error("This approval was already used for a saved bill. Check recent bills before billing again; your cart is kept.");
+        return;
+      }
       toast.error(err.message || "Checkout failed");
     } finally {
       setChecking(false);
@@ -1075,6 +1116,7 @@ export default function Scan() {
       <LowStockFlash lowStockFlash={lowStockFlash} />
 
       {/* ── Overlays ── */}
+      {manualGate.gate}
       {successBillId && <SuccessOverlay billId={successBillId} />}
       {showModal && (
         <CheckoutModal total={total} count={count}

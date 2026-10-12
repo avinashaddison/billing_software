@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
 import { useScanDebugLog, clearScanEvents } from "@/lib/scan-debug-log";
 import { toast } from "sonner";
+import { ManualBillingKeyPanel } from "@/components/ManualBillingAccess";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -911,6 +912,9 @@ export default function SettingsPage() {
 
         {/* ── Devices & Sessions (owner-only) ── */}
         {role === "owner" && <DevicesSection />}
+
+        {/* ── Manual billing key (owner-only, outside the Save-able form state) ── */}
+        {role === "owner" && <ManualBillingKeyPanel />}
 
         {isDirty && (
           <div className="fixed bottom-24 md:bottom-6 left-4 right-4 md:left-auto md:right-8 md:w-72 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-lg z-20">
