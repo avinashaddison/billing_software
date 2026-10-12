@@ -53,6 +53,12 @@ import { requireAuth } from "./auth";
 import { dailyMoneyReadGate } from "./today-billing";
 import { canEditCheckoutDiscount } from "./checkout-discount";
 import { db } from "@workspace/db";
+// These permission tests use deliberately partial transaction doubles.
+// Category policy has separate real-SQL coverage; no disabled category here.
+vi.mock("../lib/category-discounts",async importOriginal=>{
+  const actual=await importOriginal<typeof import("../lib/category-discounts")>();
+  return {...actual,categoryDiscountPolicies:vi.fn(async()=>[])};
+});
 import staffRouter from "../routes/staff";
 import billsRouter from "../routes/bills";
 import couponsRouter from "../routes/coupons";

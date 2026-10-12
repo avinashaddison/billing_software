@@ -4,6 +4,7 @@ import { db, categoriesTable, productsTable } from "@workspace/db";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { liveProduct } from "../lib/product-scope";
 import { requireWrite } from "../middlewares/auth";
+import { broadcast } from "../lib/sse";
 
 const router: IRouter = Router();
 
@@ -16,6 +17,7 @@ router.get("/categories", async (req, res): Promise<void> => {
         name:         categoriesTable.name,
         emoji:        categoriesTable.emoji,
         skuCode:      categoriesTable.skuCode,
+        checkoutDiscountEnabled: categoriesTable.checkoutDiscountEnabled,
         createdAt:    categoriesTable.createdAt,
         productCount: sql<number>`cast(count(${productsTable.id}) as int)`,
         totalStock:   sql<number>`cast(coalesce(sum(${productsTable.stock}), 0) as int)`,
@@ -41,7 +43,10 @@ router.get("/categories", async (req, res): Promise<void> => {
 
 /* ── POST /api/categories ── create ─────────────────────────────── */
 router.post("/categories", requireWrite("categories"), async (req, res): Promise<void> => {
-  const { name, emoji, skuCode } = req.body ?? {};
+  const { name, emoji, skuCode, checkoutDiscountEnabled } = req.body ?? {};
+  if (checkoutDiscountEnabled !== undefined && typeof checkoutDiscountEnabled !== "boolean") {
+    res.status(400).json({error:"Checkout discount setting must be on or off"}); return;
+  }
   if (!name || typeof name !== "string" || name.trim().length < 2) {
     res.status(400).json({ error: "Name must be at least 2 characters" });
     return;
@@ -56,7 +61,9 @@ router.post("/categories", requireWrite("categories"), async (req, res): Promise
       name:     name.trim(),
       emoji:    (emoji ?? "🎁").toString(),
       skuCode:  skuCode.trim().toUpperCase().slice(0, 6),
+      checkoutDiscountEnabled: checkoutDiscountEnabled ?? true,
     }).returning();
+    broadcast("categories_changed", {}, req.tenantId);
     res.status(201).json(row);
   } catch (err: any) {
     if (err?.code === "23505") {
@@ -69,8 +76,14 @@ router.post("/categories", requireWrite("categories"), async (req, res): Promise
 
 /* ── PUT /api/categories/:id ── update ──────────────────────────── */
 router.put("/categories/:id", requireWrite("categories"), async (req, res): Promise<void> => {
-  const { name, emoji, skuCode } = req.body ?? {};
-  const updates: Record<string, string> = {};
+  const { name, emoji, skuCode, checkoutDiscountEnabled } = req.body ?? {};
+  const updates: Record<string, string | boolean> = {};
+  if (checkoutDiscountEnabled !== undefined) {
+    if (typeof checkoutDiscountEnabled !== "boolean") {
+      res.status(400).json({error:"Checkout discount setting must be on or off"}); return;
+    }
+    updates.checkoutDiscountEnabled = checkoutDiscountEnabled;
+  }
   if (name !== undefined) {
     if (typeof name !== "string" || name.trim().length < 2) {
       res.status(400).json({ error: "Name must be at least 2 characters" });
@@ -91,6 +104,7 @@ router.put("/categories/:id", requireWrite("categories"), async (req, res): Prom
       ))
       .returning();
     if (!row) { res.status(404).json({ error: "Category not found" }); return; }
+    broadcast("categories_changed", {}, req.tenantId);
     res.json(row);
   } catch (err: any) {
     if (err?.code === "23505") {
@@ -112,6 +126,7 @@ router.delete("/categories/:id", requireWrite("categories"), async (req, res): P
       ))
       .returning();
     if (!row) { res.status(404).json({ error: "Category not found" }); return; }
+    broadcast("categories_changed", {}, req.tenantId);
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Failed to delete category" });

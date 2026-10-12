@@ -34,6 +34,7 @@ import authRouter        from "./auth";
 import couponsRouter from "./coupons";
 import dailyBookRouter from "./daily-book";
 import manualBillingAccessRouter from "./manual-billing-access";
+import categoryDiscountsRouter from "./category-discounts";
 import { PUBLIC_PATHS, requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -123,6 +124,7 @@ router.use(billsRouter);
 router.use(couponsRouter);
 router.use(dailyBookRouter);
 router.use(manualBillingAccessRouter);
+router.use(categoryDiscountsRouter);
 router.use(eventsRouter);
 router.use(suppliersRouter);
 router.use(returnsRouter);

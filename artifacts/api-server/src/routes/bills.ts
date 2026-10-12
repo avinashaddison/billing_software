@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc, and, sql, inArray, gte } from "drizzle-orm";
 import { db, billsTable, saleItemsTable, productsTable, stockLogsTable, returnsTable, billPaymentsTable } from "@workspace/db";
 import { broadcast } from "../lib/sse";
+import { categoryDiscountPolicies, assertCategoryDiscounts, CategoryDiscountError } from "../lib/category-discounts";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { liveProduct } from "../lib/product-scope";
 import { requireWrite, requireRead } from "../middlewares/auth";
@@ -218,6 +219,9 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
         ? await lockManualApproval(query => tx.execute(query), tenantId ?? null, actor.id, req.body.manualAccessToken, req.body)
         : null;
       if (manualApproval?.response) return { receipt: null, replayResponse: manualApproval.response };
+      const catalogueItems = items.filter(item=>!isManualLine(item)) as {productId:string;price:number;discountValue?:number}[];
+      const categoryPolicies = await categoryDiscountPolicies(query=>tx.execute(query),tenantId,catalogueItems.map(item=>item.productId!),true);
+      assertCategoryDiscounts(catalogueItems as {productId:string;price:number;discountValue?:number}[],categoryPolicies);
       // Lock before stock writes. All coupon checks, the bill and usage consume
       // live in one transaction: failures roll back everything together.
       const coupon = couponCode != null
@@ -614,7 +618,7 @@ router.post("/bills/checkout", requireWrite("scan"), async (req, res): Promise<v
     res.status(201).json(result);
   } catch (err: any) {
     res.status(err instanceof ManualAccessError ? err.status : err instanceof DiscountPermissionError ? 403 : 400)
-      .json({ error: err.message || "Checkout failed", ...(err instanceof ManualAccessError ? { code: err.code } : {}) });
+      .json({ error: err.message || "Checkout failed", ...(err instanceof ManualAccessError || err instanceof CategoryDiscountError ? { code: err.code } : {}) });
   }
 });
 

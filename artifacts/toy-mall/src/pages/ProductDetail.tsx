@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useManagedCategories } from "@/hooks/use-category-discounts";
 import { createPortal } from "react-dom";
 import { useSearch, useLocation, Link } from "wouter";
 import { useUsbScanner } from "@/hooks/use-usb-scanner";
@@ -58,6 +59,8 @@ export default function ProductDetail() {
     return () => window.removeEventListener("keydown", onKey);
   }, [setLocation]);
   const isOwner = role === "owner";
+  const categoryQuery = useManagedCategories();
+  const categoryNames = [...new Set(categoryQuery.data?.map(c=>c.name) ?? [])];
   /* Mirrors the server's requireWrite("stockEntry") on POST /products/:id/stock.
      Without it the Quick Adjust card is replaced by a notice — an enabled
      STOCK IN/OUT that 403s at the server is worse than no button. */
@@ -265,6 +268,9 @@ export default function ProductDetail() {
     if (purchasePrice !== null && (isNaN(purchasePrice) || purchasePrice <= 0)) { toast.error("Purchase price must be greater than 0"); return; }
     if (isNaN(threshold) || threshold < 0) { toast.error("Enter a valid threshold"); return; }
     if (!category)                      { toast.error("Category is required"); return; }
+    if (categoryQuery.isError || !categoryQuery.data || !categoryNames.includes(category)) {
+      toast.error("Select an available category before saving this product."); return;
+    }
     setEditSaving(true);
     try {
       const r = await fetch(`${BASE_URL}/api/products/${product.id}`, {
@@ -421,8 +427,15 @@ export default function ProductDetail() {
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground mb-1">Category</p>
-              <Input value={editForm.category} onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
-                placeholder="e.g. Plush Toys" className="h-11 rounded-xl" />
+              <select aria-label="Product category" value={categoryNames.includes(editForm.category)?editForm.category:""}
+                disabled={categoryQuery.isPending || categoryQuery.isError}
+                onChange={e=>setEditForm(f=>({...f,category:e.target.value}))}
+                className="h-11 rounded-xl border bg-background px-3 w-full text-sm">
+                <option value="" disabled>{categoryQuery.isPending?"Loading categories…":"Select an available category"}</option>
+                {categoryNames.map(name=><option key={name} value={name}>{name}</option>)}
+              </select>
+              {categoryQuery.isError ? <p className="text-xs text-destructive mt-1">Could not load categories. <button type="button" className="underline" onClick={()=>categoryQuery.refetch()}>Retry</button></p>
+                : categoryQuery.data && !categoryNames.includes(editForm.category) && <p className="text-xs text-amber-700 mt-1">Current category “{editForm.category}” is not available. Select an existing category above.</p>}
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground mb-1">MRP / Regular Price (₹)</p>

@@ -3,6 +3,18 @@ name: Verifying authenticated UI without creating users
 description: How to get a working logged-in browser session for e2e/UI checks on this app when you have no credentials and must not write to the live DB.
 ---
 
+For financial browser checks, prefer isolated scratch-PostgreSQL fixtures with
+real feature routes. Unsupported related reporting routes must return explicit
+errors, not a successful empty object.
+
+**Why:** A successful `{}` is not a valid timeline response and can crash the
+entire product page, producing a misleading failure before the edited feature
+is reached.
+
+**How to apply:** Keep the tested business routes real; supply correctly shaped
+empty supporting lists or explicit unavailable errors. Never perform test sales
+or stock adjustments against the live Neon database.
+
 # The problem
 Every app route except `/`, `/login` and the legal pages is behind auth, and the API is behind `requireAuth`. Staff PINs are bcrypt-hashed and the default-owner bootstrap does not apply once staff rows exist, so there is **no known password**. The database holds live client data, so creating a throwaway test user is not acceptable.
 

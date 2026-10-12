@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
+import { useCategoryDiscounts } from "@/hooks/use-category-discounts";
+import { ItemDiscountEditor, CategoryDiscountLoadError } from "@/components/ItemDiscountEditor";
 import { useLocation } from "wouter";
 import {
   ShoppingCart, Receipt, Loader2, X, CheckCircle2,
@@ -170,8 +172,10 @@ interface CartItemRowProps {
   onRemove: (productId: string) => void;
   onLineDiscount: (productId: string, type: LineDiscountType, value: number) => void;
   canEditDiscount: boolean;
+  categoryDiscountReady: boolean;
+  categoryDiscountAllowed: boolean;
 }
-const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onLineDiscount, canEditDiscount }: CartItemRowProps) {
+const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onLineDiscount, canEditDiscount, categoryDiscountReady, categoryDiscountAllowed }: CartItemRowProps) {
   const isManual   = !!item.isManual;
   const onSale     = !isManual && item.mrp != null && item.mrp > item.price;
   const eff        = effectivePrice(item);
@@ -263,7 +267,7 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
       {/* Per-line discount input — catalogue items only. Manual lines have
           no MRP / sticker reference, so a "discount %" doesn't apply: the
           cashier types the final price directly in the modal. */}
-      {!isManual && (
+      {!isManual && categoryDiscountReady && categoryDiscountAllowed && (
       <div className="flex items-center gap-2 mt-2 pl-1 flex-wrap">
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
           <Tag className="w-3 h-3" />
@@ -335,6 +339,8 @@ const CartItemRow = memo(function CartItemRow({ item, onQtyChange, onRemove, onL
         )}
       </div>
       )}
+      {(!categoryDiscountReady || !categoryDiscountAllowed) && <ItemDiscountEditor item={item}
+        ready={categoryDiscountReady} allowed={categoryDiscountAllowed} canEdit={canEditDiscount} onChange={onLineDiscount} />}
     </div>
   );
 });
@@ -582,6 +588,7 @@ export default function Checkout() {
     clearManualApproval(); rawReplaceCart(...args);
   }, [rawReplaceCart]);
   const manualGate = useManualBillingGate();
+  const categoryPolicy = useCategoryDiscounts(items);
   const [showManualModal, setShowManualModal] = useState(false);
   const openManualRef = useRef<() => Promise<void>>(async () => {});
   openManualRef.current = async () => {
@@ -819,10 +826,10 @@ export default function Checkout() {
 
   const handleLineDiscount = useCallback(
     (productId: string, type: LineDiscountType, value: number) => {
-      if (!canEditDiscount) return;
+      if (value>0 && (!canEditDiscount || !categoryPolicy.allowed(productId))) return;
       setLineDiscount(productId, type, value);
     },
-    [setLineDiscount, canEditDiscount],
+    [setLineDiscount, canEditDiscount, categoryPolicy.allowed],
   );
 
   /* Build the items payload sent to /api/bills/checkout. We send the
@@ -869,6 +876,8 @@ export default function Checkout() {
   const uncostedManual = partyType === "supplier" ? undefined : findUncostedManualLine(items);
 
   const handleCheckout = async () => {
+    const categoryIssue = partyType==="customer" ? categoryPolicy.validate() : null;
+    if(categoryIssue){toast.error(categoryIssue);return;}
     const checkoutSession = useAuth.getState();
     const sameCheckoutSession = () => {
       const a = useAuth.getState();
@@ -1181,6 +1190,7 @@ export default function Checkout() {
                   </button>
                 </div>
               </div>
+              {categoryPolicy.isError && <CategoryDiscountLoadError loading={categoryPolicy.isFetching} retry={()=>void categoryPolicy.refetch()} />}
               {items.map((item) => (
                 <CartItemRow
                   key={item.productId}
@@ -1189,6 +1199,8 @@ export default function Checkout() {
                   onRemove={removeItem}
                   onLineDiscount={handleLineDiscount}
                   canEditDiscount={canEditDiscount}
+                  categoryDiscountReady={categoryPolicy.ready}
+                  categoryDiscountAllowed={categoryPolicy.allowed(item.productId)}
                 />
               ))}
             </div>

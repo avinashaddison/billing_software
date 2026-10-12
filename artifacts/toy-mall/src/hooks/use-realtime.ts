@@ -145,6 +145,10 @@ export function useRealtime() {
       es.addEventListener("supplier_payment_added", () => notify("addison:suppliers-changed"));
       es.addEventListener("supplier_payment_deleted", () => notify("addison:suppliers-changed"));
 
+      es.addEventListener("categories_changed", () => {
+        qc.invalidateQueries({queryKey:["categories"]});
+        qc.invalidateQueries({queryKey:["checkout-category-discounts"]});
+      });
       /* ── new product added ── */
       es.addEventListener("product_created", (e) => {
         const d = JSON.parse(e.data) as { name: string; sku: string };
@@ -155,6 +159,7 @@ export function useRealtime() {
 
       /* ── product edited ── */
       es.addEventListener("product_updated", () => {
+        qc.invalidateQueries({queryKey:["checkout-category-discounts"]});
         invalidateAllProducts(qc);
         invalidateDashboard(qc);
       });

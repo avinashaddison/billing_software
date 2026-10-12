@@ -3,6 +3,20 @@ name: Checkout discount authorization
 description: Why cashier discounts need separate approval and how that differs from catalogue sale prices.
 ---
 
+Category discount toggles control **extra item discounts**, not catalogue sale
+prices, coupons, or bill-level promotions. Enabling a category does not grant
+staff the separate checkout-discount permission. Keep the existing ability on
+by default; unmanaged historical categories retain their prior behavior.
+
+**Why:** The user requested category-specific visibility without asking to
+remove existing promotions or change pending-cart totals.
+
+**How to apply:** Use current category policy in both billing screens and at
+checkout. Refuse disabled-category discounts explicitly, preserve the draft,
+and offer an intentional discount-removal action rather than changing totals
+automatically. Product editing must select an existing managed category;
+never manufacture an option for an obsolete free-text category.
+
 The user requested: "staff permissions need discount editable in checkout time".
 This is a separate owner-controlled ability, not implicit in permission to create
 bills. The chosen default is denied until the owner grants it; owners retain

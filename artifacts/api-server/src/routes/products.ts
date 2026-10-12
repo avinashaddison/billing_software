@@ -7,6 +7,7 @@ import {
   salesTable,
   saleItemsTable,
   suppliersTable,
+  categoriesTable,
 } from "@workspace/db";
 import { broadcast } from "../lib/sse";
 import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
@@ -323,6 +324,13 @@ router.patch("/products/:id", requireWrite("products"), async (req, res): Promis
   }
 
   /* Fetch existing product upfront — needed for salePrice validation and 404 detection */
+  if (d.category !== undefined) {
+    const [category] = await db.select({id:categoriesTable.id}).from(categoriesTable)
+      .where(and(eq(categoriesTable.name,d.category),tenantWhere(categoriesTable.tenantId,req.tenantId))).limit(1);
+    if (!category) {
+      res.status(400).json({error:"Select an available category from Categories before saving this product."}); return;
+    }
+  }
   const [existing] = await db
     .select()
     .from(productsTable)

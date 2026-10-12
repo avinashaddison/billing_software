@@ -16,16 +16,22 @@ vi.mock("@workspace/db",async()=>{
     select:(...args:any[])=>fake.db.select(...args),
     execute:(...args:any[])=>fake.db.execute(...args),
     transaction:(...args:any[])=>fake.db.transaction(...args),
+    insert:(...args:any[])=>fake.db.insert(...args),
+    update:(...args:any[])=>fake.db.update(...args),
+    delete:(...args:any[])=>fake.db.delete(...args),
   }};
 });
 vi.mock("../lib/telegram",()=>({sendSaleAlert:vi.fn(),sendLowStockAlert:vi.fn()}));
 vi.mock("../lib/sse",()=>({broadcast:vi.fn()}));
+vi.mock("../lib/audit",()=>({recordAudit:vi.fn(),tenantActor:vi.fn(()=>({}))}));
 import * as schema from "../../../../lib/db/src/schema";
 import { readOnlySessionGate } from "../middlewares/read-only-session";
 import { createManualBillingAccessRouter } from "./manual-billing-access";
 import billsRouter from "./bills";
 import sharedCartRouter from "./shared-cart";
 import productsRouter from "./products";
+import categoriesRouter from "./categories";
+import categoryDiscountsRouter from "./category-discounts";
 import { generateAccessKey,encryptAccessKey,digest,normalizeKey } from "../lib/manual-billing-access";
 const root=mkdtempSync(join(tmpdir(),"manual-key-test-")),data=join(root,"data");
 const browserFixture=process.env.MANUAL_BILLING_BROWSER_FIXTURE==="1";
@@ -42,17 +48,17 @@ app.use((req,_res,next)=>{
   req.authKind="pin";req.staffId=role==="owner"?owner:role==="other"?other:staff;
   req.viewAsReadOnly=req.get("X-Test-Readonly")==="yes";next();
 });
-app.use("/api",readOnlySessionGate,createManualBillingAccessRouter(()=>"fixture-encryption-secret-never-used-live"),billsRouter);
+app.use("/api",readOnlySessionGate,createManualBillingAccessRouter(()=>"fixture-encryption-secret-never-used-live"),billsRouter,categoriesRouter,categoryDiscountsRouter,productsRouter);
 if(browserFixture){
-  app.use("/api",sharedCartRouter,productsRouter);
+  app.use("/api",sharedCartRouter);
   app.use("/api",(req,res)=>{
     if(req.path==="/auth/me"){res.json({kind:"pin",id:req.staffId,role:req.staffId===owner?"owner":"staff",name:req.staffId===owner?"Fixture Owner":"Fixture Staff",permissions:{scan:"write",products:"read",stockLogs:"read",checkoutDiscount:"read"}});return;}
     if(req.path==="/auth/activity"||req.path==="/events"){res.status(204).end();return;}
     if(req.path==="/app/notices"){res.json({notices:[],viewAs:null});return;}
     if(req.path==="/settings"){res.json({});return;}
-    if(req.path==="/held-bills"||req.path==="/auth/sessions"||req.path==="/staff"){res.json([]);return;}
+    if(req.path==="/held-bills"||req.path==="/auth/sessions"||req.path==="/staff"||req.path==="/suppliers"){res.json([]);return;}
     if(req.method!=="GET"){res.status(403).json({error:"Unrelated business writes are disabled in this isolated fixture"});return;}
-    res.json({});
+    res.status(503).json({error:"Related reporting route is unavailable in this isolated fixture"});
   });
   app.post("/__fixture/finish",(_req,res)=>{res.json({stopping:true});finishFixture?.();});
   app.get("/__fixture/status",async(_req,res)=>res.json((await fake.pool!.query("SELECT id,bill_number,total_amount,created_by_staff_id FROM bills ORDER BY created_at")).rows));
@@ -60,8 +66,8 @@ if(browserFixture){
   app.get(/.*/,(_req,res)=>res.sendFile(new URL("../../../toy-mall/dist/public/index.html",import.meta.url).pathname));
 }
 app.use((_e:unknown,_req:express.Request,res:express.Response,_next:express.NextFunction)=>res.status(500).json({error:"Fixture server error"}));
-async function request(path:string,body?:unknown,headers:Record<string,string>={}){
-  const r=await fetch(`${base}/api${path}`,{method:body===undefined?"GET":"POST",headers:{"Content-Type":"application/json",...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});
+async function request(path:string,body?:unknown,headers:Record<string,string>={},method?:string){
+  const r=await fetch(`${base}/api${path}`,{method:method??(body===undefined?"GET":"POST"),headers:{"Content-Type":"application/json",...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});
   return {status:r.status,data:await r.json() as any};
 }
 async function fixtureKey(tenant:string|null="shop-a"){
@@ -83,7 +89,7 @@ beforeAll(async()=>{
   // database module or running schema-push against a connection string.
   const dialect=new PgDialect();
   for(const table of [schema.staffProfilesTable,schema.staffPermissionsTable,schema.authUsersTable,schema.productsTable,
-    schema.billsTable,schema.saleItemsTable,schema.stockLogsTable,schema.billPaymentsTable,schema.returnsTable,schema.activeCartsTable,schema.heldBillsTable]){
+    schema.billsTable,schema.saleItemsTable,schema.stockLogsTable,schema.billPaymentsTable,schema.returnsTable,schema.activeCartsTable,schema.heldBillsTable,schema.categoriesTable]){
     const config=getTableConfig(table);
     const columns=config.columns.map(c=>{
       let def="";
@@ -100,9 +106,16 @@ beforeAll(async()=>{
     {id:other,tenantId:"shop-b",name:"Fixture Other",role:"staff",pin:"not-a-real-pin",isActive:true},
   ]);
   await fake.db.insert(schema.staffPermissionsTable).values([{staffId:staff,resource:"scan",level:"write"},{staffId:staff,resource:"products",level:"read"},{staffId:other,resource:"scan",level:"write"}]);
-  await fake.db.insert(schema.productsTable).values({id:"2fba3c5a-f017-4649-afb3-06b37c923de9",tenantId:"shop-a",name:"Fixture Catalogue Toy",category:"Fixture",sku:"FIXTURE-CAT",price:"100",stock:10});
+  await fake.db.insert(schema.productsTable).values({id:"2fba3c5a-f017-4649-afb3-06b37c923de9",tenantId:"shop-a",name:"Fixture Catalogue Toy",category:"MIX",sku:"FIXTURE-CAT",price:"100",stock:10});
   const migration=readFileSync(new URL("../../../../lib/db/migrations/0028_manual_billing_access.sql",import.meta.url),"utf8");
   await fake.pool.query(migration);await fake.pool.query(migration);
+  const categoryMigration=readFileSync(new URL("../../../../lib/db/migrations/0029_category_checkout_discounts.sql",import.meta.url),"utf8");
+  await fake.pool.query(categoryMigration);await fake.pool.query(categoryMigration);
+  await fake.db.insert(schema.categoriesTable).values([
+    {id:"e0000000-0000-4000-8000-000000000001",tenantId:"shop-a",name:"STATIONERY",skuCode:"S"},
+    {id:"e0000000-0000-4000-8000-000000000002",tenantId:"shop-a",name:"SOFT TOYS",skuCode:"ST"},
+    {id:"e0000000-0000-4000-8000-000000000003",tenantId:"shop-b",name:"STATIONERY",skuCode:"S",checkoutDiscountEnabled:false},
+  ]);
   server=app.listen(browserFixture?18082:0,browserFixture?"0.0.0.0":"127.0.0.1");await once(server,"listening");
   const address=server.address();if(!address||typeof address==="string")throw new Error("No fixture server");base=`http://127.0.0.1:${address.port}`;
 },30000);
@@ -182,5 +195,27 @@ describe.skipIf(browserFixture)("manual billing real SQL safety",()=>{
     for(let i=0;i<5;i++)expect((await request("/manual-billing/authorize",{key:"MB-0000-0000-0000-0000"})).status).toBe(403);
     expect((await request("/manual-billing/authorize",{key:"MB-0000-0000-0000-0000"})).status).toBe(429);
     expect((await request("/bills/checkout",bill,{"X-Test-Role":"owner"})).status).toBe(201);
+  });
+  it("managed category editing and category discount policy preserve money and tenant scope",async()=>{
+    const ownerHeaders={"X-Test-Role":"owner"};
+    const id="2fba3c5a-f017-4649-afb3-06b37c923de9",categoryId="e0000000-0000-4000-8000-000000000001";
+    expect((await request(`/products/${id}`,{category:"NOT AVAILABLE"},ownerHeaders,"PATCH")).status).toBe(400);
+    expect((await request(`/products/${id}`,{category:"STATIONERY"},ownerHeaders,"PATCH")).status).toBe(200);
+    expect((await request(`/categories/${categoryId}`,{checkoutDiscountEnabled:false},{},"PUT")).status).toBe(403);
+    expect((await request(`/categories/${categoryId}`,{checkoutDiscountEnabled:"no"},ownerHeaders,"PUT")).status).toBe(400);
+    expect((await request(`/categories/${categoryId}`,{checkoutDiscountEnabled:false},ownerHeaders,"PUT")).status).toBe(200);
+    expect((await request(`/checkout/category-discounts?ids=${id}`)).data[0].checkoutDiscountEnabled).toBe(false);
+    expect((await request(`/categories/${categoryId}`,{checkoutDiscountEnabled:true},{"X-Test-Tenant":"shop-b","X-Test-Role":"other"},"PUT")).status).toBe(403);
+    const original=Number((await fake.pool!.query("SELECT count(*) FROM bills")).rows[0].count);
+    const catalogueBill={...bill,items:[{productId:id,quantity:1,price:90,discountType:"percent",discountValue:10}]};
+    const denied=await request("/bills/checkout",catalogueBill,ownerHeaders);
+    expect(denied.status).toBe(400);expect(denied.data.code).toBe("CATEGORY_DISCOUNT_DISABLED");
+    expect(Number((await fake.pool!.query("SELECT count(*) FROM bills")).rows[0].count)).toBe(original);
+    expect((await fake.pool!.query("SELECT stock FROM products WHERE id=$1",[id])).rows[0].stock).toBe(10);
+    expect((await request("/bills/checkout",{...catalogueBill,items:[{productId:id,quantity:1,price:90}]},ownerHeaders)).status).toBe(400);
+    expect((await request("/bills/checkout",{...catalogueBill,items:[{productId:id,quantity:1,price:100}]},ownerHeaders)).status).toBe(201);
+    await request(`/categories/${categoryId}`,{checkoutDiscountEnabled:true},ownerHeaders,"PUT");
+    expect((await request("/bills/checkout",catalogueBill,ownerHeaders)).status).toBe(201);
+    expect((await fake.pool!.query("SELECT checkout_discount_enabled FROM categories WHERE tenant_id='shop-b'")).rows[0].checkout_discount_enabled).toBe(false);
   });
 });

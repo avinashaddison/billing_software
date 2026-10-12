@@ -25,6 +25,8 @@ import { useOnline }       from "@/hooks/use-online";
 import { WifiOff, RefreshCw, Clock, PauseCircle } from "lucide-react";
 import { useStoreSettings } from "@/lib/store-info";
 import { usePermission } from "@/hooks/use-auth";
+import { useCategoryDiscounts } from "@/hooks/use-category-discounts";
+import { ItemDiscountEditor, CategoryDiscountLoadError } from "@/components/ItemDiscountEditor";
 import {
   HeldBillRequestError,
   useHeldBills,
@@ -627,8 +629,12 @@ interface CartItemRowProps {
   lowStockThreshold?: number;
   onQtyChange: (productId: string, qty: number) => void;
   onRemove: (productId: string) => void;
+  onLineDiscount: (id:string,type:LineDiscountType,value:number)=>void;
+  canEditDiscount: boolean;
+  categoryDiscountReady: boolean;
+  categoryDiscountAllowed: boolean;
 }
-const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThreshold, onQtyChange, onRemove }: CartItemRowProps) {
+const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThreshold, onQtyChange, onRemove, onLineDiscount, canEditDiscount, categoryDiscountReady, categoryDiscountAllowed }: CartItemRowProps) {
   const hasStockInfo   = stock !== undefined && lowStockThreshold !== undefined;
   const remaining      = hasStockInfo ? stock - item.quantity : null;
   const willBeZero     = remaining !== null && remaining <= 0;
@@ -666,6 +672,8 @@ const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThre
           )}
         </div>
         <p className="text-xs font-mono text-muted-foreground">{item.sku}</p>
+        <ItemDiscountEditor item={item} ready={categoryDiscountReady} allowed={categoryDiscountAllowed}
+          canEdit={canEditDiscount} onChange={onLineDiscount} />
         <p className="text-xs text-muted-foreground mt-0.5">
           ₹{unitPrice.toLocaleString("en-IN")} × {item.quantity} ={" "}
           <span className={`font-bold ${isNew ? "text-green-600 dark:text-green-400" : "text-foreground"}`}>
@@ -697,7 +705,13 @@ const CartItemRow = memo(function CartItemRow({ item, isNew, stock, lowStockThre
 ══════════════════════════════════════════════════════════════════════ */
 export default function Scan() {
   const [, setLocation] = useLocation();
-  const { items, count, total, addItem, removeItem, updateQty, clearCart: rawClearCart, prepareCart, replaceCart: rawReplaceCart } = useCart();
+  const { items, count, total, addItem, removeItem, updateQty, setLineDiscount, clearCart: rawClearCart, prepareCart, replaceCart: rawReplaceCart } = useCart();
+  const categoryPolicy = useCategoryDiscounts(items);
+  const canEditDiscount = usePermission("checkoutDiscount") === "write";
+  const handleLineDiscount = (id:string,type:LineDiscountType,value:number)=>{
+    if(value>0 && (!canEditDiscount || !categoryPolicy.allowed(id)))return;
+    setLineDiscount(id,type,value);
+  };
   const replaceCart = useCallback((...args: Parameters<typeof rawReplaceCart>) => {
     clearManualApproval(); rawReplaceCart(...args);
   }, [rawReplaceCart]);
@@ -1004,6 +1018,8 @@ export default function Scan() {
   }, [updateQty]);
 
   const handleConfirmCheckout = async (paymentMode: PaymentMode, customerPhone: string, customerName: string) => {
+    const categoryIssue=categoryPolicy.validate();
+    if(categoryIssue){toast.error(categoryIssue);return;}
     const checkoutSession = useAuth.getState();
     const sameCheckoutSession = () => {
       const a = useAuth.getState();
@@ -1393,6 +1409,7 @@ export default function Scan() {
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
                 Cart · {count} item{count !== 1 ? "s" : ""}
               </p>
+              {categoryPolicy.isError && <CategoryDiscountLoadError loading={categoryPolicy.isFetching} retry={()=>void categoryPolicy.refetch()} />}
               {items.map((item) => {
                 const skuKey = item.sku.toLowerCase();
                 const cached = skuCache.get(skuKey) ?? fallbackCache.get(skuKey);
@@ -1405,6 +1422,10 @@ export default function Scan() {
                     lowStockThreshold={cached?.lowStockThreshold}
                     onQtyChange={handleQtyChange}
                     onRemove={removeItem}
+                    onLineDiscount={handleLineDiscount}
+                    canEditDiscount={canEditDiscount}
+                    categoryDiscountReady={categoryPolicy.ready}
+                    categoryDiscountAllowed={categoryPolicy.allowed(item.productId)}
                   />
                 );
               })}

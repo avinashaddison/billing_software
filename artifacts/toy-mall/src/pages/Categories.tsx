@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { usePermission } from "@/hooks/use-auth";
+import { Switch } from "@/components/ui/switch";
+import { useManagedCategories } from "@/hooks/use-category-discounts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Layers, Package, AlertCircle } from "lucide-react";
@@ -22,6 +25,7 @@ interface Category {
   name: string;
   emoji: string;
   skuCode: string;
+  checkoutDiscountEnabled: boolean;
   productCount: number;
   totalStock: number;
   createdAt: string;
@@ -159,17 +163,26 @@ function FormModal({
 
 export default function Categories() {
   const qc = useQueryClient();
+  const canManage = usePermission("categories") === "write";
   const [formOpen, setFormOpen]       = useState(false);
   const [editing, setEditing]         = useState<Category | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
 
-  const { data: categories = [], isLoading } = useQuery<Category[]>({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const r = await fetch(apiUrl("categories"));
-      if (!r.ok) throw new Error("Failed to load");
+  const { data: categories = [], isLoading, isError, refetch } = useManagedCategories();
+  const discountMut = useMutation({
+    mutationFn: async ({id,enabled}:{id:string;enabled:boolean})=>{
+      const r=await fetch(apiUrl(`categories/${id}`),{method:"PUT",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({checkoutDiscountEnabled:enabled})});
+      if(!r.ok)throw new Error("Could not update the category discount setting.");
       return r.json();
     },
+    onSuccess:async(row)=>{
+      await qc.cancelQueries({queryKey:["categories"]});
+      qc.setQueriesData<Category[]>({queryKey:["categories"]},old=>old?.map(c=>c.id===row.id?{...c,...row}:c));
+      qc.invalidateQueries({queryKey:["checkout-category-discounts"]});
+      qc.invalidateQueries({queryKey:["categories"]});
+      toast.success(row.checkoutDiscountEnabled?"Item discounts enabled":"Item discounts turned off");
+    },
+    onError:(e:Error)=>toast.error(e.message),
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["categories"] });
@@ -249,7 +262,7 @@ export default function Categories() {
       )}
 
       {/* Category grid */}
-      {isLoading ? (
+      {isError ? <div role="alert" className="rounded-xl border border-destructive/30 p-5 text-sm">Could not load categories. <Button variant="outline" onClick={()=>refetch()}>Retry</Button></div> : isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-36 rounded-2xl bg-muted animate-pulse" />
@@ -302,6 +315,15 @@ export default function Categories() {
                 <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full bg-muted text-[10px] font-mono font-semibold text-muted-foreground">
                   {cat.skuCode}-###
                 </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 p-3">
+                <div>
+                  <Label htmlFor={`discount-${cat.id}`} className="text-xs font-bold cursor-pointer">Checkout item discount</Label>
+                  <p className="text-[11px] text-muted-foreground mt-1">{cat.checkoutDiscountEnabled?"% / ₹ input enabled":"Item discount input hidden"}</p>
+                </div>
+                <Switch id={`discount-${cat.id}`} aria-label={`Checkout item discounts for ${cat.name}`}
+                  checked={cat.checkoutDiscountEnabled} disabled={!canManage || discountMut.isPending}
+                  onCheckedChange={enabled=>discountMut.mutate({id:cat.id,enabled})} />
               </div>
 
               {/* Stats */}
