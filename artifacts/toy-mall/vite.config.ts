@@ -12,6 +12,11 @@ const basePath = process.env.BASE_PATH ?? "/";
 
 export default defineConfig({
   base: basePath,
+  // jsPDF declares DOMPurify as an optional peer for its HTML-export helper.
+  // The app's PDF exports use AutoTable, not jsPDF's HTML-export helper.
+  optimizeDeps: {
+    exclude: ["jspdf"],
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -108,6 +113,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      // The package registry blocks this optional dependency in the current
+      // environment. Its only use in jsPDF is the HTML helper, which this app
+      // does not call; keep that optional dynamic import out of the bundle.
+      external: ["dompurify"],
+    },
     /* No manualChunks — both the object form
        (`{ "vendor-react": ["react", "react-dom"] }`) and a hand-rolled
        function form produced broken bundles in production: some React
