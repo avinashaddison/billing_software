@@ -1010,10 +1010,42 @@ export const CheckoutResponse = zod.object({
 });
 
 /**
- * Staff without Today's Bills & Totals permission receive historical bills only. A today-only grant never grants history access.
+ * Optional inclusive business-day range filters paidAt before the list limit. Both from and to are required together.
+ * @summary List the latest 100 supplier payments
+ */
+export const ListSupplierPaymentsQueryParams = zod.object({
+  from: zod.date().optional(),
+  to: zod.date().optional(),
+});
+
+export const ListSupplierPaymentsResponseItem = zod.object({
+  id: zod.string(),
+  supplierId: zod.string(),
+  supplierName: zod.string(),
+  amount: zod.number(),
+  method: zod.string(),
+  paidAt: zod.coerce.date(),
+  createdAt: zod.coerce.date(),
+});
+export const ListSupplierPaymentsResponse = zod.array(
+  ListSupplierPaymentsResponseItem,
+);
+
+/**
+ * Returns the latest 50 bills, optionally within an inclusive Asia/Kolkata date range. Both from and to are required together. Staff without Today's Bills & Totals permission receive historical bills only. A today-only grant never grants history access.
  * @summary List all bills
  */
 export const ListBillsQueryParams = zod.object({
+  from: zod
+    .date()
+    .optional()
+    .describe("First included day in Asia\/Kolkata; must be supplied with to."),
+  to: zod
+    .date()
+    .optional()
+    .describe(
+      "Last included day in Asia\/Kolkata; must be supplied with from.",
+    ),
   scope: zod.enum(["today"]).optional(),
 });
 

@@ -35,6 +35,8 @@ import type {
   ListSalesParams,
   ListStockEntrySummaryParams,
   ListStockLogsParams,
+  ListSupplierPayments200Item,
+  ListSupplierPaymentsParams,
   PreviewCouponBody,
   Product,
   ProductStockHistory,
@@ -2200,6 +2202,110 @@ export const useCheckout = <
   return useMutation(getCheckoutMutationOptions(options));
 };
 
+export const getListSupplierPaymentsUrl = (
+  params?: ListSupplierPaymentsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/supplier-payments?${stringifiedParams}`
+    : `/api/supplier-payments`;
+};
+
+/**
+ * Optional inclusive business-day range filters paidAt before the list limit. Both from and to are required together.
+ * @summary List the latest 100 supplier payments
+ */
+export const listSupplierPayments = async (
+  params?: ListSupplierPaymentsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<ListSupplierPayments200Item[]> => {
+  return customFetch<ListSupplierPayments200Item[]>(
+    getListSupplierPaymentsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListSupplierPaymentsQueryKey = (
+  params?: ListSupplierPaymentsParams,
+) => {
+  return [`/api/supplier-payments`, ...(params ? [params] : [])] as const;
+};
+
+export const getListSupplierPaymentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listSupplierPayments>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListSupplierPaymentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSupplierPayments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListSupplierPaymentsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listSupplierPayments>>
+  > = ({ signal }) =>
+    listSupplierPayments(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listSupplierPayments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListSupplierPaymentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listSupplierPayments>>
+>;
+export type ListSupplierPaymentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List the latest 100 supplier payments
+ */
+
+export function useListSupplierPayments<
+  TData = Awaited<ReturnType<typeof listSupplierPayments>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListSupplierPaymentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSupplierPayments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListSupplierPaymentsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
 export const getListBillsUrl = (params?: ListBillsParams) => {
   const normalizedParams = new URLSearchParams();
 
@@ -2217,7 +2323,7 @@ export const getListBillsUrl = (params?: ListBillsParams) => {
 };
 
 /**
- * Staff without Today's Bills & Totals permission receive historical bills only. A today-only grant never grants history access.
+ * Returns the latest 50 bills, optionally within an inclusive Asia/Kolkata date range. Both from and to are required together. Staff without Today's Bills & Totals permission receive historical bills only. A today-only grant never grants history access.
  * @summary List all bills
  */
 export const listBills = async (

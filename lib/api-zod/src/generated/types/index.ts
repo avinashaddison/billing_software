@@ -36,6 +36,8 @@ export * from "./listStockEntrySummaryParams";
 export * from "./listStockEntrySummaryType";
 export * from "./listStockLogsParams";
 export * from "./listStockLogsType";
+export * from "./listSupplierPayments200Item";
+export * from "./listSupplierPaymentsParams";
 export * from "./previewCouponBody";
 export * from "./product";
 export * from "./productEntrySummary";

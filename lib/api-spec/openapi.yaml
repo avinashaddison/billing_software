@@ -695,13 +695,74 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /supplier-payments:
+    get:
+      operationId: listSupplierPayments
+      tags: [suppliers]
+      summary: List the latest 100 supplier payments
+      description: Optional inclusive business-day range filters paidAt before the list limit. Both from and to are required together.
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Supplier payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, supplierId, supplierName, amount, method, paidAt, createdAt]
+                  properties:
+                    id:
+                      type: string
+                    supplierId:
+                      type: string
+                    supplierName:
+                      type: string
+                    amount:
+                      type: number
+                    method:
+                      type: string
+                    paidAt:
+                      type: string
+                      format: date-time
+                    createdAt:
+                      type: string
+                      format: date-time
+
   /bills:
     get:
       operationId: listBills
       tags: [bills]
       summary: List all bills
-      description: Staff without Today's Bills & Totals permission receive historical bills only. A today-only grant never grants history access.
+      description: Returns the latest 50 bills, optionally within an inclusive Asia/Kolkata date range. Both from and to are required together. Staff without Today's Bills & Totals permission receive historical bills only. A today-only grant never grants history access.
       parameters:
+        - name: from
+          in: query
+          required: false
+          description: First included day in Asia/Kolkata; must be supplied with to.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          description: Last included day in Asia/Kolkata; must be supplied with from.
+          schema:
+            type: string
+            format: date
         - name: scope
           in: query
           required: false

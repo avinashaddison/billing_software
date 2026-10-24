@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePermission } from "@/hooks/use-auth";
-import { isIstToday } from "@/lib/ist-date";
+import { isIstToday, istToday, isWithinIstDateRange } from "@/lib/ist-date";
 import { PaymentTypeBadge } from "@/components/billing/PaymentTypeBadge";
 
 /* ── Types ───────────────────────────────────────────────────────── */
@@ -48,7 +48,7 @@ interface Row {
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type DateFilter = "today" | "week" | "all";
+type DateFilter = "today" | "week" | "all" | "custom";
 type Party = "all" | "customer" | "supplier";
 
 /* ── Component ───────────────────────────────────────────────────── */
@@ -60,6 +60,12 @@ export default function Billing() {
   const [payments, setPayments] = useState<SupplierPayment[]>([]);
   const [loading, setLoading]   = useState(true);
   const [dateFilter, setDateFilter] = useState<DateFilter>(canHistory ? "all" : "today");
+  const [dateFrom, setDateFrom] = useState(() => istToday());
+  const [dateTo, setDateTo] = useState(() => istToday());
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [customResult, setCustomResult] = useState<{ key: string; bills: Bill[]; payments: SupplierPayment[]; loading: boolean; error: string }>({
+    key: "", bills: [], payments: [], loading: false, error: "",
+  });
   const [party, setParty]       = useState<Party>("all");
   const [search, setSearch]     = useState("");
   const [error, setError] = useState("");
@@ -87,6 +93,7 @@ export default function Billing() {
         setBills(Array.isArray(b) ? b : []);
         setPayments(Array.isArray(p) ? p : []);
         setTodaySummary(summary);
+        setRefreshVersion((value) => value + 1);
       })
       .catch((err) => { if (request === generation.current) setError((err as Error).message); })
       .finally(() => { if (request === generation.current) setLoading(false); });
@@ -111,6 +118,40 @@ export default function Billing() {
     };
   }, [load]);
 
+  const rangeError = !dateFrom || !dateTo
+    ? "Select both From and To dates."
+    : dateFrom > dateTo ? "From date must be on or before To date." : "";
+  const customKey = `${dateFrom}:${dateTo}:${refreshVersion}`;
+  const customActive = dateFilter === "custom";
+  const customMatches = customResult.key === customKey;
+  const customError = customActive && customMatches ? customResult.error : "";
+  const listLoading = loading || (customActive && !rangeError && (!customMatches || customResult.loading));
+
+  useEffect(() => {
+    if (!customActive || !canHistory || rangeError) return;
+    const controller = new AbortController();
+    setCustomResult({ key: customKey, bills: [], payments: [], loading: true, error: "" });
+    const query = new URLSearchParams({ from: dateFrom, to: dateTo });
+    const readRange = async (path: string) => {
+        const response = await fetch(`${BASE_URL}/api/${path}?${query}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(response.status === 403 ? "Owner permission required" : "Could not load bills for these dates");
+        const data = await response.json();
+        if (!Array.isArray(data)) throw new Error("Invalid billing response");
+        return data;
+    };
+    void Promise.all([readRange("bills"), readRange("supplier-payments")])
+      .then(([rangeBills, rangePayments]) => {
+        if (!controller.signal.aborted) setCustomResult({ key: customKey, bills: rangeBills, payments: rangePayments, loading: false, error: "" });
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setCustomResult({
+          key: customKey, bills: [], payments: [], loading: false,
+          error: error instanceof Error ? error.message : "Could not load bills for these dates",
+        });
+      });
+    return () => controller.abort();
+  }, [customActive, canHistory, rangeError, customKey, dateFrom, dateTo]);
+
   /* ── Stats (customer sales = revenue only; supplier payments are money out) ── */
   const weekBills    = bills.filter((b) => isThisWeek(new Date(b.createdAt)));
   const todayRevenue = todaySummary?.totalAmount ?? 0;
@@ -118,7 +159,11 @@ export default function Billing() {
   const totalRevenue = bills.reduce((s, b) => s + b.totalAmount, 0);
 
   /* ── Build the unified row list ── */
-  const customerRows: Row[] = bills.map((b) => ({
+  // Custom requests do not replace the data behind fixed Today/Week/All cards.
+  const listBills = customActive
+    ? !rangeError && customMatches && !customResult.loading ? customResult.bills : []
+    : bills;
+  const customerRows: Row[] = listBills.map((b) => ({
     key: `b-${b.id}`,
     kind: "customer",
     name: b.customerName?.trim() || (b.customerPhone ? `+91 ${b.customerPhone}` : "Walk-in customer"),
@@ -130,7 +175,10 @@ export default function Billing() {
     itemsCount: b.itemsCount,
     method: b.paymentMode,
   }));
-  const supplierRows: Row[] = payments.map((p) => ({
+  const listPayments = customActive
+    ? !rangeError && customMatches && !customResult.loading ? customResult.payments : []
+    : payments;
+  const supplierRows: Row[] = listPayments.map((p) => ({
     key: `s-${p.id}`,
     kind: "supplier",
     name: p.supplierName,
@@ -149,6 +197,7 @@ export default function Billing() {
   const timeFiltered =
     dateFilter === "today" ? partyFiltered.filter((r) => isIstToday(r.date))
     : dateFilter === "week" ? partyFiltered.filter((r) => isThisWeek(new Date(r.date)))
+    : dateFilter === "custom" ? partyFiltered.filter((r) => !rangeError && isWithinIstDateRange(r.date, dateFrom, dateTo))
     : partyFiltered;
 
   const q = search.trim().toLowerCase().replace(/^#/, "");
@@ -256,10 +305,11 @@ export default function Billing() {
         </div>
 
         {/* ── Date filter pills ── */}
-        <div className="flex gap-2 px-4 md:px-6 mb-3">
-          {(["all", "week", "today"] as DateFilter[]).filter(f => f === "today" ? canToday : canHistory).map((f) => (
+        <div className="flex flex-wrap gap-2 px-4 md:px-6 mb-3">
+          {(["all", "week", "today", "custom"] as DateFilter[]).filter(f => f === "today" ? canToday : canHistory).map((f) => (
             <button
               key={f}
+              aria-pressed={dateFilter === f}
               onClick={() => setDateFilter(f)}
               className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${
                 dateFilter === f
@@ -267,10 +317,45 @@ export default function Billing() {
                   : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
-              {f === "all" ? "All Time" : f === "week" ? "This Week" : "Today"}
+              {f === "all" ? "All Time" : f === "week" ? "This Week" : f === "custom" ? "Custom Date" : "Today"}
             </button>
           ))}
         </div>
+
+        {customActive && canHistory && (
+          <div className="mx-4 md:mx-6 mb-4 rounded-2xl border bg-card p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <label className="flex-1 min-w-0 text-xs font-bold text-muted-foreground">
+                From date
+                <input
+                  type="date" value={dateFrom} max={dateTo || undefined}
+                  onChange={(event) => setDateFrom(event.target.value)}
+                  className="mt-1.5 block h-10 w-full min-w-0 rounded-xl border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </label>
+              <label className="flex-1 min-w-0 text-xs font-bold text-muted-foreground">
+                To date
+                <input
+                  type="date" value={dateTo} min={dateFrom || undefined}
+                  onChange={(event) => setDateTo(event.target.value)}
+                  className="mt-1.5 block h-10 w-full min-w-0 rounded-xl border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </label>
+            </div>
+            <p className={`mt-2 text-xs ${rangeError ? "text-destructive" : "text-muted-foreground"}`} role={rangeError ? "alert" : undefined}>
+              {rangeError || "Both dates are included. Dates follow India time (IST)."}
+            </p>
+            {customError && <p role="alert" className="mt-2 text-sm text-destructive">
+              {customError} <button className="underline font-bold" onClick={() => setRefreshVersion((value) => value + 1)}>Retry</button>
+            </p>}
+            {!listLoading && !rangeError && !customError && party !== "supplier" && listBills.length >= 50 && (
+              <p className="mt-2 text-xs text-muted-foreground">Showing the latest 50 customer bills in this range. Select a shorter range to see older entries.</p>
+            )}
+            {!listLoading && !rangeError && !customError && party !== "customer" && listPayments.length >= 100 && (
+              <p className="mt-2 text-xs text-muted-foreground">Showing the latest 100 supplier payments in this range. Select a shorter range to see older entries.</p>
+            )}
+          </div>
+        )}
 
         {/* ── Search bar ── */}
         <div className="px-4 md:px-6 mb-4">
@@ -302,7 +387,7 @@ export default function Billing() {
         </div>
 
         {/* ── List ── */}
-        {loading ? (
+        {listLoading ? (
           <div className="px-4 md:px-6 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="p-4 rounded-2xl border bg-card space-y-2">
@@ -315,10 +400,10 @@ export default function Billing() {
           <div className="text-center py-16 text-muted-foreground">
             <ShoppingBag className="w-16 h-16 mx-auto mb-4 opacity-20" />
             <p className="font-bold text-lg">
-              {search ? `No results for "${search}"` : "Nothing here yet"}
+              {rangeError && customActive ? "Choose a valid date range" : customError ? "Could not load these bills" : search ? `No results for "${search}"` : customActive ? "No entries in this date range" : "Nothing here yet"}
             </p>
             <p className="text-sm mt-1">
-              {search ? "Try a different name, bill number or amount." : "Complete a checkout to generate an entry."}
+              {customActive ? "Adjust the dates above or choose All Time." : search ? "Try a different name, bill number or amount." : "Complete a checkout to generate an entry."}
             </p>
           </div>
         ) : (

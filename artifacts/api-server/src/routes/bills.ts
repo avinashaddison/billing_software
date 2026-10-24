@@ -11,6 +11,7 @@ import { canEditCheckoutDiscount } from "../middlewares/checkout-discount";
 import { CouponError, couponDiscount, lookupCoupon, redeemCoupon } from "../lib/coupons";
 import { requestsExtraDiscount, lowersCataloguePrice, DiscountPermissionError } from "../lib/checkout-discount-policy";
 import { istToday } from "../lib/ist";
+import { parseBillingDateRange, billingDateCondition } from "../lib/billing-date-range";
 import { sendSaleAlert, sendLowStockAlert, type LowStockAlertItem } from "../lib/telegram";
 import { logger } from "../lib/logger";
 import { round2, checkLinePrice, isAbsurdPrice, exceedsDiscountCeiling, checkBillDiscount, maxDiscountPct, priceGuardMode, isSaneNumber, isValidManualCost, normalizeManualCost, findManualLineWithoutCost, manualCostRequiredMessage } from "../lib/price-integrity";
@@ -642,6 +643,12 @@ router.get("/bills", requireRead("billing", "todayBilling"), async (req, res): P
   if (onlyToday && !canToday) {
     res.status(403).json({ error: "Owner permission required for today's bills" }); return;
   }
+  let range: ReturnType<typeof parseBillingDateRange>;
+  try {
+    range = parseBillingDateRange(req.query.from, req.query.to);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message }); return;
+  }
   const todayCondition = sql`DATE(${billsTable.createdAt} AT TIME ZONE 'Asia/Kolkata') = ${istToday()}`;
   // A today-only grant must not open historical bills too.
   const bills = await db
@@ -650,6 +657,7 @@ router.get("/bills", requireRead("billing", "todayBilling"), async (req, res): P
     .where(and(
       tenantWhere(billsTable.tenantId, req.tenantId),
       onlyToday || !historyAllowed ? todayCondition : !canToday ? sql`NOT (${todayCondition})` : undefined,
+      billingDateCondition(billsTable.createdAt, range),
     ))
     .orderBy(desc(billsTable.createdAt))
     .limit(50);

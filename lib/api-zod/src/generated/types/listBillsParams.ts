@@ -8,5 +8,13 @@
 import type { ListBillsScope } from "./listBillsScope";
 
 export type ListBillsParams = {
+  /**
+   * First included day in Asia/Kolkata; must be supplied with to.
+   */
+  from?: Date;
+  /**
+   * Last included day in Asia/Kolkata; must be supplied with from.
+   */
+  to?: Date;
   scope?: ListBillsScope;
 };

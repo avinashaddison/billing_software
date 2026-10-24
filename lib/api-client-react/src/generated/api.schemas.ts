@@ -736,7 +736,30 @@ export type PreviewCouponBody = {
   subtotal: number;
 };
 
+export type ListSupplierPaymentsParams = {
+  from?: string;
+  to?: string;
+};
+
+export type ListSupplierPayments200Item = {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  amount: number;
+  method: string;
+  paidAt: string;
+  createdAt: string;
+};
+
 export type ListBillsParams = {
+  /**
+   * First included day in Asia/Kolkata; must be supplied with to.
+   */
+  from?: string;
+  /**
+   * Last included day in Asia/Kolkata; must be supplied with from.
+   */
+  to?: string;
   scope?: ListBillsScope;
 };
 

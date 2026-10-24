@@ -6,6 +6,7 @@ import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { liveProduct } from "../lib/product-scope";
 import { requireAdmin, requireWrite } from "../middlewares/auth";
 import { recordAudit, tenantActor } from "../lib/audit";
+import { parseBillingDateRange, billingDateCondition } from "../lib/billing-date-range";
 
 const router: IRouter = Router();
 
@@ -51,6 +52,12 @@ router.get("/suppliers", async (req, res): Promise<void> => {
 /* All supplier payments for the tenant (newest first), joined with the
  * supplier name. Powers the "Supplier" entries shown in the Billing list. */
 router.get("/supplier-payments", async (req, res): Promise<void> => {
+  let range: ReturnType<typeof parseBillingDateRange>;
+  try {
+    range = parseBillingDateRange(req.query.from, req.query.to);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message }); return;
+  }
   const rows = await db
     .select({
       id:           supplierPaymentsTable.id,
@@ -64,7 +71,10 @@ router.get("/supplier-payments", async (req, res): Promise<void> => {
     })
     .from(supplierPaymentsTable)
     .innerJoin(suppliersTable, eq(supplierPaymentsTable.supplierId, suppliersTable.id))
-    .where(tenantWhere(supplierPaymentsTable.tenantId, req.tenantId))
+    .where(and(
+      tenantWhere(supplierPaymentsTable.tenantId, req.tenantId),
+      billingDateCondition(supplierPaymentsTable.paidAt, range),
+    ))
     .orderBy(desc(supplierPaymentsTable.paidAt), desc(supplierPaymentsTable.createdAt))
     .limit(100);
   res.json(rows.map((r) => ({ ...r, amount: Number(r.amount) })));
