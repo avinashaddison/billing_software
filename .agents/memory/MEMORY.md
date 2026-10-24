@@ -1,4 +1,4 @@
-- [DB migrations, tenancy & which DB the app uses](db-tenancy-migrations.md) — app hits NEON, not the executeSql `heliumdb`; idempotent boot SQL only (never drizzle push); migrations are additive-only so they can't bootstrap an empty DB.
+- [DB safety & tenancy](db-tenancy-migrations.md) — read replit.md's live-database safety policy; Neon differs from built-in DB; additive migrations cannot bootstrap an empty DB.
 - [Dev orchestrator vs artifact workflows](replit-workflow-orchestrator-clash.md) — keep one API owner; the registered web preview has a separate lifecycle and can remain failed while the root app is healthy.
 - [EOD & product-report money math](eod-reporting.md) — ledger collections; covered profit; manual lines costed only via cashier-typed purchase_price, never 100% profit; refunds hit processing day.
 - [Defensive fetch handling](defensive-fetch.md) — check r.ok before r.json() (non-JSON error pages crash); never fall back to defaults on a failed load that feeds a Save-able form (overwrites real data).

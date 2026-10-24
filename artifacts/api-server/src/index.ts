@@ -5,6 +5,7 @@ import { bootstrapDefaultOwner } from "./lib/bootstrap";
 import { runBootMigrations } from "./lib/migrate";
 import { pool } from "@workspace/db";
 import { runtimeReadiness, verifyDatabase } from "./lib/runtime-readiness";
+import { initializeDatabase, shouldStartScheduledJobs } from "./lib/database-startup";
 
 const rawPort = process.env["PORT"];
 
@@ -30,12 +31,18 @@ const server = app.listen(port, "0.0.0.0", async () => {
   startupDeadline.unref();
 
   try {
-    await runBootMigrations();
-    await verifyDatabase();
-    await bootstrapDefaultOwner();
+    await initializeDatabase({
+      migrate: runBootMigrations,
+      verify: verifyDatabase,
+      bootstrap: bootstrapDefaultOwner,
+    }, process.env);
     if (shuttingDown) return;
     runtimeReadiness.initialized();
-    startDailyReportScheduler();
+    if (shouldStartScheduledJobs(process.env)) {
+      startDailyReportScheduler();
+    } else {
+      logger.info("Development scheduled jobs disabled to protect shared live data");
+    }
     logger.info("Application ready");
   } catch (err) {
     logger.fatal({ err }, "Startup failed; refusing to serve an unready application");

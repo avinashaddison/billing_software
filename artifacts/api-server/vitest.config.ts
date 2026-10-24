@@ -1,15 +1,15 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Unit tests for the API server's pure logic.
- *
- * Scope is deliberately limited to modules with no database import. The app
- * talks to a LIVE production database, so a test run must never be able to
- * touch real shop data — keeping the suite to pure functions makes that a
- * structural guarantee rather than a promise.
+ * Pure/mocked tests plus real SQL against disposable local clusters only.
+ * The setup file strips live credentials and rejects non-test connections
+ * before pg can open a socket.
  */
 export default defineConfig({
   test: {
+    setupFiles: ["./test/database-safety.ts"],
+    // Bound initdb/SQL fixture contention on build machines.
+    maxWorkers: 2,
     include: ["src/**/*.test.ts"],
     environment: "node",
   },

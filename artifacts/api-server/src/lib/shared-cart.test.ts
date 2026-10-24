@@ -1,7 +1,32 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, describe, expect, it } from "vitest";
-import { eq, inArray } from "drizzle-orm";
-import { activeCartsTable, db, heldBillsTable } from "@workspace/db";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir, userInfo } from "node:os";
+import { join } from "node:path";
+import pg from "pg";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+
+const scratch = vi.hoisted(() => ({
+  pool: null as import("pg").Pool | null,
+  db: null as NodePgDatabase | null,
+}));
+vi.mock("@workspace/db", async () => {
+  const schema = await import("../../../../lib/db/src/schema");
+  // Delegate to a real Drizzle instance once the scratch Pool is ready.
+  // A pool-shaped object is NOT sufficient: Drizzle would treat it as a
+  // single client and BEGIN/COMMIT could run on different pooled connections.
+  const db = new Proxy({}, {
+    get: (_target, property) => {
+      const value = Reflect.get(scratch.db!, property);
+      return typeof value === "function" ? value.bind(scratch.db) : value;
+    },
+  });
+  return { ...schema, db };
+});
+
+import { db, heldBillsTable } from "@workspace/db";
 import {
   getCartSummary,
   holdActiveCart,
@@ -9,23 +34,33 @@ import {
   withCartLock,
 } from "./shared-cart";
 
-const testTenants: string[] = [];
+const root = mkdtempSync(join(tmpdir(), "shared-cart-test-"));
+const data = join(root, "data");
+let started = false;
 
 function testTenant(label: string) {
-  const tenant = `shared-cart-test:${label}:${randomUUID()}`;
-  testTenants.push(tenant);
-  return tenant;
+  return `shared-cart-test:${label}:${randomUUID()}`;
 }
 
-afterAll(async () => {
-  if (testTenants.length > 0) {
-    await db
-      .delete(activeCartsTable)
-      .where(inArray(activeCartsTable.tenantId, testTenants));
-    await db
-      .delete(heldBillsTable)
-      .where(inArray(heldBillsTable.tenantId, testTenants));
+beforeAll(async () => {
+  execFileSync("initdb", ["-D", data, "-A", "trust", "--no-locale", "--encoding=UTF8"], { stdio: "ignore" });
+  execFileSync("pg_ctl", [
+    "-D", data, "-l", join(root, "postgres.log"),
+    "-o", `-F -h '' -k ${root} -p 55480`, "-w", "start",
+  ], { stdio: "ignore" });
+  started = true;
+  scratch.pool = new pg.Pool({ host: root, port: 55480, user: userInfo().username, database: "postgres" });
+  scratch.db = drizzle(scratch.pool);
+  for (const name of ["0019_held_bills.sql", "0020_active_carts.sql"]) {
+    const migration = readFileSync(new URL(`../../../../lib/db/migrations/${name}`, import.meta.url), "utf8");
+    await scratch.pool.query(migration);
   }
+}, 30_000);
+
+afterAll(async () => {
+  await scratch.pool?.end();
+  if (started) execFileSync("pg_ctl", ["-D", data, "-m", "immediate", "-w", "stop"], { stdio: "ignore" });
+  rmSync(root, { recursive: true, force: true });
 });
 
 describe("durable revisioned shared cart", () => {

@@ -23,23 +23,23 @@ A multi-tenant billing and inventory web app for retail shops. It includes an Ex
 - Setup checks: `pnpm run typecheck`, `pnpm --filter @workspace/api-server test`, and `pnpm run build:prod`.
 
 ## Database
+- **Live database safety:** The user confirmed this is a live database. Publishing preparation must not write to it: no schema pushes, migrations, cleanup, seed data, test transactions, or authenticated browser tests against live shop data. Keep the development workflow stopped during preparation so it cannot run background jobs. Tests must use mocks or disposable local databases.
 - Uses `NEON_DATABASE_URL` when set (takes precedence), otherwise `DATABASE_URL`.
 - **`NEON_DATABASE_URL` is set in Replit secrets → the app runs against the existing external Neon database.** The Replit built-in DB (`DATABASE_URL`) has no public tables in this import and is unused while the Neon secret exists. Do not initialize or switch to it as part of normal startup.
 - After adding/changing secrets, restart the "Start application" workflow — the running process keeps its old environment until restarted. A secret change can also reboot the whole environment, in which case the per-artifact `API Server` workflow may grab port 8080 first (without the new secret) and `Start application` fails with EADDRINUSE: stop/kill that artifact process, then restart `Start application` and confirm the API process actually has the new variable.
-- **Fresh DB setup (Replit):** `drizzle-kit push` requires a TTY and will fail in the shell. Instead, generate the base schema SQL and apply it directly:
-  ```
-  cd lib/db && npx drizzle-kit generate --config ./drizzle.config.ts --name init_schema
-  psql $DATABASE_URL -f drizzle/0000_init_schema.sql
-  ```
-  Then restart the app — the boot migration runner applies all additive migrations (0001–0024) automatically.
-- The API also runs idempotent boot migrations on startup.
+- Normal startup checks the existing schema using read-only probes; it does **not** run migrations or create a default account. Missing schema makes startup fail closed rather than changing the database.
+- `RUN_DB_MIGRATIONS=true` explicitly enables the existing migration runner. Do not set it on the live database without separate approval. `BOOTSTRAP_DEFAULT_OWNER=true` permits the legacy development-only account bootstrap; production never creates that default account.
+- Development previews do not run scheduled reports, backups, or maintenance by default. `ENABLE_DEVELOPMENT_SCHEDULERS=true` is an explicit opt-in; do not enable it against shared live data. Production keeps the existing scheduled jobs.
+- A fresh database requires a separately approved setup against a disposable/non-live target. Never initialize the built-in database or switch the live app to it as a setup workaround.
 
 ## Production / Deployment
 - Target: **Reserved VM** (`vm`), selected by the user so the existing in-process backup and report scheduler can run continuously.
 - Publish build: `pnpm run check:release` (all workspace typechecks, API tests, then frontend/API builds).
 - Run: `pnpm start` (explicit production mode; port defaults to 5000 unless `PORT` is provided).
 - Read-only production HTTP checks: `pnpm --filter @workspace/api-server run test:production`, after the build. This starts an ephemeral server without migrations/schedulers; only the readiness probe reads the existing database. Never use customer credentials or write test transactions to the external database.
-- Startup is not ready until migrations and core schema checks succeed; failed initialization exits instead of serving a broken API. `/api/healthz` is liveness only; monitor **`/api/readyz`** for database/schema readiness (200/503, no private details, short cached probe). Shutdown stops new API requests and drains active requests before closing the pool.
+- Startup is not ready until core schema checks (and migrations only if explicitly opted in) succeed; failed initialization exits instead of serving a broken API. `/api/healthz` is liveness only; monitor **`/api/readyz`** for database/schema readiness (200/503, no private details, short cached probe). Shutdown stops new API requests and drains active requests before closing the pool.
+- The release test suite strips live database credentials and blocks pg connections except to its disposable `/tmp` Unix-socket clusters. `pnpm run check:release` compiles/tests/builds without starting the application or its schedulers. Requires PostgreSQL `initdb`/`pg_ctl` for isolated SQL tests.
+- Publishing still starts the normal application and its existing scheduled reports/backups/maintenance; this is not a globally read-only deployment. Do not publish or restart during safety preparation without the user's approval.
 - `SESSION_SECRET` must have at least 32 characters in production; no known-default owner account is created in production. Provision accounts explicitly, never through test fixtures in live data. The platform-admin bootstrap reads `PLATFORM_ADMIN_PASSWORD` from secure environment storage, not command-line arguments.
 - Production CORS defaults to same-origin use (no arbitrary origin reflection). Set `CORS_ORIGIN` only for explicitly trusted additional frontends; browser writes are origin-checked separately. Signed cookies remain HttpOnly, Secure, SameSite=Lax.
 - API responses are `no-store`; the PWA never caches API data across shop/account changes. Hashed static assets are immutable; HTML and service-worker files revalidate. The explicit offline billing queue is unchanged.

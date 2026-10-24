@@ -8,21 +8,22 @@ description: How schema changes are applied (idempotent boot SQL), the NEON-vs-h
 - TRAP: earlier imports had a full but EMPTY built-in schema copy; another import had no public tables at all. Neither tells you the external database's state. Confirm the active connection and base tables before initializing anything.
 - Quick tell in boot logs for "which env did this process get": the pg SSL-modes warning appears only with the Neon URL, and the "BACKUPS NOT CONFIGURED" error appears only when Telegram secrets are missing from the process env.
 - The code-execution `executeSql` callback / Replit built-in DB talk to a **separate** `heliumdb` (`DATABASE_URL`). Introspecting via executeSql does **not** reflect the app's real (NEON) schema — it can show stale/old constraints.
-- **How to verify a schema change actually landed:** restart "Start application" and read the boot log — each migration logs `migration applied (or already up-to-date)`; a bad migration throws and crashes boot. Don't trust executeSql introspection for the app DB.
+- Read the live-database safety policy in `replit.md` before startup, verification, or publishing work. The older assumption that normal startup should apply migrations is no longer valid.
 
 # Migration convention
-- Schema changes = hand-written **idempotent** raw SQL in `lib/db/migrations/NNNN_*.sql`, registered in the `MIGRATION_FILES` array in `artifacts/api-server/src/lib/migrate.ts`, applied on every boot. Never `drizzle-kit push` / `generate`.
+- Approved schema changes use hand-written **idempotent** additive SQL, never an automatic schema push.
+  **Why:** repeated startup execution previously caused a non-idempotent migration to null sale prices.
+  **How to apply:** keep migrations repeat-safe even when execution is deliberate; missing schema is not permission to modify the connected database.
 
 # FIRST: `relation "..." does not exist` usually means the WRONG DB, not a missing schema
-- Most common cause by far: the API server process started **before** `NEON_DATABASE_URL` was present in the environment, so it fell back to the empty built-in DB and every query fails on missing tables. **Restart the API server workflow and re-read the boot log before concluding anything about the schema.**
+- A frequent cause was an API process started before the external connection secret existed, falling back to an empty built-in database. Confirm connection-source metadata before concluding the real schema is missing; a restart is not a read-only diagnostic.
 - Corollary: do not "fix" this by pushing/creating schema. That would write a second, empty copy of the app into the wrong database while the real populated NEON DB sits untouched. Confirm which DB the process actually connected to first.
 
 # Boot migrations CANNOT bootstrap an empty database
-- Every numbered migration is **additive** (ALTER/CREATE INDEX/backfill) and assumes the base tables already exist. **No migration creates the base tables.** So pointing the app at a brand-new/empty Postgres gives: migrations "succeed" or retry-fail quietly, then boot fails with `relation "staff_profiles" does not exist` from `bootstrapDefaultOwner`, while `/api/healthz` still returns 200.
-- **Why this is confusing:** the server stays up and healthy-looking because `runBootMigrations()` and `bootstrapDefaultOwner()` are fired async after `listen` and are designed not to kill the process. A green health check does NOT mean the schema is there.
+- The numbered migrations assume base tables already exist; do not mistake them for an initial schema installer.
+- **Why this was confusing:** earlier startup code stayed alive after failed initialization, making liveness appear healthy despite missing tables. Treat readiness/schema verification, not liveness alone, as the startup check.
 - **How to apply:** the "never push" rule protects the *existing populated* DB from destructive resets — it does not mean a fresh DB can self-provision. Seeding a new/empty database needs the base schema created first (Drizzle push against that empty DB, or a dumped base DDL) and only then the additive migrations. Check for base tables before assuming a DB-connection problem.
-- **Why idempotent is load-bearing:** Render free-tier cold-starts re-run all migrations on every spin-up. A non-idempotent migration (the removed `0005`) once nulled sale prices on every restart. Use `IF NOT EXISTS` / `DROP ... IF EXISTS` / guarded `DO $$` blocks everywhere.
-- The Drizzle schema files (lib/db/src/schema) are for **types only** here; they can lag the raw SQL. Keep them roughly in sync for readability, but the SQL migration is the source of truth (e.g. expression/partial unique indexes are only in the SQL).
+- Schema models have historically lagged raw SQL, especially expression/partial indexes. Do not infer the real database's constraints from model definitions alone.
 
 # Per-tenant uniqueness (decision)
 - `products.sku` / `products.barcode` and `categories.name` are unique **per tenant**, not globally (migration 0010). Enforced by unique indexes on `COALESCE(tenant_id, '__legacy_null__'), <col>`; the barcode index is partial `WHERE barcode IS NOT NULL`.
