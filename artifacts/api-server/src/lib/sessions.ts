@@ -10,6 +10,8 @@
  */
 import type { Request } from "express";
 import { db, authSessionsTable } from "@workspace/db";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { tenantWhereWrite } from "./tenant";
 
 /** Guard against oversized/spoofed headers bloating the row. */
 const MAX_UA = 512;
@@ -32,8 +34,9 @@ export function clientMeta(req: Request): ClientMeta {
 }
 
 /**
- * Insert a new device session and return its id (to embed as the cookie's
- * `sid`). `created_at` / `last_seen_at` default to DB now().
+ * Rotate the authentication id on login, retiring only the previous signed
+ * browser session. Never merge by IP/User-Agent: two real devices can share
+ * both. The transaction leaves the previous session intact if creation fails.
  */
 export async function createSession(args: {
   tenantId: string | null;
@@ -41,16 +44,28 @@ export async function createSession(args: {
   subjectId: string;
   userAgent: string | null;
   ip: string | null;
+  replace?: { id: string; tenantId: string | null };
 }): Promise<string> {
-  const [row] = await db
-    .insert(authSessionsTable)
-    .values({
-      tenantId:    args.tenantId,
-      subjectKind: args.subjectKind,
-      subjectId:   args.subjectId,
-      userAgent:   args.userAgent,
-      ip:          args.ip,
-    })
-    .returning({ id: authSessionsTable.id });
-  return row.id;
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(authSessionsTable)
+      .values({
+        tenantId: args.tenantId,
+        subjectKind: args.subjectKind,
+        subjectId: args.subjectId,
+        userAgent: args.userAgent,
+        ip: args.ip,
+      })
+      .returning({ id: authSessionsTable.id });
+    if (args.replace) {
+      await tx.update(authSessionsTable)
+        .set({ revokedAt: sql`now()` })
+        .where(and(
+          eq(authSessionsTable.id, args.replace.id),
+          tenantWhereWrite(authSessionsTable.tenantId, args.replace.tenantId),
+          isNull(authSessionsTable.revokedAt),
+        ));
+    }
+    return row.id;
+  });
 }

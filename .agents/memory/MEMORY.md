@@ -40,3 +40,4 @@
 - [Daily Book scope](daily-book-scope.md) — personal khata stays separate from sales, expenses, profit and EOD collections; automatic integration risks double-counting.
 - [Manual billing access](manual-billing-access.md) — one owner-readable 4-digit key, protected against guessing; per-bill approval; rotation revokes unused grants without duplicating committed retries.
 - [Optional LFS locking](git-lfs-lock-verification.md) — lock-verification auth can fail separately from Git; endpoint settings override generic ones; prefer local, reversible fixes.
+- [Device session lifecycle](session-lifecycle.md) — rotate login IDs, retire the replaced browser session, and serialize logout; never merge real devices using IP/User-Agent.

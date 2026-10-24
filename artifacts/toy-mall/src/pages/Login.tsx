@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth, type StaffRole } from "@/hooks/use-auth";
+import { endServerSession, waitForServerLogout } from "@/lib/server-logout";
 import { type Permissions } from "@/lib/permissions";
 import { Loader2, Delete, Mail, Lock, Eye, EyeOff, LogOut, Flame, MessageCircle, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
@@ -134,6 +135,7 @@ export default function Login() {
     setSubmittingEmail(true);
     setEmailError(null);
     try {
+      await waitForServerLogout();
       const r = await fetch(`${BASE_URL}/api/auth/login-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -162,7 +164,7 @@ export default function Login() {
      server-side session cookie so a subsequent refresh doesn't immediately
      re-enter the staff-selection step. */
   const exitEmail = () => {
-    fetch(`${BASE_URL}/api/auth/logout`, { method: "POST" }).catch(() => { /* ignore */ });
+    void endServerSession().catch(() => toast.error("Server sign-out could not be confirmed. Check your connection."));
     setEmailUser(null);
     setSelected(null);
     setStaff([]);
@@ -176,6 +178,7 @@ export default function Login() {
     if (checking || !selected || lockedUntil) return;
     setChecking(true);
     try {
+      await waitForServerLogout();
       const r = await fetch(`${BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

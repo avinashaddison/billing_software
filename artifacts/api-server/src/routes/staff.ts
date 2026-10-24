@@ -164,6 +164,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       subjectId:   member.id,
       userAgent,
       ip,
+      replace: req.sessionId ? { id: req.sessionId, tenantId: req.tenantId } : undefined,
     });
 
     /* ── Issue signed tenant_session cookie ──
@@ -202,8 +203,7 @@ router.post("/auth/logout", async (req, res): Promise<void> => {
       .where(and(
         eq(authSessionsTable.id, req.sessionId),
         sql`${authSessionsTable.revokedAt} is null`,
-      ))
-      .catch(() => undefined);
+      ));
   }
   res.clearCookie(TENANT_COOKIE_NAME, { path: "/" });
   res.json({ ok: true });

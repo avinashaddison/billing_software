@@ -10,7 +10,7 @@ export default defineConfig({
     setupFiles: ["./test/database-safety.ts"],
     // Bound initdb/SQL fixture contention on build machines.
     maxWorkers: 2,
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "test/**/*.test.ts"],
     environment: "node",
   },
 });

@@ -28,12 +28,8 @@ export function useOwnerIdle() {
     };
     const expire = () => {
       if (!sameOwner()) return;
-      // Start server revocation before clearing the local state. A failed
-      // request cannot extend the session: server idle expiry still applies.
-      void fetch(`${BASE}/api/auth/logout`, {
-        method: "POST",
-        keepalive: true,
-      }).catch(() => {});
+      // The shared logout action starts server revocation before clearing
+      // local state; server idle expiry still protects offline devices.
       useAuth.getState().logout();
       toast.info("Signed out after 10 minutes of inactivity.");
     };

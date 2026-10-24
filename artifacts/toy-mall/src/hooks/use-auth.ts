@@ -6,6 +6,8 @@ import {
 import { useStoreSettings } from "@/lib/store-info";
 import { queryClient } from "@/lib/query-client";
 import { ownerActivityKey } from "@/lib/owner-idle";
+import { endServerSession } from "@/lib/server-logout";
+import { toast } from "sonner";
 
 export type StaffRole = "owner" | "staff";
 
@@ -88,6 +90,9 @@ export const useAuth = create<AuthState>()(
       },
 
       logout: () => {
+        void endServerSession().catch(() => {
+          toast.error("Signed out locally, but server sign-out could not be confirmed. Check your connection.");
+        });
         // Idle logout must not silently discard unsynced sales. Quarantine
         // them by owner id; only that same owner restores them on next login.
         const current = get();

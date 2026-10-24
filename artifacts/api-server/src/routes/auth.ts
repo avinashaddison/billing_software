@@ -28,6 +28,7 @@ import { tenantWhere, tenantWhereWrite } from "../lib/tenant";
 import { recordAudit } from "../lib/audit";
 import { requireAdmin } from "../middlewares/auth";
 import { clientMeta, createSession } from "../lib/sessions";
+import { sessionExpired } from "../lib/session-expiry";
 import { checkRateLimit, recordFailure, clearRateLimit, LOGIN_LIMIT } from "../lib/rate-limit";
 import {
   TENANT_COOKIE_NAME,
@@ -175,6 +176,7 @@ router.post("/auth/login-email", async (req, res): Promise<void> => {
       subjectId:   user.id,
       userAgent,
       ip,
+      replace: req.sessionId ? { id: req.sessionId, tenantId: req.tenantId } : undefined,
     });
 
     res.cookie(
@@ -490,17 +492,24 @@ router.get("/auth/sessions", requireAdmin, async (req, res): Promise<void> => {
     const emailIds = sessions.filter((s) => s.subjectKind === "email").map((s) => s.subjectId);
 
     const staffRows = pinIds.length
-      ? await db.select({ id: staffProfilesTable.id, name: staffProfilesTable.name })
+      ? await db.select({ id: staffProfilesTable.id, name: staffProfilesTable.name, role: staffProfilesTable.role })
           .from(staffProfilesTable).where(inArray(staffProfilesTable.id, pinIds))
       : [];
     const userRows = emailIds.length
-      ? await db.select({ id: authUsersTable.id, email: authUsersTable.email })
+      ? await db.select({ id: authUsersTable.id, email: authUsersTable.email, role: authUsersTable.role })
           .from(authUsersTable).where(inArray(authUsersTable.id, emailIds))
       : [];
     const nameByStaff = new Map(staffRows.map((r) => [r.id, r.name]));
     const emailByUser = new Map(userRows.map((r) => [r.id, r.email]));
+    const staffRoles = new Map(staffRows.map((r) => [r.id, r.role]));
+    const userRoles = new Map(userRows.map((r) => [r.id, r.role]));
+    const now = Date.now();
+    const activeSessions = sessions.filter((s) => {
+      const role = s.subjectKind === "pin" ? staffRoles.get(s.subjectId) : userRoles.get(s.subjectId);
+      return role !== undefined && !sessionExpired(role, s, now);
+    });
 
-    res.json(sessions.map((s) => ({
+    res.json(activeSessions.map((s) => ({
       id:         s.id,
       kind:       s.subjectKind,
       who:        s.subjectKind === "pin"

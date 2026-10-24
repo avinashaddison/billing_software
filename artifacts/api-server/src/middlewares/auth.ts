@@ -18,6 +18,7 @@ import { db, authUsersTable, staffProfilesTable, authSessionsTable, staffPermiss
 import { clientMeta, createSession } from "../lib/sessions";
 import { logger } from "../lib/logger";
 import { ownerIdleExpired } from "../lib/owner-idle";
+import { sessionIdleTimeoutMs } from "../lib/session-expiry";
 import { TENANT_COOKIE_NAME, signTenantCookie, tenantCookieOptions } from "./tenant";
 
 /**
@@ -72,13 +73,6 @@ export const PUBLIC_PATHS: ReadonlySet<string> = new Set([
  *
  * Set SESSION_IDLE_DAYS to tune, or 0 to disable.
  */
-function sessionIdleTimeoutMs(): number {
-  const raw = process.env["SESSION_IDLE_DAYS"];
-  const days = raw === undefined || raw.trim() === "" ? 30 : Number(raw);
-  if (!Number.isFinite(days) || days <= 0) return 0;
-  return days * 24 * 60 * 60 * 1000;
-}
-
 async function validateOrUpgradeSession(
   req: Request,
   res: Response,
